@@ -132,6 +132,9 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 
 		// No header at all is allowed only for an open set; a token that is
 		// presented must always be the right one.
+		// Открытый набор: предъявленный заголовок сравнивается с пустым токеном
+		// и всегда получает 401 — клиент, который шлёт Authorization всегда,
+		// в открытый набор не пройдёт (нужен ключ либо молчание).
 		if r.Header.Get("Authorization") == "" {
 			if !allowAnonymous {
 				w.Header().Set("WWW-Authenticate", "Bearer")
