@@ -66,3 +66,11 @@ func TestHelpIsNotAnError(t *testing.T) {
 		t.Fatalf("прочая ошибка: код %d, ожидался 1", got)
 	}
 }
+
+// Конфиг по умолчанию — ~/.config/mcprig/servers.json, не lazy-mcp.
+func TestDefaultConfigPath(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/tmp/xdg-mcprig")
+	if got, want := defaultConfigPath(), "/tmp/xdg-mcprig/mcprig/servers.json"; got != want {
+		t.Fatalf("defaultConfigPath = %q, ожидалось %q", got, want)
+	}
+}

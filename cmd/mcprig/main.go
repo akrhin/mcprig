@@ -209,7 +209,7 @@ func run() error {
 
 func defaultConfigPath() string {
 	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "lazy-mcp", "servers.json")
+		return filepath.Join(dir, "mcprig", "servers.json")
 	}
 	return "servers.json"
 }
