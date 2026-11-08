@@ -761,13 +761,13 @@ func (m *Manager) apiEnvPut(req *request) error {
 
 func (m *Manager) apiEnvDelete(req *request) error {
 	name := req.args[0]
-	removed, err := m.sec.Delete(name, req.r.URL.Query().Get("store"))
+	removed, source, err := m.sec.DeleteFrom(name, req.r.URL.Query().Get("store"))
 	if err != nil {
 		return badRequest(err.Error())
 	}
 	restarted := m.restartSetsUsingEnv(name)
 	writeJSON(req.w, http.StatusOK, map[string]any{
-		"name": name, "removed": removed, "restarted": restarted,
+		"name": name, "removed": removed, "source": source, "restarted": restarted,
 	})
 	return nil
 }
