@@ -29,6 +29,7 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
+      - README.ru.md
       - LICENSE
       - deploy/mcprig-set@.service
       - deploy/mcprig.service
@@ -45,4 +46,8 @@ changelog:
       - "^test:"
 
 release:
+  # Черновик: артефакты загружены, публикация — вручную в интерфейсе Gitea.
   draft: true
+  gitea:
+    owner: sintez
+    name: mcprig

@@ -1,0 +1,86 @@
+name: release
+# Тег v* → проверки (vet, тесты с -race, govulncheck, gofmt) → goreleaser: четыре
+# платформы, checksums, черновик релиза в Gitea. Публикацию делает человек.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# По умолчанию — только чтение; право на релиз выдаётся одному job'у ниже.
+permissions:
+  contents: read
+
+concurrency:
+  # Один раннер: релизы сериализуются, новый пуш тега не отменяет идущий.
+  group: mcprig-release
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: '1.25'
+  GORELEASER_VERSION: v2.20.0
+  GITEA_URL: https://frosty-ad-gt.cloudpub.ru
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # Экшены прибиты к SHA: тег можно переписать, коммит — нет.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Формат
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "gofmt: файлы не отформатированы"; exit 1; }
+      - name: go vet
+        run: go vet ./...
+      # -p 1 обязателен: пакеты manager и e2e делят порты 9100–9199
+      - name: Тесты
+        run: go test ./... -race -count=1 -p 1
+      - name: Уязвимые зависимости
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          govulncheck ./...
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write # создание релиза и загрузка артефактов
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # goreleaser не собирается нашим Go (нужен тулчейн новее) — берём готовый
+      # бинарник, но только после сверки sha256 по их же checksums.txt.
+      - name: Установить goreleaser
+        run: |
+          set -euo pipefail
+          base="https://github.com/goreleaser/goreleaser/releases/download/${GORELEASER_VERSION}"
+          file="goreleaser_Linux_x86_64.tar.gz"
+          for i in 1 2 3; do
+            if curl -sfL --retry 3 -o "$file" "$base/$file" && curl -sfL --retry 3 -o checksums.txt "$base/checksums.txt"; then
+              break
+            fi
+            echo "скачивание goreleaser: попытка $i не удалась, повтор через 10с"; sleep 10
+          done
+          grep " $file\$" checksums.txt | sha256sum -c -
+          tar -xzf "$file" goreleaser
+          ./goreleaser --version
+      - name: Релиз
+        env:
+          # Встроенный токен задачи с permissions.contents=write. Если инстанс его
+          # не выдаёт — заведите секрет RELEASE_TOKEN (PAT со scope write:repository).
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ gitea.ref_name }}
+        run: ./goreleaser release --clean
