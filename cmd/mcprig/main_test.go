@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"slices"
 	"testing"
 )
@@ -39,5 +41,28 @@ func TestParseArgs(t *testing.T) {
 		if !slices.Equal(rest, c.rest) {
 			t.Errorf("%s: rest = %q, want %q", c.name, rest, c.rest)
 		}
+	}
+}
+
+// -h/-help — не ошибка: usage напечатан, код возврата 0. Настоящая ошибка
+// разбора флагов по-прежнему код 2.
+func TestHelpIsNotAnError(t *testing.T) {
+	for _, args := range [][]string{{"-h"}, {"--help"}, {"serve", "-h"}} {
+		_, _, err := parseArgs(args)
+		if !errors.Is(err, flag.ErrHelp) {
+			t.Fatalf("%v: err = %v, ожидался flag.ErrHelp", args, err)
+		}
+		if got := exitCode(err); got != 0 {
+			t.Fatalf("%v: код %d, ожидался 0", args, got)
+		}
+	}
+	if err := runInit([]string{"-h"}); !errors.Is(err, flag.ErrHelp) {
+		t.Fatalf("init -h: err = %v, ожидался flag.ErrHelp", err)
+	}
+	if got := exitCode(&usageError{"плохой флаг"}); got != 2 {
+		t.Fatalf("usageError: код %d, ожидался 2", got)
+	}
+	if got := exitCode(errors.New("сбой")); got != 1 {
+		t.Fatalf("прочая ошибка: код %d, ожидался 1", got)
 	}
 }

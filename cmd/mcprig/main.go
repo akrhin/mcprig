@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -30,12 +31,24 @@ var version = "dev"
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "mcprig:", err)
-		if _, ok := err.(*usageError); ok {
-			os.Exit(2)
+		// -h: flag уже напечатал usage, это не ошибка.
+		if errors.Is(err, flag.ErrHelp) {
+			return
 		}
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr, "mcprig:", err)
+		os.Exit(exitCode(err))
 	}
+}
+
+// exitCode: 0 — help, 2 — ошибка командной строки, 1 — всё прочее.
+func exitCode(err error) int {
+	if errors.Is(err, flag.ErrHelp) {
+		return 0
+	}
+	if _, ok := err.(*usageError); ok {
+		return 2
+	}
+	return 1
 }
 
 // usageError — ошибка командной строки: код возврата 2, как у пакета flag.
@@ -58,6 +71,21 @@ func newStdioFlags() (fs *flag.FlagSet, cfgPath *string) {
 	return fs, cfgPath
 }
 
+// parseFlags разбирает флаги подкоманды. -h/-help — ErrHelp как есть:
+// usage уже напечатан flag, main выйдет с кодом 0.
+func parseFlags(fs *flag.FlagSet, args []string) error {
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return flag.ErrHelp
+		}
+		return &usageError{err.Error()}
+	}
+	if fs.NArg() > 0 {
+		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+	}
+	return nil
+}
+
 // parseArgs отделяет подкоманду от её флагов и отбивает лишние позиционные
 // аргументы. Неизвестная подкоманда — ошибка, а не молчаливый serve: иначе
 // опечатка поднимает прокси с конфигом по умолчанию.
@@ -68,31 +96,22 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 	// Флаги без подкоманды — это serve: так исторически запускают прокси.
 	if strings.HasPrefix(args[0], "-") {
 		fs, _, _, _ := newServeFlags()
-		if err := fs.Parse(args); err != nil {
-			return "", nil, &usageError{err.Error()}
-		}
-		if fs.NArg() > 0 {
-			return "", nil, &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		if err := parseFlags(fs, args); err != nil {
+			return "", nil, err
 		}
 		return "serve", args, nil
 	}
 	switch args[0] {
 	case "serve":
 		fs, _, _, _ := newServeFlags()
-		if err := fs.Parse(args[1:]); err != nil {
-			return "", nil, &usageError{err.Error()}
-		}
-		if fs.NArg() > 0 {
-			return "", nil, &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
 		}
 		return "serve", args[1:], nil
 	case "stdio":
 		fs, _ := newStdioFlags()
-		if err := fs.Parse(args[1:]); err != nil {
-			return "", nil, &usageError{err.Error()}
-		}
-		if fs.NArg() > 0 {
-			return "", nil, &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
 		}
 		return "stdio", args[1:], nil
 	case "init":
@@ -125,11 +144,8 @@ func run() error {
 	args := rest
 
 	fs, cfgPath, showVersion, addr := newServeFlags()
-	if err := fs.Parse(args); err != nil {
-		return &usageError{err.Error()}
-	}
-	if fs.NArg() > 0 {
-		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+	if err := parseFlags(fs, args); err != nil {
+		return err
 	}
 
 	if *showVersion {
@@ -171,6 +187,7 @@ func run() error {
 		listen = net.JoinHostPort(host, fmt.Sprint(port))
 	}
 
+	// ReadTimeout не ставим: SSE-поток набора нельзя рвать по времени.
 	srv := &http.Server{Addr: listen, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -201,11 +218,8 @@ func defaultConfigPath() string {
 // process. No listener, no key — the transport is the boundary.
 func runStdio(args []string) error {
 	fs, cfgPath := newStdioFlags()
-	if err := fs.Parse(args); err != nil {
-		return &usageError{err.Error()}
-	}
-	if fs.NArg() > 0 {
-		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+	if err := parseFlags(fs, args); err != nil {
+		return err
 	}
 
 	cfg, err := config.Load(*cfgPath)

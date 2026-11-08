@@ -32,11 +32,8 @@ func newInitFlags() (*flag.FlagSet, *initConfig) {
 
 func runInit(args []string) error {
 	fs, cfg := newInitFlags()
-	if err := fs.Parse(args); err != nil {
-		return &usageError{err.Error()}
-	}
-	if fs.NArg() > 0 {
-		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+	if err := parseFlags(fs, args); err != nil {
+		return err
 	}
 	client := strings.ToLower(cfg.Client)
 	switch client {
