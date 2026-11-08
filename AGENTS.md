@@ -17,11 +17,13 @@ go vet ./...                      # статика
 go test ./...                     # тесты
 go test ./e2e -run TestLifecycle -v   # панель + набор + stdio-даунстрим, без подготовки
 bash scripts/contract-e2e.sh      # контракт против BASE (по умолчанию 127.0.0.1:9091)
+bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
 ```
 
 Go-тулчейн: локально 1.24.4, модуль требует 1.25.0 — `GOTOOLCHAIN=auto` скачает сам при первой сборке.
 
 ## Ссылки
 
+- Стенд на настоящих серверах: `docs/dev-real-servers.md` (serena, socraticode, xerj).
 - Эталон: `/home/sintez/git/lazy-mcp@5a963c5` (заморожен) и распакованный менеджер `/tmp/opencode/mm/mcp-manager`.
 - MCP Go SDK: `github.com/modelcontextprotocol/go-sdk` v1.8.0, протокол по умолчанию `2026-07-28`.
