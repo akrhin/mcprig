@@ -61,7 +61,7 @@ Input is one of two forms:
 | input | output |
 | --- | --- |
 | `{"server": "alpha"}` | array of commands |
-| `{"servers": ["alpha", "beta"]}` | object keyed by server name, each value an array |
+| `{"servers": ["alpha", "beta"]}` | object keyed by server name, each value an array; a failed server's value is `{"error": "…"}` |
 | both | `Error: укажи server или servers, не оба` |
 | neither | `Error: нужен параметр server или servers` |
 
@@ -79,6 +79,9 @@ Input is one of two forms:
 `name` is the canonical field; `command` repeats it for clients written against
 the older shape. `description` is present when the server provides one.
 Pagination is followed to the end, capped at 20 pages.
+
+One failed server does not hide the others: its value is `{"error": "…"}` and
+the tool returns an error only when every requested server failed.
 
 ## describe_commands
 
