@@ -622,14 +622,3 @@ func PublicSet(set *Set) PublicSetEntry {
 	}
 	return out
 }
-
-// PublicSets is PublicSet over the whole list.
-func (s *Store) PublicSets() []PublicSetEntry {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	out := make([]PublicSetEntry, 0, len(s.data.Sets))
-	for _, set := range s.data.Sets {
-		out = append(out, PublicSet(set))
-	}
-	return out
-}
