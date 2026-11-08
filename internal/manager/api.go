@@ -458,7 +458,6 @@ func (m *Manager) buildRoutes() []route {
 		mk(`^/api/sets/`+setPattern+`/keys/([A-Za-z0-9_-]{1,32})$`, map[string]handlerFunc{http.MethodDelete: m.apiKeyRevoke}),
 		mk(`^/api/sets/`+setPattern+`/servers$`, map[string]handlerFunc{http.MethodGet: m.apiSetServers}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiServerLogs}),
-		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/restart$`, map[string]handlerFunc{http.MethodPost: m.apiServerRestart}),
 		mk(`^/api/sets/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiSetLogs}),
 		mk(`^/api/sets/`+setPattern+`/(start|stop|restart)$`, map[string]handlerFunc{http.MethodPost: m.apiSetAction}),
 		mk(`^/api/sets$`, map[string]handlerFunc{
@@ -1168,22 +1167,6 @@ func (m *Manager) apiServerLogs(req *request) error {
 		"server": name,
 		"logs":   m.rt.ServerLogs(id, name, linesParam(req.r, 200)),
 	})
-	return nil
-}
-
-func (m *Manager) apiServerRestart(req *request) error {
-	id, name := req.args[0], req.args[1]
-	set := m.store.Set(id)
-	if set == nil {
-		return notFound("нет набора " + id)
-	}
-	if !containsName(set.Servers, name) {
-		return notFound("нет сервера " + name + " в наборе " + id)
-	}
-	if _, err := m.RestartSet(req.r.Context(), set); err != nil {
-		return err
-	}
-	writeJSON(req.w, http.StatusOK, map[string]any{"restarted": true, "scope": "set"})
 	return nil
 }
 

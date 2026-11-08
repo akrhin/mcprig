@@ -479,3 +479,13 @@ func TestUpdateSetRejectsBusyPort(t *testing.T) {
 	}
 }
 
+// Перезапуск сервера внутри набора не существует: остаётся наборный.
+func TestServerRestartRouteRemoved(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+
+	status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/servers/a/restart", nil), http.StatusNotFound)
+	status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/restart", nil), http.StatusOK)
+}
+
