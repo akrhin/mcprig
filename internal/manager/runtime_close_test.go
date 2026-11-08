@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/sintez/mcprig/internal/registry"
 )
 
 // TestCloseStopsStartingSet: панель гаснет, пока набор ещё стартует — процесс
@@ -71,22 +73,37 @@ func TestLoopbackAddr(t *testing.T) {
 // «набор поднялся».
 func TestStartRefusesBusyPort(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
-	e.addServer(t, "fake")
-	id := e.addSet(t, "busy", "fake")
-	set := e.m.store.Set(id)
+	port := freePort(t)
+	set := &registry.Set{ID: "busy", Name: "busy", Port: port, Open: true}
 
-	ln, err := net.Listen("tcp", net.JoinHostPort("0.0.0.0", strconv.Itoa(set.Port)))
+	ln, err := net.Listen("tcp", net.JoinHostPort("0.0.0.0", strconv.Itoa(port)))
 	if err != nil {
-		t.Fatalf("занять порт %d: %v", set.Port, err)
+		t.Fatalf("занять порт %d: %v", port, err)
 	}
 	defer ln.Close()
 
-	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err == nil {
+	if _, err := e.m.rt.Start(context.Background(), set, nil); err == nil {
 		t.Fatal("старт на занятом порту объявлен успешным")
 	} else if !strings.Contains(err.Error(), "занят") {
 		t.Fatalf("неожиданная ошибка: %v", err)
 	}
-	if p := e.m.rt.proc(id); p != nil {
+	if p := e.m.rt.proc(set.ID); p != nil {
 		t.Fatalf("на занятом порту всё же запущен процесс %d", p.pid)
 	}
+}
+
+// freePort ищет свободный порт диапазона наборов: 9100 может занимать живой
+// стенд, и тест не должен от этого падать.
+func freePort(t *testing.T) int {
+	t.Helper()
+	for port := 9100; port <= 9199; port++ {
+		ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+		if err != nil {
+			continue
+		}
+		ln.Close()
+		return port
+	}
+	t.Fatal("нет свободного порта в диапазоне 9100–9199")
+	return 0
 }

@@ -31,7 +31,7 @@ func TestCleanExitDoesNotRestart(t *testing.T) {
 	rt.procs["clean"] = p
 	rt.mu.Unlock()
 
-	rt.wait("clean", &registry.Set{ID: "clean", Port: 9100}, nil, p, logFile)
+	rt.wait("clean", &registry.Set{ID: "clean", Port: freePort(t)}, nil, p, logFile)
 
 	rt.mu.Lock()
 	restarts := p.restarts
