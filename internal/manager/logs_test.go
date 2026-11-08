@@ -3,6 +3,8 @@ package manager
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -37,5 +39,34 @@ func TestSetLogsTailFromFile(t *testing.T) {
 			t.Fatalf("в логах нет хвоста файла: %s", w.Body.String())
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// TestLogWriterRotatesBySize: долгоживущий набор не растёт без предела —
+// .log переезжает в .log.1 при 5 МиБ.
+func TestLogWriterRotatesBySize(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lazy-mcp.log")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := &logWriter{file: f, path: path, ring: &ring{}}
+	chunk := []byte(strings.Repeat("x", 1<<20) + "\n")
+	for i := 0; i < 6; i++ {
+		if _, err := w.Write(chunk); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.file.Close()
+
+	if _, err := os.Stat(path + ".1"); err != nil {
+		t.Fatalf("нет .log.1 после 6 МиБ: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() > maxLogBytes {
+		t.Fatalf("текущий лог %d байт, больше %d", info.Size(), maxLogBytes)
 	}
 }

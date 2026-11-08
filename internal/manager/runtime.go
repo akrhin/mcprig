@@ -162,13 +162,16 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	}
 
 	logPath := LogPath(rt.dataDir, set.ID)
-	rotateLog(logPath)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return RuntimeStatus{}, fmt.Errorf("лог набора %s: %w", set.ID, err)
 	}
 	ring := rt.ring(set.ID)
-	writer := &logWriter{file: logFile, ring: ring}
+	size := int64(0)
+	if info, err := logFile.Stat(); err == nil {
+		size = info.Size()
+	}
+	writer := &logWriter{file: logFile, path: logPath, size: size, ring: ring}
 
 	cmd := exec.Command(rt.cliPath, "serve", "--config", cfgPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -562,14 +565,6 @@ func waitPort(host string, port int, budget time.Duration, done <-chan struct{})
 	}
 }
 
-func rotateLog(path string) {
-	info, err := os.Stat(path)
-	if err != nil || info.Size() < maxLogBytes {
-		return
-	}
-	_ = os.Rename(path, path+".1")
-}
-
 // ring — последние 2000 строк вывода набора для GET /api/sets/:id/logs.
 type ring struct {
 	mu      sync.Mutex
@@ -614,23 +609,43 @@ func (r *ring) tail(n int) []string {
 }
 
 // logWriter пишет и в файл, и в кольцо: два потока ребёнка зовут Write
-// параллельно.
+// параллельно. Файл ротируется по размеру, иначе долгоживущий набор растёт без
+// предела.
 type logWriter struct {
 	mu   sync.Mutex
 	file *os.File
+	path string
+	size int64
 	ring *ring
 }
 
 func (w *logWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.size+int64(len(p)) > maxLogBytes {
+		w.rotate()
+	}
 	if w.file != nil {
 		if _, err := w.file.Write(p); err != nil {
 			return 0, err
 		}
+		w.size += int64(len(p))
 	}
 	w.ring.add(string(p))
 	return len(p), nil
+}
+
+// rotate заменяет .log на свежий файл, оставляя один .log.1.
+func (w *logWriter) rotate() {
+	if w.file != nil {
+		w.file.Close()
+		w.file = nil
+	}
+	_ = os.Rename(w.path, w.path+".1")
+	if f, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
+		w.file = f
+	}
+	w.size = 0
 }
 
 var _ io.Writer = (*logWriter)(nil)
