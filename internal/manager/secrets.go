@@ -368,31 +368,60 @@ func (s *Secrets) Set(name, value, store string) (string, error) {
 }
 
 func (s *Secrets) Delete(name, store string) (bool, error) {
+	removed, _, err := s.DeleteFrom(name, store)
+	return removed, err
+}
+
+// DeleteFrom — то же, что Delete, но говорит, откуда значение ушло.
+// Пустой store значит «удалить секрет отовсюду»: сначала OpenBao, затем
+// env.json. Копию в env.json убираем и после успешного OpenBao: иначе Get
+// снова находит секрет в файле и «удалённая» переменная возвращается.
+func (s *Secrets) DeleteFrom(name, store string) (bool, string, error) {
 	defer s.cacheDrop(name)
 	if store == "" {
-		if s.bao != nil {
-			store = sourceOpenBao
-		} else {
-			store = sourceFile
-		}
+		return s.deleteDefault(name)
 	}
 	switch store {
 	case sourceOpenBao:
 		if s.bao == nil {
-			return false, errors.New("OpenBao не настроен: нужны BAO_ADDR и BAO_TOKEN")
+			return false, "", errors.New("OpenBao не настроен: нужны BAO_ADDR и BAO_TOKEN")
 		}
 		removed, err := s.bao.delete(name)
 		if err != nil {
 			s.setRemoteErr(err)
-			return false, err
+			return false, "", err
 		}
 		s.setRemoteErr(nil)
-		return removed, nil
+		return removed, sourceOpenBao, nil
 	case sourceFile:
-		return s.local.delete(name)
+		removed, err := s.local.delete(name)
+		return removed, sourceFile, err
 	default:
-		return false, errors.New("store: ожидалось local или openbao")
+		return false, "", errors.New("store: ожидалось local или openbao")
 	}
+}
+
+func (s *Secrets) deleteDefault(name string) (bool, string, error) {
+	source := ""
+	if s.bao != nil {
+		removed, err := s.bao.delete(name)
+		if err != nil {
+			s.setRemoteErr(err)
+			return false, "", err
+		}
+		s.setRemoteErr(nil)
+		if removed {
+			source = sourceOpenBao
+		}
+	}
+	fileRemoved, err := s.local.delete(name)
+	if err != nil {
+		return source != "", source, err
+	}
+	if source == "" && fileRemoved {
+		source = sourceFile
+	}
+	return source != "", source, nil
 }
 
 func truncate(s string, n int) string {
