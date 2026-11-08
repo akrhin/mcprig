@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -185,7 +186,9 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 
 	cmd := exec.Command(rt.cliPath, "serve", "--config", cfgPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Env = append(childEnv(setServers(set, servers), rt.sec), "MCPRIG_SET="+set.ID, "MCPRIG_DATA_DIR="+rt.dataDir)
+	// Свой каталог состояния у каждого набора: общий oauth.json затирается
+	// снимком другого процесса.
+	cmd.Env = rt.setEnv(set, setServers(set, servers))
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 	if err := cmd.Start(); err != nil {
@@ -237,6 +240,7 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 	p.exitCode = code
 	stopping := p.stopping
 	closed := rt.closed
+	restarts := p.restarts // снимок: ручной Start может сбросить поле под замком
 	rt.mu.Unlock()
 	close(p.done)
 
@@ -250,13 +254,13 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 	if err != nil {
 		rt.log.Warn("набор завершился", "set", id, "code", code, "err", err)
 	}
-	if p.restarts >= maxRestarts {
+	if restarts >= maxRestarts {
 		rt.mu.Lock()
-		p.err = fmt.Sprintf("набор падал %d раз, последний код %d", p.restarts+1, code)
+		p.err = fmt.Sprintf("набор падал %d раз, последний код %d", restarts+1, code)
 		rt.mu.Unlock()
 		return
 	}
-	delay := time.Second << p.restarts
+	delay := time.Second << restarts
 	if delay > maxBackoff {
 		delay = maxBackoff
 	}
@@ -532,6 +536,13 @@ func childEnv(servers []registry.Server, sec *Secrets) []string {
 		out = append(out, name+"="+values[name])
 	}
 	return out
+}
+
+// setEnv — окружение процесса набора: переменные серверов, свой ID и свой
+// каталог состояния (лог и servers.json уже лежат в нём).
+func (rt *Runtime) setEnv(set *registry.Set, servers []registry.Server) []string {
+	return append(childEnv(servers, rt.sec), "MCPRIG_SET="+set.ID,
+		"MCPRIG_DATA_DIR="+filepath.Join(rt.dataDir, "sets", set.ID))
 }
 
 // managerEnv — окружение stdio-сервера для probe и browse: whitelist плюс

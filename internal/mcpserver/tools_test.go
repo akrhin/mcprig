@@ -3,11 +3,13 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/sintez/mcprig/internal/config"
@@ -43,6 +45,68 @@ func TestInvokeCommandTimeout(t *testing.T) {
 	}
 	if text := resultText(t, res); !strings.Contains(text, "таймаут вызова 20 мс") {
 		t.Fatalf("want a timeout naming 20 мс, got %q", text)
+	}
+}
+
+// silentTransport takes the connection and never answers — a hung downstream.
+type silentTransport struct{}
+
+type silentConn struct{ done chan struct{} }
+
+func (silentTransport) Connect(context.Context) (mcp.Connection, error) {
+	return &silentConn{done: make(chan struct{})}, nil
+}
+
+func (c *silentConn) Read(ctx context.Context) (jsonrpc.Message, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-c.done:
+		return nil, io.EOF
+	}
+}
+
+func (c *silentConn) Write(context.Context, jsonrpc.Message) error { return nil }
+
+func (c *silentConn) Close() error {
+	select {
+	case <-c.done:
+	default:
+		close(c.done)
+	}
+	return nil
+}
+
+func (c *silentConn) SessionID() string { return "" }
+
+// requestTimeout must bound the overview tools too: a downstream that accepts
+// the connection and stays silent makes list_commands return, not hang.
+func TestListCommandsTimeout(t *testing.T) {
+	m := New(&config.Config{
+		RequestTimeout: 50,
+		Servers:        []*config.Server{stdio("dead")},
+	}, "test", nil)
+	m.dial = func(ctx context.Context, _ *config.Server) (*mcp.ClientSession, error) {
+		return mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil).
+			Connect(ctx, silentTransport{}, nil)
+	}
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	res, err := cs.CallTool(ctx, &mcp.CallToolParams{
+		Name: "list_commands", Arguments: map[string]any{"server": "dead"},
+	})
+	if err != nil {
+		t.Fatalf("list_commands: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("молчащий downstream должен истечь по таймауту")
+	}
+	if d := time.Since(start); d >= 2*time.Second {
+		t.Fatalf("list_commands ждал %s при requestTimeout 50 мс", d)
 	}
 }
 

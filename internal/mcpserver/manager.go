@@ -317,6 +317,8 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 }
 
 func (m *Manager) commandsOf(ctx context.Context, name string) ([]commandInfo, error) {
+	ctx, cancel := m.callCtx(ctx)
+	defer cancel()
 	e := m.find(name)
 	if e == nil {
 		return nil, fmt.Errorf("неизвестный сервер %q", name)
@@ -360,6 +362,8 @@ type describeOut struct {
 }
 
 func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	ctx, cancel := m.callCtx(ctx)
+	defer cancel()
 	var in describeCommandsInput
 	if err := strictArgs(req, &in, "", "server", "command_names"); err != nil {
 		return errResult(err)
@@ -443,15 +447,11 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		args = in.Parameters
 	}
 
-	callCtx := ctx
-	if m.cfg.RequestTimeout > 0 {
-		var cancel context.CancelFunc
-		callCtx, cancel = context.WithTimeout(ctx, time.Duration(m.cfg.RequestTimeout)*time.Millisecond)
-		defer cancel()
-	}
+	callCtx, cancel := m.callCtx(ctx)
+	defer cancel()
 	var res *mcp.CallToolResult
 	start := time.Now()
-	err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
+	err := m.withSession(callCtx, e, func(sess *mcp.ClientSession) error {
 		r, err := sess.CallTool(callCtx, &mcp.CallToolParams{Name: in.CommandName, Arguments: args})
 		res = r
 		return err
@@ -516,6 +516,15 @@ func (m *Manager) dialFor(srv *config.Server) func(context.Context) (*mcp.Client
 		defer stop()
 		return m.dial(ctx, srv)
 	}
+}
+
+// callCtx bounds one downstream operation by requestTimeout: a server that
+// accepts the connection and stays silent must not hold the caller forever.
+func (m *Manager) callCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	if m.cfg.RequestTimeout > 0 {
+		return context.WithTimeout(ctx, time.Duration(m.cfg.RequestTimeout)*time.Millisecond)
+	}
+	return ctx, func() {}
 }
 
 // withSession runs fn on the server's session. A dead cached session

@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -41,6 +42,11 @@ func main() {
 		host = "127.0.0.1"
 	}
 	addr := fmt.Sprintf("%s:%d", host, cfg.Transport.Port)
+	// Менеджерские тесты проверяют, какой каталог состояния достался набору.
+	if err := os.WriteFile(filepath.Join(filepath.Dir(*path), "child-env"),
+		[]byte(os.Getenv("MCPRIG_DATA_DIR")), 0o600); err != nil {
+		log.Fatalf("fakeset: %v", err)
+	}
 	log.Printf("fakeset слушает %s", addr)
 	if err := http.ListenAndServe(addr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "ok")
