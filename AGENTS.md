@@ -14,7 +14,8 @@
 ```bash
 go build ./...                    # сборка
 go vet ./...                      # статика
-go test ./...                     # тесты
+go test ./... -race -count=1 -p 1  # тесты; -p 1 обязателен: пакеты manager и e2e
+                                  # поднимают наборы в общем диапазоне 9100–9199
 go test ./e2e -run TestLifecycle -v   # панель + набор + stdio-даунстрим, без подготовки
 bash scripts/contract-e2e.sh      # контракт против BASE (по умолчанию 127.0.0.1:9091)
 bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
