@@ -1088,6 +1088,11 @@ func (m *Manager) apiSetDelete(req *request) error {
 	if err := m.store.DeleteSet(id); err != nil {
 		return err
 	}
+	// Каталог набора хранит servers.json с bearer-ключом: удалённый набор не
+	// должен оставлять его на диске.
+	if err := os.RemoveAll(filepath.Join(m.rt.dataDir, "sets", id)); err != nil {
+		m.log.Warn("каталог удалённого набора не убран", "set", id, "err", err)
+	}
 	writeJSON(req.w, http.StatusOK, map[string]any{"ok": true})
 	return nil
 }

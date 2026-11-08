@@ -489,3 +489,20 @@ func TestServerRestartRouteRemoved(t *testing.T) {
 	status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/restart", nil), http.StatusOK)
 }
 
+// Удаление набора убирает каталог с servers.json (в нём bearer-ключ).
+func TestDeleteSetRemovesDir(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+	status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/start", nil), http.StatusOK)
+
+	dir := filepath.Join(e.dir, "sets", id)
+	if _, err := os.Stat(filepath.Join(dir, "servers.json")); err != nil {
+		t.Fatalf("servers.json не создан: %v", err)
+	}
+	status(t, e.do(t, http.MethodDelete, "/api/sets/"+id, nil), http.StatusOK)
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("каталог удалённого набора остался: %v", err)
+	}
+}
+
