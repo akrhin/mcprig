@@ -31,6 +31,7 @@ type resp struct {
 	Status int
 	Body   []byte
 	JSON   map[string]any
+	Any    any
 }
 
 func TestMain(m *testing.M) {
@@ -72,6 +73,10 @@ func call(t *testing.T, method, path string, payload any) resp {
 	var obj map[string]any
 	if json.Unmarshal(raw, &obj) == nil {
 		out.JSON = obj
+	}
+	var anyVal any
+	if json.Unmarshal(raw, &anyVal) == nil {
+		out.Any = anyVal
 	}
 	return out
 }
@@ -126,10 +131,26 @@ func TestStateShapeAndMaskedTokens(t *testing.T) {
 	check(t, false, !tokenRE.Match(r.Body), "GET /api/state leaks a raw set token")
 }
 
+// GET /api/sets answers a bare array, so the leak is only visible once a set
+// actually owns a key.
 func TestRawSetListLeaksTokens(t *testing.T) {
-	r := call(t, "GET", "/api/sets", nil)
+	srv := uniq("t-key-srv")
+	r := call(t, "POST", "/api/servers", map[string]any{
+		"name": srv, "transport": "stdio", "command": []string{"echo"},
+	})
+	expect(t, r, 201, "POST /api/servers "+srv)
+	t.Cleanup(func() { call(t, "DELETE", "/api/servers/"+srv, nil) })
+
+	set := uniq("t-key-set")
+	r = call(t, "POST", "/api/sets", map[string]any{"name": set, "servers": []string{srv}})
+	expect(t, r, 201, "POST /api/sets "+set)
+	if id, _ := r.JSON["id"].(string); id != "" {
+		t.Cleanup(func() { call(t, "DELETE", "/api/sets/"+id, nil) })
+	}
+
+	r = call(t, "GET", "/api/sets", nil)
 	expect(t, r, 200, "GET /api/sets")
-	check(t, true, !tokenRE.Match(r.Body), "GET /api/sets returns raw token material")
+	check(t, true, !tokenRE.Match(r.Body), "GET /api/sets returns raw token material: %.300s", r.Body)
 }
 
 func TestUnknownRouteIs404(t *testing.T) {
@@ -139,20 +160,27 @@ func TestUnknownRouteIs404(t *testing.T) {
 
 func TestValidateServer(t *testing.T) {
 	cases := []struct {
-		name    string
-		payload map[string]any
+		name        string
+		payload     map[string]any
+		knownDefect bool
 	}{
-		{"uppercase name", map[string]any{"name": "UPPER", "transport": "stdio", "command": []string{"echo"}}},
-		{"env value not a string", map[string]any{"name": uniq("t-env"), "transport": "stdio", "command": []string{"echo"}, "env": map[string]any{"A": 1}}},
-		{"stdio without command", map[string]any{"name": uniq("t-nocmd"), "transport": "stdio"}},
-		{"http without url", map[string]any{"name": uniq("t-nourl"), "transport": "http"}},
+		{"uppercase name", map[string]any{"name": "UPPER", "transport": "stdio", "command": []string{"echo"}}, false},
+		// The reference validates only that env is an object, not its value
+		// types (domain/validation.ts:20-22): a non-string poisons /api/env.
+		{"env value not a string", map[string]any{"name": uniq("t-env"), "transport": "stdio", "command": []string{"echo"}, "env": map[string]any{"A": 1}}, true},
+		{"stdio without command", map[string]any{"name": uniq("t-nocmd"), "transport": "stdio"}, false},
+		{"http without url", map[string]any{"name": uniq("t-nourl"), "transport": "http"}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			r := call(t, "POST", "/api/servers", c.payload)
-			if r.Status != 400 {
-				t.Errorf("POST /api/servers (%s): want 400, got %d: %.200s", c.name, r.Status, r.Body)
+			if r.Status == 201 {
+				if name, _ := r.JSON["name"].(string); name != "" {
+					t.Cleanup(func() { call(t, "DELETE", "/api/servers/"+name, nil) })
+				}
 			}
+			check(t, c.knownDefect, r.Status == 400,
+				"POST /api/servers (%s): want 400, got %d: %.200s", c.name, r.Status, r.Body)
 		})
 	}
 }
@@ -228,9 +256,9 @@ func TestEnvListingHasNoValues(t *testing.T) {
 func TestSetLogsShape(t *testing.T) {
 	r := call(t, "GET", "/api/sets", nil)
 	expect(t, r, 200, "GET /api/sets")
-	sets, _ := r.JSON["sets"].([]any)
+	sets, _ := r.Any.([]any)
 	if len(sets) == 0 {
-		t.Skip("no sets on the reference yet")
+		t.Fatalf("no sets on the reference: %.200s", r.Body)
 	}
 	first, _ := sets[0].(map[string]any)
 	id, _ := first["id"].(string)
@@ -246,9 +274,10 @@ func TestSetLogsShape(t *testing.T) {
 
 func TestSetServersHealthShape(t *testing.T) {
 	r := call(t, "GET", "/api/sets", nil)
-	sets, _ := r.JSON["sets"].([]any)
+	expect(t, r, 200, "GET /api/sets")
+	sets, _ := r.Any.([]any)
 	if len(sets) == 0 {
-		t.Skip("no sets on the reference yet")
+		t.Fatalf("no sets on the reference: %.200s", r.Body)
 	}
 	first, _ := sets[0].(map[string]any)
 	id, _ := first["id"].(string)
