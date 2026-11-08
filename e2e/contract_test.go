@@ -122,8 +122,12 @@ func uniq(prefix string) string {
 func TestContractHealthzOpen(t *testing.T) {
 	r := call(t, "GET", "/healthz", nil)
 	expect(t, r, 200, "GET /healthz")
-	if got := strings.TrimSpace(string(r.Body)); got != "ok" {
-		t.Errorf("GET /healthz body: want ok, got %q", got)
+	body := strings.TrimSpace(string(r.Body))
+	if body == "ok" {
+		return // эталон TS отдаёт голый ok
+	}
+	if status, _ := r.JSON["status"].(string); status != "ok" {
+		t.Errorf("GET /healthz body: want 200 ok or {\"status\":\"ok\"}, got %.200q", body)
 	}
 }
 

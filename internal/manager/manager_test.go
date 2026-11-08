@@ -43,6 +43,11 @@ type env struct {
 func newEnv(t *testing.T, auth AuthOptions) *env {
 	t.Helper()
 	dir := t.TempDir()
+	// httptest.NewRequest ставит Host example.com: пустой список теперь значит
+	// только loopback, поэтому тестовому менеджеру нужен явный хост.
+	if auth.AllowedHosts == nil {
+		auth.AllowedHosts = []string{"example.com"}
+	}
 	m, err := New(Options{
 		DataDir: dir,
 		Version: "test",
@@ -137,7 +142,11 @@ func TestHealthzBeforeAuth(t *testing.T) {
 
 	w := e.do(t, http.MethodGet, "/healthz", nil)
 	status(t, w, http.StatusOK)
-	if strings.TrimSpace(w.Body.String()) != "ok" {
+	var healthz struct {
+		Status string `json:"status"`
+		Sets   int    `json:"sets"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &healthz); err != nil || healthz.Status != "ok" || healthz.Sets != 0 {
 		t.Fatalf("healthz = %q", w.Body.String())
 	}
 
@@ -358,7 +367,7 @@ func TestSetIgnoresClientIDAndToken(t *testing.T) {
 func TestRegistrySurvivesRestart(t *testing.T) {
 	dir := t.TempDir()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m1, err := New(Options{DataDir: dir, Auth: AuthOptions{Off: true}, CLIPath: fakeBin, Log: log})
+	m1, err := New(Options{DataDir: dir, Auth: AuthOptions{Off: true, AllowedHosts: []string{"example.com"}}, CLIPath: fakeBin, Log: log})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -370,7 +379,7 @@ func TestRegistrySurvivesRestart(t *testing.T) {
 	status(t, w, http.StatusCreated)
 	m1.Close()
 
-	m2, err := New(Options{DataDir: dir, Auth: AuthOptions{Off: true}, CLIPath: fakeBin, Log: log})
+	m2, err := New(Options{DataDir: dir, Auth: AuthOptions{Off: true, AllowedHosts: []string{"example.com"}}, CLIPath: fakeBin, Log: log})
 	if err != nil {
 		t.Fatalf("повторный New: %v", err)
 	}
