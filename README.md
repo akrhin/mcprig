@@ -5,6 +5,8 @@
   </picture>
 </p>
 
+[English](README.md) · [Русский](README.ru.md)
+
 # mcprig
 
 One static Go binary that serves many MCP servers through one endpoint, with a
