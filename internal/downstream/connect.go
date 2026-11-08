@@ -72,8 +72,11 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 			return nil, fmt.Errorf("пустой url")
 		}
 		tr := &mcp.StreamableClientTransport{
-			Endpoint:   srv.URL,
-			HTTPClient: &http.Client{Transport: withHeaders(http.DefaultTransport, srv.Headers)},
+			Endpoint: srv.URL,
+			HTTPClient: &http.Client{
+				Transport:     withHeaders(http.DefaultTransport, srv.Headers),
+				CheckRedirect: sameHostRedirect,
+			},
 		}
 		handler, err := c.oauthHandler(ctx, srv)
 		if err != nil {
@@ -108,6 +111,19 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 		return nil, fmt.Errorf("oauth: %w", err)
 	}
 	return h, nil
+}
+
+// sameHostRedirect: заголовки сервера (в том числе Authorization) ставятся на
+// каждый RoundTrip, поэтому кросс-хостовый редирект унёс бы их чужому хосту —
+// встроенная защита Go здесь не работает.
+func sameHostRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return fmt.Errorf("слишком много редиректов")
+	}
+	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
+		return fmt.Errorf("редирект на другой хост отклонён: %s", req.URL.Host)
+	}
+	return nil
 }
 
 func flatten(env map[string]string) []string {
