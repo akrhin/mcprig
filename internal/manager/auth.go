@@ -307,11 +307,26 @@ func (a *auth) login(user, password string) bool {
 }
 
 // clientIP — адрес клиента для счётчика неудачных входов.
-func clientIP(r *http.Request) string {
+// clientIP — адрес для лимита входа. За обратным прокси RemoteAddr один на
+// всех, поэтому X-Forwarded-For читаем только когда прокси настроен явно:
+// иначе заголовок подделывается и лимит обходится.
+func (a *auth) clientIP(r *http.Request) string {
+	if a.proxySecret != "" {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if ip := strings.TrimSpace(strings.Split(xff, ",")[0]); ip != "" {
+				return ip
+			}
+		}
+	}
 	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return h
 	}
 	return r.RemoteAddr
+}
+
+// secureRequest — панель обычно стоит за TLS-прокси, где до Go доходит http.
+func secureRequest(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 // loginBlocked — попытки с этого IP исчерпаны; возвращает остаток окна.
@@ -374,7 +389,7 @@ func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, err
 		MaxAge:   int(sessionTTL / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   secureRequest(r),
 	})
 	return a.user, nil
 }
@@ -390,6 +405,6 @@ func (a *auth) clearSession(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   secureRequest(r),
 	})
 }

@@ -348,7 +348,7 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		m.methodNotAllowed(w, []string{http.MethodPost})
 		return
 	}
-	ip := clientIP(r)
+	ip := m.auth.clientIP(r)
 	if wait, blocked := m.auth.loginBlocked(ip); blocked {
 		secs := int((wait + time.Second - 1) / time.Second)
 		if secs < 1 {
