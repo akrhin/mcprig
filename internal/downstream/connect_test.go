@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"github.com/sintez/mcprig/internal/config"
 )
 
@@ -66,5 +68,38 @@ func TestHeadersAreApplied(t *testing.T) {
 	}
 	if got := seen.Get("X-Token"); got != "abc" {
 		t.Fatalf("header not applied, got %q", got)
+	}
+}
+
+// Env заменяет os.Environ целиком: в env процесса сервера не должно быть ни
+// лишних переменных вызывающего, ни потери собственного env сервера.
+func TestConnectorEnvHook(t *testing.T) {
+	t.Setenv("MCPRIG_PASSWORD", "secret")
+	srv := &config.Server{
+		Name:      "env",
+		Transport: config.TransportStdio,
+		Command:   []string{"sh", "-c", "env"},
+		Env:       map[string]string{"OWN": "1"},
+	}
+	c := &Connector{Env: func(*config.Server) []string {
+		return []string{"PATH=/bin", "ONLY=1"}
+	}}
+	tr, err := c.transport(context.Background(), srv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := tr.(*mcp.CommandTransport).Command
+	got := map[string]bool{}
+	for _, kv := range cmd.Env {
+		got[kv] = true
+	}
+	want := []string{"PATH=/bin", "ONLY=1", "OWN=1"}
+	for _, kv := range want {
+		if !got[kv] {
+			t.Errorf("в env нет %q: %v", kv, cmd.Env)
+		}
+	}
+	if len(cmd.Env) != len(want) {
+		t.Errorf("env = %v, ожидались только %v", cmd.Env, want)
 	}
 }

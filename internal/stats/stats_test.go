@@ -23,12 +23,45 @@ func TestRecordAggregatesPerClientAndTool(t *testing.T) {
 		t.Fatalf("counters = %d, want 2", len(s.Counters))
 	}
 	// sorted by client then tool: claude-code/fetch, opencode/echo.
-	oc := find(s.Counters, "opencode", "echo")
+	oc := find(s.Counters, "alpha", "opencode", "echo")
 	if oc == nil || oc.Calls != 3 || oc.Failures != 1 || oc.TotalMs != 40 {
 		t.Fatalf("opencode/echo = %+v", oc)
 	}
-	if cc := find(s.Counters, "claude-code", "fetch"); cc == nil || cc.Calls != 1 {
+	if cc := find(s.Counters, "beta", "claude-code", "fetch"); cc == nil || cc.Calls != 1 {
 		t.Fatalf("claude-code/fetch = %+v", cc)
+	}
+}
+
+// Один и тот же инструмент на двух серверах — две строки: сервер входит в ключ.
+func TestCountersSplitByServer(t *testing.T) {
+	r := NewRecorder("demo", 4)
+	r.Record("opencode", "alpha", "search", 10*time.Millisecond, nil)
+	r.Record("opencode", "beta", "search", 20*time.Millisecond, nil)
+	r.Record("opencode", "alpha", "search", 30*time.Millisecond, nil)
+
+	s := r.Snapshot()
+	if len(s.Counters) != 2 {
+		t.Fatalf("counters = %+v", s.Counters)
+	}
+	a := find(s.Counters, "alpha", "opencode", "search")
+	b := find(s.Counters, "beta", "opencode", "search")
+	if a == nil || a.Calls != 2 || b == nil || b.Calls != 1 {
+		t.Fatalf("alpha = %+v, beta = %+v", a, b)
+	}
+	if a.Server != "alpha" || b.Server != "beta" {
+		t.Fatalf("поле server не заполнено: %+v, %+v", a, b)
+	}
+}
+
+// Перцентили попадают в снимок в миллисекундах.
+func TestSnapshotPercentiles(t *testing.T) {
+	r := NewRecorder("demo", 4)
+	for i := 1; i <= 100; i++ {
+		r.Record("opencode", "alpha", "echo", time.Duration(i)*time.Millisecond, nil)
+	}
+	c := find(r.Snapshot().Counters, "alpha", "opencode", "echo")
+	if c == nil || c.P50Ms != 50 || c.P95Ms != 95 {
+		t.Fatalf("перцентили = %+v", c)
 	}
 }
 
@@ -55,7 +88,7 @@ func TestQuantilesAndOverflow(t *testing.T) {
 	for i := 1; i <= MaxLatencySamples+10; i++ {
 		r.Record("a", "s", "t", time.Duration(i)*time.Millisecond, nil)
 	}
-	c := find(r.Snapshot().Counters, "a", "t")
+	c := find(r.Snapshot().Counters, "s", "a", "t")
 	if c == nil || c.Calls != int64(MaxLatencySamples+10) {
 		t.Fatalf("counter = %+v", c)
 	}
@@ -83,9 +116,9 @@ func TestClientLabelFromContext(t *testing.T) {
 	}
 }
 
-func find(cs []Counter, client, tool string) *Counter {
+func find(cs []Counter, server, client, tool string) *Counter {
 	for i := range cs {
-		if cs[i].Client == client && cs[i].Tool == tool {
+		if cs[i].Server == server && cs[i].Client == client && cs[i].Tool == tool {
 			return &cs[i]
 		}
 	}

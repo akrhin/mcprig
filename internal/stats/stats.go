@@ -170,7 +170,8 @@ type Snapshot struct {
 	Tail     []Call    `json:"tail"`
 }
 
-// Snapshot copies the state. Counters are sorted by client, then tool.
+// Snapshot copies the state. Counters are sorted by client, server, then tool,
+// and carry their percentiles.
 func (r *Recorder) Snapshot() Snapshot {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -179,6 +180,8 @@ func (r *Recorder) Snapshot() Snapshot {
 	for _, c := range r.counters {
 		cp := *c
 		cp.latencies = append([]int64(nil), c.latencies...)
+		cp.P50Ms = cp.P50()
+		cp.P95Ms = cp.P95()
 		out.Counters = append(out.Counters, cp)
 	}
 	sortCounters(out.Counters)
@@ -209,6 +212,9 @@ func sortCounters(cs []Counter) {
 	sort.Slice(cs, func(i, j int) bool {
 		if cs[i].Client != cs[j].Client {
 			return cs[i].Client < cs[j].Client
+		}
+		if cs[i].Server != cs[j].Server {
+			return cs[i].Server < cs[j].Server
 		}
 		return cs[i].Tool < cs[j].Tool
 	})
