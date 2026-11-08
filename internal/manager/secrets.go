@@ -278,8 +278,12 @@ func (s *Secrets) Get(name string) (string, string) {
 	if v, source, ok := s.cached(name); ok {
 		return v, source
 	}
-	v, source := s.resolve(name)
-	s.cachePut(name, secretEntry{value: v, source: source})
+	v, source, transient := s.resolve(name)
+	// Ошибку OpenBao не кэшируем: иначе 30 секунд секрет «отсутствует» даже
+	// после того, как хранилище вернулось.
+	if !transient {
+		s.cachePut(name, secretEntry{value: v, source: source})
+	}
 	return v, source
 }
 
@@ -309,26 +313,31 @@ func (s *Secrets) cacheDrop(name string) {
 	s.mu.Unlock()
 }
 
-func (s *Secrets) resolve(name string) (string, string) {
+// resolve идёт по цепочке OpenBao → env.json → окружение. transient=true,
+// когда OpenBao ответил не «нет секрета», а ошибкой: такой ответ кэшировать
+// нельзя.
+func (s *Secrets) resolve(name string) (string, string, bool) {
+	transient := false
 	if s.bao != nil {
 		v, err := s.bao.get(name)
 		switch {
 		case err == nil:
 			s.setRemoteErr(nil)
-			return v, sourceOpenBao
+			return v, sourceOpenBao, false
 		case errors.Is(err, errSecretNotFound):
 			s.setRemoteErr(nil)
 		default:
 			s.setRemoteErr(err)
+			transient = true
 		}
 	}
 	if v, ok := s.local.get(name); ok {
-		return v, sourceFile
+		return v, sourceFile, transient
 	}
 	if v, ok := os.LookupEnv(name); ok {
-		return v, sourceEnv
+		return v, sourceEnv, transient
 	}
-	return "", ""
+	return "", "", transient
 }
 
 func (s *Secrets) Lookup(name string) (string, bool) {

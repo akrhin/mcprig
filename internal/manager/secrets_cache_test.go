@@ -16,6 +16,7 @@ type fakeBao struct {
 	mu     sync.Mutex
 	values map[string]string
 	gets   int
+	fail   int // сколько следующих GET ответить 500 (сбой, а не «нет секрета»)
 }
 
 func (f *fakeBao) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +36,11 @@ func (f *fakeBao) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		f.gets++
+		if f.fail > 0 {
+			f.fail--
+			http.Error(w, "boom", http.StatusInternalServerError)
+			return
+		}
 		v, ok := f.values[key]
 		if !ok {
 			http.NotFound(w, r)
@@ -130,5 +136,21 @@ func TestDeleteWithoutStoreRemovesDuplicate(t *testing.T) {
 	}
 	if _, ok := sec.local.get("FOO"); ok {
 		t.Fatal("копия осталась в env.json")
+	}
+}
+
+// Сбой OpenBao не кэшируется: иначе 30 секунд секрет считается отсутствующим.
+func TestSecretsGetDoesNotCacheBaoFailure(t *testing.T) {
+	fake := &fakeBao{values: map[string]string{"TOKEN": "v1"}, fail: 1}
+	sec := fakeSecrets(t, fake, nil)
+
+	if v, _ := sec.Get("TOKEN"); v != "" {
+		t.Fatalf("при сбое OpenBao Get = %q, ожидалась пустота", v)
+	}
+	if v, source := sec.Get("TOKEN"); v != "v1" || source != sourceOpenBao {
+		t.Fatalf("после восстановления Get = %q из %q", v, source)
+	}
+	if n := fake.getCount(); n != 2 {
+		t.Fatalf("сбой закэширован: запросов %d, ожидалось 2", n)
 	}
 }
