@@ -1,0 +1,48 @@
+# Сборка релизов: один статичный бинарник на платформу.
+# Проверка без публикации: goreleaser release --snapshot --clean
+version: 2
+
+before:
+  hooks:
+    - go vet ./...
+
+builds:
+  - id: mcprig
+    main: ./cmd/mcprig
+    binary: mcprig
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: mcprig
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - deploy/mcprig-set@.service
+      - deploy/mcprig.service
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  draft: true
