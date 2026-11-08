@@ -215,8 +215,8 @@
     c.forEach(function (row) {
       all.calls += row.calls || 0;
       all.failures += row.failures || 0;
-      if (row.p50 != null) { all.p50 = Math.max(all.p50 || 0, row.p50); }
-      if (row.p95 != null) { all.p95 = Math.max(all.p95 || 0, row.p95); }
+      if (row.p50ms != null) { all.p50 = Math.max(all.p50 || 0, row.p50ms); }
+      if (row.p95ms != null) { all.p95 = Math.max(all.p95 || 0, row.p95ms); }
     });
     return all;
   }
@@ -390,7 +390,7 @@
   }
 
   function renderCalls(data) {
-    var tail = (data && data.tail) || [];
+    var tail = (data && data.calls) || [];
     if (!data) {
       renderKpis(null);
       sync($('calls-body'), [], function () { return ''; }, function () { return el('tr'); }, function () {});
@@ -413,14 +413,14 @@
         return tr;
       },
       function (tr, c) {
-        tr.children[0].textContent = clock(c.at);
+        tr.children[0].textContent = clock(c.time);
         tr.children[1].textContent = c.server || '—';
         tr.children[2].textContent = c.tool || '—';
         tr.children[3].textContent = c.client || '—';
         tr.children[4].className = 'num n' + (c.ms > 1000 ? ' slow' : '');
         tr.children[4].textContent = fmtN(c.ms);
-        tr.children[5].className = 'num st n' + (c.ok ? '' : ' bad');
-        tr.children[5].textContent = c.ok ? '200' : 'ошибка';
+        tr.children[5].className = 'num st n' + (c.failed ? ' bad' : '');
+        tr.children[5].textContent = c.failed ? 'ошибка' : '200';
         tr.children[5].title = c.error || '';
       });
     filterCalls();
