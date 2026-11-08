@@ -31,3 +31,6 @@ systemctl --user enable --now mcprig-set@demo.service
 `docker.io` на этом хосте недоступен (`DeadlineExceeded` на
 `load metadata for node:22-alpine`), так что сборку надо проверить там, где
 registry доступен.
+
+Юниты проверены `systemd-analyze verify`: ошибок нет, кроме отсутствующего по
+пути `/home/<user>/.local/bin/mcprig` — он появится после установки бинарника.
