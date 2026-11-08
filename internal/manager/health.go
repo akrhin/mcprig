@@ -13,8 +13,11 @@ import (
 )
 
 const (
-	healthTTL     = 15 * time.Second
-	healthTimeout = 5 * time.Second
+	healthTTL = 15 * time.Second
+	// healthTimeout такой же, как таймаут опроса в прокси: сервер, который
+	// поднимается дольше (stdio-обёртка npx, холодный LSP), иначе выглядит
+	// мёртвым, хотя вызовы проходят.
+	healthTimeout = 15 * time.Second
 )
 
 type serverHealth struct {
