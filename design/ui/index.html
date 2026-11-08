@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mcprig — набор demo</title>
+<style>
+/* OD-LAYOUT-PRIMITIVES v1 — structure only: display, flex/grid, overflow, wrapping, ratio, geometry.
+   Put this @layer first; product CSS outside the layer wins ordinary layout rules.
+   Native hidden and closed-dialog states take precedence over component display rules. */
+@layer od-layout {
+  [hidden]:not([hidden="until-found" i]) { display: none !important; }
+  dialog:not([open]) { display: none !important; }
+
+  :where(.od-stack,.od-row,.od-row-top,.od-cluster,.od-grid,.od-field,.od-stat,.od-cell,.od-tile) > :where(*) { min-width: 0; }
+
+  /* containers */
+  .od-stack   { display: flex; flex-direction: column; gap: var(--od-gap, 8px); }
+  .od-row     { display: flex; align-items: center; gap: var(--od-gap, 8px); }
+  .od-row-top { display: flex; align-items: flex-start; gap: var(--od-gap, 8px); }
+  .od-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--od-gap, 8px); }
+  .od-fill    { flex: 1 1 0; min-width: 0; }
+  .od-fixed   { flex: none; }
+  .od-grid    { display: grid; gap: var(--od-gap, 12px); grid-template-columns: repeat(var(--od-cols, 3), minmax(0, 1fr)); }
+
+  /* stacked information: each piece is its own line — never sibling inline spans */
+  .od-stat, .od-field, .od-cell { display: grid; gap: var(--od-gap, 2px); }
+  :where(.od-stat,.od-field,.od-cell) > :where(*) { display: block; }
+  .od-tile { display: grid; grid-template-rows: auto 1fr; }
+  :where(.od-tile) > :where(*) { display: block; }
+
+  .od-media { display: block; width: 100%; height: auto; aspect-ratio: var(--od-ratio, auto); }
+  .od-media-cover { object-fit: cover; }
+
+  /* functional inline SVG icons opt into bounded geometry; content SVGs keep their own */
+  .od-icon { display: inline-block; inline-size: var(--od-icon-size, 1em); block-size: var(--od-icon-size, 1em); flex: none; }
+
+  /* data text only — authored copy is rewritten to its budget instead */
+  .od-truncate { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .od-clamp-2, .od-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .od-clamp-2 { -webkit-line-clamp: 2; }
+  .od-clamp-3 { -webkit-line-clamp: 3; }
+  .od-lines-2 { min-height: calc(2 * 1.4em); }
+  .od-nowrap  { white-space: nowrap; }
+  .od-keep    { word-break: keep-all; overflow-wrap: anywhere; }
+
+  /* screen skeleton (optional): bars take their own space, the middle scrolls — no padding guessed for chrome */
+  .od-screen { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+  .od-scroll { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+
+  .od-rail { display: flex; gap: var(--od-gap, 8px); overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+             padding-inline: var(--od-rail-pad, 16px); scroll-padding-inline: var(--od-rail-pad, 16px); }
+  .od-rail::-webkit-scrollbar { display: none; }
+  :where(.od-rail) > :where(*) { flex: none; scroll-snap-align: start; }
+  :where(.od-rail) > :where(:last-child) { margin-inline-end: var(--od-rail-pad, 16px); }
+
+  .od-spacer { flex: none; visibility: hidden; pointer-events: none; }
+  .od-touch  { min-width: 44px; min-height: 44px; }
+}
+:root [hidden]:where(:not([hidden="until-found" i])) { display: none; }
+/* /OD-LAYOUT-PRIMITIVES v1 */
+
+:root{
+  --page:#06171C;
+  --panel:#0B2229;
+  --raised:#112E36;
+  --border:#24505A;
+  --text:#E6EFF1;
+  --muted:#8CA6AE;
+  --accent:#2BB3A3;
+  --ok:#4FBE79;
+  --warn:#D9A03C;
+  --err:#F0808A;
+  --hair:rgba(36,80,90,.5);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  color-scheme:dark;
+}
+html.dim{
+  --panel:#081A20;
+  --raised:#0D262D;
+  --border:#1E434C;
+  --hair:rgba(30,67,76,.55);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--page);
+  color:var(--text);
+  font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;
+}
+.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+:focus-visible{outline:1px solid var(--text);outline-offset:2px}
+button{font:inherit;color:inherit}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-rows:48px minmax(0,1fr) 28px;min-height:100vh}
+.body{display:grid;grid-template-columns:216px minmax(0,1fr) 320px;min-height:0}
+
+/* ---------- top bar ---------- */
+.top{display:flex;align-items:center;border-bottom:1px solid var(--border);background:var(--panel);padding:0 14px;min-width:0}
+.brand{display:flex;align-items:center;gap:9px;padding-right:2px}
+.mark{width:20px;height:20px;border:1px solid var(--border);border-radius:3px;display:grid;place-items:center;color:var(--accent);background:var(--raised)}
+.wordmark{font-size:13.5px;font-weight:600;letter-spacing:.01em}
+.sep{width:1px;height:20px;background:var(--border);margin:0 14px;flex:none}
+.counters{display:flex;align-items:center;gap:18px;font-size:12px;color:var(--muted);min-width:0;white-space:nowrap}
+.counters b{color:var(--text);font-weight:500}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex:none}
+.search{display:flex;align-items:center;gap:7px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:4px;color:var(--muted);background:transparent}
+.search:focus-within{border-color:var(--muted)}
+.search input{width:168px;background:none;border:0;outline:none;color:var(--text);font:inherit}
+.search input::placeholder{color:var(--muted)}
+.search kbd{font:11px/1 var(--mono);border:1px solid var(--border);border-radius:2px;padding:2px 4px;color:var(--muted)}
+.iconbtn{width:28px;height:28px;display:grid;place-items:center;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer}
+.iconbtn:hover{background:var(--raised);color:var(--text)}
+.iconbtn[aria-pressed="true"]{color:var(--text);background:var(--raised)}
+.avatar{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--raised);display:grid;place-items:center;font-size:11px;color:var(--muted);flex:none}
+
+/* ---------- left rail ---------- */
+.rail{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.rail-h{display:flex;align-items:center;justify-content:space-between;padding:11px 14px 10px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--hair)}
+.sets{display:flex;flex-direction:column}
+.setrow{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 8px;padding:8px 14px 9px;border-bottom:1px solid var(--hair);color:var(--text);text-decoration:none}
+.setrow:hover{background:var(--raised)}
+.setrow.is-active{background:var(--raised)}
+.setrow.is-active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent)}
+.sname{display:flex;align-items:center;gap:7px;font-size:13px;min-width:0}
+.sport{font-size:11px;color:var(--muted);align-self:center}
+.srate{grid-column:1 / -1;font-size:11px;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;flex:none;display:inline-block}
+.dot.ok{background:var(--ok)}
+.dot.warn{background:var(--warn)}
+.dot.err{background:var(--err)}
+.rail-foot{margin-top:auto;border-top:1px solid var(--border);padding:9px 10px}
+.rail-add{width:100%;text-align:left;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted);padding:6px 8px;cursor:pointer;font-size:12px}
+.rail-add:hover{background:var(--raised);color:var(--text)}
+.addform{padding:10px;border-top:1px solid var(--border);display:grid;gap:8px}
+.addform .f{display:grid;gap:3px}
+.addform .f span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.addform input{background:var(--page);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;font:inherit;min-width:0}
+.addbtns{display:flex;gap:6px}
+.adderr{color:var(--err);font-size:11px}
+
+/* ---------- main ---------- */
+.main{min-width:0;display:flex;flex-direction:column;padding:14px 20px 18px;gap:16px}
+.phead{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.title-row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h1{font-size:18px;font-weight:600;margin:0;letter-spacing:-.01em}
+.port{font-size:13px;color:var(--muted)}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+.ident{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:9px}
+.iditem{display:flex;align-items:center;gap:8px;min-width:0}
+.iditem .lab{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:none}
+code{font-family:var(--mono);font-size:12px;color:var(--text);letter-spacing:.01em}
+.mini{background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--muted);font-size:11px;padding:2px 6px;cursor:pointer;white-space:nowrap}
+.mini:hover{background:var(--raised);color:var(--text)}
+.phead-actions{margin-left:auto;display:flex;gap:8px;flex:none}
+.btn{background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:5px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--raised)}
+.btn.primary{border-color:var(--accent);color:var(--accent)}
+.btn.primary:hover{background:rgba(43,179,163,.1)}
+.btn:disabled{color:var(--muted);border-color:var(--border);background:transparent;cursor:default}
+
+/* ---------- KPI strip ---------- */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.kpi{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px 13px 0;min-width:0}
+.kpi + .kpi{border-left:1px solid var(--hair);padding-left:18px}
+.kpi .od-stat{gap:1px}
+.kv{font-size:23px;line-height:1.1;font-weight:500;letter-spacing:-.01em}
+.kl{font-size:11px;color:var(--muted)}
+.spark{width:84px;height:22px;flex:none;color:var(--muted)}
+.spark.is-err{color:var(--err)}
+.spark polyline{fill:none;stroke:currentColor;stroke-width:1;vector-effect:non-scaling-stroke}
+
+/* ---------- blocks & tables ---------- */
+.block{display:grid;gap:7px;min-width:0}
+.block-h{display:flex;align-items:baseline;gap:10px}
+.block-h h2{font-size:12px;font-weight:600;letter-spacing:.02em;margin:0}
+.block-h .hint{font-size:11px;color:var(--muted)}
+.block-h .hint:last-child{margin-left:auto}
+.tw{overflow-x:auto;border-top:1px solid var(--border)}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{text-align:left;font-weight:500;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+table.t td{padding:6px 10px;border-bottom:1px solid var(--hair);vertical-align:middle;white-space:nowrap}
+table.t th:first-child,table.t td:first-child{padding-left:0}
+table.t th:last-child,table.t td:last-child{padding-right:0}
+table.t tbody tr:last-child td{border-bottom:0}
+.num{text-align:right}
+td.num,th.num{font-family:var(--mono)}
+.st{color:var(--muted)}
+.st.bad{color:var(--err)}
+tr.row-warn td:first-child{color:var(--warn)}
+tr.row-warn .st{color:var(--warn)}
+.slow{color:var(--warn)}
+.tb-name{color:var(--text)}
+.portcell{color:var(--muted);font-family:var(--mono)}
+.emptyrow td{color:var(--muted);padding:14px 0}
+
+/* ---------- right column ---------- */
+.side{background:var(--panel);border-left:1px solid var(--border);min-height:0;display:flex;flex-direction:column}
+.pane{padding:11px 14px 13px;border-bottom:1px solid var(--border)}
+.pane:last-child{border-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0}
+.pane-h{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.pane-h h2{font-size:10.5px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0}
+.pane-h .cnt{margin-left:auto;font-size:11px;color:var(--muted)}
+ul.list{list-style:none;margin:0;padding:0;display:grid}
+.srv,.var{display:grid;gap:3px;padding:7px 0;border-bottom:1px solid var(--hair);min-width:0}
+.srv:last-child,.var:last-child{border-bottom:0}
+.srv-top,.var-top{display:flex;align-items:center;gap:7px;min-width:0}
+.snm{font-size:12.5px;min-width:0}
+.badge{margin-left:auto;flex:none;font:10px/1 var(--mono);letter-spacing:.04em;border:1px solid var(--border);border-radius:2px;padding:2px 4px;color:var(--muted);text-transform:uppercase}
+.srv-note,.var-val{font-size:11px;color:var(--muted);min-width:0}
+.srv-note.is-err{color:var(--err)}
+.var-top code{font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log{font-family:var(--mono);font-size:11.5px;line-height:1.55;overflow:hidden;display:grid;gap:1px}
+.logline{display:grid;grid-template-columns:52px 34px minmax(0,1fr);gap:7px;min-width:0}
+.logline .lt{color:var(--muted);opacity:.75}
+.logline .lv{font-size:10px;letter-spacing:.02em}
+.logline .lv.info{color:var(--muted)}
+.logline .lv.warn{color:var(--warn)}
+.logline .lv.error{color:var(--err)}
+.logline .lm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+
+/* ---------- status bar ---------- */
+.status{display:flex;align-items:center;gap:0;padding:0 14px;border-top:1px solid var(--border);background:var(--panel);font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.status .item{display:flex;gap:5px;align-items:center}
+.status .dotsep{margin:0 9px;color:var(--border)}
+.status b{font-weight:400;color:var(--text)}
+.status .push{margin-left:auto}
+
+/* ---------- dialog ---------- */
+dialog{border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);padding:0;width:min(620px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(6,23,28,.74)}
+.dlg-h{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)}
+.dlg-h h3{font-size:13px;font-weight:600;margin:0}
+.dlg-h .mini{margin-left:auto}
+.dlg-body{padding:12px 14px}
+.dlg-note{margin:10px 0 0;font-size:11.5px;color:var(--muted);line-height:1.5}
+.dlg-f{display:flex;justify-content:flex-end;padding:0 14px 12px}
+
+/* ---------- responsive ---------- */
+@media (max-width:1339px){
+  .body{grid-template-columns:200px minmax(0,1fr) 296px}
+  .search input{width:120px}
+}
+@media (max-width:1150px){
+  .body{grid-template-columns:200px minmax(0,1fr)}
+  .side{grid-column:1 / -1;border-left:0;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;align-items:start}
+  .pane{border-bottom:0;border-right:1px solid var(--border)}
+  .pane:last-child{border-right:0}
+  .counters span:nth-child(4){display:none}
+}
+@media (max-width:900px){
+  .shell{grid-template-rows:48px auto 28px}
+  .body{grid-template-columns:1fr}
+  .rail{border-right:0;border-bottom:1px solid var(--border)}
+  .sets{flex-direction:row;overflow-x:auto}
+  .setrow{min-width:150px;border-bottom:0;border-right:1px solid var(--hair)}
+  .setrow.is-active::before{top:auto;height:2px;width:auto;left:0;right:0}
+  .rail-foot{margin-top:0}
+  .side{grid-template-columns:1fr}
+  .pane{border-right:0;border-bottom:1px solid var(--border)}
+  .main{padding:12px 14px 16px}
+  .search input{width:96px}
+  .phead-actions{margin-left:0;width:100%}
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpi:nth-child(3){border-left:0;padding-left:0}
+  .kpi:nth-child(n+3){border-top:1px solid var(--hair)}
+}
+@media (max-width:520px){
+  .counters span:nth-child(3){display:none}
+  .search input{width:72px}
+  .kpi .spark{display:none}
+  .status .optional{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg class="od-icon" style="--od-icon-size:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8.5 13.5V5.8a1.4 1.4 0 0 1 2.8 0v4.4"/>
+          <path d="M11.3 10.6V4.6a1.4 1.4 0 0 1 2.8 0v6"/>
+          <path d="M14.1 10.8V6.4a1.4 1.4 0 0 1 2.8 0v6"/>
+          <path d="M16.9 12.4v-2a1.4 1.4 0 0 1 2.8 0V15a6 6 0 0 1-6 6h-1.6a4.6 4.6 0 0 1-3.6-1.8l-3-3.9a1.5 1.5 0 0 1 2.3-1.9l1.7 1.8"/>
+        </svg>
+      </span>
+      <span class="wordmark">mcprig</span>
+    </div>
+    <div class="sep" aria-hidden="true"></div>
+    <div class="counters">
+      <span><b class="n" id="c-sets">4</b> набора</span>
+      <span><b class="n" id="c-servers">12</b> серверов</span>
+      <span><b class="n">3 412</b> вызовов / 24 ч</span>
+      <span>ошибки <b class="n">0,4 %</b></span>
+    </div>
+    <div class="top-right">
+      <label class="search">
+        <svg class="od-icon" style="--od-icon-size:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>
+        </svg>
+        <span class="sr">Поиск по вызовам</span>
+        <input type="search" id="q" placeholder="поиск по вызовам" autocomplete="off">
+        <kbd>/</kbd>
+      </label>
+      <button class="iconbtn" type="button" id="dim" aria-pressed="false" aria-label="Понизить яркость панели">
+        <svg class="od-icon" style="--od-icon-size:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none" opacity=".55"/>
+        </svg>
+      </button>
+      <span class="avatar" title="Владимир">В</span>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <nav class="rail" aria-label="Наборы">
+      <div class="rail-h"><span>Наборы</span><span class="n" id="rail-count">4</span></div>
+      <div class="sets" id="rail-sets">
+        <a class="setrow is-active" href="#demo" data-id="demo" aria-current="true">
+          <span class="sname"><span class="dot ok"></span><span class="od-truncate">demo</span></span>
+          <span class="sport n">9100</span>
+          <span class="srate"><span class="n">128</span> / ч</span>
+        </a>
+        <a class="setrow" href="#ops" data-id="ops">
+          <span class="sname"><span class="dot ok"></span><span class="od-truncate">ops</span></span>
+          <span class="sport n">9101</span>
+          <span class="srate"><span class="n">96</span> / ч</span>
+        </a>
+        <a class="setrow" href="#lab" data-id="lab">
+          <span class="sname"><span class="dot warn"></span><span class="od-truncate">lab</span></span>
+          <span class="sport n">9102</span>
+          <span class="srate"><span class="n">—</span> остановлен</span>
+        </a>
+        <a class="setrow" href="#dev" data-id="dev">
+          <span class="sname"><span class="dot ok"></span><span class="od-truncate">dev</span></span>
+          <span class="sport n">9103</span>
+          <span class="srate"><span class="n">41</span> / ч</span>
+        </a>
+      </div>
+      <div class="rail-foot">
+        <button class="rail-add" type="button" id="add-toggle">+ набор</button>
+        <form class="addform" id="addform" hidden>
+          <label class="f"><span>имя</span><input name="name" autocomplete="off" placeholder="staging"></label>
+          <label class="f"><span>порт 9100–9199</span><input name="port" class="n" inputmode="numeric" value="9104"></label>
+          <p class="adderr" id="add-err" hidden></p>
+          <div class="addbtns">
+            <button class="btn" type="submit">создать</button>
+            <button class="mini" type="button" id="add-cancel">отмена</button>
+          </div>
+        </form>
+      </div>
+    </nav>
+
+    <main class="main">
+
+      <div class="phead">
+        <div>
+          <div class="title-row">
+            <h1 id="set-name">Набор demo</h1>
+            <span class="port n" id="set-port">:9100</span>
+            <span class="state" id="set-state"><span class="dot ok"></span>работает</span>
+          </div>
+          <div class="ident">
+            <div class="iditem">
+              <span class="lab">endpoint</span>
+              <code id="endpoint">http://127.0.0.1:9100/mcp</code>
+              <button class="mini" type="button" id="copy">копировать</button>
+            </div>
+            <div class="iditem">
+              <span class="lab">ключ</span>
+              <code id="key" data-masked="demo_…f4a1" data-revealed="demo_7c1b9e34…f4a1">demo_…f4a1</code>
+              <button class="mini" type="button" id="mask" aria-pressed="false">показать</button>
+            </div>
+          </div>
+        </div>
+        <div class="phead-actions">
+          <button class="btn" type="button" id="keys">Ключи</button>
+          <button class="btn primary" type="button" id="restart">Перезапустить</button>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="od-stat"><span class="kv n" id="k-calls">3 412</span><span class="kl">вызовы 24 ч</span></div>
+          <svg class="spark" viewBox="0 0 96 24" width="84" height="22" aria-hidden="true"><polyline points="0,18 8,17 16,19 24,14 32,15 40,12 48,13 56,9 64,10 72,7 80,8 88,5 96,4"/></svg>
+        </div>
+        <div class="kpi">
+          <div class="od-stat"><span class="kv n" id="k-p50">41 <span class="kl" style="font-size:12px">мс</span></span><span class="kl">p50</span></div>
+          <svg class="spark" viewBox="0 0 96 24" width="84" height="22" aria-hidden="true"><polyline points="0,14 8,13 16,15 24,13 32,14 40,12 48,13 56,14 64,12 72,13 80,12 88,13 96,12"/></svg>
+        </div>
+        <div class="kpi">
+          <div class="od-stat"><span class="kv n" id="k-p95">214 <span class="kl" style="font-size:12px">мс</span></span><span class="kl">p95</span></div>
+          <svg class="spark" viewBox="0 0 96 24" width="84" height="22" aria-hidden="true"><polyline points="0,12 8,8 16,14 24,6 32,13 40,4 48,11 56,7 64,15 72,5 80,12 88,6 96,9"/></svg>
+        </div>
+        <div class="kpi">
+          <div class="od-stat"><span class="kv n" id="k-err">0,4 <span class="kl" style="font-size:12px">%</span></span><span class="kl">ошибки</span></div>
+          <svg class="spark is-err" viewBox="0 0 96 24" width="84" height="22" aria-hidden="true"><polyline points="0,21 8,21 16,20 24,21 32,21 40,17 48,21 56,21 64,20 72,21 80,21 88,21 96,21"/></svg>
+        </div>
+      </div>
+
+      <section class="block">
+        <div class="block-h">
+          <h2>Наборы</h2>
+          <span class="hint">порты 9100–9199 · одна точка входа на набор</span>
+          <span class="hint n" id="sets-count">4</span>
+        </div>
+        <div class="tw">
+          <table class="t">
+            <caption class="sr">Наборы, их порты, состояние и нагрузка</caption>
+            <thead>
+              <tr>
+                <th scope="col">Набор</th>
+                <th scope="col">Порт</th>
+                <th scope="col">Состояние</th>
+                <th scope="col" class="num">Серверов</th>
+                <th scope="col">Аптайм</th>
+                <th scope="col" class="num">Вызовов за час</th>
+                <th scope="col" class="num">Ошибок</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="tb-name">demo</td>
+                <td class="portcell">9100</td>
+                <td><span class="state"><span class="dot ok"></span>работает</span></td>
+                <td class="num">4</td>
+                <td class="n">4 ч 12 м</td>
+                <td class="num">128</td>
+                <td class="num">0,2 %</td>
+              </tr>
+              <tr>
+                <td class="tb-name">ops</td>
+                <td class="portcell">9101</td>
+                <td><span class="state"><span class="dot ok"></span>работает</span></td>
+                <td class="num">3</td>
+                <td class="n">2 ч 40 м</td>
+                <td class="num">96</td>
+                <td class="num">0,0 %</td>
+              </tr>
+              <tr class="row-warn">
+                <td class="tb-name">lab</td>
+                <td class="portcell">9102</td>
+                <td><span class="state"><span class="dot warn"></span>остановлен</span></td>
+                <td class="num">2</td>
+                <td class="n">—</td>
+                <td class="num">12</td>
+                <td class="num">6,1 %</td>
+              </tr>
+              <tr>
+                <td class="tb-name">dev</td>
+                <td class="portcell">9103</td>
+                <td><span class="state"><span class="dot ok"></span>работает</span></td>
+                <td class="num">3</td>
+                <td class="n">1 ч 05 м</td>
+                <td class="num">41</td>
+                <td class="num">0,7 %</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="block-h">
+          <h2>Вызовы</h2>
+          <span class="hint">живой хвост · <span class="n" id="calls-count">12 из 3 412</span></span>
+        </div>
+        <div class="tw">
+          <table class="t">
+            <caption class="sr">Последние вызовы по всем наборам</caption>
+            <thead>
+              <tr>
+                <th scope="col">Время</th>
+                <th scope="col">Набор</th>
+                <th scope="col">Инструмент</th>
+                <th scope="col">Кто</th>
+                <th scope="col" class="num">мс</th>
+                <th scope="col" class="num">Токены</th>
+                <th scope="col" class="num">Статус</th>
+              </tr>
+            </thead>
+            <tbody id="calls">
+              <tr><td class="n">21:04:12</td><td>demo</td><td class="n">invoke_command</td><td>context7</td><td class="num n">84</td><td class="num n">1 240</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:04:07</td><td>demo</td><td class="n">list_commands</td><td>fetch</td><td class="num n">12</td><td class="num n">96</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:03:58</td><td>ops</td><td class="n">invoke_command</td><td>memory</td><td class="num n slow">2 340</td><td class="num n">4 180</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:03:51</td><td>demo</td><td class="n">describe_commands</td><td>time</td><td class="num n">31</td><td class="num n">210</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:03:44</td><td>demo</td><td class="n">invoke_command</td><td>fetch</td><td class="num n">96</td><td class="num n">1 020</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:03:39</td><td>lab</td><td class="n">invoke_command</td><td>memory</td><td class="num n">470</td><td class="num n">3 400</td><td class="num st bad n">500</td></tr>
+              <tr><td class="n">21:03:31</td><td>demo</td><td class="n">list_commands</td><td>context7</td><td class="num n">18</td><td class="num n">74</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:03:22</td><td>ops</td><td class="n">invoke_command</td><td>time</td><td class="num n">55</td><td class="num n">320</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:03:15</td><td>demo</td><td class="n">invoke_command</td><td>fetch</td><td class="num n">148</td><td class="num n">2 240</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:02:58</td><td>demo</td><td class="n">list_commands</td><td>memory</td><td class="num n">22</td><td class="num n">88</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:02:47</td><td>dev</td><td class="n">invoke_command</td><td>context7</td><td class="num n">1 020</td><td class="num n">8 640</td><td class="num st n">200</td></tr>
+              <tr><td class="n">21:02:33</td><td>demo</td><td class="n">describe_commands</td><td>fetch</td><td class="num n">27</td><td class="num n">180</td><td class="num st n">200</td></tr>
+              <tr class="emptyrow" id="calls-empty" hidden><td colspan="7">нет вызовов по запросу «<span id="q-echo"></span>»</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <aside class="side" aria-label="Детали набора">
+
+      <section class="pane">
+        <div class="pane-h"><h2>Серверы набора</h2><span class="cnt n" id="srv-count">4</span></div>
+        <ul class="list" id="servers">
+          <li class="srv">
+            <div class="srv-top"><span class="dot ok"></span><span class="snm od-truncate">fetch</span><span class="badge">stdio</span></div>
+            <div class="srv-note">последний вызов 21:04:07 · 12 мс</div>
+          </li>
+          <li class="srv">
+            <div class="srv-top"><span class="dot ok"></span><span class="snm od-truncate">time</span><span class="badge">stdio</span></div>
+            <div class="srv-note">последний вызов 21:03:51 · 31 мс</div>
+          </li>
+          <li class="srv">
+            <div class="srv-top"><span class="dot warn"></span><span class="snm od-truncate">memory</span><span class="badge">http</span></div>
+            <div class="srv-note is-err">timeout after 5000 ms · попытка 2 из 3</div>
+          </li>
+          <li class="srv">
+            <div class="srv-top"><span class="dot ok"></span><span class="snm od-truncate">context7</span><span class="badge">http</span></div>
+            <div class="srv-note">streamable-http · 84 мс</div>
+          </li>
+        </ul>
+      </section>
+
+      <section class="pane">
+        <div class="pane-h"><h2>Переменные</h2><span class="cnt n">3</span></div>
+        <ul class="list">
+          <li class="var">
+            <div class="var-top"><code>CONTEXT7_API_KEY</code><span class="badge">openbao</span></div>
+            <div class="var-val n">ctx7_••••••••42d1</div>
+          </li>
+          <li class="var">
+            <div class="var-top"><code>MEMORY_DSN</code><span class="badge">file</span></div>
+            <div class="var-val n">/etc/mcprig/env.d/memory</div>
+          </li>
+          <li class="var">
+            <div class="var-top"><code>MCP_LOG_LEVEL</code><span class="badge">env</span></div>
+            <div class="var-val n">info</div>
+          </li>
+        </ul>
+      </section>
+
+      <section class="pane">
+        <div class="pane-h"><h2>Хвост лога</h2><span class="cnt n">12</span></div>
+        <div class="log" id="log" aria-live="polite">
+          <div class="logline"><span class="lt n">21:05:02</span><span class="lv info">INFO</span><span class="lm">listen demo :9100 · 4 сервера</span></div>
+          <div class="logline"><span class="lt n">21:04:58</span><span class="lv info">INFO</span><span class="lm">proxy context7 streamable-http · 84 мс</span></div>
+          <div class="logline"><span class="lt n">21:04:44</span><span class="lv warn">WARN</span><span class="lm">memory: timeout after 5000 ms (2/3)</span></div>
+          <div class="logline"><span class="lt n">21:04:44</span><span class="lv info">INFO</span><span class="lm">retry memory через 250 мс</span></div>
+          <div class="logline"><span class="lt n">21:04:41</span><span class="lv info">INFO</span><span class="lm">invoke_command fetch → 200 · 96 мс</span></div>
+          <div class="logline"><span class="lt n">21:04:12</span><span class="lv info">INFO</span><span class="lm">key demo_…f4a1 · 128 вызовов/ч</span></div>
+          <div class="logline"><span class="lt n">21:04:02</span><span class="lv info">INFO</span><span class="lm">health check 4/4 ok</span></div>
+          <div class="logline"><span class="lt n">21:03:39</span><span class="lv error">ERROR</span><span class="lm">lab :9102 процесс завершился (code 1)</span></div>
+          <div class="logline"><span class="lt n">21:03:22</span><span class="lv info">INFO</span><span class="lm">invoke_command time → 200 · 55 мс</span></div>
+          <div class="logline"><span class="lt n">21:03:11</span><span class="lv info">INFO</span><span class="lm">stdio fetch spawn pid 24817</span></div>
+          <div class="logline"><span class="lt n">21:02:58</span><span class="lv info">INFO</span><span class="lm">list_commands memory → 200 · 22 мс</span></div>
+          <div class="logline"><span class="lt n">21:02:33</span><span class="lv info">INFO</span><span class="lm">gc 3 простаивающих сессии</span></div>
+        </div>
+      </section>
+
+    </aside>
+  </div>
+
+  <footer class="status">
+    <span class="item"><b class="n">go1.25</b></span>
+    <span class="dotsep" aria-hidden="true">·</span>
+    <span class="item">бинарь <b class="n">10,4 МБ</b></span>
+    <span class="dotsep" aria-hidden="true">·</span>
+    <span class="item">RSS <b class="n">68 МБ</b></span>
+    <span class="dotsep" aria-hidden="true">·</span>
+    <span class="item">uptime <b class="n">4 ч 12 м</b></span>
+    <span class="dotsep optional" aria-hidden="true">·</span>
+    <span class="item optional">protocol <b class="n">2026-07-28</b></span>
+    <span class="push item"><span class="dot ok" aria-hidden="true"></span><span class="muted">прокси-пул 12/12</span></span>
+  </footer>
+</div>
+
+<dialog id="keys-dlg" aria-labelledby="keys-title">
+  <div class="dlg-h">
+    <h3 id="keys-title">Ключи набора <span class="n" id="dlg-set">demo</span></h3>
+    <button class="mini" type="button" id="keys-close">закрыть</button>
+  </div>
+  <div class="dlg-body">
+    <table class="t">
+      <thead>
+        <tr><th scope="col">Ключ</th><th scope="col">Создан</th><th scope="col" class="num">Вызовов</th><th scope="col">Последний</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="n">demo_…f4a1</td><td class="n">12.10.2026</td><td class="num n">3 180</td><td class="n">21:04:12</td></tr>
+        <tr><td class="n">demo_…8c07</td><td class="n">03.11.2026</td><td class="num n">232</td><td class="n">20:58:41</td></tr>
+      </tbody>
+    </table>
+    <p class="dlg-note">Полный токен показывается один раз при выпуске. Отзыв ключа действует без перезапуска набора.</p>
+  </div>
+  <div class="dlg-f"><button class="btn" type="button" id="keys-done">готово</button></div>
+</dialog>
+
+<script>
+(function () {
+  var sets = {
+    demo: {
+      name: 'demo', port: 9100, state: 'ok', stateText: 'работает', rate: '128',
+      calls: '3 412', p50: '41', p95: '214', err: '0,4',
+      keyMasked: 'demo_…f4a1', keyRevealed: 'demo_7c1b9e34…f4a1',
+      servers: [
+        { n: 'fetch', t: 'stdio', h: 'ok', note: 'последний вызов 21:04:07 · 12 мс' },
+        { n: 'time', t: 'stdio', h: 'ok', note: 'последний вызов 21:03:51 · 31 мс' },
+        { n: 'memory', t: 'http', h: 'warn', note: 'timeout after 5000 ms · попытка 2 из 3' },
+        { n: 'context7', t: 'http', h: 'ok', note: 'streamable-http · 84 мс' }
+      ]
+    },
+    ops: {
+      name: 'ops', port: 9101, state: 'ok', stateText: 'работает', rate: '96',
+      calls: '1 204', p50: '38', p95: '168', err: '0,1',
+      keyMasked: 'ops_…c2d7', keyRevealed: 'ops_51ab0f92…c2d7',
+      servers: [
+        { n: 'fetch', t: 'stdio', h: 'ok', note: 'последний вызов 21:04:21 · 9 мс' },
+        { n: 'time', t: 'stdio', h: 'ok', note: 'последний вызов 21:03:22 · 55 мс' },
+        { n: 'memory', t: 'http', h: 'ok', note: 'streamable-http · 41 мс' }
+      ]
+    },
+    lab: {
+      name: 'lab', port: 9102, state: 'warn', stateText: 'остановлен', rate: '—',
+      calls: '96', p50: '62', p95: '890', err: '6,1',
+      keyMasked: 'lab_…9e30', keyRevealed: 'lab_3d77aa10…9e30',
+      servers: [
+        { n: 'memory', t: 'http', h: 'err', note: 'процесс завершился (code 1) · 21:03:39' },
+        { n: 'context7', t: 'http', h: 'err', note: 'нет соединения с 21:03:39' }
+      ]
+    },
+    dev: {
+      name: 'dev', port: 9103, state: 'ok', stateText: 'работает', rate: '41',
+      calls: '512', p50: '44', p95: '260', err: '0,7',
+      keyMasked: 'dev_…77bd', keyRevealed: 'dev_0e94c155…77bd',
+      servers: [
+        { n: 'fetch', t: 'stdio', h: 'ok', note: 'последний вызов 21:01:44 · 18 мс' },
+        { n: 'fs', t: 'stdio', h: 'ok', note: 'последний вызов 21:00:12 · 24 мс' },
+        { n: 'time', t: 'stdio', h: 'ok', note: 'последний вызов 20:59:03 · 7 мс' }
+      ]
+    }
+  };
+
+  var active = 'demo';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function serverRow(s) {
+    return '<li class="srv">' +
+      '<div class="srv-top"><span class="dot ' + s.h + '"></span>' +
+      '<span class="snm od-truncate">' + s.n + '</span>' +
+      '<span class="badge">' + s.t + '</span></div>' +
+      '<div class="srv-note' + (s.h === 'err' ? ' is-err' : '') + '">' + s.note + '</div>' +
+      '</li>';
+  }
+
+  function render(id) {
+    var s = sets[id];
+    active = id;
+    $('set-name').textContent = 'Набор ' + s.name;
+    $('set-port').textContent = ':' + s.port;
+    $('set-state').innerHTML = '<span class="dot ' + s.state + '"></span>' + s.stateText;
+    $('endpoint').textContent = 'http://127.0.0.1:' + s.port + '/mcp';
+    $('key').dataset.masked = s.keyMasked;
+    $('key').dataset.revealed = s.keyRevealed;
+    $('key').textContent = $('mask').getAttribute('aria-pressed') === 'true' ? s.keyRevealed : s.keyMasked;
+    $('dlg-set').textContent = s.name;
+    $('k-calls').textContent = s.calls;
+    $('k-p50').innerHTML = s.p50 + ' <span class="kl" style="font-size:12px">мс</span>';
+    $('k-p95').innerHTML = s.p95 + ' <span class="kl" style="font-size:12px">мс</span>';
+    $('k-err').innerHTML = s.err + ' <span class="kl" style="font-size:12px">%</span>';
+    $('servers').innerHTML = s.servers.map(serverRow).join('');
+    $('srv-count').textContent = s.servers.length;
+
+    var rows = $('rail-sets').querySelectorAll('.setrow');
+    for (var i = 0; i < rows.length; i++) {
+      var on = rows[i].dataset.id === id;
+      rows[i].classList.toggle('is-active', on);
+      if (on) { rows[i].setAttribute('aria-current', 'true'); } else { rows[i].removeAttribute('aria-current'); }
+    }
+  }
+
+  $('rail-sets').addEventListener('click', function (e) {
+    var row = e.target.closest('.setrow');
+    if (!row || !sets[row.dataset.id]) { return; }
+    e.preventDefault();
+    render(row.dataset.id);
+  });
+
+  $('mask').addEventListener('click', function () {
+    var k = $('key');
+    var shown = this.getAttribute('aria-pressed') === 'true';
+    this.setAttribute('aria-pressed', String(!shown));
+    this.textContent = shown ? 'показать' : 'скрыть';
+    k.textContent = shown ? k.dataset.masked : k.dataset.revealed;
+  });
+
+  $('copy').addEventListener('click', function () {
+    var btn = this;
+    var text = $('endpoint').textContent;
+    var done = function (ok) {
+      btn.textContent = ok ? 'скопировано' : 'не удалось';
+      setTimeout(function () { btn.textContent = 'копировать'; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    } else {
+      done(false);
+    }
+  });
+
+  $('restart').addEventListener('click', function () {
+    var btn = this;
+    if (btn.disabled) { return; }
+    var s = sets[active];
+    btn.disabled = true;
+    btn.textContent = 'перезапуск…';
+    setTimeout(function () {
+      btn.disabled = false;
+      btn.textContent = 'Перезапустить';
+      appendLog('info', 'INFO', 'набор ' + s.name + ' перезапущен · порт ' + s.port);
+    }, 900);
+  });
+
+  function appendLog(cls, label, msg) {
+    var log = $('log');
+    var line = document.createElement('div');
+    line.className = 'logline';
+    var t = new Date();
+    var hh = String(t.getHours()).padStart(2, '0');
+    var mm = String(t.getMinutes()).padStart(2, '0');
+    var ss = String(t.getSeconds()).padStart(2, '0');
+    var time = document.createElement('span');
+    time.className = 'lt n';
+    time.textContent = hh + ':' + mm + ':' + ss;
+    var lv = document.createElement('span');
+    lv.className = 'lv ' + cls;
+    lv.textContent = label;
+    var m = document.createElement('span');
+    m.className = 'lm';
+    m.textContent = msg;
+    line.appendChild(time);
+    line.appendChild(lv);
+    line.appendChild(m);
+    log.insertBefore(line, log.firstChild);
+    while (log.children.length > 12) { log.removeChild(log.lastChild); }
+  }
+
+  var dlg = $('keys-dlg');
+  $('keys').addEventListener('click', function () {
+    if (typeof dlg.showModal === 'function') { dlg.showModal(); }
+  });
+  $('keys-close').addEventListener('click', function () { dlg.close(); });
+  $('keys-done').addEventListener('click', function () { dlg.close(); });
+
+  /* search over the calls tail */
+  var q = $('q');
+  function filterCalls() {
+    var term = q.value.trim().toLowerCase();
+    var rows = $('calls').querySelectorAll('tr:not(.emptyrow)');
+    var shown = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var hit = term === '' || rows[i].textContent.toLowerCase().indexOf(term) !== -1;
+      rows[i].hidden = !hit;
+      if (hit) { shown++; }
+    }
+    $('calls-empty').hidden = shown !== 0;
+    $('q-echo').textContent = q.value.trim();
+    $('calls-count').textContent = term === '' ? '12 из 3 412' : shown + ' из 12';
+  }
+  q.addEventListener('input', filterCalls);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== q && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      q.focus();
+    }
+  });
+
+  /* dim mode */
+  $('dim').addEventListener('click', function () {
+    var on = this.getAttribute('aria-pressed') === 'true';
+    this.setAttribute('aria-pressed', String(!on));
+    document.documentElement.classList.toggle('dim', !on);
+  });
+
+  /* new set */
+  var form = $('addform');
+  $('add-toggle').addEventListener('click', function () {
+    form.hidden = !form.hidden;
+    $('add-err').hidden = true;
+    if (!form.hidden) { form.querySelector('input[name="name"]').focus(); }
+  });
+  $('add-cancel').addEventListener('click', function () {
+    form.hidden = true;
+    $('add-err').hidden = true;
+  });
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = form.querySelector('input[name="name"]').value.trim();
+    var port = parseInt(form.querySelector('input[name="port"]').value, 10);
+    var err = $('add-err');
+    if (!name) { err.textContent = 'имя обязательно'; err.hidden = false; return; }
+    if (!(port >= 9100 && port <= 9199)) { err.textContent = 'порт вне диапазона 9100–9199'; err.hidden = false; return; }
+    if (Object.keys(sets).some(function (k) { return sets[k].port === port; })) {
+      err.textContent = 'порт ' + port + ' уже занят набором';
+      err.hidden = false;
+      return;
+    }
+    var base = name.toLowerCase().replace(/[^a-z0-9]+/g, '') || ('set' + port);
+    var key = base;
+    var n = 2;
+    while (sets[key]) { key = base + n++; }
+    sets[key] = {
+      name: name, port: port, state: 'warn', stateText: 'запускается', rate: '0',
+      calls: '0', p50: '—', p95: '—', err: '0,0',
+      keyMasked: key + '_…' + String(port).slice(-4), keyRevealed: key + '_•••••…' + String(port).slice(-4),
+      servers: []
+    };
+    var row = document.createElement('a');
+    row.className = 'setrow';
+    row.href = '#' + key;
+    row.dataset.id = key;
+    row.innerHTML = '<span class="sname"><span class="dot warn"></span><span class="od-truncate">' + name + '</span></span>' +
+      '<span class="sport n">' + port + '</span>' +
+      '<span class="srate"><span class="n">0</span> / ч</span>';
+    $('rail-sets').appendChild(row);
+    $('c-sets').textContent = $('rail-count').textContent = String($('rail-sets').children.length);
+    form.reset();
+    form.hidden = true;
+    err.hidden = true;
+    render(key);
+    appendLog('info', 'INFO', 'набор ' + name + ' создан · порт ' + port + ' · серверы не назначены');
+  });
+
+  /* seed counters from data */
+  var totalServers = 0;
+  Object.keys(sets).forEach(function (k) { totalServers += sets[k].servers.length; });
+  $('c-servers').textContent = String(totalServers);
+
+  render('demo');
+})();
+</script>
+</body>
+</html>
