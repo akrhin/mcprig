@@ -131,31 +131,30 @@ func writeAtomic(path string, body []byte, mode os.FileMode) error {
 
 var envRefRe = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
-// envRefs — имена ${VAR}, на которые ссылается набор: env, headers, url, cwd,
-// command[]. Отсортированы без повторов.
-func envRefs(servers []registry.Server) []string {
-	seen := map[string]bool{}
-	add := func(text string) {
-		for _, m := range envRefRe.FindAllStringSubmatch(text, -1) {
-			seen[m[1]] = true
-		}
+// addRefs собирает имена ${VAR} из строки в seen.
+func addRefs(seen map[string]bool, text string) {
+	for _, m := range envRefRe.FindAllStringSubmatch(text, -1) {
+		seen[m[1]] = true
 	}
-	for _, s := range servers {
-		if s == nil {
-			continue
-		}
+}
+
+// serverEnvRefs — имена ${VAR}, на которые ссылается сервер: env, headers,
+// url, cwd, command[]. Отсортированы без повторов.
+func serverEnvRefs(s *config.Server) []string {
+	seen := map[string]bool{}
+	if s != nil {
 		for name, value := range s.Env {
-			add(name)
-			add(value)
+			addRefs(seen, name)
+			addRefs(seen, value)
 		}
 		for name, value := range s.Headers {
-			add(name)
-			add(value)
+			addRefs(seen, name)
+			addRefs(seen, value)
 		}
-		add(s.URL)
-		add(s.Cwd)
+		addRefs(seen, s.URL)
+		addRefs(seen, s.Cwd)
 		for _, part := range s.Command {
-			add(part)
+			addRefs(seen, part)
 		}
 	}
 	out := make([]string, 0, len(seen))
@@ -163,6 +162,34 @@ func envRefs(servers []registry.Server) []string {
 		out = append(out, name)
 	}
 	sort.Strings(out)
+	return out
+}
+
+// envRefs — имена ${VAR} всех серверов набора, без повторов.
+func envRefs(servers []registry.Server) []string {
+	seen := map[string]bool{}
+	for _, s := range servers {
+		for _, name := range serverEnvRefs(s) {
+			seen[name] = true
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for name := range seen {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// reservedRefs — служебные ${VAR} сервера, которые нельзя раскрывать: иначе
+// импортированный конфиг уносит секрет панели в env набора или в URL.
+func reservedRefs(s *config.Server) []string {
+	out := []string{}
+	for _, name := range serverEnvRefs(s) {
+		if reservedSecret(name) {
+			out = append(out, name)
+		}
+	}
 	return out
 }
 

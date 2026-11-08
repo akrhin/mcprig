@@ -653,6 +653,9 @@ func (m *Manager) apiImport(req *request) error {
 	if body.MCPServers == nil {
 		return badRequest("нужен объект mcpServers")
 	}
+	if name, found := importRefsReserved(body.MCPServers); found {
+		return reservedRefError(name)
+	}
 	added, skipped := m.store.Import(body.MCPServers)
 	if added == nil {
 		added = []string{}
@@ -879,6 +882,63 @@ func (m *Manager) apiBrowseCall(req *request) error {
 
 // ─── servers ─────────────────────────────────────────────────────────────────
 
+// checkReservedRefs отбивает сервер, который подставляет служебную ${VAR}
+// менеджера: значение ушло бы в env набора или в URL при probe/browse.
+func checkReservedRefs(raw json.RawMessage) error {
+	var srv config.Server
+	if err := json.Unmarshal(raw, &srv); err != nil {
+		return nil // кривой JSON отклонит store
+	}
+	if names := reservedRefs(&srv); len(names) > 0 {
+		return reservedRefError(names[0])
+	}
+	return nil
+}
+
+func reservedRefError(name string) error {
+	return badRequest(fmt.Sprintf("переменная ${%s} — служебная, её нельзя подставлять в сервер", name))
+}
+
+// importRefsReserved ищет служебные ${VAR} в сырых записях mcpServers.
+// Значения разбираются, а не ищутся текстом: имя может прийти с \u-escape.
+func importRefsReserved(entries map[string]json.RawMessage) (string, bool) {
+	for _, raw := range entries {
+		seen := map[string]bool{}
+		trimmed := bytes.TrimSpace(raw)
+		if len(trimmed) == 0 {
+			continue
+		}
+		switch trimmed[0] {
+		case '{':
+			var srv config.Server
+			if json.Unmarshal(trimmed, &srv) != nil {
+				continue
+			}
+			for _, name := range serverEnvRefs(&srv) {
+				seen[name] = true
+			}
+		case '"':
+			var text string
+			if json.Unmarshal(trimmed, &text) == nil {
+				addRefs(seen, text)
+			}
+		case '[':
+			var argv []string
+			if json.Unmarshal(trimmed, &argv) == nil {
+				for _, part := range argv {
+					addRefs(seen, part)
+				}
+			}
+		}
+		for name := range seen {
+			if reservedSecret(name) {
+				return name, true
+			}
+		}
+	}
+	return "", false
+}
+
 func (m *Manager) apiServersList(req *request) error {
 	writeJSON(req.w, http.StatusOK, serversOrEmpty(m.store.Servers()))
 	return nil
@@ -891,6 +951,9 @@ func (m *Manager) apiServerAdd(req *request) error {
 	}
 	if len(body) == 0 || !bytes.HasPrefix(bytes.TrimSpace(body), []byte("{")) {
 		return badRequest("ожидался JSON")
+	}
+	if err := checkReservedRefs(body); err != nil {
+		return err
 	}
 	var name struct {
 		Name string `json:"name"`
@@ -917,6 +980,9 @@ func (m *Manager) apiServerUpdate(req *request) error {
 	}
 	body, err := readBody(req.r)
 	if err != nil {
+		return err
+	}
+	if err := checkReservedRefs(body); err != nil {
 		return err
 	}
 	srv, err := m.store.UpdateServer(name, json.RawMessage(body))

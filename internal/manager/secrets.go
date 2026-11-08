@@ -249,8 +249,19 @@ func (s *Secrets) RemoteError() string {
 	return ""
 }
 
+// reservedSecret: переменные самого менеджера. Их нельзя подставлять в
+// сервер набора — иначе чужой конфиг унесёт пароль панели или токен OpenBao.
+func reservedSecret(name string) bool {
+	return strings.HasPrefix(name, "MCPRIG_") ||
+		strings.HasPrefix(name, "BAO_") ||
+		strings.HasPrefix(name, "OPENBAO_")
+}
+
 // Get возвращает первое найденное значение и его источник.
 func (s *Secrets) Get(name string) (string, string) {
+	if reservedSecret(name) {
+		return "", ""
+	}
 	if s.bao != nil {
 		v, err := s.bao.get(name)
 		switch {
