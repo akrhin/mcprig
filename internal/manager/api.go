@@ -1242,7 +1242,10 @@ func (m *Manager) stopSetsUsing(server string) []string {
 		if !containsName(set.Servers, server) {
 			continue
 		}
-		if status := m.rt.Stop(set); status.PID != 0 || status.Running {
+		// Статус — до Stop: Stop удаляет запись, и после него набор всегда «не работает».
+		wasRunning := m.rt.status(set).Running
+		m.rt.Stop(set)
+		if wasRunning {
 			out = append(out, set.ID)
 		}
 		m.health.clear(set.ID)

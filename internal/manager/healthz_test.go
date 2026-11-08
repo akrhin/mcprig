@@ -35,3 +35,21 @@ func TestHealthzReflectsDeadAutostart(t *testing.T) {
 		t.Fatalf("healthz после старта: %s", w.Body.String())
 	}
 }
+
+// TestDeleteServerReportsStoppedSet: stopped[] — по статусу до Stop, иначе
+// список всегда пуст.
+func TestDeleteServerReportsStoppedSet(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "live", "fake")
+	if _, err := e.m.rt.Start(context.Background(), e.m.store.Set(id), e.m.store.Servers()); err != nil {
+		t.Fatalf("старт: %v", err)
+	}
+
+	w := e.do(t, http.MethodDelete, "/api/servers/fake", nil)
+	status(t, w, http.StatusOK)
+	stopped, _ := decode[map[string]any](t, w)["stopped"].([]any)
+	if len(stopped) != 1 || stopped[0] != id {
+		t.Fatalf("stopped = %v, ждали [%s]: %s", stopped, id, w.Body.String())
+	}
+}
