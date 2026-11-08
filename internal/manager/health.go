@@ -80,7 +80,11 @@ func (c *healthCache) get(ctx context.Context, id string, load func(context.Cont
 		e.wait = wait
 		c.mu.Unlock()
 
-		view := load(ctx)
+		// Лидер грузит под своим ctx: отмена запроса клиента не должна
+		// попадать в кэш как «context canceled» на весь healthTTL.
+		loadCtx, cancel := context.WithTimeout(context.Background(), healthTimeout)
+		view := load(loadCtx)
+		cancel()
 
 		c.mu.Lock()
 		e.view, e.at, e.wait = view, time.Now(), nil
