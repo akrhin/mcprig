@@ -4,18 +4,21 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 )
 
 // initFlags — генератор клиентской настройки. Печатает фрагмент, который
 // человек вставляет в свой конфиг сам: чужие файлы не переписываем.
 type initConfig struct {
-	Client string
-	Set    string
-	Remote string
-	Key    string
-	Binary string
-	Config string
+	Client  string
+	Set     string
+	Remote  string
+	Key     string
+	KeyFile string
+	Binary  string
+	Config  string
 }
 
 func newInitFlags() (*flag.FlagSet, *initConfig) {
@@ -24,7 +27,8 @@ func newInitFlags() (*flag.FlagSet, *initConfig) {
 	fs.StringVar(&cfg.Client, "client", "opencode", "клиент: opencode, claude, codex")
 	fs.StringVar(&cfg.Set, "set", "demo", "имя набора")
 	fs.StringVar(&cfg.Remote, "remote", "", "адрес набора, напр. http://127.0.0.1:9100/mcp; пусто — stdio")
-	fs.StringVar(&cfg.Key, "key", "", "bearer-ключ набора (только для --remote)")
+	fs.StringVar(&cfg.Key, "key", "", "bearer-ключ набора (только для --remote); - — читать stdin")
+	fs.StringVar(&cfg.KeyFile, "key-file", "", "файл с bearer-ключом набора (только для --remote)")
 	fs.StringVar(&cfg.Binary, "binary", "mcprig", "путь к бинарю mcprig для stdio-режима")
 	fs.StringVar(&cfg.Config, "config", "", "путь к servers.json для stdio-режима")
 	return fs, cfg
@@ -41,8 +45,15 @@ func runInit(args []string) error {
 	default:
 		return &usageError{fmt.Sprintf("неизвестный клиент %q; доступны: opencode, claude, codex", cfg.Client)}
 	}
-	if cfg.Remote != "" && cfg.Key == "" {
-		return &usageError{"для --remote нужен --key (ключ набора выдаёт панель)"}
+	if cfg.Remote == "" && (cfg.Key != "" || cfg.KeyFile != "") {
+		return &usageError{"--key и --key-file нужны только с --remote: в stdio-режиме ключ не требуется"}
+	}
+	key, err := initKey(cfg)
+	if err != nil {
+		return err
+	}
+	if cfg.Remote != "" && key == "" {
+		return &usageError{"для --remote нужен ключ: --key, --key-file, --key - или MCPRIG_KEY"}
 	}
 	if cfg.Remote == "" && cfg.Config == "" {
 		return &usageError{"для stdio-режима нужен --config (путь к servers.json набора)"}
@@ -60,7 +71,7 @@ func runInit(args []string) error {
 				"type":    "remote",
 				"url":     cfg.Remote,
 				"enabled": true,
-				"headers": map[string]string{"Authorization": "Bearer " + cfg.Key},
+				"headers": map[string]string{"Authorization": "Bearer " + key},
 			}
 		}
 		out = marshal(map[string]any{"mcp": map[string]any{name: entry}})
@@ -71,7 +82,7 @@ func runInit(args []string) error {
 				"type": "http",
 				"url":  cfg.Remote,
 				"headers": map[string]string{
-					"Authorization": "Bearer " + cfg.Key,
+					"Authorization": "Bearer " + key,
 				},
 			}
 		}
@@ -82,7 +93,7 @@ func runInit(args []string) error {
 		fmt.Fprintf(&b, "[mcp_servers.%s]\n", name)
 		if cfg.Remote != "" {
 			fmt.Fprintf(&b, "url = %q\n", cfg.Remote)
-			fmt.Fprintf(&b, "http_headers = { Authorization = %q }\n", "Bearer "+cfg.Key)
+			fmt.Fprintf(&b, "http_headers = { Authorization = %q }\n", "Bearer "+key)
 		} else {
 			fmt.Fprintf(&b, "command = %q\n", cfg.Binary)
 			fmt.Fprintf(&b, "args = [%q, %q, %q]\n", "stdio", "--config", cfg.Config)
@@ -91,6 +102,32 @@ func runInit(args []string) error {
 	}
 	fmt.Println(out)
 	return nil
+}
+
+// initKey берёт ключ из --key-file, stdin (--key -), --key или MCPRIG_KEY.
+// Значение в argv видно в ps и истории шелла, поэтому основной путь — файл.
+func initKey(cfg *initConfig) (string, error) {
+	if cfg.KeyFile != "" && cfg.Key != "" {
+		return "", &usageError{"выберите что-то одно: --key или --key-file"}
+	}
+	if cfg.KeyFile != "" {
+		body, err := os.ReadFile(cfg.KeyFile)
+		if err != nil {
+			return "", fmt.Errorf("ключ: %w", err)
+		}
+		return strings.TrimSpace(string(body)), nil
+	}
+	if cfg.Key == "-" {
+		body, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return "", fmt.Errorf("ключ: %w", err)
+		}
+		return strings.TrimSpace(string(body)), nil
+	}
+	if cfg.Key != "" {
+		return cfg.Key, nil
+	}
+	return strings.TrimSpace(os.Getenv("MCPRIG_KEY")), nil
 }
 
 func marshal(v any) string {
