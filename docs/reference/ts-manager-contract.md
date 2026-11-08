@@ -15,7 +15,7 @@ SSE, CORS, OPTIONS нет. Ошибки: `HttpError.status`, иначе `400`.
 
 | Метод | Путь | Тело/query | Ответ |
 |---|---|---|---|
-| GET | `/healthz` | — | `200 {"status":"ok","sets":N}`; `503 {"status":"degraded","dead":["id",…]}` при мёртвом autostart-наборе; до auth |
+| GET | `/healthz` | — | `200 {"status":"ok","sets":N}`, N — наборов в реестре; `503 {"status":"degraded","dead":["id",…]}` при мёртвом autostart-наборе; до auth |
 | GET | `/login` | — | HTML; `404`, если парольный режим выключен |
 | POST | `/api/login` | `{user,password}` | `{ok,user}` + cookie `mcp_session=<tok>.<sig>`, `HttpOnly; SameSite=Lax; Max-Age=43200`; `401` |
 | POST | `/api/logout` | — | `{ok:true}`, cookie с `Max-Age=0` |
@@ -126,9 +126,10 @@ RegistryData  {version:1, servers, sets, nextPort}
    но недоступен.
 8. **Супервизия.** `stop`/`exit` не должны оставлять висячий роут; `stopAll` —
    с `SIGKILL`-фолбэком; `pid-lock` используется, а не лежит.
-9. **Health и логи.** `/healthz` отдаёт `200 {"status":"ok","sets":N}`, когда все
-   autostart-наборы живы или их нет, и `503 {"status":"degraded","dead":["id",…]}`
-   когда autostart-набор задан, но процесса нет; логи читаются хвостом файла
+9. **Health и логи.** `/healthz` отдаёт `200 {"status":"ok","sets":N}` (N — сколько
+   наборов в реестре), когда все autostart-наборы живы или их нет, и
+   `503 {"status":"degraded","dead":["id",…]}` когда autostart-набор задан, но
+   процесса нет; логи читаются хвостом файла
    набора, фильтр по точному имени сервера, не подстрокой.
 10. **Атомарность.** `fsync`/`.bak` перед перезаписью реестра; `JSON.parse` с
     восстановлением; ошибки записи не глотаются.

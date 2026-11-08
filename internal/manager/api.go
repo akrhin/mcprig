@@ -148,6 +148,13 @@ func New(opts Options) (*Manager, error) {
 		browse:  newBrowser(sec, version),
 	}
 	m.rt = NewRuntime(opts.DataDir, cli, opts.BindIP, sec, log)
+	m.rt.reload = func(id string) (*registry.Set, []registry.Server) {
+		set := m.store.Set(id)
+		if set == nil {
+			return nil, nil
+		}
+		return set, m.store.Servers()
+	}
 	m.routes = m.buildRoutes()
 	return m, nil
 }
@@ -216,15 +223,14 @@ func Run(opts Options) error {
 }
 
 // healthz отражает мёртвые autostart-наборы: контракт требует 503, а не «ok»,
-// когда набор задан, но процесса нет.
+// когда набор задан, но процесса нет. sets — сколько наборов в реестре всего.
 func (m *Manager) healthz(w http.ResponseWriter) {
-	sets := 0
+	sets := m.store.Sets()
 	dead := []string{}
-	for _, set := range m.store.Sets() {
+	for _, set := range sets {
 		if !set.Autostart {
 			continue
 		}
-		sets++
 		if !m.rt.status(set).Running {
 			dead = append(dead, set.ID)
 		}
@@ -234,7 +240,7 @@ func (m *Manager) healthz(w http.ResponseWriter) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "degraded", "dead": dead})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "sets": sets})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "sets": len(sets)})
 }
 
 // lockDataDir не даёт двум менеджерам делить один реестр.

@@ -34,6 +34,13 @@ func TestHealthzReflectsDeadAutostart(t *testing.T) {
 	if got := decode[map[string]any](t, w); got["status"] != "ok" || got["sets"] != float64(1) {
 		t.Fatalf("healthz после старта: %s", w.Body.String())
 	}
+
+	// sets считает весь реестр, а не только autostart.
+	e.addSet(t, "plain", "fake")
+	w = e.do(t, http.MethodGet, "/healthz", nil)
+	if got := decode[map[string]any](t, w); got["sets"] != float64(2) {
+		t.Fatalf("sets не считает наборы реестра: %s", w.Body.String())
+	}
 }
 
 // TestDeleteServerReportsStoppedSet: stopped[] — по статусу до Stop, иначе

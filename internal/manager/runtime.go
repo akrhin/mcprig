@@ -73,6 +73,10 @@ type Runtime struct {
 	rings  map[string]*ring
 	locks  map[string]*sync.Mutex
 	closed bool
+
+	// reload отдаёт актуальные набор и серверы для отложенного перезапуска:
+	// снимок первого старта к моменту рестарта устаревает.
+	reload func(id string) (*registry.Set, []registry.Server)
 }
 
 func NewRuntime(dataDir, cliPath, bindIP string, sec *Secrets, log *slog.Logger) *Runtime {
@@ -126,11 +130,17 @@ func (rt *Runtime) ring(id string) *ring {
 	return r
 }
 
-// Start поднимает набор, если он ещё не работает.
+// Start поднимает набор, если он ещё не работает. Явный старт начинает бюджет
+// перезапусков заново.
 func (rt *Runtime) Start(ctx context.Context, set *registry.Set, servers []registry.Server) (RuntimeStatus, error) {
 	l := rt.setLock(set.ID)
 	l.Lock()
 	defer l.Unlock()
+	rt.mu.Lock()
+	if cur := rt.procs[set.ID]; cur != nil {
+		cur.restarts = 0
+	}
+	rt.mu.Unlock()
 	return rt.startLocked(ctx, set, servers)
 }
 
@@ -233,6 +243,10 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 	if stopping || closed {
 		return
 	}
+	if code == 0 {
+		// Штатный выход — не падение: рестарта нет.
+		return
+	}
 	if err != nil {
 		rt.log.Warn("набор завершился", "set", id, "code", code, "err", err)
 	}
@@ -262,7 +276,15 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 		if !same {
 			return
 		}
-		if _, err := rt.startLocked(context.Background(), set, servers); err != nil {
+		rs, fresh := set, servers
+		if rt.reload != nil {
+			freshSet, freshServers := rt.reload(id)
+			if freshSet == nil {
+				return // набор удалили, пока ждали
+			}
+			rs, fresh = freshSet, freshServers
+		}
+		if _, err := rt.startLocked(context.Background(), rs, fresh); err != nil {
 			rt.log.Warn("перезапуск набора не удался", "set", id, "err", err)
 		}
 	}()
