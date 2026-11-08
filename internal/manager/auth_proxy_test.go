@@ -24,7 +24,8 @@ func TestClientIPFollowsHeaderOnlyForProxy(t *testing.T) {
 	if got := (&auth{}).clientIP(r); got != "10.0.0.5" {
 		t.Fatalf("без прокси заголовок подделывается: %q", got)
 	}
-	if got := (&auth{proxySecret: "s"}).clientIP(r); got != "1.2.3.4" {
-		t.Fatalf("за прокси нужен первый адрес: %q", got)
+	// Клиент прислал "1.2.3.4", прокси дописал свой адрес — считаем по нему.
+	if got := (&auth{proxySecret: "s"}).clientIP(r); got != "5.6.7.8" {
+		t.Fatalf("за прокси нужен адрес, дописанный прокси: %q", got)
 	}
 }

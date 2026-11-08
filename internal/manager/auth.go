@@ -312,8 +312,11 @@ func (a *auth) login(user, password string) bool {
 // иначе заголовок подделывается и лимит обходится.
 func (a *auth) clientIP(r *http.Request) string {
 	if a.proxySecret != "" {
+		// Берём последний адрес: его дописал ближайший прокси. Первый элемент
+		// приходит от клиента и подделывается, обходя лимит входа.
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			if ip := strings.TrimSpace(strings.Split(xff, ",")[0]); ip != "" {
+			parts := strings.Split(xff, ",")
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
 				return ip
 			}
 		}
