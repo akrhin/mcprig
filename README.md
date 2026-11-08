@@ -87,7 +87,7 @@ path,authToken,allowedHosts}`, `healthMonitor`, `requestTimeout`, обе фор�
 ```bash
 go build ./...
 go test ./...
-go build -o mcprig ./cmd/mcp-manager
+go build -o mcprig ./cmd/mcprig
 ./mcprig -version
 ```
 

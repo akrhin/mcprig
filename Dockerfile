@@ -11,7 +11,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/mcprig ./cmd/mcp-manager
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/mcprig ./cmd/mcprig
 
 FROM alpine:3.21 AS slim
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 mcprig

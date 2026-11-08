@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/sintez/mcp-manager/internal/downstream"
-	"github.com/sintez/mcp-manager/internal/registry"
+	"github.com/sintez/mcprig/internal/downstream"
+	"github.com/sintez/mcprig/internal/registry"
 )
 
 const probeTimeout = 60 * time.Second

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sintez/mcp-manager/internal/atomicfile"
-	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcprig/internal/atomicfile"
+	"github.com/sintez/mcprig/internal/config"
 )
 
 // Store is the manager registry. Every exported method takes the lock, so the

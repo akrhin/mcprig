@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sintez/mcp-manager/internal/registry"
+	"github.com/sintez/mcprig/internal/registry"
 )
 
 const (

@@ -8,7 +8,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcprig/internal/config"
 )
 
 // denyReason applies lazy-mcp's resolution order and reports whether the call
@@ -85,7 +85,7 @@ func blockedResult(serverName, command, message string) *mcp.CallToolResult {
 	}
 	return &mcp.CallToolResult{
 		IsError: true,
-		Content: []mcp.Content{&mcp.TextContent{Text: "🚫 Blocked by mcp-manager policy: " + message}},
+		Content: []mcp.Content{&mcp.TextContent{Text: "🚫 Blocked by mcprig policy: " + message}},
 		Meta:    mcp.Meta{"lazyMcpPolicy": "blocked"},
 	}
 }

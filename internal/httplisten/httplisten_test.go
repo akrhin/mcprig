@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcprig/internal/config"
 )
 
 const testToken = "s3cret-token"

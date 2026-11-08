@@ -21,8 +21,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sintez/mcp-manager/internal/config"
-	"github.com/sintez/mcp-manager/internal/registry"
+	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/registry"
 )
 
 const maxBody = 1 << 20

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcprig/internal/config"
 )
 
 var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)

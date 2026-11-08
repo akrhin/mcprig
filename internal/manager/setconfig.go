@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sintez/mcp-manager/internal/config"
-	"github.com/sintez/mcp-manager/internal/registry"
+	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/registry"
 )
 
 // Формат servers.json — вход lazy-mcp `serve`. ${VAR} остаются нераскрытыми:

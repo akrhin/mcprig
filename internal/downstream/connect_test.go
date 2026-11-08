@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcprig/internal/config"
 )
 
 func TestTransportRejectsBrokenServer(t *testing.T) {

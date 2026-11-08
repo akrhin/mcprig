@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/sintez/mcp-manager/internal/config"
-	"github.com/sintez/mcp-manager/internal/stats"
+	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/stats"
 )
 
 // maxBodyBytes is the contract limit for one proxied MCP request.

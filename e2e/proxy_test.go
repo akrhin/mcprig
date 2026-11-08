@@ -21,8 +21,8 @@ import (
 func TestProxyServesMetaTools(t *testing.T) {
 	dir := t.TempDir()
 	fixture := filepath.Join(dir, "testmcp")
-	bin := filepath.Join(dir, "mcp-manager")
-	for src, out := range map[string]string{"./cmd/testmcp": fixture, "./cmd/mcp-manager": bin} {
+	bin := filepath.Join(dir, "mcprig")
+	for src, out := range map[string]string{"./cmd/testmcp": fixture, "./cmd/mcprig": bin} {
 		cmd := exec.Command("go", "build", "-o", out, src)
 		cmd.Dir = ".."
 		if b, err := cmd.CombinedOutput(); err != nil {

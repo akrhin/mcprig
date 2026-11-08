@@ -11,8 +11,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcp-manager/internal/downstream"
-	"github.com/sintez/mcp-manager/internal/registry"
+	"github.com/sintez/mcprig/internal/downstream"
+	"github.com/sintez/mcprig/internal/registry"
 )
 
 const (

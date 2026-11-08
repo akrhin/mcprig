@@ -17,9 +17,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcp-manager/internal/config"
-	"github.com/sintez/mcp-manager/internal/downstream"
-	"github.com/sintez/mcp-manager/internal/stats"
+	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/downstream"
+	"github.com/sintez/mcprig/internal/stats"
 )
 
 const (
@@ -113,7 +113,7 @@ func (m *Manager) Close() error {
 
 // Server builds the MCP server carrying the four meta-tools.
 func (m *Manager) Server() *mcp.Server {
-	s := mcp.NewServer(&mcp.Implementation{Name: "mcp-manager", Version: m.version}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "mcprig", Version: m.version}, nil)
 	s.AddTool(&mcp.Tool{
 		Name: "list_servers",
 		Description: "List all available MCP servers with their capabilities and tags. " +

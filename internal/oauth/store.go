@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/sintez/mcp-manager/internal/atomicfile"
+	"github.com/sintez/mcprig/internal/atomicfile"
 )
 
 // Key возвращает ключ хранилища для пары «имя сервера + URL»: первые 32 hex

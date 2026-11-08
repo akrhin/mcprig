@@ -13,8 +13,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcp-manager/internal/config"
-	"github.com/sintez/mcp-manager/internal/stats"
+	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/stats"
 )
 
 // upstream is one in-memory downstream server with two commands. No network,

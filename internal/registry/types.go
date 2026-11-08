@@ -5,7 +5,7 @@
 // headers accept strings only, and writes are atomic.
 package registry
 
-import "github.com/sintez/mcp-manager/internal/config"
+import "github.com/sintez/mcprig/internal/config"
 
 const (
 	// RegistryFile is the registry file name inside the data directory.

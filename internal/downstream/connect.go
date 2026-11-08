@@ -10,8 +10,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcp-manager/internal/config"
-	"github.com/sintez/mcp-manager/internal/oauth"
+	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/oauth"
 )
 
 // Connector opens sessions to downstream servers. OAuth is optional: without a

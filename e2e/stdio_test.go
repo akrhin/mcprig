@@ -16,7 +16,7 @@ func TestStdioModeIsClientOwned(t *testing.T) {
 	dir := t.TempDir()
 	fixture := filepath.Join(dir, "testmcp")
 	bin := filepath.Join(dir, "mcprig")
-	for src, out := range map[string]string{"../cmd/testmcp": fixture, "../cmd/mcp-manager": bin} {
+	for src, out := range map[string]string{"../cmd/testmcp": fixture, "../cmd/mcprig": bin} {
 		cmd := exec.Command("go", "build", "-o", out, src)
 		if b, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("go build %s: %v\n%s", src, err, b)

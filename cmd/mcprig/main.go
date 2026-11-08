@@ -1,4 +1,4 @@
-// Command mcp-manager serves one set of MCP servers behind a single lazy proxy.
+// Command mcprig serves one set of MCP servers behind a single lazy proxy.
 package main
 
 import (
@@ -16,13 +16,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sintez/mcp-manager/internal/config"
-	"github.com/sintez/mcp-manager/internal/downstream"
-	"github.com/sintez/mcp-manager/internal/httplisten"
-	"github.com/sintez/mcp-manager/internal/manager"
-	"github.com/sintez/mcp-manager/internal/mcpserver"
-	"github.com/sintez/mcp-manager/internal/oauth"
-	"github.com/sintez/mcp-manager/internal/stats"
+	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/downstream"
+	"github.com/sintez/mcprig/internal/httplisten"
+	"github.com/sintez/mcprig/internal/manager"
+	"github.com/sintez/mcprig/internal/mcpserver"
+	"github.com/sintez/mcprig/internal/oauth"
+	"github.com/sintez/mcprig/internal/stats"
 )
 
 // version is set by the release build.
@@ -30,7 +30,7 @@ var version = "dev"
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "mcp-manager:", err)
+		fmt.Fprintln(os.Stderr, "mcprig:", err)
 		if _, ok := err.(*usageError); ok {
 			os.Exit(2)
 		}

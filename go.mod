@@ -1,4 +1,4 @@
-module github.com/sintez/mcp-manager
+module github.com/sintez/mcprig
 
 go 1.25.0
 
