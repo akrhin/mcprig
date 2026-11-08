@@ -1,0 +1,329 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-label="mcp-manager — набросок дашборда">
+<style>
+  svg{
+    --bg:#06171C;--surface:#0B2229;--s2:#112E36;--border:#24505A;
+    --text:#E6EFF1;--dim:#8CA6AE;--acc:#2BB3A3;--ok:#4FBE79;--warn:#D9A03C;--err:#F0808A;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .mono{font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", "IBM Plex Mono", Menlo, monospace; font-variant-numeric: tabular-nums;}
+  .k{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;fill:var(--dim);font-weight:600}
+  .h1{font-size:12.5px;font-weight:600;fill:var(--text)}
+  .h2{font-size:15px;font-weight:600;fill:var(--text)}
+  .lbl{font-size:11px;fill:var(--dim)}
+  .td{font-size:11.5px;fill:var(--text)}
+  .tdd{font-size:11.5px;fill:var(--dim)}
+  .tiny{font-size:10px;fill:var(--dim)}
+  .val{font-size:23px;font-weight:600;fill:var(--text)}
+  .chip{font-size:9.5px;font-weight:600;letter-spacing:.04em}
+  .col{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;fill:var(--dim);font-weight:600}
+</style>
+<rect x="0" y="0" width="1280" height="800" rx="0" fill="#06171C"/>
+<rect x="0" y="0" width="60" height="800" rx="0" fill="#0B2229"/>
+<line x1="60" y1="0" x2="60" y2="800" stroke="#24505A" stroke-width="1"/>
+<g transform="translate(13,13) scale(0.266)">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#112E36"/>
+  <mask id="railmark">
+    <rect x="0" y="0" width="128" height="128" fill="#000"/>
+    <g fill="#fff"><rect x="18" y="32" width="14" height="16" rx="4"/><rect x="18" y="82" width="14" height="16" rx="4"/><rect x="96" y="32" width="14" height="16" rx="4"/><rect x="96" y="82" width="14" height="16" rx="4"/><rect x="32" y="16" width="64" height="96" rx="12"/></g>
+    <rect x="46" y="32" width="36" height="16" rx="8" fill="#000"/>
+  </mask>
+  <rect x="0" y="0" width="128" height="128" fill="#E6EFF1" mask="url(#railmark)"/>
+  <rect x="42" y="66" width="44" height="20" rx="5" fill="#2BB3A3"/>
+</g>
+<rect x="14" y="84" width="32" height="32" rx="9" fill="#17635C"/>
+<g transform="translate(20,90)" color="#2BB3A3"><rect x="4.5" y="4.5" width="15" height="6" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4.5" y="13.5" width="15" height="6" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+<rect x="14" y="124" width="32" height="32" rx="9" fill="transparent"/>
+<g transform="translate(20,130)" color="#8CA6AE"><rect x="4.5" y="4.5" width="15" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4.5" y="13.5" width="15" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="7.5" r="1.3" fill="currentColor"/></g>
+<rect x="14" y="164" width="32" height="32" rx="9" fill="transparent"/>
+<g transform="translate(20,170)" color="#8CA6AE"><circle cx="8.5" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 12h8M17 12v3.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+<rect x="14" y="204" width="32" height="32" rx="9" fill="transparent"/>
+<g transform="translate(20,210)" color="#8CA6AE"><rect x="4.5" y="4.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="12.5" y="4.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4.5" y="12.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="12.5" y="12.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/></g>
+<rect x="14" y="244" width="32" height="32" rx="9" fill="transparent"/>
+<g transform="translate(20,250)" color="#8CA6AE"><path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g>
+<rect x="60" y="0" width="1220" height="56" rx="0" fill="#0B2229"/>
+<line x1="60" y1="56" x2="1280" y2="56" stroke="#24505A" stroke-width="1"/>
+<text x="80" y="25" class="h2">mcp-manager</text>
+<text x="80" y="42" class="tiny mono">fleet · 4 набора · 12 серверов</text>
+<rect x="360" y="12" width="300" height="32" rx="8" fill="#112E36" stroke="#24505A"/>
+<g stroke="#8CA6AE" stroke-width="1.5" fill="none"><circle cx="377" cy="27" r="5"/><path d="M381 31l3.6 3.6"/></g>
+<text x="394" y="32" class="lbl">сервер, набор, инструмент…</text>
+<text x="646" y="32" class="tiny mono" text-anchor="end">⌘K</text>
+<rect x="700" y="14" width="150" height="28" rx="14" fill="#112E36" stroke="#24505A"/>
+<circle cx="716" cy="28" r="3.5" fill="#4FBE79"/>
+<text x="726" y="32" class="lbl">3 набора живы</text>
+<rect x="1024" y="14" width="104" height="28" rx="8" fill="#2BB3A3"/>
+<text x="1076" y="32" class="lbl" text-anchor="middle" fill="#06171C" font-weight="600">+ Набор</text>
+<rect x="1138" y="14" width="122" height="28" rx="8" fill="transparent" stroke="#24505A"/>
+<text x="1199" y="32" class="lbl" text-anchor="middle">+ Сервер</text>
+<rect x="80" y="68" width="285" height="76" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="94" y="88" class="k">Наборы</text>
+<text x="94" y="118" class="val mono">4</text>
+<text x="94" y="135" class="tiny mono">3 работают · 1 остановлен</text>
+<path d="M274.0 115.6 L283.5 109.2 L293.0 122.0 L302.5 102.8 L312.0 96.4 L321.5 109.2 L331.0 90.0 L340.5 96.4 L350.0 90.0" fill="none" stroke="#4FBE79" stroke-width="1.5" stroke-linejoin="round"/>
+<rect x="377" y="68" width="285" height="76" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="391" y="88" class="k">Серверы</text>
+<text x="391" y="118" class="val mono">12</text>
+<text x="391" y="135" class="tiny mono">11 здоровы · 1 не отвечает</text>
+<path d="M571.0 122.0 L580.5 122.0 L590.0 106.0 L599.5 106.0 L609.0 106.0 L618.5 90.0 L628.0 90.0 L637.5 106.0 L647.0 106.0" fill="none" stroke="#D9A03C" stroke-width="1.5" stroke-linejoin="round"/>
+<rect x="674" y="68" width="285" height="76" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="688" y="88" class="k">Вызовы, 24 ч</text>
+<text x="688" y="118" class="val mono">18 402</text>
+<text x="688" y="135" class="tiny mono">p50 42 мс · p95 142 мс</text>
+<path d="M868.0 122.0 L874.9 114.9 L881.8 118.4 L888.7 107.8 L895.6 111.3 L902.5 97.1 L909.5 104.2 L916.4 93.6 L923.3 100.7 L930.2 90.0 L937.1 97.1 L944.0 104.2" fill="none" stroke="#4A9FD8" stroke-width="1.5" stroke-linejoin="round"/>
+<rect x="971" y="68" width="285" height="76" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="985" y="88" class="k">Ошибки, 24 ч</text>
+<text x="985" y="118" class="val mono">0,6 %</text>
+<text x="985" y="135" class="tiny mono">112 из 18 402 · 3 набора</text>
+<path d="M1165.0 114.0 L1171.9 122.0 L1178.8 106.0 L1185.7 122.0 L1192.6 114.0 L1199.5 90.0 L1206.5 114.0 L1213.4 122.0 L1220.3 106.0 L1227.2 114.0 L1234.1 122.0 L1241.0 114.0" fill="none" stroke="#F0808A" stroke-width="1.5" stroke-linejoin="round"/>
+<rect x="80" y="156" width="856" height="204" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="96" y="180" class="h1">Наборы</text>
+<text x="920" y="180" class="tiny mono" text-anchor="end">порты 9100–9199 · 2 автозапуска</text>
+<line x1="80" y1="192" x2="936" y2="192" stroke="#24505A" stroke-width="1"/>
+<text x="96" y="210" class="col">набор</text>
+<text x="376" y="210" class="col">порт</text>
+<text x="452" y="210" class="col">состояние</text>
+<text x="566" y="210" class="col">аптайм</text>
+<text x="660" y="210" class="col">серверы</text>
+<text x="740" y="210" class="col">ключ</text>
+<text x="850" y="210" class="col">вызовы</text>
+<text x="96" y="240" class="td mono">demo</text>
+<text x="135.6" y="240" class="tiny mono">3 сервера · cat</text>
+<text x="376" y="240" class="td mono">9100</text>
+<circle cx="456" cy="235" r="3.5" fill="#4FBE79"/>
+<text x="465" y="240" class="td" fill="#4FBE79">работает</text>
+<text x="566" y="240" class="tdd mono">6д 04ч</text>
+<text x="660" y="240" class="tdd mono">3/3</text>
+<text x="740" y="240" class="tdd mono">a91f4c2e</text>
+<text x="850" y="240" class="td mono">812</text>
+<rect x="902" y="228" width="18" height="18" rx="4" fill="transparent" stroke="#24505A"/>
+<text x="911" y="240" class="lbl" text-anchor="middle">›</text>
+<rect x="81" y="252" width="854" height="32" rx="0" fill="#112E36"/>
+<text x="96" y="272" class="td mono">infra</text>
+<text x="142.5" y="272" class="tiny mono">5 серверов · dev</text>
+<text x="376" y="272" class="td mono">9101</text>
+<circle cx="456" cy="267" r="3.5" fill="#4FBE79"/>
+<text x="465" y="272" class="td" fill="#4FBE79">работает</text>
+<text x="566" y="272" class="tdd mono">2д 11ч</text>
+<text x="660" y="272" class="tdd mono">5/5</text>
+<text x="740" y="272" class="tdd mono">7d02b18f</text>
+<text x="850" y="272" class="td mono">1 204</text>
+<rect x="902" y="260" width="18" height="18" rx="4" fill="transparent" stroke="#24505A"/>
+<text x="911" y="272" class="lbl" text-anchor="middle">›</text>
+<text x="96" y="304" class="td mono">docs</text>
+<text x="135.6" y="304" class="tiny mono">2 сервера · www</text>
+<text x="376" y="304" class="td mono">9102</text>
+<circle cx="456" cy="299" r="3.5" fill="#2BB3A3"/>
+<text x="465" y="304" class="td" fill="#2BB3A3">запуск…</text>
+<text x="566" y="304" class="tdd mono">—</text>
+<text x="660" y="304" class="tdd mono">—</text>
+<text x="740" y="304" class="tdd mono">e3c577a0</text>
+<text x="850" y="304" class="td mono">0</text>
+<rect x="902" y="292" width="18" height="18" rx="4" fill="transparent" stroke="#24505A"/>
+<text x="911" y="304" class="lbl" text-anchor="middle">›</text>
+<rect x="81" y="316" width="854" height="32" rx="0" fill="#112E36"/>
+<text x="96" y="336" class="td mono">lab</text>
+<text x="128.7" y="336" class="tiny mono">2 сервера · exp</text>
+<text x="376" y="336" class="td mono">9103</text>
+<circle cx="456" cy="331" r="3.5" fill="#F0808A"/>
+<text x="465" y="336" class="td" fill="#F0808A">остановлен</text>
+<text x="566" y="336" class="tdd mono">—</text>
+<text x="660" y="336" class="tdd mono">1/2</text>
+<text x="740" y="336" class="tdd mono">44be903d</text>
+<text x="850" y="336" class="td mono">0</text>
+<rect x="902" y="324" width="18" height="18" rx="4" fill="transparent" stroke="#24505A"/>
+<text x="911" y="336" class="lbl" text-anchor="middle">›</text>
+<text x="96" y="352" class="tiny mono" fill="#F0808A">lab: нет активного ключа — набор не стартует</text>
+<rect x="960" y="156" width="300" height="300" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="976" y="180" class="h1">Серверы</text>
+<text x="1244" y="180" class="tiny mono" text-anchor="end">health · 15 с</text>
+<line x1="960" y1="192" x2="1260" y2="192" stroke="#24505A" stroke-width="1"/>
+<circle cx="982" cy="213" r="3.5" fill="#4FBE79"/>
+<text x="992" y="217" class="td mono">serena</text>
+<rect x="1116" y="204" width="44" height="16" rx="4" fill="#112E36"/><text x="1138" y="215.5" class="chip" text-anchor="middle" fill="#4A9FD8">http</text>
+<text x="1244" y="217" class="tdd mono" text-anchor="end" fill="#8CA6AE">38 мс</text>
+<line x1="976" y1="227" x2="1244" y2="227" stroke="#24505A" stroke-width="0.8"/>
+<circle cx="982" cy="247" r="3.5" fill="#4FBE79"/>
+<text x="992" y="251" class="td mono">xerj</text>
+<rect x="1116" y="238" width="44" height="16" rx="4" fill="#112E36"/><text x="1138" y="249.5" class="chip" text-anchor="middle" fill="#8CA6AE">stdio</text>
+<text x="1244" y="251" class="tdd mono" text-anchor="end" fill="#8CA6AE">9 мс</text>
+<line x1="976" y1="261" x2="1244" y2="261" stroke="#24505A" stroke-width="0.8"/>
+<circle cx="982" cy="281" r="3.5" fill="#4FBE79"/>
+<text x="992" y="285" class="td mono">playwright</text>
+<rect x="1116" y="272" width="44" height="16" rx="4" fill="#112E36"/><text x="1138" y="283.5" class="chip" text-anchor="middle" fill="#8CA6AE">stdio</text>
+<text x="1244" y="285" class="tdd mono" text-anchor="end" fill="#8CA6AE">24 мс</text>
+<line x1="976" y1="295" x2="1244" y2="295" stroke="#24505A" stroke-width="0.8"/>
+<circle cx="982" cy="315" r="3.5" fill="#4FBE79"/>
+<text x="992" y="319" class="td mono">socraticode</text>
+<rect x="1116" y="306" width="44" height="16" rx="4" fill="#112E36"/><text x="1138" y="317.5" class="chip" text-anchor="middle" fill="#4A9FD8">http</text>
+<text x="1244" y="319" class="tdd mono" text-anchor="end" fill="#8CA6AE">112 мс</text>
+<line x1="976" y1="329" x2="1244" y2="329" stroke="#24505A" stroke-width="0.8"/>
+<circle cx="982" cy="349" r="3.5" fill="#4FBE79"/>
+<text x="992" y="353" class="td mono">raven</text>
+<rect x="1116" y="340" width="44" height="16" rx="4" fill="#112E36"/><text x="1138" y="351.5" class="chip" text-anchor="middle" fill="#8CA6AE">stdio</text>
+<text x="1244" y="353" class="tdd mono" text-anchor="end" fill="#8CA6AE">61 мс</text>
+<line x1="976" y1="363" x2="1244" y2="363" stroke="#24505A" stroke-width="0.8"/>
+<circle cx="982" cy="383" r="3.5" fill="#4FBE79"/>
+<text x="992" y="387" class="td mono">context7</text>
+<rect x="1116" y="374" width="44" height="16" rx="4" fill="#112E36"/><text x="1138" y="385.5" class="chip" text-anchor="middle" fill="#4A9FD8">http</text>
+<text x="1244" y="387" class="tdd mono" text-anchor="end" fill="#8CA6AE">210 мс</text>
+<line x1="976" y1="397" x2="1244" y2="397" stroke="#24505A" stroke-width="0.8"/>
+<circle cx="982" cy="417" r="3.5" fill="#F0808A"/>
+<text x="992" y="421" class="td mono">open-design</text>
+<rect x="1116" y="408" width="44" height="16" rx="4" fill="#112E36"/><text x="1138" y="419.5" class="chip" text-anchor="middle" fill="#8CA6AE">stdio</text>
+<text x="1244" y="421" class="tdd mono" text-anchor="end" fill="#F0808A">нет</text>
+<text x="976" y="444" class="tiny mono" fill="#F0808A">open-design: EOF на tools/list</text>
+<rect x="80" y="372" width="856" height="228" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="96" y="396" class="h1">Вызовы инструментов</text>
+<text x="920" y="396" class="tiny mono" text-anchor="end">18 402 за 24 ч · 0,6 % ошибок</text>
+<line x1="80" y1="408" x2="936" y2="408" stroke="#24505A" stroke-width="1"/>
+<text x="96" y="426" class="col">время</text>
+<text x="180" y="426" class="col">набор</text>
+<text x="380" y="426" class="col">инструмент</text>
+<text x="620" y="426" class="col">кто</text>
+<text x="760" y="426" class="col">мс</text>
+<text x="820" y="426" class="col">ток</text>
+<text x="870" y="426" class="col">статус</text>
+<text x="96" y="445" class="tdd mono">14:12:03</text>
+<text x="180" y="445" class="td mono">demo</text>
+<text x="380" y="445" class="td mono">serena.find_symbol</text>
+<text x="620" y="445" class="tdd mono">coder · a91f</text>
+<text x="760" y="445" class="tdd mono">42</text>
+<text x="820" y="445" class="tdd mono">3 112</text>
+<circle cx="873" cy="441" r="3" fill="#4FBE79"/>
+<text x="881" y="445" class="tdd" fill="#4FBE79">ok</text>
+<text x="96" y="464" class="tdd mono">14:12:01</text>
+<text x="180" y="464" class="td mono">infra</text>
+<text x="380" y="464" class="td mono">playwright.browser_navigate</text>
+<text x="620" y="464" class="tdd mono">coder · 7d02</text>
+<text x="760" y="464" class="tdd mono">1 820</text>
+<text x="820" y="464" class="tdd mono">12 480</text>
+<circle cx="873" cy="460" r="3" fill="#D9A03C"/>
+<text x="881" y="464" class="tdd" fill="#D9A03C">медленно</text>
+<text x="96" y="483" class="tdd mono">14:11:58</text>
+<text x="180" y="483" class="td mono">demo</text>
+<text x="380" y="483" class="td mono">xerj.xerj_search</text>
+<text x="620" y="483" class="tdd mono">coder · a91f</text>
+<text x="760" y="483" class="tdd mono">96</text>
+<text x="820" y="483" class="tdd mono">1 940</text>
+<circle cx="873" cy="479" r="3" fill="#4FBE79"/>
+<text x="881" y="483" class="tdd" fill="#4FBE79">ok</text>
+<text x="96" y="502" class="tdd mono">14:11:52</text>
+<text x="180" y="502" class="td mono">infra</text>
+<text x="380" y="502" class="td mono">socraticode.codebase_search</text>
+<text x="620" y="502" class="tdd mono">claude</text>
+<text x="760" y="502" class="tdd mono">1 240</text>
+<text x="820" y="502" class="tdd mono">8 610</text>
+<circle cx="873" cy="498" r="3" fill="#4FBE79"/>
+<text x="881" y="502" class="tdd" fill="#4FBE79">ok</text>
+<text x="96" y="521" class="tdd mono">14:11:47</text>
+<text x="180" y="521" class="td mono">docs</text>
+<text x="380" y="521" class="td mono">context7.query-docs</text>
+<text x="620" y="521" class="tdd mono">—</text>
+<text x="760" y="521" class="tdd mono">502</text>
+<text x="820" y="521" class="tdd mono">—</text>
+<circle cx="873" cy="517" r="3" fill="#F0808A"/>
+<text x="881" y="521" class="tdd" fill="#F0808A">ошибка</text>
+<text x="96" y="540" class="tdd mono">14:11:39</text>
+<text x="180" y="540" class="td mono">demo</text>
+<text x="380" y="540" class="td mono">serena.find_referencing_symbols</text>
+<text x="620" y="540" class="tdd mono">coder · a91f</text>
+<text x="760" y="540" class="tdd mono">388</text>
+<text x="820" y="540" class="tdd mono">5 020</text>
+<circle cx="873" cy="536" r="3" fill="#4FBE79"/>
+<text x="881" y="540" class="tdd" fill="#4FBE79">ok</text>
+<text x="96" y="559" class="tdd mono">14:11:31</text>
+<text x="180" y="559" class="td mono">infra</text>
+<text x="380" y="559" class="td mono">raven.audit_contrast</text>
+<text x="620" y="559" class="tdd mono">coder · 7d02</text>
+<text x="760" y="559" class="tdd mono">214</text>
+<text x="820" y="559" class="tdd mono">2 260</text>
+<circle cx="873" cy="555" r="3" fill="#4FBE79"/>
+<text x="881" y="559" class="tdd" fill="#4FBE79">ok</text>
+<text x="96" y="578" class="tdd mono">14:11:18</text>
+<text x="180" y="578" class="td mono">demo</text>
+<text x="380" y="578" class="td mono">playwright.browser_take_screenshot</text>
+<text x="620" y="578" class="tdd mono">coder · a91f</text>
+<text x="760" y="578" class="tdd mono">640</text>
+<text x="820" y="578" class="tdd mono">880</text>
+<circle cx="873" cy="574" r="3" fill="#4FBE79"/>
+<text x="881" y="578" class="tdd" fill="#4FBE79">ok</text>
+<text x="96" y="592" class="tiny mono">фильтр: набор — все · окно — 1 ч · только ошибки</text>
+<rect x="80" y="612" width="560" height="164" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="96" y="636" class="h1">Токенов на вызов</text>
+<text x="624" y="636" class="tiny mono" text-anchor="end">24 ч · p50 2,1k · p95 11,8k</text>
+<line x1="80" y1="648" x2="640" y2="648" stroke="#24505A" stroke-width="1"/>
+<rect x="96" y="722" width="19" height="12" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="118" y="715.1428571428571" width="19" height="18.857142857142858" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="140" y="718.5714285714286" width="19" height="15.428571428571427" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="162" y="708.2857142857143" width="19" height="25.714285714285715" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="184" y="711.7142857142857" width="19" height="22.285714285714285" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="206" y="698" width="19" height="36" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="228" y="704.8571428571429" width="19" height="29.142857142857142" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="250" y="686.8571428571429" width="19" height="47.142857142857146" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="272" y="699.7142857142857" width="19" height="34.285714285714285" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="294" y="680.8571428571429" width="19" height="53.142857142857146" rx="2" fill="#D9A03C" opacity="0.9"/>
+<rect x="316" y="692.8571428571429" width="19" height="41.14285714285714" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="338" y="674" width="19" height="60" rx="2" fill="#D9A03C" opacity="0.9"/>
+<rect x="360" y="696.2857142857143" width="19" height="37.714285714285715" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="382" y="684.2857142857143" width="19" height="49.714285714285715" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="404" y="703.1428571428571" width="19" height="30.857142857142854" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="426" y="677.4285714285714" width="19" height="56.57142857142857" rx="2" fill="#D9A03C" opacity="0.9"/>
+<rect x="448" y="689.4285714285714" width="19" height="44.57142857142857" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="470" y="670.5714285714286" width="19" height="63.42857142857143" rx="2" fill="#D9A03C" opacity="0.9"/>
+<rect x="492" y="694.5714285714286" width="19" height="39.42857142857143" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="514" y="682.5714285714286" width="19" height="51.42857142857143" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="536" y="701.4285714285714" width="19" height="32.57142857142857" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="558" y="686" width="19" height="48" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="580" y="708.2857142857143" width="19" height="25.714285714285715" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<rect x="602" y="692.8571428571429" width="19" height="41.14285714285714" rx="2" fill="#4A9FD8" opacity="0.55"/>
+<line x1="96" y1="734" x2="624" y2="734" stroke="#24505A" stroke-width="1"/>
+<line x1="96" y1="708.2857142857143" x2="624" y2="708.2857142857143" stroke="#8CA6AE" stroke-width="0.8" stroke-dasharray="3 3"/>
+<text x="96" y="747" class="tiny mono" text-anchor="middle">−24 ч</text>
+<text x="228" y="747" class="tiny mono" text-anchor="middle">−18 ч</text>
+<text x="360" y="747" class="tiny mono" text-anchor="middle">−12 ч</text>
+<text x="492" y="747" class="tiny mono" text-anchor="middle">−6 ч</text>
+<text x="624" y="747" class="tiny mono" text-anchor="middle">сейчас</text>
+<text x="96" y="764" class="tiny mono">столбик — суммарный контекст запроса и ответа</text>
+<rect x="660" y="612" width="276" height="164" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="676" y="636" class="h1">Хвост лога</text>
+<text x="920" y="636" class="tiny mono" text-anchor="end">demo</text>
+<line x1="660" y1="648" x2="936" y2="648" stroke="#24505A" stroke-width="1"/>
+<text x="676" y="668" class="tiny mono">14:12:03</text>
+<text x="736" y="668" class="tiny mono">invoke find_symbol 42ms</text>
+<text x="676" y="686" class="tiny mono">14:12:01</text>
+<text x="736" y="686" class="tiny mono">downstream ready</text>
+<text x="676" y="704" class="tiny mono">14:11:58</text>
+<text x="736" y="704" class="tiny mono">invoke xerj_search 96ms</text>
+<text x="676" y="722" class="tiny mono">14:11:52</text>
+<text x="736" y="722" class="tiny mono">health: 3/3 ok</text>
+<text x="676" y="740" class="tiny mono">14:11:39</text>
+<text x="736" y="740" class="tiny mono">invoke find_ref 388ms</text>
+<rect x="960" y="468" width="300" height="136" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="976" y="492" class="h1">Ошибки, 24 ч</text>
+<text x="1244" y="492" class="tiny mono" text-anchor="end">112</text>
+<line x1="960" y1="504" x2="1260" y2="504" stroke="#24505A" stroke-width="1"/>
+<circle cx="980" cy="523" r="3" fill="#F0808A"/>
+<text x="990" y="527" class="tiny mono">14:05</text>
+<text x="1024" y="527" class="tiny mono">docs · invoke_command 502</text>
+<circle cx="980" cy="545" r="3" fill="#F0808A"/>
+<text x="990" y="549" class="tiny mono">13:58</text>
+<text x="1024" y="549" class="tiny mono">lab · нет активного ключа</text>
+<circle cx="980" cy="567" r="3" fill="#F0808A"/>
+<text x="990" y="571" class="tiny mono">13:41</text>
+<text x="1024" y="571" class="tiny mono">raven · tools/list EOF</text>
+<rect x="960" y="616" width="300" height="160" rx="10" fill="#0B2229" stroke="#24505A"/>
+<text x="976" y="640" class="h1">Переменные</text>
+<text x="1244" y="640" class="tiny mono" text-anchor="end">3 источника</text>
+<line x1="960" y1="652" x2="1260" y2="652" stroke="#24505A" stroke-width="1"/>
+<text x="976" y="677" class="td mono">GITEA_TOKEN</text>
+<rect x="1178" y="665" width="66" height="16" rx="4" fill="#112E36"/><text x="1211" y="676.5" class="chip" text-anchor="middle" fill="#4FBE79">openbao</text>
+<text x="976" y="703" class="td mono">NIBLET_TOKEN</text>
+<rect x="1178" y="691" width="66" height="16" rx="4" fill="#112E36"/><text x="1211" y="702.5" class="chip" text-anchor="middle" fill="#8CA6AE">file</text>
+<text x="976" y="729" class="td mono">HTTP_PROXY</text>
+<rect x="1178" y="717" width="66" height="16" rx="4" fill="#112E36"/><text x="1211" y="728.5" class="chip" text-anchor="middle" fill="#8CA6AE">env</text>
+<text x="976" y="758" class="tiny mono">значения в клиент не уходят</text>
+<rect x="0" y="780" width="1280" height="20" rx="0" fill="#0B2229"/>
+<line x1="0" y1="780" x2="1280" y2="780" stroke="#24505A" stroke-width="1"/>
+<text x="80" y="794" class="tiny mono">go1.25 · бинарь 10,4 МБ · 4 набора · RSS 68 МБ</text>
+<text x="1200" y="794" class="tiny mono" text-anchor="end">127.0.0.1:8080 · auth: password · uptime 6д 04ч</text>
+</svg>

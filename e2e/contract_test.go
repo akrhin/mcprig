@@ -36,15 +36,18 @@ type resp struct {
 
 func TestMain(m *testing.M) {
 	if baseURL == "" {
-		fmt.Println("E2E_BASE is empty: skipping the contract suite")
-		os.Exit(0)
+		fmt.Println("E2E_BASE is empty: contract tests will skip")
+	} else {
+		fmt.Printf("contract suite against %s (strict=%v)\n", baseURL, strict)
 	}
-	fmt.Printf("contract suite against %s (strict=%v)\n", baseURL, strict)
 	os.Exit(m.Run())
 }
 
 func call(t *testing.T, method, path string, payload any) resp {
 	t.Helper()
+	if baseURL == "" {
+		t.Skip("E2E_BASE is empty")
+	}
 	var body io.Reader
 	if payload != nil {
 		raw, err := json.Marshal(payload)

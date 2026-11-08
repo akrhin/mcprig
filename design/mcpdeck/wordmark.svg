@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160" role="img" aria-label="mcpdeck">
+  <g transform="translate(68.25,28.00) scale(0.8125)">
+    
+    <mask id="md">
+      <rect x="0" y="0" width="128" height="128" fill="#000"/>
+      <path fill="#fff" d="M 38 20 H 86 L 114 48 V 82 A 16 16 0 0 1 98 98 H 30 A 16 16 0 0 1 14 82 V 36 A 16 16 0 0 1 30 20 Z"/>
+      <g fill="#000">
+        <rect x="40" y="32" width="14" height="56" rx="7"/>
+        <rect x="64" y="32" width="14" height="56" rx="7"/>
+        <rect x="88" y="32" width="14" height="56" rx="7"/>
+      </g>
+    </mask>
+    <rect x="0" y="0" width="128" height="128" fill="#E6EFF1" mask="url(#md)"/>
+    <g fill="#2BB3A3">
+      <rect x="33" y="42" width="28" height="14" rx="3"/>
+      <rect x="81" y="62" width="28" height="14" rx="3"/>
+    </g></g>
+  <g transform="translate(195.75,55.69) scale(0.5525)" fill="none" stroke="#8CA6AE" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M 8 94 V 26 A 20 20 0 0 1 48 26 A 20 20 0 0 1 88 26 V 94 M 48 26 V 94"/></g>
+  <g transform="translate(260.94,55.69) scale(0.5525)" fill="none" stroke="#8CA6AE" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M 83.7 78.3 A 44 44 0 1 1 83.7 21.7"/></g>
+  <g transform="translate(330.56,55.69) scale(0.5525)" fill="none" stroke="#8CA6AE" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M 8 124 V 6 A 44 44 0 0 1 8 94"/></g>
+  <g transform="translate(373.65,55.69) scale(0.5525)" fill="none" stroke="#E6EFF1" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M 62 -24 V 94 M 62 6 A 44 44 0 0 0 62 94"/></g>
+  <g transform="translate(422.27,55.69) scale(0.5525)" fill="none" stroke="#E6EFF1" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M 8 50 H 94"/><path d="M 94 50 A 44 44 0 1 0 78.3 83.7"/></g>
+  <g transform="translate(491.88,55.69) scale(0.5525)" fill="none" stroke="#E6EFF1" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M 83.7 78.3 A 44 44 0 1 1 83.7 21.7"/></g>
+  <g transform="translate(561.50,55.69) scale(0.5525)" fill="none" stroke="#E6EFF1" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"><path d="M 8 94 V -24 M 52 94 L 14 52 M 22 60 L 56 22"/></g>
+</svg>

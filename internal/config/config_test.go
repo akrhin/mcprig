@@ -91,6 +91,72 @@ func TestSoftFail(t *testing.T) {
 	}
 }
 
+func TestPermissions(t *testing.T) {
+	path := write(t, `{
+	  "permissions": {
+	    "default": "allow",
+	    "rules": [{"server": "a*", "pattern": "write*", "action": "deny", "message": "read only"}]
+	  },
+	  "servers": [
+	    {"name": "a", "command": ["x"], "permissions": {
+	      "default": "deny",
+	      "rules": [{"pattern": "read*", "action": "allow"}]
+	    }},
+	    {"name": "bad-default", "command": ["x"], "permissions": {"default": "maybe"}},
+	    {"name": "empty-pattern", "command": ["x"], "permissions": {"rules": [{"pattern": "", "action": "allow"}]}},
+	    {"name": "server-in-server", "command": ["x"], "permissions": {"rules": [{"server": "a", "pattern": "x", "action": "deny"}]}},
+	    {"name": "plain", "command": ["x"]}
+	  ]
+	}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Permissions == nil || cfg.Permissions.Default != PermissionAllow || len(cfg.Permissions.Rules) != 1 {
+		t.Fatalf("global permissions not read: %+v", cfg.Permissions)
+	}
+	if got := cfg.Permissions.Rules[0]; got.Server != "a*" || got.Pattern != "write*" || got.Action != PermissionDeny || got.Message != "read only" {
+		t.Errorf("global rule: %+v", got)
+	}
+	byName := map[string]*Server{}
+	for _, s := range cfg.Servers {
+		byName[s.Name] = s
+	}
+	a := byName["a"].Permissions
+	if a == nil || a.Default != PermissionDeny || len(a.Rules) != 1 || a.Rules[0].Pattern != "read*" {
+		t.Errorf("server permissions not read: %+v", a)
+	}
+	for _, name := range []string{"bad-default", "empty-pattern", "server-in-server"} {
+		if byName[name].ConfigError == "" {
+			t.Errorf("%s: want a config error for a broken permissions block", name)
+		}
+		if byName[name].Permissions != nil {
+			t.Errorf("%s: broken block must be dropped", name)
+		}
+	}
+	if byName["plain"].Permissions != nil || byName["plain"].ConfigError != "" {
+		t.Error("a server without permissions must stay untouched")
+	}
+}
+
+// A broken top-level block must be ignored: the set still serves everything.
+func TestInvalidGlobalPermissionsIgnored(t *testing.T) {
+	path := write(t, `{
+	  "permissions": {"default": "maybe"},
+	  "servers": [{"name": "a", "command": ["x"]}]
+	}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("a broken global permissions block must not fail the load: %v", err)
+	}
+	if cfg.Permissions != nil {
+		t.Errorf("want the block dropped, got %+v", cfg.Permissions)
+	}
+	if len(cfg.Usable()) != 1 {
+		t.Error("the server must stay usable")
+	}
+}
+
 func TestIdentifiableFailsLoad(t *testing.T) {
 	path := write(t, `{"servers": [{"nameless": true}]}`)
 	if _, err := Load(path); err == nil {

@@ -1,55 +1,53 @@
 # Текущий этап
 
-**Этап 1: ядро прокси**
-**Статус:** в работе
+**Этап 2: OAuth 2.0 + PKCE для remote-серверов**
+**Статус:** не начат
 **Дата:** 2026-11-08
 
-## Этап 0 принят (2026-11-08)
+## Принято
 
-Контрактный e2e прогнан против живого TS-эталона (`127.0.0.1:9091`, seed-набор `demo`):
-14 проверок прошли, 3 дефекта эталона воспроизведены исполнением, 1 проверка
-ждёт auth-режим.
+**Этап 0 — контракт.** `e2e/contract_test.go` против живого TS-эталона
+(`127.0.0.1:9091`): 14 прошли, 3 дефекта воспроизведены исполнением
+(сырые токены в `GET /api/sets`; `env:{"A":1}` → 201; `port:9200` → 201),
+1 ждёт auth-режим. Побочно: числовое значение в `env` валит `GET /api/env`
+(`text.matchAll is not a function`).
 
+**Этап 1 — ядро прокси.** `internal/config`, `internal/downstream`,
+`internal/mcpserver`, `internal/registry`. 43 юнит-теста. Ворота — настоящий
+бинарник и настоящий stdio-downstream:
+
+```bash
+go test ./e2e -run TestProxyServesMetaTools -v   # PASS 2.2s
 ```
-E2E_BASE=http://127.0.0.1:9091 E2E_STRICT=0 go test ./e2e -v   → exit 0
-EXPECTED FAIL: GET /api/sets возвращает сырые 48-hex токены
-EXPECTED FAIL: POST /api/servers принимает env:{"A":1} → 201 (валидация только «объект»)
-EXPECTED FAIL: POST /api/sets с port 9200 → 201 (валидация 1024–65535 вместо 9100–9199)
-SKIP: TestAPIRequiresAuth (нужен E2E_AUTH=1 и менеджер с паролем)
-```
 
-Третий дефект тянет за собой четвёртый: числовое значение в `env` ломает
-`GET /api/env` (`text.matchAll is not a function`), проверено вручную — на чистом
-реестре 200, после одного «отравленного» сервера 400.
+Проверено: `list_servers` показывает фикстуру живой, `invoke_command echo`
+возвращает текст, ошибка downstream (`fixture failure`) доходит до клиента,
+неизвестный сервер даёт внятную ошибку.
 
-## Цель этапа 1
+**Этап 3 — HTTP-транспорт.** `internal/httplisten`: stateless `2026-07-28` тем же
+обработчиком, что legacy `initialize` 2025-06-18; bearer fail-closed; `Host` и
+`Origin` по `allowedHosts`; лимит 4 МиБ; `/healthz` публичный; 9 тестов, включая
+`-race`.
 
-Прокси, который читает `servers.json` и отдаёт четыре мета-тула.
+## Цель этапа 2
+
+OAuth 2.0 + PKCE для remote-серверов на `auth.NewAuthorizationCodeHandler`.
 
 ## Ворота
 
-```bash
-go build ./... && go vet ./... && go test ./...
-E2E_BASE=http://127.0.0.1:<go-прокси> go test ./e2e -v      # strict, без E2E_STRICT=0
-```
-
-## Сделано
-
-- `internal/config` — формат lazy-mcp `servers.json`, обе формы `command`,
-  soft-fail `_configError`, `Usable()`. 3 теста.
-- `internal/downstream` — `Connect` на go-sdk: stdio через `CommandTransport`,
-  remote через `StreamableClientTransport` с заголовками. 3 теста.
-- 9 тестов зелено, `go vet` чист.
+`httptest`-заглушка сервера авторизации: RFC 8414 discovery → RFC 7591
+dynamic client registration → authorize → token → refresh, плюс протухание
+токена и повторный запрос.
 
 ## Дальше
 
-1. `internal/mcpserver` — агрегация в `list_servers` / `list_commands` /
-   `describe_commands` / `invoke_command`, ленивый коннект, single-flight.
-2. Permission-gate (`resolveAction` → отказ вместо вызова).
-3. HTTP-listener прокси: bearer, `Host`/`Origin`, лимит тела.
-4. Прогон strict-e2e против Go-прокси.
+1. `internal/oauth`: хранение ключей (`sha256(name\0url)`), loopback callback,
+   single-flight на обновление.
+2. Подключить к `downstream.Connect`: 401 от downstream → пройти авторизацию →
+   повторить запрос.
+3. Этап 4: супервизор наборов поверх `internal/registry` + lifecycle-e2e.
 
 ## Проверяет человек
 
-- Набор `demo` из `config/registry.demo.json` поднимается Go-бинарником и
-  отвечает `tools/list` через `curl`.
+- `mcprig` поднимает набор с remote-сервером, требующим OAuth, и после
+  авторизации инструменты доступны без ручных токенов.

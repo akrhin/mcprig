@@ -29,7 +29,59 @@ type Server struct {
 	Headers     map[string]string `json:"headers,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
 	Enabled     bool              `json:"enabled,omitempty"`
+	Permissions *Permissions      `json:"permissions,omitempty"`
 	ConfigError string            `json:"_configError,omitempty"`
+}
+
+// PermissionAction is allow or deny; lazy-mcp's "ask" is not implemented.
+type PermissionAction string
+
+const (
+	PermissionAllow PermissionAction = "allow"
+	PermissionDeny  PermissionAction = "deny"
+)
+
+// Permissions is the experimental allow/deny block, on the top level or one
+// server. Without it everything is allowed.
+type Permissions struct {
+	Default PermissionAction `json:"default,omitempty"`
+	Rules   []Rule           `json:"rules,omitempty"`
+}
+
+// Rule matches the command name by glob; Server is only allowed on global
+// rules and matches the server name (default "*").
+type Rule struct {
+	Server  string           `json:"server,omitempty"`
+	Pattern string           `json:"pattern"`
+	Action  PermissionAction `json:"action"`
+	Message string           `json:"message,omitempty"`
+}
+
+// validate returns a defect description, empty when the block is usable.
+func (p *Permissions) validate(prefix string, global bool) string {
+	if p == nil {
+		return ""
+	}
+	switch p.Default {
+	case "", PermissionAllow, PermissionDeny:
+	default:
+		return fmt.Sprintf("%s.default: ожидалось allow или deny, получено %q", prefix, p.Default)
+	}
+	for i, r := range p.Rules {
+		rp := fmt.Sprintf("%s.rules[%d]", prefix, i)
+		if r.Pattern == "" {
+			return rp + ".pattern: пустой шаблон"
+		}
+		switch r.Action {
+		case PermissionAllow, PermissionDeny:
+		default:
+			return fmt.Sprintf("%s.action: ожидалось allow или deny, получено %q", rp, r.Action)
+		}
+		if !global && r.Server != "" {
+			return rp + ".server допустим только в глобальном блоке"
+		}
+	}
+	return ""
 }
 
 // UnmarshalJSON accepts both command forms: the array form and the legacy
@@ -47,6 +99,7 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 		Headers     map[string]any  `json:"headers"`
 		Tags        []string        `json:"tags"`
 		Enabled     *bool           `json:"enabled"`
+		Permissions json.RawMessage `json:"permissions"`
 	}
 	var r raw
 	if err := json.Unmarshal(data, &r); err != nil {
@@ -69,7 +122,29 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 	}
 	s.Env = stringMap(r.Env, &s.ConfigError, "env")
 	s.Headers = stringMap(r.Headers, &s.ConfigError, "headers")
+	s.decodePermissions(r.Permissions)
 	return nil
+}
+
+// decodePermissions soft-fails a broken block onto the server, like lazy-mcp.
+func (s *Server) decodePermissions(data json.RawMessage) {
+	if len(data) == 0 || string(data) == "null" {
+		return
+	}
+	var p Permissions
+	if err := json.Unmarshal(data, &p); err != nil {
+		if s.ConfigError == "" {
+			s.ConfigError = "permissions: " + err.Error()
+		}
+		return
+	}
+	if msg := p.validate("permissions", false); msg != "" {
+		if s.ConfigError == "" {
+			s.ConfigError = msg
+		}
+		return
+	}
+	s.Permissions = &p
 }
 
 func stringMap(in map[string]any, configErr *string, field string) map[string]string {
@@ -160,6 +235,7 @@ type Config struct {
 	Transport      *HTTPTransport `json:"transport,omitempty"`
 	HealthMonitor  *HealthMonitor `json:"healthMonitor,omitempty"`
 	RequestTimeout int            `json:"requestTimeout,omitempty"` // ms
+	Permissions    *Permissions   `json:"permissions,omitempty"`
 }
 
 // Load reads a config file. A server that cannot be identified (no name) fails
@@ -174,11 +250,16 @@ func Load(path string) (*Config, error) {
 		Transport      *HTTPTransport    `json:"transport"`
 		HealthMonitor  *HealthMonitor    `json:"healthMonitor"`
 		RequestTimeout int               `json:"requestTimeout"`
+		Permissions    json.RawMessage   `json:"permissions"`
 	}
 	if err := json.Unmarshal(data, &shape); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	cfg := &Config{Transport: shape.Transport, HealthMonitor: shape.HealthMonitor, RequestTimeout: shape.RequestTimeout}
+	// A broken global block is dropped, not fatal: a typo must not brick the set.
+	if p := decodeGlobalPermissions(shape.Permissions); p != nil {
+		cfg.Permissions = p
+	}
 	seen := make(map[string]bool, len(shape.Servers))
 	for i, raw := range shape.Servers {
 		srv := &Server{}
@@ -196,6 +277,22 @@ func Load(path string) (*Config, error) {
 		cfg.Servers = append(cfg.Servers, srv)
 	}
 	return cfg, nil
+}
+
+// decodeGlobalPermissions returns nil for an absent or invalid block: the set
+// keeps working with everything allowed.
+func decodeGlobalPermissions(data json.RawMessage) *Permissions {
+	if len(data) == 0 || string(data) == "null" {
+		return nil
+	}
+	var p Permissions
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil
+	}
+	if p.validate("permissions", true) != "" {
+		return nil
+	}
+	return &p
 }
 
 // Usable reports whether the set can be served: at least one healthy server.

@@ -1,0 +1,99 @@
+/*
+  mcp-manager — панель, тёмная тема (единственная).
+  Палитра: «harbor night» — глубокий сине-зелёный, а не почти-чёрный #111 и не
+  фиолетовый Linear: пульт живёт в тёмной комнате, но не сливается с редактором.
+
+  Контраст посчитан по WCAG 2.1 (relative luminance), AA для текста = 4.5:1,
+  для крупного/иконочных пар и границ-акцентов достаточным считается 3:1.
+  На трёх поверхностях: bg / surface / surface-2.
+
+  text      #E6EFF1  bg 15.68 · surface 14.10 · surface-2 12.25
+  text-dim  #8CA6AE  bg  7.13 · surface  6.42 · surface-2  5.57
+  accent    #2BB3A3  bg  7.04 · surface  6.34 · surface-2  5.50
+  success   #4FBE79  bg  7.82 · surface  7.04 · surface-2  6.11
+  warn      #D9A03C  bg  7.88 · surface  7.09 · surface-2  6.16
+  error     #F0808A  bg  7.11 · surface  6.40 · surface-2  5.56
+  chart-1   #4A9FD8  bg  6.31 · surface  5.68 · surface-2  4.93
+  chart-2   #46B98A  bg  7.47 · surface  6.72 · surface-2  5.84
+  chart-3   #A98BE0  bg  6.50 · surface  5.85 · surface-2  5.08
+  chart-4   #E0B15C  bg  9.25 · surface  8.32 · surface-2  7.23
+
+  Текст на акценте: #04171C на #2BB3A3 = 7.06 (кнопка «+ Набор»).
+  Текст на --accent-dim: #E6EFF1 на #17635C = 6.04 (активная иконка в рейле).
+  border #24505A: 2.07 к bg — это декоративный разделитель, не признак состояния;
+    всё, что несёт смысл (состояние набора, health сервера), дублируется точкой
+    цвета success/warn/error + текстом, чтобы 3:1 не требовалось.
+*/
+
+:root {
+  color-scheme: dark;
+
+  /* поверхности */
+  --background: #06171c; /* корпус окна */
+  --surface: #0b2229; /* панель, рейл, топбар */
+  --surface-2: #112e36; /* строка таблицы, поле ввода, чип */
+  --border: #24505a; /* разделители, 1px */
+
+  /* текст */
+  --text: #e6eff1;
+  --text-dim: #8ca6ae;
+
+  /* акцент и состояние */
+  --accent: #2bb3a3;
+  --accent-dim: #17635c; /* заливка под иконкой, не текст */
+  --success: #4fbe79;
+  --warn: #d9a03c;
+  --error: #f0808a;
+
+  /* серии графиков */
+  --chart-1: #4a9fd8;
+  --chart-2: #46b98a;
+  --chart-3: #a98be0;
+  --chart-4: #e0b15c;
+
+  /* типографика: без веб-шрифтов, только системные стеки */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  --text-xs: 0.6875rem; /* 11px — подписи, метки колонок */
+  --text-sm: 0.75rem; /* 12px — таблицы, плотные строки */
+  --text-base: 0.8125rem; /* 13px — тело интерфейса */
+  --text-lg: 1.0625rem; /* 17px — заголовок панели */
+  --text-xl: 1.4375rem; /* 23px — число в KPI */
+
+  /* радиусы */
+  --radius-xs: 4px; /* чип, тег */
+  --radius-sm: 6px; /* поле, кнопка */
+  --radius-md: 8px; /* карточка KPI */
+  --radius-lg: 10px; /* панель */
+  --radius-pill: 999px; /* статус-пилюля */
+
+  /* отступы: шаг 4, дальше только из шкалы */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* каркас */
+  --rail-w: 60px; /* левый рейл навигации */
+  --topbar-h: 56px;
+  --statusbar-h: 20px;
+  --row-h: 32px; /* строка таблицы наборов; 19px — строка вызовов */
+
+  --shadow-panel: 0 1px 0 rgb(230 239 241 / 0.02), 0 8px 24px rgb(0 0 0 / 0.28);
+  --focus-ring: 0 0 0 2px var(--background), 0 0 0 4px var(--accent);
+}
+
+/* Числа в таблицах и KPI — табличные, иначе колонки прыгают на каждом обновлении. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Светлая тема не делается: панель — пульт, работает в одном режиме.
+   Если понадобится, менять только значения переменных, селекторы не трогать. */
