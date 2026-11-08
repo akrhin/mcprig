@@ -22,7 +22,8 @@ func TestTransportRejectsBrokenServer(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := transport(c.srv)
+			conn := &Connector{}
+			_, err := conn.transport(context.Background(), c.srv)
 			if err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("want error %q, got %v", c.want, err)
 			}

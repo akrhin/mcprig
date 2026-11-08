@@ -3,6 +3,7 @@ package downstream
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -10,15 +11,34 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcp-manager/internal/oauth"
 )
+
+// Connector opens sessions to downstream servers. OAuth is optional: without a
+// token store the connector behaves as before and never touches the browser.
+type Connector struct {
+	Version string
+	OAuth   *config.OAuth // set-wide defaults, nil when the set has none
+	Store   *oauth.Store  // nil when tokens cannot be persisted
+	Log     *slog.Logger
+}
 
 // Connect opens one session to a downstream server. The caller owns Close.
 func Connect(ctx context.Context, srv *config.Server, version string) (*mcp.ClientSession, error) {
-	tr, err := transport(srv)
+	c := &Connector{Version: version}
+	return c.Connect(ctx, srv)
+}
+
+func (c *Connector) Connect(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
+	tr, err := c.transport(ctx, srv)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", srv.Name, err)
 	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "mcp-manager", Version: version}, nil)
+	version := c.Version
+	if version == "" {
+		version = "dev"
+	}
+	client := mcp.NewClient(&mcp.Implementation{Name: "mcprig", Version: version}, nil)
 	session, err := client.Connect(ctx, tr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", srv.Name, err)
@@ -26,7 +46,13 @@ func Connect(ctx context.Context, srv *config.Server, version string) (*mcp.Clie
 	return session, nil
 }
 
-func transport(srv *config.Server) (mcp.Transport, error) {
+// oauthBlock merges the set-wide block under the server's own.
+func (c *Connector) oauthBlock(srv *config.Server) *config.OAuth {
+	cfg := &config.Config{OAuth: c.OAuth}
+	return cfg.OAuthFor(srv)
+}
+
+func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Transport, error) {
 	switch srv.Transport {
 	case config.TransportStdio:
 		if len(srv.Command) == 0 {
@@ -42,14 +68,43 @@ func transport(srv *config.Server) (mcp.Transport, error) {
 		if srv.URL == "" {
 			return nil, fmt.Errorf("пустой url")
 		}
-		// No client timeout: a streamable session holds the connection open.
-		return &mcp.StreamableClientTransport{
+		tr := &mcp.StreamableClientTransport{
 			Endpoint:   srv.URL,
 			HTTPClient: &http.Client{Transport: withHeaders(http.DefaultTransport, srv.Headers)},
-		}, nil
+		}
+		handler, err := c.oauthHandler(ctx, srv)
+		if err != nil {
+			return nil, err
+		}
+		tr.OAuthHandler = handler
+		return tr, nil
 	default:
 		return nil, fmt.Errorf("неизвестный transport %q", srv.Transport)
 	}
+}
+
+// oauthHandler builds the client-side flow for one server. It binds nothing:
+// the loopback listener starts only when the server actually asks for a token.
+func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oauth.Handler, error) {
+	block := c.oauthBlock(srv)
+	if block.Disabled || c.Store == nil {
+		return nil, nil
+	}
+	h, err := oauth.NewHandler(ctx, oauth.Options{
+		ServerName:   srv.Name,
+		ServerURL:    srv.URL,
+		RedirectURL:  block.RedirectURL,
+		CallbackAddr: fmt.Sprintf("127.0.0.1:%d", block.CallbackPort),
+		ClientID:     block.ClientID,
+		ClientSecret: block.ClientSecret,
+		Scopes:       block.Scopes,
+		Store:        c.Store,
+		Log:          c.Log,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("oauth: %w", err)
+	}
+	return h, nil
 }
 
 func flatten(env map[string]string) []string {

@@ -35,12 +35,19 @@ type entry struct {
 }
 
 // New builds a manager. Nothing is connected until a tool needs a server.
-func New(cfg *config.Config, version string) *Manager {
+// A connector carries the version and, when present, OAuth settings.
+func New(cfg *config.Config, version string, conn *downstream.Connector) *Manager {
+	if conn == nil {
+		conn = &downstream.Connector{Version: version}
+	}
+	if conn.Version == "" {
+		conn.Version = version
+	}
 	m := &Manager{
 		cfg:     cfg,
 		version: version,
 		dial: func(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
-			return downstream.Connect(ctx, srv, version)
+			return conn.Connect(ctx, srv)
 		},
 	}
 	for _, srv := range cfg.Servers {

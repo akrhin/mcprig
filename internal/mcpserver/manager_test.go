@@ -37,7 +37,7 @@ func upstream(ctx context.Context) (*mcp.ClientSession, error) {
 }
 
 func testManager(cfg *config.Config, dials *int32, delay time.Duration) *Manager {
-	m := New(cfg, "test")
+	m := New(cfg, "test", nil)
 	m.dial = func(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
 		atomic.AddInt32(dials, 1)
 		if delay > 0 {

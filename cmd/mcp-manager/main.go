@@ -16,8 +16,10 @@ import (
 	"time"
 
 	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcp-manager/internal/downstream"
 	"github.com/sintez/mcp-manager/internal/httplisten"
 	"github.com/sintez/mcp-manager/internal/mcpserver"
+	"github.com/sintez/mcp-manager/internal/oauth"
 )
 
 // version is set by the release build.
@@ -50,7 +52,12 @@ func run() error {
 	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	mgr := mcpserver.New(cfg, version)
+	store, err := oauth.OpenStore(stateDir())
+	if err != nil {
+		return err
+	}
+	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log}
+	mgr := mcpserver.New(cfg, version, conn)
 	defer mgr.Close()
 
 	handler, err := httplisten.New(cfg, mgr.Server(), log)
@@ -95,4 +102,20 @@ func defaultConfigPath() string {
 		return filepath.Join(dir, "lazy-mcp", "servers.json")
 	}
 	return "servers.json"
+}
+
+// stateDir holds what must survive a restart but is not configuration: OAuth
+// tokens now, the manager's registry later.
+func stateDir() string {
+	if dir := os.Getenv("MCPRIG_DATA_DIR"); dir != "" {
+		return dir
+	}
+	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
+		return filepath.Join(dir, "mcprig")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ".mcprig"
+	}
+	return filepath.Join(home, ".local", "state", "mcprig")
 }
