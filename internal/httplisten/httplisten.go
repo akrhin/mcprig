@@ -88,9 +88,14 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 		// У открытого набора bearer нет ни у кого, поэтому анонимный снимок
 		// редактируется: без меток клиентов и текстов ошибок апстрима.
 		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			snap := rec.Snapshot()
-			if token == "" || !bearerOK(r, token) {
+			// Редакция выбирается до снимка: собранная в редакции копия не
+			// платит за полный снимок, который тут же был бы выброшен.
+			anon := token == "" || !bearerOK(r, token)
+			var snap stats.Snapshot
+			if anon {
 				snap = rec.SnapshotRedacted()
+			} else {
+				snap = rec.Snapshot()
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			_ = json.NewEncoder(w).Encode(snap)

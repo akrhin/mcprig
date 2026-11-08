@@ -250,3 +250,38 @@ func TestErrorMessageIsBounded(t *testing.T) {
 		t.Fatalf("обрезка многоточием сломана: %d байт, utf8=%v", len(msg), utf8.ValidString(msg))
 	}
 }
+
+var benchSink Snapshot
+
+// Замер анонимного /stats: снимок на 4096 счётчиках собирается сразу в
+// редакции, без промежуточной полной копии.
+func BenchmarkSnapshotRedacted(b *testing.B) {
+	r := benchRecorder()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchSink = r.SnapshotRedacted()
+	}
+}
+
+// BenchmarkSnapshot — тот же набор без редакции, для сравнения цены.
+func BenchmarkSnapshot(b *testing.B) {
+	r := benchRecorder()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		benchSink = r.Snapshot()
+	}
+}
+
+// benchRecorder заполняет потолок счётчиков и кольцо на 512 вызовов.
+func benchRecorder() *Recorder {
+	r := NewRecorder("bench", 0)
+	for i := 0; i < MaxCounters-1; i++ {
+		r.Record(fmt.Sprintf("client-%d", i), "s", fmt.Sprintf("tool-%d", i), time.Duration(i)*time.Millisecond, nil)
+	}
+	for i := 0; i < 512; i++ {
+		r.Record("opencode", "s", "echo", time.Millisecond, nil)
+	}
+	return r
+}

@@ -190,7 +190,19 @@ type Snapshot struct {
 
 // Snapshot copies the state. Counters are sorted by client, server, then tool,
 // and carry their percentiles.
-func (r *Recorder) Snapshot() Snapshot {
+func (r *Recorder) Snapshot() Snapshot { return r.snapshot(false) }
+
+// AnonymousLabel заменяет метку клиента в редакции для открытого набора.
+const AnonymousLabel = "(аноним)"
+
+// SnapshotRedacted — снимок для анонимного читателя открытого набора: тексты
+// ошибок апстрима и метки клиентов не выходят наружу, остальное (счётчики,
+// латентности, хвост) остаётся.
+func (r *Recorder) SnapshotRedacted() Snapshot { return r.snapshot(true) }
+
+// snapshot собирает снимок сразу в нужной редакции: второй снимок и второй
+// проход по полной копии не нужны, а на открытом наборе /stats зовут анонимно.
+func (r *Recorder) snapshot(redacted bool) Snapshot {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -200,6 +212,9 @@ func (r *Recorder) Snapshot() Snapshot {
 		cp.latencies = append([]int64(nil), c.latencies...)
 		cp.P50Ms = cp.P50()
 		cp.P95Ms = cp.P95()
+		if redacted {
+			cp.Client = AnonymousLabel
+		}
 		out.Counters = append(out.Counters, cp)
 	}
 	sortCounters(out.Counters)
@@ -207,25 +222,12 @@ func (r *Recorder) Snapshot() Snapshot {
 	out.Tail = make([]Call, 0, len(r.tail))
 	for i := 0; i < len(r.tail); i++ {
 		idx := (r.tailNext - 1 - i + len(r.tail)) % len(r.tail)
-		out.Tail = append(out.Tail, r.tail[idx])
-	}
-	return out
-}
-
-// AnonymousLabel заменяет метку клиента в редакции для открытого набора.
-const AnonymousLabel = "(аноним)"
-
-// SnapshotRedacted — снимок для анонимного читателя открытого набора: тексты
-// ошибок апстрима и метки клиентов не выходят наружу, остальное (счётчики,
-// латентности, хвост) остаётся.
-func (r *Recorder) SnapshotRedacted() Snapshot {
-	out := r.Snapshot()
-	for i := range out.Counters {
-		out.Counters[i].Client = AnonymousLabel
-	}
-	for i := range out.Tail {
-		out.Tail[i].Client = AnonymousLabel
-		out.Tail[i].Message = ""
+		c := r.tail[idx]
+		if redacted {
+			c.Client = AnonymousLabel
+			c.Message = ""
+		}
+		out.Tail = append(out.Tail, c)
 	}
 	return out
 }
