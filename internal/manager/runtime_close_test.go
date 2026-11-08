@@ -51,6 +51,22 @@ func TestCloseStopsStartingSet(t *testing.T) {
 	}
 }
 
+// TestLoopbackAddr: проба идёт на bindIP, а для «все интерфейсы» — на loopback.
+func TestLoopbackAddr(t *testing.T) {
+	cases := map[string]string{
+		"":         "127.0.0.1",
+		"0.0.0.0":  "127.0.0.1",
+		"::":       "::1",
+		"[::]":     "::1",
+		"10.1.2.3": "10.1.2.3",
+	}
+	for bindIP, want := range cases {
+		if got := loopbackAddr(bindIP); got != want {
+			t.Errorf("loopbackAddr(%q) = %q, ждали %q", bindIP, got, want)
+		}
+	}
+}
+
 // TestStartRefusesBusyPort: чужой процесс на порту набора — ошибка, а не
 // «набор поднялся».
 func TestStartRefusesBusyPort(t *testing.T) {
