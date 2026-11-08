@@ -148,6 +148,9 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	if !registry.CanServe(set) {
 		return RuntimeStatus{}, fmt.Errorf("у набора %s нет активного ключа — выдайте новый", set.ID)
 	}
+	if err := portFree(listenHost(rt.bindIP), set.Port); err != nil {
+		return RuntimeStatus{}, err
+	}
 
 	body, err := BuildSetConfig(set, setServers(set, servers), rt.bindIP)
 	if err != nil {
@@ -497,6 +500,28 @@ func managerEnv(sec *Secrets) func(*config.Server) []string {
 
 // waitPort ждёт слушателя; done закрывается, когда процесс умер, — ждать
 // оставшийся бюджет незачем.
+// listenHost — адрес, на котором набор слушает: пустой bindIP значит все
+// интерфейсы.
+func listenHost(bindIP string) string {
+	switch bindIP {
+	case "":
+		return "0.0.0.0"
+	case "[::]":
+		return "::"
+	}
+	return bindIP
+}
+
+// portFree проверяет, что порт свободен: готовность набора проверяется
+// подсоединением, и чужой слушатель выглядел бы поднявшимся набором.
+func portFree(host string, port int) error {
+	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	if err != nil {
+		return fmt.Errorf("порт %d занят другим процессом", port)
+	}
+	return ln.Close()
+}
+
 func waitPort(host string, port int, budget time.Duration, done <-chan struct{}) bool {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	deadline := time.Now().Add(budget)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -47,5 +48,29 @@ func TestCloseStopsStartingSet(t *testing.T) {
 	if conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(set.Port)), 300*time.Millisecond); err == nil {
 		conn.Close()
 		t.Fatalf("порт %d слушает после Close", set.Port)
+	}
+}
+
+// TestStartRefusesBusyPort: чужой процесс на порту набора — ошибка, а не
+// «набор поднялся».
+func TestStartRefusesBusyPort(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "busy", "fake")
+	set := e.m.store.Set(id)
+
+	ln, err := net.Listen("tcp", net.JoinHostPort("0.0.0.0", strconv.Itoa(set.Port)))
+	if err != nil {
+		t.Fatalf("занять порт %d: %v", set.Port, err)
+	}
+	defer ln.Close()
+
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err == nil {
+		t.Fatal("старт на занятом порту объявлен успешным")
+	} else if !strings.Contains(err.Error(), "занят") {
+		t.Fatalf("неожиданная ошибка: %v", err)
+	}
+	if p := e.m.rt.proc(id); p != nil {
+		t.Fatalf("на занятом порту всё же запущен процесс %d", p.pid)
 	}
 }
