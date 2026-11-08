@@ -54,3 +54,20 @@ func TestEnvDeleteWithoutStoreHidesVariable(t *testing.T) {
 		}
 	}
 }
+
+// Контракт TS-эталона зовёт файловый источник `local`; принимаем оба имени.
+func TestStoreLocalAlias(t *testing.T) {
+	fake := &fakeBao{values: map[string]string{}}
+	sec := fakeSecrets(t, fake, nil)
+
+	if source, err := sec.Set("NEW_VAR", "v", "local"); err != nil || source != sourceFile {
+		t.Fatalf("Set store=local: источник %q, ошибка %v", source, err)
+	}
+	if v, _ := sec.Get("NEW_VAR"); v != "v" {
+		t.Fatalf("Get = %q, ожидалось v", v)
+	}
+	removed, source, err := sec.DeleteFrom("NEW_VAR", "local")
+	if err != nil || !removed || source != sourceFile {
+		t.Fatalf("DeleteFrom store=local: removed=%v источник %q ошибка %v", removed, source, err)
+	}
+}

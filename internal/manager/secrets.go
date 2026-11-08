@@ -358,7 +358,7 @@ func (s *Secrets) Set(name, value, store string) (string, error) {
 			store = sourceFile
 		}
 	}
-	switch store {
+	switch storeName(store) {
 	case sourceOpenBao:
 		if s.bao == nil {
 			return "", errors.New("OpenBao не настроен: нужны BAO_ADDR и BAO_TOKEN")
@@ -376,6 +376,14 @@ func (s *Secrets) Set(name, value, store string) (string, error) {
 	}
 }
 
+// storeName — контракт TS-эталона называет файл `local`, наш источник — `file`.
+func storeName(store string) string {
+	if store == "local" {
+		return sourceFile
+	}
+	return store
+}
+
 func (s *Secrets) Delete(name, store string) (bool, error) {
 	removed, _, err := s.DeleteFrom(name, store)
 	return removed, err
@@ -390,7 +398,7 @@ func (s *Secrets) DeleteFrom(name, store string) (bool, string, error) {
 	if store == "" {
 		return s.deleteDefault(name)
 	}
-	switch store {
+	switch storeName(store) {
 	case sourceOpenBao:
 		if s.bao == nil {
 			return false, "", errors.New("OpenBao не настроен: нужны BAO_ADDR и BAO_TOKEN")
