@@ -386,8 +386,6 @@ func (rt *Runtime) status(set *registry.Set) RuntimeStatus {
 	return out
 }
 
-// Statuses — статус всех известных наборов по id.
-
 // Logs — хвост файла лога набора; кольцо нужно, только пока файла нет.
 func (rt *Runtime) Logs(id string, lines int) []string {
 	if lines <= 0 {

@@ -310,6 +310,10 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		out := make(map[string]any, len(in.Servers))
 		var firstErr error
 		failed := 0
+		// Один общий бюджет на весь обзор: иначе десять зависших серверов дают
+		// десять requestTimeout подряд, и клиент ждёт часы.
+		ctx, cancel := m.callCtx(ctx)
+		defer cancel()
 		for _, name := range in.Servers {
 			cmds, err := m.commandsOf(ctx, name)
 			if err != nil {
