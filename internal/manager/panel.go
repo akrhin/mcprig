@@ -23,8 +23,8 @@ var panelTypes = map[string]string{
 	".json": "application/json; charset=utf-8",
 }
 
-// servePanel отдаёт статику панели из бинаря. Вызывается до auth только для
-// GET/HEAD: содержимое одно и то же для всех, данные приходят из /api.
+// servePanel отдаёт статику панели из бинаря после проверки сессии: содержимое
+// одно и то же для всех, данные приходят из /api.
 func (m *Manager) servePanel(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return false

@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -14,9 +15,9 @@ import (
 
 const (
 	healthTTL = 15 * time.Second
-	// healthTimeout такой же, как таймаут опроса в прокси: сервер, который
-	// поднимается дольше (stdio-обёртка npx, холодный LSP), иначе выглядит
-	// мёртвым, хотя вызовы проходят.
+	// healthTimeout — такой же, как healthTimeout в internal/mcpserver: сервер,
+	// который поднимается дольше (stdio-обёртка npx, холодный LSP), иначе
+	// выглядит мёртвым, хотя вызовы проходят. Числа обязаны совпадать.
 	healthTimeout = 15 * time.Second
 )
 
@@ -173,7 +174,7 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 			out.Servers[i].Error = s.err
 			continue
 		}
-		errText := "набор не ответил за 15 с"
+		errText := fmt.Sprintf("набор не ответил за %s", healthTimeout)
 		if firstText(res) != "" {
 			errText = "нет в ответе list_servers"
 		}

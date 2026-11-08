@@ -24,10 +24,12 @@ import (
 
 const (
 	// healthTTL keeps one probe result (including a failure) before re-checking.
+	// Должен совпадать с healthTTL в internal/manager/health.go: иначе панель и
+	// прокси расходятся в том, кто «здоров».
 	healthTTL = 15 * time.Second
-	// healthTimeout bounds one server's status probe. Холодный stdio (npx,
-	// uvx) и первый коннект к LSP поднимаются дольше пяти секунд, и такой
-	// сервер выглядел мёртвым, хотя вызовы проходят.
+	// healthTimeout bounds one server's status probe; такой же, как healthTimeout
+	// в internal/manager/health.go. Холодный stdio (npx, uvx) и первый коннект к
+	// LSP поднимаются дольше 15 с, и сервер выглядел мёртвым, хотя вызовы проходят.
 	healthTimeout = 15 * time.Second
 	// closeWait bounds how long Close waits for an in-flight connect.
 	closeWait = 5 * time.Second
@@ -260,7 +262,7 @@ func (m *Manager) status(ctx context.Context, e *entry) (bool, string) {
 	return ok, errText
 }
 
-// probe connects with its own 5 s budget so one hung server cannot stall a list.
+// probe connects within healthTimeout so one hung server cannot stall a list.
 func (m *Manager) probe(ctx context.Context, e *entry) error {
 	probeCtx, cancel := context.WithTimeout(ctx, healthTimeout)
 	defer cancel()
@@ -303,13 +305,25 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		}
 		return jsonResult(cmds)
 	case len(in.Servers) > 0:
-		out := make(map[string][]commandInfo, len(in.Servers))
+		// Ответ остальных не теряется из-за одного упавшего: у него в карте
+		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
+		out := make(map[string]any, len(in.Servers))
+		var firstErr error
+		failed := 0
 		for _, name := range in.Servers {
 			cmds, err := m.commandsOf(ctx, name)
 			if err != nil {
-				return errResult(err)
+				out[name] = map[string]string{"error": err.Error()}
+				if firstErr == nil {
+					firstErr = fmt.Errorf("%s: %w", name, err)
+				}
+				failed++
+				continue
 			}
 			out[name] = cmds
+		}
+		if failed == len(in.Servers) {
+			return errResult(firstErr)
 		}
 		return jsonResult(out)
 	}
