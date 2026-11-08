@@ -391,3 +391,43 @@ func TestRegistrySurvivesRestart(t *testing.T) {
 		t.Fatalf("лишние наборы: %v", m2.store.Sets())
 	}
 }
+
+// addServerWithEnv заводит stdio-сервер с ссылками на ${VAR}.
+func (e *env) addServerWithEnv(t *testing.T, name string, vars map[string]string) {
+	t.Helper()
+	w := e.do(t, http.MethodPost, "/api/servers", map[string]any{
+		"name": name, "transport": "stdio", "command": []string{"/bin/true"}, "env": vars,
+	})
+	status(t, w, http.StatusCreated)
+}
+
+// Правка переменной перезапускает только наборы, чьи серверы на неё ссылаются.
+func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServerWithEnv(t, "db", map[string]string{"PASSWORD": "${DB_PASSWORD}"})
+	e.addServer(t, "other")
+	dbSet := e.addSet(t, "db", "db")
+	otherSet := e.addSet(t, "other", "other")
+	// Оба «работают»: проверяется выбор набора, а не старт — иначе тест
+	// ловит чужой процесс на порту 91xx из параллельного пакета.
+	for _, id := range []string{dbSet, otherSet} {
+		markRunning(e.m, id, e.m.store.Set(id).Port)
+	}
+	e.m.rt.mu.Lock()
+	dbProc, otherProc := e.m.rt.procs[dbSet], e.m.rt.procs[otherSet]
+	e.m.rt.mu.Unlock()
+
+	w := e.do(t, http.MethodPut, "/api/env/DB_PASSWORD", map[string]any{"value": "s3cret"})
+	status(t, w, http.StatusOK)
+
+	e.m.rt.mu.Lock()
+	gotDB, gotOther := e.m.rt.procs[dbSet], e.m.rt.procs[otherSet]
+	e.m.rt.mu.Unlock()
+	if gotDB == dbProc {
+		t.Fatal("набор со ссылкой на переменную не перезапускался")
+	}
+	if gotOther != otherProc {
+		t.Fatal("набор без ссылки на переменную перезапущен")
+	}
+}
+

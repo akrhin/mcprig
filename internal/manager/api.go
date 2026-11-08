@@ -750,7 +750,7 @@ func (m *Manager) apiEnvPut(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted := m.restartRunning()
+	restarted := m.restartSetsUsingEnv(name)
 	writeJSON(req.w, http.StatusOK, map[string]any{
 		"name": name, "set": true, "source": source, "restarted": restarted,
 	})
@@ -763,7 +763,7 @@ func (m *Manager) apiEnvDelete(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted := m.restartRunning()
+	restarted := m.restartSetsUsingEnv(name)
 	writeJSON(req.w, http.StatusOK, map[string]any{
 		"name": name, "removed": removed, "restarted": restarted,
 	})
@@ -1289,11 +1289,13 @@ func activeKey(set *registry.Set) any {
 
 // ─── вспомогательные ────────────────────────────────────────────────────────
 
-// restartRunning перезапускает работающие наборы после смены секрета.
-func (m *Manager) restartRunning() []string {
+// restartSetsUsingEnv перезапускает работающие наборы, в серверах которых
+// встречается ${name}: остальных правка секрета не касается.
+func (m *Manager) restartSetsUsingEnv(name string) []string {
 	out := []string{}
+	servers := m.store.Servers()
 	for _, set := range m.store.Sets() {
-		if !m.rt.status(set).Running {
+		if !containsName(envRefs(setServers(set, servers)), name) || !m.rt.status(set).Running {
 			continue
 		}
 		if _, err := m.RestartSet(context.Background(), set); err != nil {
