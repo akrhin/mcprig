@@ -7,103 +7,206 @@
 
 # mcprig
 
-Один бинарник: прокси для MCP-серверов, менеджер и веб-панель. Заводите серверы,
-собираете из них наборы, каждый набор — отдельный процесс прокси на своём порту
-со своим ключом.
+One static Go binary that serves many MCP servers through one endpoint, with a
+web panel.
 
-Имя — «rig»: стенд, на который смонтированы все серверы. Свободно в npm, PyPI,
-GitHub, crates.io, `.dev` и `.io` (проверено 2026-11-08).
+## What it is
 
-## Откуда взялось
+mcprig is three things in one binary:
 
-Проект вырос из [lazy-mcp](https://gitlab.com/gitlab-org/ai/lazy-mcp) (MIT) —
-прокси, который отдаёт четыре мета-тула (`list_servers`, `list_commands`,
-`describe_commands`, `invoke_command`) вместо того, чтобы грузить в контекст
-сотни инструментов сразу. Идея, формат конфига и сам контракт мета-тулов взяты
-оттуда; `servers.json` читается как есть, без миграции.
+- a **proxy** that exposes four meta-tools (`list_servers`, `list_commands`,
+  `describe_commands`, `invoke_command`) instead of loading every downstream
+  tool into the client's context;
+- a **manager** that keeps the registry of servers and sets, supervises one
+  process per set, and issues access keys;
+- a **web panel** for the same registry and the live call tail.
 
-Прототип веб-панели, на котором проверялись сценарии и который мы переносим,
-сделан [V0rt](https://github.com/V0rt).
+A **set** is a named group of downstream servers published as one MCP endpoint.
+Each set runs as its own `mcprig serve` process on its own port with its own
+bearer key (or explicitly open), so a restart or a crash of one set does not
+touch the others.
 
-## Чем отличаемся
+`servers.json` is the lazy-mcp format, read as-is: `servers[]`, both `command`
+forms, `url`, `env`, `headers`, `transport`, `healthMonitor`,
+`requestTimeout`. A server with a broken field stays in the list as unhealthy
+with its error; a missing name or invalid JSON fails the load.
 
-| | lazy-mcp (TypeScript) | mcprig (Go) |
-|---|---|---|
-| рантайм | Node 20+ и 446 npm-пакетов | один статический бинарник |
-| холодный старт | 95–137 мс | 12–44 мс (замер на этом хосте) |
-| поставка | npm, PyPI (влезает `nodejs-wheel`), crates.io с prebuilt bun, Homebrew | бинарник под linux/darwin × x64/arm64 |
-| состав | только прокси | прокси + менеджер + панель в одном процессе |
-| валидация конфига | `env:{"A":1}` принимается, дальше панель падает на `text.matchAll` | типы проверяются на входе, отказ 400 с внятным текстом |
-| токены | `GET /api/sets` отдаёт сырые 48-hex ключи | ключ виден один раз при выдаче, дальше только префикс |
-| порты наборов | 1024–65535 | 9100–9199, как обещано в интерфейсе |
-| протокол MCP | 2025-era + stateless fallback | 2026-07-28, stateless на каждый запрос, со фолбэком на старые версии |
+## Quick start
 
-Формат `servers.json` совместим: массив `servers[]`, `transport{type,host,port,
-path,authToken,allowedHosts}`, `healthMonitor`, `requestTimeout`, обе формы
-`command` (массив и legacy `command` + `args`). Невалидный сервер не валит
-загрузку — попадает в список как unhealthy с текстом ошибки.
-
-## Статус
-
-Этапы 0–4 приняты: чтение `servers.json`, коннект по stdio и HTTP, четыре
-мета-тула с permissions, HTTP-транспорт набора (stateless, 2026-07-28 с
-фолбэком), клиентский OAuth для серверов с 401/403, менеджер (супервизия
-наборов, HTTP API по контракту, счётчик вызовов). В работе: панель и
-дашборд — этап 5.
-
-Этапы и ворота — `docs/plan.md`, что делается сейчас — `docs/CURRENT-GOAL.md`.
-Контракт, который переносим с TS-версии, — `docs/reference/ts-manager-contract.md`.
-
-## Установка и подключение
-
-Три способа, подробно — `docs/decisions/0002-installation.md`.
-
-**Сервис (HTTP).** Один набор — один юнит `mcprig-set@<набор>.service`,
-конфиг в `~/.config/mcprig/sets/<набор>/servers.json`, ключ в env-файле рядом.
-Клиент подключается к `http://127.0.0.1:9100/mcp` с `Authorization: Bearer …`.
-
-**Контейнер.** Для наборов из HTTP-серверов; stdio-серверы внутри образа есть
-только те, что мы положили (образ `full` с node и python).
-
-**Клиент.** `mcprig stdio --config <servers.json>` — клиент запускает бинарник
-сам, ни порта, ни ключа. Для opencode:
-
-```jsonc
-// ~/.config/opencode/opencode.jsonc
-"mcp": { "servers": { "demo": {
-  "type": "local",
-  "command": ["mcprig", "stdio", "--config", "/home/me/.config/mcprig/sets/demo/servers.json"]
-} } }
-```
-
-Для общего процесса на несколько клиентов — `serve` и `type: "remote"` с
-`headers.Authorization`. Ключ выдаёт панель или реестр; в API и логах он есть
-только префиксом.
-
-Фрагмент конфига печатает сам бинарник — он ничего не пишет на диск, текст
-вставляете в свой файл:
+Go 1.25 is required; `GOTOOLCHAIN=auto` downloads it on the first build.
 
 ```bash
-mcprig init --client opencode --set demo --config ~/.config/mcprig/sets/demo/servers.json
-mcprig init --client claude --set demo --remote http://127.0.0.1:9100/mcp --key <ключ>
-mcprig init --client codex --set demo --config ~/.config/mcprig/sets/demo/servers.json
+# 1. build
+go build -o mcprig ./cmd/mcprig
+
+# 2. run the panel (loopback only, no login on this local demo)
+MCPRIG_AUTH=off ./mcprig panel
+# from another shell:
+curl -s http://127.0.0.1:9091/healthz
+# {"sets":0,"status":"ok"}
 ```
 
-`claude` — JSON для `claude_desktop_config.json`, `codex` — TOML для
-`~/.codex/config.toml`.
+In the panel, add a server, add a set containing it, press **Start**, then issue
+a key (**Keys** → issue). The token is shown once; save it to `demo.key`
+(`chmod 600`). Then print a client fragment:
 
-Секреты в `servers.json` не пишем: `${VAR}` раскрывается из окружения набора,
-а разворачивание — `docs/reference/ts-manager-contract.md`.
+```bash
+# 3. connect a client
+./mcprig init --client opencode --set demo \
+  --remote http://127.0.0.1:9100/mcp --key-file ./demo.key
+```
 
-## Сборка
+```json
+{
+  "mcp": {
+    "mcprig-demo": {
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer <token>"
+      },
+      "type": "remote",
+      "url": "http://127.0.0.1:9100/mcp"
+    }
+  }
+}
+```
+
+`--client claude` prints `mcpServers` JSON for `claude_desktop_config.json`;
+`--client codex` prints TOML for `~/.codex/config.toml`. For a stdio client
+(the client spawns the binary), pass `--config <servers.json>` instead of
+`--remote`. `init` writes nothing to disk.
+
+![mcprig panel](design/ui/panel.png)
+
+## CLI
+
+| command | what it does | example |
+| --- | --- | --- |
+| `serve` | runs one set from `servers.json` as an HTTP MCP endpoint | `mcprig serve --config ./servers.json` |
+| `stdio` | serves one set over stdin/stdout; the client owns the process | `mcprig stdio --config ./servers.json` |
+| `panel` | runs the manager and the web panel | `MCPRIG_PASSWORD=... mcprig panel` |
+| `init` | prints a client config fragment; writes no files | `mcprig init --client claude --set demo --remote http://127.0.0.1:9100/mcp --key-file ./demo.key` |
+
+Flags, verbatim:
+
+| command | flags |
+| --- | --- |
+| `serve` | `-config` (default `os.UserConfigDir()/mcprig/servers.json`), `-addr`, `-version` |
+| `stdio` | `-config` (same default) |
+| `panel` | none; configured through `MCPRIG_*` environment variables |
+| `init` | `-client` (default `opencode`), `-set` (default `demo`), `-remote`, `-key`, `-key-file`, `-binary` (default `mcprig`), `-config` |
+
+Flags accept one or two dashes (`-config` and `--config` are the same).
+Exit codes: `0` for help, `2` for a command-line error, `1` for everything
+else. Details and examples: [docs/en/cli.md](docs/en/cli.md).
+
+## Configuration
+
+`servers.json` is the same file lazy-mcp reads. A minimal set:
+
+```json
+{
+  "servers": [
+    {
+      "name": "fs",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/srv/docs"],
+      "env": {"LOG_LEVEL": "warn"},
+      "tags": ["files", "local"]
+    },
+    {
+      "name": "serena",
+      "url": "http://127.0.0.1:8899/mcp",
+      "headers": {"Authorization": "Bearer ${SERENA_TOKEN}"},
+      "tags": ["code"]
+    },
+    {
+      "name": "db",
+      "command": ["/usr/local/bin/db-mcp"],
+      "env": {"DB_PASSWORD": "{file:/run/secrets/db_password}"},
+      "enabled": false
+    }
+  ],
+  "transport": {
+    "type": "http",
+    "host": "127.0.0.1",
+    "port": 9100,
+    "path": "/mcp",
+    "authToken": "{file:/home/me/.config/mcprig/demo.token}",
+    "allowedHosts": ["127.0.0.1", "localhost"]
+  },
+  "permissions": {
+    "default": "allow",
+    "rules": [
+      {"server": "db", "pattern": "drop_*", "action": "deny", "message": "no destructive SQL"}
+    ]
+  },
+  "requestTimeout": 120000
+}
+```
+
+`${VAR}` is taken from the environment of the set process; `{file:/absolute}`
+reads a secret file and strips one trailing newline. `serve` refuses to start
+without `transport.authToken` unless `transport.allowAnonymous` is true. Full
+field reference: [docs/en/configuration.md](docs/en/configuration.md).
+
+## Meta tools
+
+| tool | what it returns |
+| --- | --- |
+| `list_servers` | every server with `type`, `enabled`, `healthy`, tags; optional `filter` over name, description and tags |
+| `list_commands` | commands of one server (`server`) as an array, or of several (`servers`) as an object keyed by name |
+| `describe_commands` | input schemas for the named commands; unknown names land in `missing` |
+| `invoke_command` | runs `command_name` on `server`; downstream inputs go inside `parameters` |
+
+All four are thin wrappers over the downstream MCP servers. Response forms:
+[docs/en/meta-tools.md](docs/en/meta-tools.md).
+
+## Security defaults
+
+| area | default |
+| --- | --- |
+| set bearer | compared in constant time; an empty `authToken` refuses to start unless the set is explicitly open |
+| panel password | plain text or `scrypt$N$r$p$salt$hash`; constant-time compare; 5 failed logins per minute per IP, one scrypt at a time |
+| panel session | `mcp_session` cookie: random id signed with HMAC-SHA256, 12 h TTL, `HttpOnly`, `SameSite=Lax`, `Secure` over TLS; sessions live in memory, so a restart logs everyone out |
+| CSRF | writes reject `Sec-Fetch-Site: cross-site`, require `Origin` to match `Host`, and require a JSON body |
+| Host policy | empty `allowedHosts` / `MCPRIG_ALLOWED_HOSTS` means loopback only; `*` disables the check |
+| tokens | the panel and API return only the 8-character prefix; the full token is shown once, when a key is issued |
+| `/stats` | on an open set, client labels become `(аноним)` and error text is dropped |
+| request body | 4 MiB cap on the MCP endpoint |
+
+## Install
+
+Release archives are built by `.goreleaser.yaml` for linux and darwin on amd64
+and arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, plus `checksums.txt`). The
+config is written; `goreleaser` is not installed on the development host, so
+the archive build itself has not been verified.
+
+- systemd user units: `deploy/mcprig.service` (panel) and
+  `deploy/mcprig-set@.service` (one set per unit).
+- Docker: `slim` (binary only, HTTP downstreams) and `full` (adds node and
+  python for `npx`/`uvx` stdio servers). The images were not built on this
+  host because the registry was unreachable.
+
+Details: [docs/en/install.md](docs/en/install.md).
+
+## Development
 
 ```bash
 go build ./...
-go test ./...
-go build -o mcprig ./cmd/mcprig
-./mcprig -version
+go vet ./...
+go test ./... -race -count=1
+E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
+bash scripts/dev-real-set.sh
 ```
 
-Нужен Go 1.25 (модуль просит 1.25.0, `GOTOOLCHAIN=auto` подтянет сам).
+`dev-real-set.sh` builds the binary and starts a panel plus one open set against
+real serena, socraticode and xerj instances; `bash scripts/dev-real-set.sh stop`
+shuts it down. More: [docs/en/development.md](docs/en/development.md).
 
-Лицензия — MIT (см. [LICENSE](LICENSE)), как у проекта-вдохновителя.
+## Status
+
+Pre-1.0, single operator: one panel, one password, no per-user roles. Stages
+0–4 are accepted (config, proxy core, OAuth, HTTP transport, manager); stage 5
+(the panel) is in progress. CLI help and log lines are Russian in this build.
+
+License: MIT, see [LICENSE](LICENSE).
