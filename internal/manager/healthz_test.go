@@ -3,12 +3,13 @@ package manager
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-// TestHealthzReflectsDeadAutostart: мёртвый autostart-набор — 503 с его id,
-// живой — 200 и счётчик.
+// TestHealthzReflectsDeadAutostart: мёртвый autostart-набор — 503, но id
+// наборов публично не отдаются: только статус и счётчик.
 func TestHealthzReflectsDeadAutostart(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServer(t, "fake")
@@ -20,8 +21,11 @@ func TestHealthzReflectsDeadAutostart(t *testing.T) {
 
 	w = e.do(t, http.MethodGet, "/healthz", nil)
 	status(t, w, http.StatusServiceUnavailable)
-	if !strings.Contains(w.Body.String(), id) {
-		t.Fatalf("в dead нет %s: %s", id, w.Body.String())
+	if got := decode[map[string]any](t, w); got["status"] != "degraded" || got["sets"] != float64(1) {
+		t.Fatalf("healthz при мёртвом наборе: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), id) {
+		t.Fatalf("публичный healthz отдал id набора: %s", w.Body.String())
 	}
 
 	if _, err := e.m.rt.Start(context.Background(), e.m.store.Set(id), e.m.store.Servers()); err != nil {
@@ -41,6 +45,17 @@ func TestHealthzReflectsDeadAutostart(t *testing.T) {
 	if got := decode[map[string]any](t, w); got["sets"] != float64(2) {
 		t.Fatalf("sets не считает наборы реестра: %s", w.Body.String())
 	}
+}
+
+// TestHealthzRejectsForeignHost: healthz публичный, но Host-политика действует
+// и здесь — иначе docker-healthcheck работал бы с любого хоста.
+func TestHealthzRejectsForeignHost(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true}) // AllowedHosts: example.com
+	r := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	r.Host = "evil.example"
+	w := httptest.NewRecorder()
+	e.m.ServeHTTP(w, r)
+	status(t, w, http.StatusForbidden)
 }
 
 // TestDeleteServerReportsStoppedSet: stopped[] — по статусу до Stop, иначе

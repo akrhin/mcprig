@@ -223,25 +223,18 @@ func Run(opts Options) error {
 	return nil
 }
 
-// healthz отражает мёртвые autostart-наборы: контракт требует 503, а не «ok»,
-// когда набор задан, но процесса нет. sets — сколько наборов в реестре всего.
+// healthz публичный (нужен docker/systemd healthcheck), поэтому имён наборов
+// в ответе нет: только статус и счётчик. Мёртвый autostart — 503.
 func (m *Manager) healthz(w http.ResponseWriter) {
 	sets := m.store.Sets()
-	dead := []string{}
+	status, code := "ok", http.StatusOK
 	for _, set := range sets {
-		if !set.Autostart {
-			continue
-		}
-		if !m.rt.status(set).Running {
-			dead = append(dead, set.ID)
+		if set.Autostart && !m.rt.status(set).Running {
+			status, code = "degraded", http.StatusServiceUnavailable
+			break
 		}
 	}
-	if len(dead) > 0 {
-		sort.Strings(dead)
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "degraded", "dead": dead})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "sets": len(sets)})
+	writeJSON(w, code, map[string]any{"status": status, "sets": len(sets)})
 }
 
 // lockDataDir не даёт двум менеджерам делить один реестр.
@@ -272,16 +265,17 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	if !m.auth.hostOK(r.Host) {
+		m.fail(w, r, &httpError{http.StatusForbidden, "хост не разрешён"})
+		return
+	}
+
 	if r.URL.Path == "/healthz" {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			m.methodNotAllowed(w, []string{http.MethodGet})
 			return
 		}
 		m.healthz(w)
-		return
-	}
-	if !m.auth.hostOK(r.Host) {
-		m.fail(w, r, &httpError{http.StatusForbidden, "хост не разрешён"})
 		return
 	}
 	if err := checkCSRF(r); err != nil {
