@@ -15,6 +15,7 @@
 go build ./...                    # сборка
 go vet ./...                      # статика
 go test ./...                     # тесты
+go test ./e2e -run TestLifecycle -v   # панель + набор + stdio-даунстрим, без подготовки
 bash scripts/contract-e2e.sh      # контракт против BASE (по умолчанию 127.0.0.1:9091)
 ```
 
