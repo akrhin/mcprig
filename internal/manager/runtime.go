@@ -387,35 +387,6 @@ func (rt *Runtime) status(set *registry.Set) RuntimeStatus {
 }
 
 // Statuses — статус всех известных наборов по id.
-func (rt *Runtime) Statuses() map[string]RuntimeStatus {
-	rt.mu.Lock()
-	ids := make([]string, 0, len(rt.procs))
-	for id := range rt.procs {
-		ids = append(ids, id)
-	}
-	rt.mu.Unlock()
-	out := make(map[string]RuntimeStatus, len(ids))
-	for _, id := range ids {
-		rt.mu.Lock()
-		p := rt.procs[id]
-		rt.mu.Unlock()
-		if p == nil {
-			continue
-		}
-		rt.mu.Lock()
-		out[id] = RuntimeStatus{
-			ID:        id,
-			Running:   !p.exited && !p.stopping,
-			PID:       p.pid,
-			StartedAt: p.startedAt.UTC().Format(time.RFC3339),
-			Port:      p.port,
-			Restarts:  p.restarts,
-			Error:     p.err,
-		}
-		rt.mu.Unlock()
-	}
-	return out
-}
 
 // Logs — хвост файла лога набора; кольцо нужно, только пока файла нет.
 func (rt *Runtime) Logs(id string, lines int) []string {

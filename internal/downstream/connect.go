@@ -28,12 +28,6 @@ type Connector struct {
 	Env func(*config.Server) []string
 }
 
-// Connect opens one session to a downstream server. The caller owns Close.
-func Connect(ctx context.Context, srv *config.Server, version string) (*mcp.ClientSession, error) {
-	c := &Connector{Version: version}
-	return c.Connect(ctx, srv)
-}
-
 func (c *Connector) Connect(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
 	tr, err := c.transport(ctx, srv)
 	if err != nil {

@@ -43,7 +43,7 @@ func TestConnectWrapsFailure(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := Connect(ctx, srv, "test")
+	_, err := (&Connector{Version: "test"}).Connect(ctx, srv)
 	if err == nil {
 		t.Fatal("want a connect error for a missing binary")
 	}
