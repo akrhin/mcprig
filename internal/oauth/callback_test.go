@@ -1,0 +1,214 @@
+package oauth
+
+import (
+	"context"
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+)
+
+func newTestCallback(t *testing.T) *Callback {
+	t.Helper()
+	cb, err := NewCallback("127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("NewCallback: %v", err)
+	}
+	t.Cleanup(func() { cb.Close() })
+	return cb
+}
+
+func get(t *testing.T, url string) (int, string) {
+	t.Helper()
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(body)
+}
+
+func TestCallbackSuccess(t *testing.T) {
+	cb := newTestCallback(t)
+	cb.ExpectState("st-1")
+	if !strings.HasPrefix(cb.URL(), "http://127.0.0.1:") || !strings.HasSuffix(cb.URL(), "/callback") {
+		t.Fatalf("URL = %q", cb.URL())
+	}
+
+	type outcome struct {
+		res *Result
+		err error
+	}
+	ch := make(chan outcome, 1)
+	go func() {
+		res, err := cb.Wait(context.Background())
+		ch <- outcome{res, err}
+	}()
+	waitUntilWaiting(t, cb)
+
+	code, body := get(t, cb.URL()+"?code=abc&state=st-1&iss=https%3A%2F%2Fas.example")
+	if code != http.StatusOK {
+		t.Fatalf("статус = %d, want 200", code)
+	}
+	if !strings.Contains(body, "Авторизация завершена") {
+		t.Fatalf("нет страницы успеха: %q", body)
+	}
+
+	select {
+	case o := <-ch:
+		if o.err != nil {
+			t.Fatalf("Wait: %v", o.err)
+		}
+		if o.res.Code != "abc" || o.res.State != "st-1" || o.res.Iss != "https://as.example" {
+			t.Fatalf("Result = %+v", o.res)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait не завершился")
+	}
+}
+
+func TestCallbackStateMismatch(t *testing.T) {
+	cb := newTestCallback(t)
+	cb.ExpectState("st-1")
+	ch := make(chan error, 1)
+	go func() {
+		_, err := cb.Wait(context.Background())
+		ch <- err
+	}()
+	waitUntilWaiting(t, cb)
+
+	code, _ := get(t, cb.URL()+"?code=abc&state=wrong")
+	if code != http.StatusBadRequest {
+		t.Fatalf("статус = %d, want 400", code)
+	}
+	select {
+	case err := <-ch:
+		if err == nil || !strings.Contains(err.Error(), "state mismatch") {
+			t.Fatalf("Wait err = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait не завершился")
+	}
+}
+
+func TestCallbackEmptyStateRejected(t *testing.T) {
+	cb := newTestCallback(t)
+	ch := make(chan error, 1)
+	go func() {
+		_, err := cb.Wait(context.Background())
+		ch <- err
+	}()
+	waitUntilWaiting(t, cb)
+
+	if code, _ := get(t, cb.URL()+"?code=abc"); code != http.StatusBadRequest {
+		t.Fatalf("статус = %d, want 400", code)
+	}
+	if err := <-ch; err == nil || !strings.Contains(err.Error(), "state mismatch") {
+		t.Fatalf("Wait err = %v", err)
+	}
+}
+
+func TestCallbackAuthorizationError(t *testing.T) {
+	cb := newTestCallback(t)
+	cb.ExpectState("st-1")
+	ch := make(chan error, 1)
+	go func() {
+		_, err := cb.Wait(context.Background())
+		ch <- err
+	}()
+	waitUntilWaiting(t, cb)
+
+	code, _ := get(t, cb.URL()+"?error=access_denied&error_description=user+denied&state=st-1")
+	if code != http.StatusBadRequest {
+		t.Fatalf("статус = %d, want 400", code)
+	}
+	select {
+	case err := <-ch:
+		if err == nil || !strings.Contains(err.Error(), "access_denied") || !strings.Contains(err.Error(), "user denied") {
+			t.Fatalf("Wait err = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait не завершился")
+	}
+}
+
+func TestCallbackWaitContextDone(t *testing.T) {
+	cb := newTestCallback(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := cb.Wait(ctx)
+	if err == nil {
+		t.Fatal("ожидалась ошибка по ctx")
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("Wait не снялся по ctx за %v", time.Since(start))
+	}
+}
+
+func TestCallbackSecondWaitRejected(t *testing.T) {
+	cb := newTestCallback(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		cb.Wait(ctx)
+		close(done)
+	}()
+	waitUntilWaiting(t, cb)
+
+	start := time.Now()
+	_, err := cb.Wait(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "another authorization is already in progress") {
+		t.Fatalf("второй Wait: err = %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("второй Wait заблокировался")
+	}
+	cancel()
+	<-done
+}
+
+func TestCallbackCloseUnblocksWait(t *testing.T) {
+	cb := newTestCallback(t)
+	ch := make(chan error, 1)
+	go func() {
+		_, err := cb.Wait(context.Background())
+		ch <- err
+	}()
+	waitUntilWaiting(t, cb)
+	if err := cb.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	select {
+	case err := <-ch:
+		if err == nil {
+			t.Fatal("Wait после Close вернул успех")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait не снялся по Close")
+	}
+}
+
+func TestNewCallbackRejectsNonLoopback(t *testing.T) {
+	if _, err := NewCallback("0.0.0.0:0"); err == nil {
+		t.Fatal("ожидалась ошибка на не-loopback адрес")
+	}
+}
+
+func waitUntilWaiting(t *testing.T, cb *Callback) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		cb.mu.Lock()
+		w := cb.waiting
+		cb.mu.Unlock()
+		if w {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("Wait не зарегистрировался")
+}
