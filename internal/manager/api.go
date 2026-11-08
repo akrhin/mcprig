@@ -302,6 +302,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if m.servePanel(w, r) {
 		return
 	}
+	if r.Method == http.MethodGet && (r.URL.Path == "/ui" || r.URL.Path == "/ui/") {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
 	if err := m.serveRoute(w, r); err != nil {
 		m.fail(w, r, err)
 	}

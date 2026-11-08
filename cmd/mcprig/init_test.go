@@ -53,11 +53,11 @@ func TestInitOpencodeLocalIsJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	var doc map[string]map[string]map[string]any
+	var doc map[string]map[string]map[string]map[string]any
 	if err := json.Unmarshal([]byte(out), &doc); err != nil {
 		t.Fatalf("не JSON: %v\n%s", err, out)
 	}
-	entry := doc["mcp"]["mcprig-demo"]
+	entry := doc["mcp"]["servers"]["mcprig-demo"]
 	if entry["type"] != "local" {
 		t.Fatalf("тип не local: %v", entry)
 	}

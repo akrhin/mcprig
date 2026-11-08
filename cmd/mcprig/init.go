@@ -74,7 +74,8 @@ func runInit(args []string) error {
 				"headers": map[string]string{"Authorization": "Bearer " + key},
 			}
 		}
-		out = marshal(map[string]any{"mcp": map[string]any{name: entry}})
+		servers := map[string]any{name: entry}
+		out = marshal(map[string]any{"mcp": map[string]any{"servers": servers}})
 	case "claude":
 		entry := map[string]any{"command": cfg.Binary, "args": stdioArgs[1:]}
 		if cfg.Remote != "" {
