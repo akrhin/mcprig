@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="design/mcprig/logo-hand-dark.png">
+    <img src="design/mcprig/logo-hand-light.png" width="220" alt="mcprig">
+  </picture>
+</p>
+
 # mcprig
 
 Один бинарник: прокси для MCP-серверов, менеджер и веб-панель. Заводите серверы,
