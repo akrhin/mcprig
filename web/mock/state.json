@@ -1,0 +1,155 @@
+{
+  "sets": [
+    {
+      "id": "demo",
+      "name": "demo",
+      "description": "основной набор",
+      "servers": [
+        "fetch",
+        "time",
+        "memory",
+        "context7"
+      ],
+      "port": 9100,
+      "keys": [
+        {
+          "id": "k_demo1",
+          "createdAt": "2026-10-12T19:40:58.440Z",
+          "note": "ноутбук"
+        },
+        {
+          "id": "k_demo0",
+          "createdAt": "2026-08-10T19:40:58.440Z",
+          "revokedAt": "2026-10-12T19:40:58.440Z",
+          "note": "старый"
+        }
+      ],
+      "keyPrefix": "demo_7c1",
+      "autostart": true,
+      "runtime": {
+        "id": "demo",
+        "running": true,
+        "pid": 24817,
+        "startedAt": "2026-11-08T15:28:58.440Z",
+        "port": 9100
+      }
+    },
+    {
+      "id": "ops",
+      "name": "ops",
+      "servers": [
+        "fetch",
+        "time",
+        "memory"
+      ],
+      "port": 9101,
+      "keys": [
+        {
+          "id": "k_ops1",
+          "createdAt": "2026-10-27T19:40:58.440Z"
+        }
+      ],
+      "keyPrefix": "ops_51ab",
+      "runtime": {
+        "id": "ops",
+        "running": true,
+        "pid": 24902,
+        "startedAt": "2026-11-08T17:00:58.440Z",
+        "port": 9101
+      }
+    },
+    {
+      "id": "lab",
+      "name": "lab",
+      "description": "эксперименты",
+      "servers": [
+        "memory",
+        "context7"
+      ],
+      "port": 9102,
+      "keys": [
+        {
+          "id": "k_lab1",
+          "createdAt": "2026-11-03T19:40:58.440Z"
+        }
+      ],
+      "keyPrefix": "lab_3d77",
+      "runtime": {
+        "id": "lab",
+        "running": false,
+        "port": 9102,
+        "exitCode": 1,
+        "restarts": 2,
+        "error": "memory: connection refused после 3 попыток"
+      }
+    },
+    {
+      "id": "dev",
+      "name": "dev",
+      "servers": [
+        "fetch",
+        "fs",
+        "time"
+      ],
+      "port": 9103,
+      "keys": [
+        {
+          "id": "k_dev1",
+          "createdAt": "2026-11-06T19:40:58.440Z",
+          "note": "ноутбук"
+        }
+      ],
+      "keyPrefix": "dev_0e94",
+      "runtime": {
+        "id": "dev",
+        "running": true,
+        "pid": 25311,
+        "startedAt": "2026-11-08T18:35:58.440Z",
+        "port": 9103
+      }
+    }
+  ],
+  "servers": [
+    {
+      "name": "fetch",
+      "transport": "stdio",
+      "command": [
+        "uvx",
+        "mcp-server-fetch"
+      ],
+      "enabled": true
+    },
+    {
+      "name": "time",
+      "transport": "stdio",
+      "command": [
+        "uvx",
+        "mcp-server-time"
+      ],
+      "enabled": true
+    },
+    {
+      "name": "memory",
+      "transport": "http",
+      "url": "http://127.0.0.1:49374/mcp",
+      "enabled": true
+    },
+    {
+      "name": "context7",
+      "transport": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    },
+    {
+      "name": "fs",
+      "transport": "stdio",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "enabled": true
+    }
+  ],
+  "firstPort": 9100
+}

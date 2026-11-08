@@ -1,0 +1,12 @@
+{
+  "logs": [
+    "2026-11-08 21:03:11 stdio fetch spawn pid 24817",
+    "2026-11-08 21:03:12 INFO health check 4/4 ok",
+    "2026-11-08 21:04:12 INFO key demo_7c1 · 128 вызовов/ч",
+    "2026-11-08 21:04:41 INFO invoke_command fetch → 200 · 96 мс",
+    "2026-11-08 21:04:44 WARN memory: timeout after 5000 ms (2/3)",
+    "2026-11-08 21:04:44 INFO retry memory через 250 мс",
+    "2026-11-08 21:04:58 INFO proxy context7 streamable-http · 84 мс",
+    "2026-11-08 21:05:02 INFO listen demo :9100 · 4 сервера"
+  ]
+}

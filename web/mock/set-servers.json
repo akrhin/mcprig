@@ -1,0 +1,22 @@
+{
+  "running": true,
+  "servers": [
+    {
+      "name": "fetch",
+      "healthy": true
+    },
+    {
+      "name": "time",
+      "healthy": true
+    },
+    {
+      "name": "memory",
+      "healthy": false,
+      "error": "timeout after 5000 ms"
+    },
+    {
+      "name": "context7",
+      "healthy": true
+    }
+  ]
+}

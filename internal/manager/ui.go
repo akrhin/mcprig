@@ -18,53 +18,6 @@ func writeHTML(w http.ResponseWriter, status int, tmpl *template.Template, data 
 	_ = tmpl.Execute(w, data)
 }
 
-type uiData struct {
-	Version string
-	Servers int
-	Sets    []setView
-}
-
-func (m *Manager) pageIndex(req *request) error {
-	data := uiData{Version: m.version, Servers: len(m.store.Servers()), Sets: m.setViews()}
-	writeHTML(req.w, http.StatusOK, uiTemplate, data)
-	return nil
-}
-
-// Страница минимальная: панель — этап 5. Никакого inline-JS, только текст.
-var uiTemplate = template.Must(template.New("index").Parse(`<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mcprig</title>
-<style>
- body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 60rem; padding: 0 1rem; color: #1b1b1b; }
- table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
- th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid #ddd; }
- code { background: #f3f3f3; padding: 0 .3rem; border-radius: 3px; }
- .up { color: #0a7d2b; } .down { color: #9b1c1c; }
-</style>
-</head>
-<body>
-<h1>mcprig</h1>
-<p>Версия {{.Version}} · серверов в реестре: {{.Servers}}</p>
-<table>
-<thead><tr><th>набор</th><th>порт</th><th>состояние</th><th>ключ</th><th>серверы</th></tr></thead>
-<tbody>
-{{range .Sets}}<tr>
-<td><code>{{.ID}}</code>{{if .Description}} — {{.Description}}{{end}}</td>
-<td>{{.Port}}</td>
-<td>{{if .Runtime.Running}}<span class="up">работает</span>{{else}}<span class="down">остановлен</span>{{end}}</td>
-<td>{{if .KeyPrefix}}<code>{{.KeyPrefix}}…</code>{{else}}нет{{end}}</td>
-<td>{{len .Servers}}</td>
-</tr>{{else}}<tr><td colspan="5">наборов нет</td></tr>{{end}}
-</tbody>
-</table>
-<p>API: <code>/api/state</code>, <code>/api/sets</code>, <code>/api/servers</code>, <code>/api/env</code></p>
-</body>
-</html>
-`))
-
 type loginData struct {
 	Error string
 }

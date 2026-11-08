@@ -1,0 +1,403 @@
+{
+  "set": "demo",
+  "counters": [
+    {
+      "client": "opencode/2.2.6",
+      "tool": "invoke_command",
+      "calls": 2114,
+      "failures": 9,
+      "totalMs": 138420,
+      "p50": 41,
+      "p95": 214
+    },
+    {
+      "client": "opencode/2.2.6",
+      "tool": "list_commands",
+      "calls": 812,
+      "failures": 1,
+      "totalMs": 18440,
+      "p50": 18,
+      "p95": 96
+    },
+    {
+      "client": "claude-desktop/1.2",
+      "tool": "invoke_command",
+      "calls": 312,
+      "failures": 2,
+      "totalMs": 41200,
+      "p50": 62,
+      "p95": 890
+    },
+    {
+      "client": "cursor/0.48",
+      "tool": "describe_commands",
+      "calls": 174,
+      "failures": 0,
+      "totalMs": 3100,
+      "p50": 12,
+      "p95": 40
+    }
+  ],
+  "tail": [
+    {
+      "at": "2026-11-08T19:40:55.728Z",
+      "client": "cursor/0.48",
+      "server": "fetch",
+      "tool": "invoke_command",
+      "ms": 8,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:40:49.328Z",
+      "client": "cursor/0.48",
+      "server": "time",
+      "tool": "describe_commands",
+      "ms": 104,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:40:44.856Z",
+      "client": "claude-desktop/1.2",
+      "server": "fetch",
+      "tool": "describe_commands",
+      "ms": 136,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:40:37.368Z",
+      "client": "claude-desktop/1.2",
+      "server": "time",
+      "tool": "invoke_command",
+      "ms": 328,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:40:29.928Z",
+      "client": "opencode/2.2.6",
+      "server": "context7",
+      "tool": "describe_commands",
+      "ms": 152,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:40:25.696Z",
+      "client": "claude-desktop/1.2",
+      "server": "fetch",
+      "tool": "invoke_command",
+      "ms": 4168,
+      "ok": false,
+      "error": "upstream 504"
+    },
+    {
+      "at": "2026-11-08T19:40:19.736Z",
+      "client": "cursor/0.48",
+      "server": "fs",
+      "tool": "describe_commands",
+      "ms": 296,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:40:12.088Z",
+      "client": "cursor/0.48",
+      "server": "memory",
+      "tool": "describe_commands",
+      "ms": 392,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:40:04.792Z",
+      "client": "cursor/0.48",
+      "server": "fetch",
+      "tool": "invoke_command",
+      "ms": 232,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:58.464Z",
+      "client": "opencode/2.2.6",
+      "server": "context7",
+      "tool": "invoke_command",
+      "ms": 136,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:54.368Z",
+      "client": "opencode/2.2.6",
+      "server": "context7",
+      "tool": "list_commands",
+      "ms": 200,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:46.160Z",
+      "client": "opencode/2.2.6",
+      "server": "fs",
+      "tool": "invoke_command",
+      "ms": 200,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:41.528Z",
+      "client": "cursor/0.48",
+      "server": "fetch",
+      "tool": "list_commands",
+      "ms": 168,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:32.848Z",
+      "client": "cursor/0.48",
+      "server": "time",
+      "tool": "list_commands",
+      "ms": 216,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:25.880Z",
+      "client": "opencode/2.2.6",
+      "server": "memory",
+      "tool": "invoke_command",
+      "ms": 264,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:20.328Z",
+      "client": "opencode/2.2.6",
+      "server": "fetch",
+      "tool": "list_commands",
+      "ms": 344,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:13.936Z",
+      "client": "opencode/2.2.6",
+      "server": "context7",
+      "tool": "invoke_command",
+      "ms": 4936,
+      "ok": false,
+      "error": "upstream 504"
+    },
+    {
+      "at": "2026-11-08T19:39:08.048Z",
+      "client": "opencode/2.2.6",
+      "server": "fs",
+      "tool": "invoke_command",
+      "ms": 104,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:39:02.344Z",
+      "client": "opencode/2.2.6",
+      "server": "memory",
+      "tool": "describe_commands",
+      "ms": 184,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:54.392Z",
+      "client": "opencode/2.2.6",
+      "server": "context7",
+      "tool": "describe_commands",
+      "ms": 184,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:49.559Z",
+      "client": "opencode/2.2.6",
+      "server": "fetch",
+      "tool": "describe_commands",
+      "ms": 280,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:42.104Z",
+      "client": "claude-desktop/1.2",
+      "server": "time",
+      "tool": "list_commands",
+      "ms": 8,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:35.536Z",
+      "client": "cursor/0.48",
+      "server": "time",
+      "tool": "list_commands",
+      "ms": 184,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:29.696Z",
+      "client": "cursor/0.48",
+      "server": "memory",
+      "tool": "list_commands",
+      "ms": 344,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:23.664Z",
+      "client": "cursor/0.48",
+      "server": "memory",
+      "tool": "invoke_command",
+      "ms": 392,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:16.784Z",
+      "client": "cursor/0.48",
+      "server": "time",
+      "tool": "invoke_command",
+      "ms": 216,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:10.632Z",
+      "client": "cursor/0.48",
+      "server": "context7",
+      "tool": "describe_commands",
+      "ms": 376,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:38:03.896Z",
+      "client": "claude-desktop/1.2",
+      "server": "fetch",
+      "tool": "describe_commands",
+      "ms": 4840,
+      "ok": false,
+      "error": "upstream 504"
+    },
+    {
+      "at": "2026-11-08T19:37:58.920Z",
+      "client": "opencode/2.2.6",
+      "server": "memory",
+      "tool": "list_commands",
+      "ms": 88,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:50.296Z",
+      "client": "claude-desktop/1.2",
+      "server": "fetch",
+      "tool": "invoke_command",
+      "ms": 136,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:44.296Z",
+      "client": "cursor/0.48",
+      "server": "fs",
+      "tool": "list_commands",
+      "ms": 232,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:37.456Z",
+      "client": "cursor/0.48",
+      "server": "memory",
+      "tool": "invoke_command",
+      "ms": 328,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:33.384Z",
+      "client": "opencode/2.2.6",
+      "server": "time",
+      "tool": "describe_commands",
+      "ms": 200,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:25.808Z",
+      "client": "cursor/0.48",
+      "server": "context7",
+      "tool": "list_commands",
+      "ms": 376,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:18.736Z",
+      "client": "claude-desktop/1.2",
+      "server": "fs",
+      "tool": "list_commands",
+      "ms": 152,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:13.936Z",
+      "client": "claude-desktop/1.2",
+      "server": "time",
+      "tool": "invoke_command",
+      "ms": 376,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:37:05.632Z",
+      "client": "opencode/2.2.6",
+      "server": "fs",
+      "tool": "describe_commands",
+      "ms": 56,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:36:59.160Z",
+      "client": "opencode/2.2.6",
+      "server": "fs",
+      "tool": "describe_commands",
+      "ms": 152,
+      "ok": true,
+      "error": ""
+    },
+    {
+      "at": "2026-11-08T19:36:53.424Z",
+      "client": "opencode/2.2.6",
+      "server": "time",
+      "tool": "describe_commands",
+      "ms": 4872,
+      "ok": false,
+      "error": "upstream 504"
+    },
+    {
+      "at": "2026-11-08T19:36:46.312Z",
+      "client": "claude-desktop/1.2",
+      "server": "memory",
+      "tool": "describe_commands",
+      "ms": 344,
+      "ok": true,
+      "error": ""
+    }
+  ]
+}

@@ -305,6 +305,9 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.unauthorized(w, r)
 		return
 	}
+	if m.servePanel(w, r) {
+		return
+	}
 	if err := m.serveRoute(w, r); err != nil {
 		m.fail(w, r, err)
 	}
@@ -429,8 +432,6 @@ func (m *Manager) buildRoutes() []route {
 		return route{re: regexp.MustCompile(pattern), methods: methods}
 	}
 	return []route{
-		mk(`^/$`, map[string]handlerFunc{http.MethodGet: m.pageIndex}),
-		mk(`^/ui/?$`, map[string]handlerFunc{http.MethodGet: m.pageIndex}),
 		mk(`^/api/state$`, map[string]handlerFunc{http.MethodGet: m.apiState}),
 		mk(`^/api/import$`, map[string]handlerFunc{http.MethodPost: m.apiImport}),
 		mk(`^/api/export/registry$`, map[string]handlerFunc{http.MethodGet: m.apiExportRegistry}),
