@@ -458,8 +458,14 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	// либо ошибки не было вовсе. Неизвестный инструмент и несостоявшееся
 	// соединение дают res == nil — такие имена не должны заводить счётчики,
 	// иначе память растёт от любого выдуманного command_name.
+	// Инструмент может вернуть ошибку содержимым (isError) вместо ошибки
+	// протокола — для счётчика это провал, иначе «ошибки» в панели всегда 0.
+	recErr := err
+	if recErr == nil && res != nil && res.IsError {
+		recErr = errors.New(resultMessage(res))
+	}
 	if m.Stats != nil && (err == nil || res != nil) {
-		m.Stats.Record(stats.ClientFrom(ctx, clientOf(req)), e.srv.Name, in.CommandName, time.Since(start), err)
+		m.Stats.Record(stats.ClientFrom(ctx, clientOf(req)), e.srv.Name, in.CommandName, time.Since(start), recErr)
 	}
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {
@@ -623,6 +629,16 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 		return errResult(err)
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(data)}}}, nil
+}
+
+// resultMessage берёт текст ошибки из ответа инструмента.
+func resultMessage(res *mcp.CallToolResult) string {
+	for _, c := range res.Content {
+		if t, ok := c.(*mcp.TextContent); ok && t.Text != "" {
+			return t.Text
+		}
+	}
+	return "инструмент вернул ошибку"
 }
 
 func errResult(err error) (*mcp.CallToolResult, error) {

@@ -21,11 +21,16 @@ import (
 // no child process.
 func upstream(ctx context.Context) (*mcp.ClientSession, error) {
 	s := mcp.NewServer(&mcp.Implementation{Name: "downstream", Version: "test"}, nil)
-	for _, name := range []string{"echo", "danger-zone"} {
+	for _, name := range []string{"echo", "danger-zone", "boom"} {
 		s.AddTool(&mcp.Tool{
 			Name:        name,
 			InputSchema: objectSchema(map[string]any{"text": map[string]any{"type": "string"}}),
 		}, func(_ context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if name == "boom" {
+				return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{
+					Text: "апстрим упал",
+				}}}, nil
+			}
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{
 				Text: name + ":" + string(req.Params.Arguments),
 			}}}, nil
@@ -598,6 +603,29 @@ func TestStatsCountCallsPerClient(t *testing.T) {
 	}
 	if len(snap.Tail) != 1 || snap.Tail[0].Server != "alpha" {
 		t.Fatalf("tail = %+v", snap.Tail)
+	}
+}
+
+// Ошибка инструмента, пришедшая содержимым (isError), — это провал в счётчике.
+func TestStatsCountToolErrorAsFailure(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	m.Stats = stats.NewRecorder("t", 8)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{
+		"server": "alpha", "command_name": "boom", "parameters": map[string]any{},
+	})
+	if !res.IsError {
+		t.Fatalf("ошибка инструмента не дошла клиенту: %s", resultText(t, res))
+	}
+	snap := m.Stats.Snapshot()
+	if len(snap.Counters) != 1 || snap.Counters[0].Failures != 1 || snap.Counters[0].Calls != 1 {
+		t.Fatalf("счётчик: %+v", snap.Counters)
+	}
+	if len(snap.Tail) != 1 || !snap.Tail[0].Failed || !strings.Contains(snap.Tail[0].Message, "апстрим упал") {
+		t.Fatalf("хвост: %+v", snap.Tail)
 	}
 }
 
