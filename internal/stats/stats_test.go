@@ -2,6 +2,7 @@ package stats
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -208,5 +209,44 @@ func TestLabelIsBoundedAndClean(t *testing.T) {
 	}
 	if got := cleanLabel(strings.Repeat("ж", 100)); len(got) > MaxLabelBytes || !utf8.ValidString(got) {
 		t.Fatalf("обрезка по байтам разрезала руну: %q (%d байт)", got, len(got))
+	}
+}
+
+// Текст ошибки в кольце не тянет тело запроса: 10 МиБ обрезаются до
+// MaxMessageBytes, а снимок из 512 таких вызовов остаётся меньше 1 МиБ.
+func TestErrorMessageIsBounded(t *testing.T) {
+	huge := errors.New(strings.Repeat("e", 10<<20))
+	r := NewRecorder("demo", 512)
+	for i := 0; i < 512; i++ {
+		r.Record("opencode", "upstream", "echo", 0, huge)
+	}
+
+	s := r.Snapshot()
+	if got := len(s.Tail); got != 512 {
+		t.Fatalf("tail len = %d, ожидалось 512", got)
+	}
+	for _, c := range s.Tail {
+		if len(c.Message) > MaxMessageBytes+len("…") {
+			t.Fatalf("текст ошибки %d байт, потолок %d", len(c.Message), MaxMessageBytes)
+		}
+		if !c.Failed {
+			t.Fatalf("потерян признак ошибки: %+v", c)
+		}
+	}
+
+	raw, err := json.Marshal(s)
+	if err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	if len(raw) >= 1<<20 {
+		t.Fatalf("снимок %d байт, ожидалось < 1 МиБ", len(raw))
+	}
+
+	// Обрезка по границе руны: многоточие на конце, utf8 цел.
+	r2 := NewRecorder("demo", 1)
+	r2.Record("a", "s", "t", 0, errors.New(strings.Repeat("ж", 1000)))
+	msg := r2.Snapshot().Tail[0].Message
+	if len(msg) > MaxMessageBytes+len("…") || !utf8.ValidString(msg) || !strings.HasSuffix(msg, "…") {
+		t.Fatalf("обрезка многоточием сломана: %d байт, utf8=%v", len(msg), utf8.ValidString(msg))
 	}
 }

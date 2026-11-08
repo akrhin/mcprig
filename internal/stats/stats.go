@@ -32,6 +32,24 @@ const MaxLabelBytes = 64
 // User-Agent. Лишние пары падают в один счётчик OtherLabel.
 const MaxCounters = 4096
 
+// MaxMessageBytes — потолок текста ошибки в кольце вызовов. Текст приходит от
+// апстрима и может нести тело запроса (до 4 МиБ), а кольцо — 512 записей:
+// без потолка один набор занимал бы гигабайты.
+const MaxMessageBytes = 512
+
+// cleanMessage обрезает текст ошибки до MaxMessageBytes по границе руны и
+// помечает обрезку многоточием.
+func cleanMessage(s string) string {
+	if len(s) <= MaxMessageBytes {
+		return s
+	}
+	cut := MaxMessageBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
+}
+
 // OtherLabel — метка счётчика, вбирающего пары сверх MaxCounters.
 const OtherLabel = "(прочее)"
 
@@ -123,7 +141,7 @@ func (r *Recorder) Record(client, server, tool string, d time.Duration, err erro
 	c := Call{Time: time.Now(), Client: client, Set: r.set, Server: server, Tool: tool, Millis: ms}
 	if err != nil {
 		c.Failed = true
-		c.Message = err.Error()
+		c.Message = cleanMessage(err.Error())
 	}
 
 	r.mu.Lock()
