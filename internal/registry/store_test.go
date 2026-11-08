@@ -437,6 +437,10 @@ func TestCanServe(t *testing.T) {
 
 // A failed write must leave memory as it was: memory never runs ahead of disk.
 func TestFailedWriteKeepsMemory(t *testing.T) {
+	// root игнорирует права каталога: проверка возможна только от обычного uid.
+	if os.Geteuid() == 0 {
+		t.Skip("root не подчиняется правам каталога")
+	}
 	dir := t.TempDir()
 	store := openStore(t, dir)
 	addServer(t, store, `{"name":"keep","command":["x"]}`)

@@ -5,7 +5,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 # По умолчанию — только чтение; право на релиз выдаётся одному job'у ниже.
 permissions:
@@ -82,5 +81,4 @@ jobs:
           # Встроенный токен задачи с permissions.contents=write. Если инстанс его
           # не выдаёт — заведите секрет RELEASE_TOKEN (PAT со scope write:repository).
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          GORELEASER_CURRENT_TAG: ${{ gitea.ref_name }}
         run: ./goreleaser release --clean
