@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -169,8 +170,8 @@ func TestPortRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AllocatePort: %v", err)
 	}
-	if port != 9102 {
-		t.Errorf("AllocatePort = %d, want 9102 (9100 и 9101 заняты)", port)
+	if port == 9100 || port == 9101 || port < FirstPort || port > LastPort {
+		t.Errorf("AllocatePort = %d, ждали свободный порт вне 9100 и 9101", port)
 	}
 
 	// Занять остаток диапазона: свободных портов быть не должно.
@@ -179,6 +180,24 @@ func TestPortRange(t *testing.T) {
 	}
 	if _, err := store.AllocatePort(); err == nil {
 		t.Error("AllocatePort не вернул ошибку при полном диапазоне")
+	}
+}
+
+// TestAllocatePortSkipsBusyOSPort: порт, занятый в системе, не выдаётся, даже
+// если в реестре он свободен.
+func TestAllocatePortSkipsBusyOSPort(t *testing.T) {
+	// 9100 занимает либо сам тест, либо чужой процесс (живой стенд) — в обоих
+	// случаях AllocatePort не должен его выдать.
+	if ln, err := net.Listen("tcp", "127.0.0.1:9100"); err == nil {
+		defer ln.Close()
+	}
+	store := openStore(t, t.TempDir())
+	port, err := store.AllocatePort()
+	if err != nil {
+		t.Fatalf("AllocatePort: %v", err)
+	}
+	if port == 9100 {
+		t.Fatalf("AllocatePort выдал занятый 9100")
 	}
 }
 

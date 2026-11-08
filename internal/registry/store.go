@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -568,16 +569,28 @@ func (s *Store) allocPortLocked() (int, error) {
 		start = FirstPort
 	}
 	for port := start; port <= LastPort; port++ {
-		if !used[port] {
+		if !used[port] && !portBusy(port) {
 			return port, nil
 		}
 	}
 	for port := FirstPort; port < start; port++ {
-		if !used[port] {
+		if !used[port] && !portBusy(port) {
 			return port, nil
 		}
 	}
 	return 0, fmt.Errorf("свободных портов в диапазоне %d–%d нет", FirstPort, LastPort)
+}
+
+// portBusy — порт занят в системе, а не только в реестре. Между проверкой и
+// стартом набора порт может занять кто-то ещё — тогда start вернёт «порт занят»,
+// это осознанно.
+func portBusy(port int) bool {
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return true
+	}
+	ln.Close()
+	return false
 }
 
 func nextPort(port int) int {
