@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"log/slog"
 	"net"
 	"net/http"
@@ -33,10 +34,21 @@ func main() {
 }
 
 func run() error {
-	cfgPath := flag.String("config", defaultConfigPath(), "путь к servers.json")
-	showVersion := flag.Bool("version", false, "показать версию и выйти")
-	addr := flag.String("addr", "", "адрес прослушивания, по умолчанию берётся из transport")
-	flag.Parse()
+	args := os.Args[1:]
+	if len(args) > 0 {
+		switch args[0] {
+		case "stdio":
+			return runStdio(args[1:])
+		case "serve":
+			args = args[1:]
+		}
+	}
+
+	fs := flag.NewFlagSet("serve", flag.ExitOnError)
+	cfgPath := fs.String("config", defaultConfigPath(), "путь к servers.json")
+	showVersion := fs.Bool("version", false, "показать версию и выйти")
+	addr := fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из transport")
+	_ = fs.Parse(args)
 
 	if *showVersion {
 		fmt.Println(version)
@@ -102,6 +114,31 @@ func defaultConfigPath() string {
 		return filepath.Join(dir, "lazy-mcp", "servers.json")
 	}
 	return "servers.json"
+}
+
+// runStdio serves one set over stdin/stdout: the client spawns us and owns the
+// process. No listener, no key — the transport is the boundary.
+func runStdio(args []string) error {
+	fs := flag.NewFlagSet("stdio", flag.ExitOnError)
+	cfgPath := fs.String("config", defaultConfigPath(), "путь к servers.json")
+	_ = fs.Parse(args)
+
+	cfg, err := config.Load(*cfgPath)
+	if err != nil {
+		return err
+	}
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	store, err := oauth.OpenStore(stateDir())
+	if err != nil {
+		return err
+	}
+	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log}
+	mgr := mcpserver.New(cfg, version, conn)
+	defer mgr.Close()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return mgr.Server().Run(ctx, &mcp.StdioTransport{})
 }
 
 // stateDir holds what must survive a restart but is not configuration: OAuth
