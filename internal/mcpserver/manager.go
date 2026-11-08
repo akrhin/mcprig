@@ -25,8 +25,10 @@ import (
 const (
 	// healthTTL keeps one probe result (including a failure) before re-checking.
 	healthTTL = 15 * time.Second
-	// healthTimeout bounds one server's status probe.
-	healthTimeout = 5 * time.Second
+	// healthTimeout bounds one server's status probe. Холодный stdio (npx,
+	// uvx) и первый коннект к LSP поднимаются дольше пяти секунд, и такой
+	// сервер выглядел мёртвым, хотя вызовы проходят.
+	healthTimeout = 15 * time.Second
 	// closeWait bounds how long Close waits for an in-flight connect.
 	closeWait = 5 * time.Second
 	// maxPages stops a server that keeps handing out cursors.
