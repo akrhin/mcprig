@@ -1271,9 +1271,6 @@ func linesParam(r *http.Request, def int) int {
 	if err != nil || n < 1 {
 		return def
 	}
-	if n > 5000 {
-		return 5000
-	}
 	return n
 }
 

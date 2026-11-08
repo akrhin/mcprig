@@ -388,14 +388,33 @@ func (rt *Runtime) Statuses() map[string]RuntimeStatus {
 	return out
 }
 
+// Logs — хвост файла лога набора; кольцо нужно, только пока файла нет.
 func (rt *Runtime) Logs(id string, lines int) []string {
 	if lines <= 0 {
 		lines = 200
 	}
-	if lines > 5000 {
-		lines = 5000
+	if out, err := tailFile(LogPath(rt.dataDir, id), lines); err == nil {
+		return out
 	}
 	return rt.ring(id).tail(lines)
+}
+
+// tailFile — последние lines строк файла. Логи ротируются на 5 МиБ, поэтому
+// читать файл целиком дешевле, чем возиться с seek.
+func tailFile(path string, lines int) ([]string, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	text := strings.TrimRight(string(body), "\n")
+	if text == "" {
+		return []string{}, nil
+	}
+	all := strings.Split(text, "\n")
+	if len(all) > lines {
+		all = all[len(all)-lines:]
+	}
+	return all, nil
 }
 
 // ServerLogs — строки лога, где имя сервера встречается отдельным словом.
