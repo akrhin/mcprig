@@ -431,3 +431,31 @@ func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
 	}
 }
 
+// Набор с id вне шаблона отбрасывается при загрузке — но не молча.
+func TestNewLogsDroppedSets(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"Demo Set","name":"Demo Set","servers":["fs"],"port":9100}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, "registry.json"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	m, err := New(Options{
+		DataDir: dir, Version: "test", CLIPath: fakeBin,
+		Auth: AuthOptions{Off: true},
+		Log:  slog.New(slog.NewTextHandler(&buf, nil)),
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(m.Close)
+
+	if m.store.Set("Demo Set") != nil {
+		t.Fatal("набор Demo Set не отброшен")
+	}
+	if !strings.Contains(buf.String(), "набор выброшен") {
+		t.Fatalf("предупреждения в логе нет: %s", buf.String())
+	}
+}
+

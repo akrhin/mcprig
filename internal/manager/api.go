@@ -116,6 +116,9 @@ func New(opts Options) (*Manager, error) {
 	if log == nil {
 		log = slog.Default()
 	}
+	for _, id := range store.Dropped() {
+		log.Warn("набор выброшен: некорректный id", "id", id)
+	}
 	a, err := newAuth(opts.Auth)
 	if err != nil {
 		return nil, err
