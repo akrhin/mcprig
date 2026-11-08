@@ -215,6 +215,28 @@ func Run(opts Options) error {
 	return nil
 }
 
+// healthz отражает мёртвые autostart-наборы: контракт требует 503, а не «ok»,
+// когда набор задан, но процесса нет.
+func (m *Manager) healthz(w http.ResponseWriter) {
+	sets := 0
+	dead := []string{}
+	for _, set := range m.store.Sets() {
+		if !set.Autostart {
+			continue
+		}
+		sets++
+		if !m.rt.status(set).Running {
+			dead = append(dead, set.ID)
+		}
+	}
+	if len(dead) > 0 {
+		sort.Strings(dead)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "degraded", "dead": dead})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "sets": sets})
+}
+
 // lockDataDir не даёт двум менеджерам делить один реестр.
 func lockDataDir(dir string) (func(), error) {
 	path := filepath.Join(dir, "manager.pid")
@@ -248,8 +270,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			m.methodNotAllowed(w, []string{http.MethodGet})
 			return
 		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		io.WriteString(w, "ok")
+		m.healthz(w)
 		return
 	}
 	if !m.auth.hostOK(r.Host) {
