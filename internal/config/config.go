@@ -30,7 +30,73 @@ type Server struct {
 	Tags        []string          `json:"tags,omitempty"`
 	Enabled     bool              `json:"enabled,omitempty"`
 	Permissions *Permissions      `json:"permissions,omitempty"`
+	OAuth       *OAuth            `json:"oauth,omitempty"`
 	ConfigError string            `json:"_configError,omitempty"`
+}
+
+// OAuth tunes the client-side authorization code flow for one server. An empty
+// block is fine: the flow starts only when the server answers 401 or 403.
+type OAuth struct {
+	Disabled     bool     `json:"disabled,omitempty"`
+	CallbackPort int      `json:"callbackPort,omitempty"` // loopback, default 8947
+	RedirectURL  string   `json:"redirectUrl,omitempty"`
+	ClientID     string   `json:"clientId,omitempty"`
+	ClientSecret string   `json:"clientSecret,omitempty"`
+	Scopes       []string `json:"scopes,omitempty"`
+}
+
+// DefaultCallbackPort is the loopback port the redirect listener uses unless a
+// config overrides it. Fixed on purpose: some authorization servers only accept
+// a redirect URI registered by hand.
+const DefaultCallbackPort = 8947
+
+// validate returns a defect description, empty when the block is usable.
+func (o *OAuth) validate(prefix string) string {
+	if o == nil {
+		return ""
+	}
+	if o.CallbackPort < 0 || o.CallbackPort > 65535 {
+		return fmt.Sprintf("%s.callbackPort: ожидался порт 0–65535, получено %d", prefix, o.CallbackPort)
+	}
+	if o.ClientSecret != "" && o.ClientID == "" {
+		return prefix + ".clientSecret без clientId"
+	}
+	return ""
+}
+
+// merge lays one server's block over the set-wide one.
+func (o *OAuth) merge(global *OAuth) *OAuth {
+	out := &OAuth{}
+	for _, src := range []*OAuth{global, o} {
+		if src == nil {
+			continue
+		}
+		if src.Disabled {
+			out.Disabled = true
+		}
+		if src.CallbackPort != 0 {
+			out.CallbackPort = src.CallbackPort
+		}
+		if src.RedirectURL != "" {
+			out.RedirectURL = src.RedirectURL
+		}
+		if src.ClientID != "" {
+			out.ClientID = src.ClientID
+		}
+		if src.ClientSecret != "" {
+			out.ClientSecret = src.ClientSecret
+		}
+		if len(src.Scopes) > 0 {
+			out.Scopes = src.Scopes
+		}
+	}
+	if out.CallbackPort == 0 {
+		out.CallbackPort = DefaultCallbackPort
+	}
+	if out.RedirectURL == "" {
+		out.RedirectURL = fmt.Sprintf("http://127.0.0.1:%d/callback", out.CallbackPort)
+	}
+	return out
 }
 
 // PermissionAction is allow or deny; lazy-mcp's "ask" is not implemented.
@@ -100,6 +166,7 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 		Tags        []string        `json:"tags"`
 		Enabled     *bool           `json:"enabled"`
 		Permissions json.RawMessage `json:"permissions"`
+		OAuth       *OAuth          `json:"oauth"`
 	}
 	var r raw
 	if err := json.Unmarshal(data, &r); err != nil {
@@ -123,6 +190,13 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 	s.Env = stringMap(r.Env, &s.ConfigError, "env")
 	s.Headers = stringMap(r.Headers, &s.ConfigError, "headers")
 	s.decodePermissions(r.Permissions)
+	if msg := r.OAuth.validate("oauth"); msg != "" {
+		if s.ConfigError == "" {
+			s.ConfigError = msg
+		}
+	} else if r.OAuth != nil {
+		s.OAuth = r.OAuth
+	}
 	return nil
 }
 
@@ -236,6 +310,17 @@ type Config struct {
 	HealthMonitor  *HealthMonitor `json:"healthMonitor,omitempty"`
 	RequestTimeout int            `json:"requestTimeout,omitempty"` // ms
 	Permissions    *Permissions   `json:"permissions,omitempty"`
+	OAuth          *OAuth         `json:"oauth,omitempty"`
+}
+
+// OAuthFor returns the effective OAuth settings for one server, set-wide block
+// under the server's own, defaults filled in.
+func (c *Config) OAuthFor(srv *Server) *OAuth {
+	var own *OAuth
+	if srv != nil {
+		own = srv.OAuth
+	}
+	return own.merge(c.OAuth)
 }
 
 // Load reads a config file. A server that cannot be identified (no name) fails
@@ -251,11 +336,16 @@ func Load(path string) (*Config, error) {
 		HealthMonitor  *HealthMonitor    `json:"healthMonitor"`
 		RequestTimeout int               `json:"requestTimeout"`
 		Permissions    json.RawMessage   `json:"permissions"`
+		OAuth          *OAuth            `json:"oauth"`
 	}
 	if err := json.Unmarshal(data, &shape); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	cfg := &Config{Transport: shape.Transport, HealthMonitor: shape.HealthMonitor, RequestTimeout: shape.RequestTimeout}
+	// A broken global OAuth block is dropped too: a typo must not brick the set.
+	if shape.OAuth.validate("oauth") == "" {
+		cfg.OAuth = shape.OAuth
+	}
 	// A broken global block is dropped, not fatal: a typo must not brick the set.
 	if p := decodeGlobalPermissions(shape.Permissions); p != nil {
 		cfg.Permissions = p
