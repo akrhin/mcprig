@@ -19,6 +19,10 @@ const (
 	// который поднимается дольше (stdio-обёртка npx, холодный LSP), иначе
 	// выглядит мёртвым, хотя вызовы проходят. Числа обязаны совпадать.
 	healthTimeout = 15 * time.Second
+	// healthLoadTimeout — бюджет самого запроса: набор тратит до healthTimeout
+	// на пробу и ещё немного на ответ, поэтому внешний ровно тот же 15 с
+	// истекал одновременно с внутренним и панель показывала «не ответил».
+	healthLoadTimeout = 2 * healthTimeout
 )
 
 type serverHealth struct {
@@ -83,7 +87,7 @@ func (c *healthCache) get(ctx context.Context, id string, load func(context.Cont
 
 		// Лидер грузит под своим ctx: отмена запроса клиента не должна
 		// попадать в кэш как «context canceled» на весь healthTTL.
-		loadCtx, cancel := context.WithTimeout(context.Background(), healthTimeout)
+		loadCtx, cancel := context.WithTimeout(context.Background(), healthLoadTimeout)
 		view := load(loadCtx)
 		cancel()
 
@@ -174,7 +178,7 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 			out.Servers[i].Error = s.err
 			continue
 		}
-		errText := fmt.Sprintf("набор не ответил за %s", healthTimeout)
+		errText := fmt.Sprintf("набор не ответил за %s", healthLoadTimeout)
 		if firstText(res) != "" {
 			errText = "нет в ответе list_servers"
 		}
