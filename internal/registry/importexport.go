@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // Skip is one import entry that did not make it in, with the reason.
@@ -58,8 +57,9 @@ func (s *Store) Import(entries map[string]json.RawMessage) ([]string, []Skip) {
 	return added, skipped
 }
 
-// importObject turns one import value into a server body: a bare command
-// string, a legacy argv array, or an object as is.
+// importObject turns one import value into a server body: an argv array or an
+// object as is. A bare string used to be split into argv, but a path with spaces
+// broke silently; it is refused instead.
 func importObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if isNull(trimmed) {
@@ -69,18 +69,7 @@ func importObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 	case '{':
 		return decodeObject(trimmed)
 	case '"':
-		var command string
-		if err := json.Unmarshal(trimmed, &command); err != nil {
-			return nil, errors.New("command: ожидалась строка")
-		}
-		// MCPHub shorthand: here a bare string is a whole shell line, so it is
-		// split into argv. Everywhere else (commandOf) a plain string names the
-		// executable only.
-		argv, err := json.Marshal(strings.Fields(command))
-		if err != nil {
-			return nil, err
-		}
-		return map[string]json.RawMessage{"command": argv}, nil
+		return nil, errors.New("command: передайте массив")
 	case '[':
 		var argv []string
 		if err := json.Unmarshal(trimmed, &argv); err != nil {

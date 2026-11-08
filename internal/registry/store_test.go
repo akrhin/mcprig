@@ -261,12 +261,15 @@ func TestImport(t *testing.T) {
 	}
 	added, skipped := store.Import(entries)
 
-	if got, want := strings.Join(added, ","), "arr,obj,str"; got != want {
+	if got, want := strings.Join(added, ","), "arr,obj"; got != want {
 		t.Errorf("added = %q, want %q", got, want)
 	}
 	reasons := make(map[string]string, len(skipped))
 	for _, skip := range skipped {
 		reasons[skip.Name] = skip.Reason
+	}
+	if reasons["str"] != "command: передайте массив" {
+		t.Errorf("str: %q", reasons["str"])
 	}
 	if !strings.Contains(reasons["num"], "env.A") {
 		t.Errorf("num: %q", reasons["num"])
@@ -277,8 +280,8 @@ func TestImport(t *testing.T) {
 	if !strings.Contains(reasons["Upper"], "имя сервера") {
 		t.Errorf("Upper: %q", reasons["Upper"])
 	}
-	if srv := store.Server("str"); srv == nil || len(srv.Command) != 3 || srv.Command[2] != "server-a" {
-		t.Errorf("сервер str: %+v", srv)
+	if srv := store.Server("str"); srv != nil {
+		t.Errorf("строковая команда импортирована: %+v", srv)
 	}
 
 	// Повторный импорт ничего не добавляет: имена уже есть.
@@ -287,7 +290,7 @@ func TestImport(t *testing.T) {
 		t.Errorf("повторный импорт: added=%v skipped=%d", added, len(skipped))
 	}
 
-	addSet(t, store, `{"name":"demo","servers":["str","obj"],"port":9100}`)
+	addSet(t, store, `{"name":"demo","servers":["arr","obj"],"port":9100}`)
 	exported, err := store.ExportSet("demo")
 	if err != nil {
 		t.Fatalf("ExportSet: %v", err)
