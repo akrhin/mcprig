@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -456,6 +457,25 @@ func TestNewLogsDroppedSets(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "набор выброшен") {
 		t.Fatalf("предупреждения в логе нет: %s", buf.String())
+	}
+}
+
+// Явный порт проверяется в системе: занятый процессом — 409, а не 200.
+func TestUpdateSetRejectsBusyPort(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+
+	ln, err := net.Listen("tcp", "127.0.0.1:9150")
+	if err != nil {
+		t.Fatalf("занять порт 9150: %v", err)
+	}
+	defer ln.Close()
+
+	w := e.do(t, http.MethodPut, "/api/sets/"+id, map[string]any{"port": 9150})
+	status(t, w, http.StatusConflict)
+	if msg := decode[map[string]string](t, w)["error"]; !strings.Contains(msg, "занят процессом") {
+		t.Fatalf("ошибка = %q", msg)
 	}
 }
 

@@ -332,12 +332,14 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		return nil, errors.New("в наборе должен быть хотя бы один сервер")
 	}
 
+	explicitPort := false
 	if raw, ok := in["port"]; ok && !isNull(raw) {
 		var port int
 		if err := json.Unmarshal(raw, &port); err != nil {
 			return nil, fmt.Errorf("порт: целое %d–%d", FirstPort, LastPort)
 		}
 		out.Port = port
+		explicitPort = true
 	}
 	if out.Port == 0 {
 		port, err := s.allocPortLocked()
@@ -353,6 +355,11 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		if other.ID != out.ID && other.Port == out.Port {
 			return nil, fmt.Errorf("порт %d занят набором %s", out.Port, other.ID)
 		}
+	}
+	// Порт из тела при правке: незанятый в реестре ещё не значит свободный в
+	// системе, иначе рестарт набора упадёт уже после записи.
+	if cur != nil && explicitPort && cur.Port != out.Port && portBusy(out.Port) {
+		return nil, fmt.Errorf("порт %d занят процессом", out.Port)
 	}
 
 	if autostart, present, err := strictBool(in, "autostart"); err != nil {
