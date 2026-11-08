@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/sintez/mcprig/internal/registry"
@@ -19,6 +20,7 @@ const (
 	callsDefaultLimit = 50
 	callsMaxLimit     = 500
 	callsTimeout      = 2 * time.Second
+	callsConcurrency  = 4
 )
 
 // callRow — одна строка хвоста для панели. Error всегда в теле, даже пустой:
@@ -83,8 +85,25 @@ func (m *Manager) apiCalls(req *request) error {
 		}
 	}
 
-	for _, t := range targets {
-		snap, err := m.fetchSetStats(req.r.Context(), t.set, t.port)
+	// Наборы опрашиваются параллельно: по два секунды таймаута на каждый,
+	// последовательно это до десяти секунд на запрос панели при пяти наборах.
+	snaps := make([]stats.Snapshot, len(targets))
+	errs := make([]error, len(targets))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, callsConcurrency)
+	for i, t := range targets {
+		wg.Add(1)
+		go func(i int, t target) {
+			defer wg.Done()
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			snaps[i], errs[i] = m.fetchSetStats(req.r.Context(), t.set, t.port)
+		}(i, t)
+	}
+	wg.Wait()
+
+	for i, t := range targets {
+		snap, err := snaps[i], errs[i]
 		if err != nil {
 			out.Unreachable = append(out.Unreachable, t.set.ID)
 			continue
