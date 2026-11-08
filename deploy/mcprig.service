@@ -1,0 +1,21 @@
+[Unit]
+Description=mcprig panel (registry, sets, dashboard)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/mcprig/panel.env
+Environment=MCPRIG_DATA_DIR=%h/.local/state/mcprig
+Environment=MCPRIG_HOST=127.0.0.1
+Environment=MCPRIG_PORT=9091
+ExecStart=%h/.local/bin/mcprig panel
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+SyslogIdentifier=mcprig-panel
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

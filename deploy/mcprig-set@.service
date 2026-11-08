@@ -1,0 +1,23 @@
+[Unit]
+Description=mcprig set %i
+Documentation=file://%h/.config/mcprig/sets/%i/servers.json
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/mcprig/sets/%i/env
+Environment=MCPRIG_DATA_DIR=%h/.local/state/mcprig
+ExecStart=%h/.local/bin/mcprig serve --config %h/.config/mcprig/sets/%i/servers.json
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+SyslogIdentifier=mcprig-%i
+# stdio downstreams are arbitrary programs, so only the cheap hardening is here.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,40 @@
+# Two sets, one container each. Configs stay on the host and are mounted read-only;
+# OAuth tokens and anything else the process must not lose live in named volumes.
+services:
+  demo:
+    image: ghcr.io/sintez/mcprig:latest
+    command: ["serve", "--config", "/config/servers.json", "--addr", "0.0.0.0:9100"]
+    ports:
+      - "127.0.0.1:9100:9100"
+    volumes:
+      - ./sets/demo/servers.json:/config/servers.json:ro
+      - mcprig-demo-state:/data
+    env_file:
+      - ./sets/demo/env
+    environment:
+      MCPRIG_DATA_DIR: /data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  ops:
+    image: ghcr.io/sintez/mcprig:latest
+    command: ["serve", "--config", "/config/servers.json", "--addr", "0.0.0.0:9101"]
+    ports:
+      - "127.0.0.1:9101:9101"
+    volumes:
+      - ./sets/ops/servers.json:/config/servers.json:ro
+      - mcprig-ops-state:/data
+    env_file:
+      - ./sets/ops/env
+    environment:
+      MCPRIG_DATA_DIR: /data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+volumes:
+  mcprig-demo-state:
+  mcprig-ops-state:
