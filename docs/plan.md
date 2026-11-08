@@ -65,7 +65,6 @@ health, вызовы). Экран показывает то, чего сейча
 
 ## Открытые вопросы
 
-1. Каналы публикации: только архивы goreleaser, или ещё обёртки npm/PyPI/crates
-   (второй код на каждый канал, выигрыш — привычка `npx`/`pipx`).
-2. Путь модуля для `go install`: оставить `github.com/sintez/mcprig` как
-   vanity-путь или перевести на `frosty-ad-gt.cloudpub.ru/sintez/mcprig`.
+Нет. Каналы — только архивы goreleaser (обёртки npm/PyPI/crates не заводим);
+путь модуля остаётся `github.com/sintez/mcprig`, репозиторий на GitHub появится,
+когда изделие будет готово.
