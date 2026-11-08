@@ -3,6 +3,7 @@ package httplisten
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/stats"
 )
 
 const testToken = "s3cret-token"
@@ -333,5 +335,108 @@ func TestClientLabel(t *testing.T) {
 	}
 	if open := clientLabel(httptest.NewRequest("POST", "/mcp", nil)); open != "" {
 		t.Fatalf("anonymous label = %q, want empty", open)
+	}
+}
+
+// Отпечаток — ровно 6 hex, и только от реально предъявленного bearer-ключа:
+// пустое значение, чужая схема и заголовок "Bearer " без ключа не дают метки.
+func TestClientLabelFingerprintShape(t *testing.T) {
+	req := httptest.NewRequest("POST", "/mcp", nil)
+	req.Header.Set("User-Agent", "harness/1")
+	req.Header.Set("Authorization", "Bearer "+testToken)
+	got := clientLabel(req)
+	head, _, ok := strings.Cut(got, "/")
+	if !ok {
+		t.Fatalf("label = %q", got)
+	}
+	fp := strings.TrimPrefix(head, "key:")
+	if len(fp) != 6 {
+		t.Fatalf("отпечаток %q длиной %d, ожидалось 6 hex", fp, len(fp))
+	}
+	if _, err := hex.DecodeString(fp); err != nil {
+		t.Fatalf("отпечаток %q не hex: %v", fp, err)
+	}
+
+	for _, header := range []string{"", "Bearer ", "Bearer   ", "Basic dXNlcjpwd2Q="} {
+		r := httptest.NewRequest("POST", "/mcp", nil)
+		r.Header.Set("User-Agent", "harness/1")
+		if header != "" {
+			r.Header.Set("Authorization", header)
+		}
+		if got := clientLabel(r); strings.Contains(got, "key:") {
+			t.Fatalf("заголовок %q дал отпечаток: %q", header, got)
+		}
+	}
+}
+
+func newStatsHandler(t *testing.T, token string, allowAnonymous bool, rec *stats.Recorder) http.Handler {
+	t.Helper()
+	cfg := &config.Config{Transport: &config.HTTPTransport{
+		AuthToken:      token,
+		AllowAnonymous: allowAnonymous,
+	}}
+	h, err := New(cfg, testServer(), slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), rec)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	return h
+}
+
+// Открытый набор: /mcp анонимно работает, /stats анонимно — 403, иначе первый
+// же прохожий читает метки клиентов и тексты ошибок апстрима.
+func TestOpenSetStatsForbidden(t *testing.T) {
+	rec := stats.NewRecorder("open", 4)
+	srv := httptest.NewServer(newStatsHandler(t, "", true, rec))
+	defer srv.Close()
+
+	res := postMCP(t, srv, "", "", "")
+	body := drain(t, res)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("/mcp без ключа: статус %d, тело %q", res.StatusCode, body)
+	}
+
+	res, err := srv.Client().Get(srv.URL + "/stats")
+	if err != nil {
+		t.Fatalf("get /stats: %v", err)
+	}
+	raw := drain(t, res)
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("/stats открытого набора: статус %d, тело %q", res.StatusCode, raw)
+	}
+	if !strings.Contains(raw, `"error"`) {
+		t.Fatalf("/stats: ожидался JSON с ошибкой, тело %q", raw)
+	}
+}
+
+// Закрытый набор: /stats требует тот же bearer, что и /mcp, и не отдаёт ключ.
+func TestStatsNeedsTokenAndNeverLeaksIt(t *testing.T) {
+	rec := stats.NewRecorder("closed", 4)
+	srv := httptest.NewServer(newStatsHandler(t, testToken, false, rec))
+	defer srv.Close()
+
+	res, err := srv.Client().Get(srv.URL + "/stats")
+	if err != nil {
+		t.Fatalf("get /stats: %v", err)
+	}
+	drain(t, res)
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("/stats без ключа: статус %d, ожидался 401", res.StatusCode)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/stats", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+testToken)
+	res, err = srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	raw := drain(t, res)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("/stats с ключом: статус %d, тело %q", res.StatusCode, raw)
+	}
+	if strings.Contains(raw, testToken) {
+		t.Fatalf("токен попал в снимок: %q", raw)
 	}
 }

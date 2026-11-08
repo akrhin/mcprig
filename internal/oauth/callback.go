@@ -40,8 +40,12 @@ type Callback struct {
 
 // NewCallback поднимает приёмник на addr ("127.0.0.1:8947"). Пустой addr —
 // DefaultCallbackAddr; пустой порт — эфемерный, фактический виден в URL().
-// Слушается только loopback.
-func NewCallback(addr string) (*Callback, error) {
+// state — ожидаемое значение из URL авторизации: пустой отвергается, потому
+// что иначе приёмник принимал бы любой редирект. Слушается только loopback.
+func NewCallback(addr, state string) (*Callback, error) {
+	if state == "" {
+		return nil, errors.New("oauth: не задан ожидаемый state для приёмника кода")
+	}
 	if addr == "" {
 		addr = DefaultCallbackAddr
 	}
@@ -64,9 +68,10 @@ func NewCallback(addr string) (*Callback, error) {
 	}
 
 	c := &Callback{
-		done: make(chan struct{}),
-		res:  make(chan *Result, 1),
-		errs: make(chan error, 1),
+		done:     make(chan struct{}),
+		res:      make(chan *Result, 1),
+		errs:     make(chan error, 1),
+		expected: state,
 	}
 	_, actualPort, err := net.SplitHostPort(ln.Addr().String())
 	if err != nil {
@@ -84,14 +89,6 @@ func NewCallback(addr string) (*Callback, error) {
 
 // URL — адрес редиректа, который должен совпадать с RedirectURL обработчика.
 func (c *Callback) URL() string { return c.url }
-
-// ExpectState задаёт state из URL авторизации; редирект с другим state
-// отклоняется. Пустая строка — не проверять (любой непустой принимается).
-func (c *Callback) ExpectState(state string) {
-	c.mu.Lock()
-	c.expected = state
-	c.mu.Unlock()
-}
 
 // Wait ждёт редирект. Одновременно допускается один ожидающий.
 func (c *Callback) Wait(ctx context.Context) (*Result, error) {
@@ -141,10 +138,7 @@ func (c *Callback) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := q.Get("state")
-	c.mu.Lock()
-	expected := c.expected
-	c.mu.Unlock()
-	if state == "" || (expected != "" && state != expected) {
+	if state != c.expected {
 		http.Error(w, "state mismatch", http.StatusBadRequest)
 		c.fail(errors.New("state mismatch: state в редиректе не совпал с ожидаемым"))
 		return

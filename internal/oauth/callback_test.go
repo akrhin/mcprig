@@ -9,9 +9,9 @@ import (
 	"time"
 )
 
-func newTestCallback(t *testing.T) *Callback {
+func newTestCallback(t *testing.T, state string) *Callback {
 	t.Helper()
-	cb, err := NewCallback("127.0.0.1:0")
+	cb, err := NewCallback("127.0.0.1:0", state)
 	if err != nil {
 		t.Fatalf("NewCallback: %v", err)
 	}
@@ -31,8 +31,7 @@ func get(t *testing.T, url string) (int, string) {
 }
 
 func TestCallbackSuccess(t *testing.T) {
-	cb := newTestCallback(t)
-	cb.ExpectState("st-1")
+	cb := newTestCallback(t, "st-1")
 	if !strings.HasPrefix(cb.URL(), "http://127.0.0.1:") || !strings.HasSuffix(cb.URL(), "/callback") {
 		t.Fatalf("URL = %q", cb.URL())
 	}
@@ -70,8 +69,7 @@ func TestCallbackSuccess(t *testing.T) {
 }
 
 func TestCallbackStateMismatch(t *testing.T) {
-	cb := newTestCallback(t)
-	cb.ExpectState("st-1")
+	cb := newTestCallback(t, "st-1")
 	ch := make(chan error, 1)
 	go func() {
 		_, err := cb.Wait(context.Background())
@@ -94,7 +92,7 @@ func TestCallbackStateMismatch(t *testing.T) {
 }
 
 func TestCallbackEmptyStateRejected(t *testing.T) {
-	cb := newTestCallback(t)
+	cb := newTestCallback(t, "st-1")
 	ch := make(chan error, 1)
 	go func() {
 		_, err := cb.Wait(context.Background())
@@ -111,8 +109,7 @@ func TestCallbackEmptyStateRejected(t *testing.T) {
 }
 
 func TestCallbackAuthorizationError(t *testing.T) {
-	cb := newTestCallback(t)
-	cb.ExpectState("st-1")
+	cb := newTestCallback(t, "st-1")
 	ch := make(chan error, 1)
 	go func() {
 		_, err := cb.Wait(context.Background())
@@ -135,7 +132,7 @@ func TestCallbackAuthorizationError(t *testing.T) {
 }
 
 func TestCallbackWaitContextDone(t *testing.T) {
-	cb := newTestCallback(t)
+	cb := newTestCallback(t, "st-1")
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	start := time.Now()
@@ -149,7 +146,7 @@ func TestCallbackWaitContextDone(t *testing.T) {
 }
 
 func TestCallbackSecondWaitRejected(t *testing.T) {
-	cb := newTestCallback(t)
+	cb := newTestCallback(t, "st-1")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan struct{})
@@ -172,7 +169,7 @@ func TestCallbackSecondWaitRejected(t *testing.T) {
 }
 
 func TestCallbackCloseUnblocksWait(t *testing.T) {
-	cb := newTestCallback(t)
+	cb := newTestCallback(t, "st-1")
 	ch := make(chan error, 1)
 	go func() {
 		_, err := cb.Wait(context.Background())
@@ -193,8 +190,16 @@ func TestCallbackCloseUnblocksWait(t *testing.T) {
 }
 
 func TestNewCallbackRejectsNonLoopback(t *testing.T) {
-	if _, err := NewCallback("0.0.0.0:0"); err == nil {
+	if _, err := NewCallback("0.0.0.0:0", "st-1"); err == nil {
 		t.Fatal("ожидалась ошибка на не-loopback адрес")
+	}
+}
+
+// Пустой ожидаемый state означал бы «принимай любой редирект»; приёмник
+// обязан отказаться слушать ещё до открытия порта.
+func TestNewCallbackRejectsEmptyState(t *testing.T) {
+	if _, err := NewCallback("127.0.0.1:0", ""); err == nil {
+		t.Fatal("ожидалась ошибка на пустой ожидаемый state")
 	}
 }
 

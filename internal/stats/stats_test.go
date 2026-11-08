@@ -3,8 +3,12 @@ package stats
 import (
 	"context"
 	"errors"
+	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestRecordAggregatesPerClientAndTool(t *testing.T) {
@@ -86,4 +90,90 @@ func find(cs []Counter, client, tool string) *Counter {
 		}
 	}
 	return nil
+}
+
+// Потолок: 5000 разных меток не растят карту дальше MaxCounters, лишние пары
+// уходят в один счётчик (прочее), и ни один вызов не теряется.
+func TestCounterCap(t *testing.T) {
+	r := NewRecorder("demo", 0)
+	const n = 5000
+	for i := 0; i < n; i++ {
+		r.Record(fmt.Sprintf("client-%d", i), "s", fmt.Sprintf("tool-%d", i), 0, nil)
+	}
+	s := r.Snapshot()
+	if len(s.Counters) > MaxCounters {
+		t.Fatalf("счётчиков %d, потолок %d", len(s.Counters), MaxCounters)
+	}
+	var calls int64
+	var other *Counter
+	for i := range s.Counters {
+		calls += s.Counters[i].Calls
+		if s.Counters[i].Client == OtherLabel && s.Counters[i].Tool == OtherLabel {
+			other = &s.Counters[i]
+		}
+	}
+	if calls != n {
+		t.Fatalf("сумма вызовов %d, ожидалось %d", calls, n)
+	}
+	if other == nil || other.Calls != n-(MaxCounters-1) {
+		t.Fatalf("счётчик (прочее) = %+v, ожидалось %d вызовов", other, n-(MaxCounters-1))
+	}
+	if cc := s.Counters[0]; cc.Client == "client-0" && cap(cc.latencies) > 64 {
+		t.Fatalf("латентностный резерв под счётчик = %d, ожидался маленький старт", cap(cc.latencies))
+	}
+}
+
+// Память не растёт линейно: после насыщения потолка новая тысяча меток не
+// добавляет ни счётчиков, ни заметной кучи.
+func TestCounterCapBoundsMemory(t *testing.T) {
+	r := NewRecorder("demo", 0)
+	record := func(from, to int) {
+		for i := from; i < to; i++ {
+			r.Record(fmt.Sprintf("client-%d", i), "s", fmt.Sprintf("tool-%d", i), 0, nil)
+		}
+	}
+	record(0, 5000)
+	runtime.GC()
+	var before runtime.MemStats
+	runtime.ReadMemStats(&before)
+
+	record(5000, 45000)
+	runtime.GC()
+	var after runtime.MemStats
+	runtime.ReadMemStats(&after)
+
+	if got := len(r.Snapshot().Counters); got > MaxCounters {
+		t.Fatalf("счётчиков %d, потолок %d", got, MaxCounters)
+	}
+	if grown := int64(after.HeapAlloc) - int64(before.HeapAlloc); grown > 4<<20 {
+		t.Fatalf("куча выросла на %d байт на 40000 меток — потолок не работает", grown)
+	}
+}
+
+// Внешняя метка не сохраняется целиком: 1 МиБ обрезается, управляющие
+// символы вычищаются.
+func TestLabelIsBoundedAndClean(t *testing.T) {
+	r := NewRecorder("demo", 4)
+	r.Record(strings.Repeat("A", 1<<20), "s", "tool\x00\x1b[31mred", 0, nil)
+
+	s := r.Snapshot()
+	if len(s.Counters) != 1 {
+		t.Fatalf("счётчиков %d, ожидался 1", len(s.Counters))
+	}
+	c := s.Counters[0]
+	if len(c.Client) > MaxLabelBytes || len(c.Client) != MaxLabelBytes {
+		t.Fatalf("метка клиента длиной %d, ожидалось %d", len(c.Client), MaxLabelBytes)
+	}
+	if strings.ContainsAny(c.Tool, "\x00\x1b") {
+		t.Fatalf("в имени инструмента остались управляющие символы: %q", c.Tool)
+	}
+	if len(s.Tail[0].Client) > MaxLabelBytes {
+		t.Fatalf("метка в хвосте длиной %d", len(s.Tail[0].Client))
+	}
+	if got := cleanLabel("  "); got != "  " {
+		t.Fatalf("cleanLabel не должен трогать короткие метки: %q", got)
+	}
+	if got := cleanLabel(strings.Repeat("ж", 100)); len(got) > MaxLabelBytes || !utf8.ValidString(got) {
+		t.Fatalf("обрезка по байтам разрезала руну: %q (%d байт)", got, len(got))
+	}
 }

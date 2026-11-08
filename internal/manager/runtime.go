@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/registry"
 )
 
@@ -153,7 +154,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 
 	cmd := exec.Command(rt.cliPath, "serve", "--config", cfgPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Env = append(rt.childEnv(setServers(set, servers)), "MCPRIG_SET="+set.ID)
+	cmd.Env = append(childEnv(setServers(set, servers), rt.sec), "MCPRIG_SET="+set.ID, "MCPRIG_DATA_DIR="+rt.dataDir)
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 	if err := cmd.Start(); err != nil {
@@ -417,7 +418,9 @@ func (rt *Runtime) Close() {
 }
 
 // childEnv — whitelist плюс только те ${VAR}, на которые ссылается набор.
-func (rt *Runtime) childEnv(servers []registry.Server) []string {
+// Тот же хелпер отдаёт окружение probe и browse: у них в env не должно быть
+// секретов менеджера.
+func childEnv(servers []registry.Server, sec *Secrets) []string {
 	values := map[string]string{}
 	keep := map[string]bool{
 		"PATH": true, "HOME": true, "LANG": true, "TZ": true, "TMPDIR": true,
@@ -432,9 +435,9 @@ func (rt *Runtime) childEnv(servers []registry.Server) []string {
 			values[name] = value
 		}
 	}
-	if rt.sec != nil {
+	if sec != nil {
 		for _, name := range envRefs(servers) {
-			if v, ok := rt.sec.Lookup(name); ok {
+			if v, ok := sec.Lookup(name); ok {
 				values[name] = v
 			}
 		}
@@ -449,6 +452,14 @@ func (rt *Runtime) childEnv(servers []registry.Server) []string {
 		out = append(out, name+"="+values[name])
 	}
 	return out
+}
+
+// managerEnv — окружение stdio-сервера для probe и browse: whitelist плюс
+// ${VAR} этого сервера, без секретов менеджера.
+func managerEnv(sec *Secrets) func(*config.Server) []string {
+	return func(srv *config.Server) []string {
+		return childEnv([]registry.Server{srv}, sec)
+	}
 }
 
 func waitPort(port int, budget time.Duration) bool {

@@ -4,17 +4,55 @@
 // "claude-code", …) or a caller of the HTTP endpoint (key id plus the
 // User-Agent product token). Counters live in memory; the panel reads them
 // and the ring of recent calls for the tail of the dashboard.
+//
+// Токены не учитываются: у MCP-ответа нет стандартного поля usage, а формы
+// _meta у серверов разные, поэтому счётчик намеренно без токенов.
 package stats
 
 import (
+	"sort"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // MaxLatencySamples bounds the per-(client, tool) latency reservoir used for
 // percentiles. A call beyond the bound overwrites a slot round-robin, so the
 // percentiles describe recent traffic rather than all of it.
 const MaxLatencySamples = 256
+
+// MaxLabelBytes — потолок метки клиента и имени инструмента: и то и другое
+// приходит снаружи (заголовок User-Agent, clientInfo из initialize, имя
+// инструмента в invoke_command), поэтому длина не доверяется.
+const MaxLabelBytes = 64
+
+// MaxCounters — жёсткий потолок числа счётчиков. Пара (клиент, инструмент)
+// создаётся по запросу, и без потолка память растёт от каждого нового
+// User-Agent. Лишние пары падают в один счётчик OtherLabel.
+const MaxCounters = 4096
+
+// OtherLabel — метка счётчика, вбирающего пары сверх MaxCounters.
+const OtherLabel = "(прочее)"
+
+// cleanLabel обрезает внешнюю метку до MaxLabelBytes, выбрасывает управляющие
+// символы и чинит разрезанную на границе руну.
+func cleanLabel(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
+	if len(s) > MaxLabelBytes {
+		cut := MaxLabelBytes
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut--
+		}
+		s = s[:cut]
+	}
+	return s
+}
 
 // Call is one finished invocation, kept for the dashboard's tail.
 type Call struct {
@@ -28,13 +66,18 @@ type Call struct {
 	Message string    `json:"error,omitempty"`
 }
 
-// Counter is the aggregate for one (client, tool) pair.
+// Counter is the aggregate for one (client, server, tool) triple.
 type Counter struct {
 	Client   string `json:"client"`
+	Server   string `json:"server"`
 	Tool     string `json:"tool"`
 	Calls    int64  `json:"calls"`
 	Failures int64  `json:"failures"`
 	TotalMs  int64  `json:"total_ms"`
+	// Перцентили заполняются при сборке Snapshot: в Record это стоило бы
+	// сортировки резерва на каждый вызов.
+	P50Ms int64 `json:"p50ms"`
+	P95Ms int64 `json:"p95ms"`
 
 	latencies []int64
 	next      int
@@ -50,7 +93,9 @@ type Recorder struct {
 	tailCap  int
 }
 
-type counterKey struct{ client, tool string }
+// counterKey включает сервер: два сервера с одинаковым именем инструмента —
+// две разные строки дашборда.
+type counterKey struct{ server, client, tool string }
 
 // NewRecorder makes a recorder for one set. tailCap bounds the recent-call
 // ring (0 means 512).
@@ -66,8 +111,11 @@ func NewRecorder(set string, tailCap int) *Recorder {
 	}
 }
 
-// Record accounts one finished invocation.
+// Record accounts one finished invocation. Метки приходят от клиента, поэтому
+// сначала чистятся, а пары сверх потолка складываются в OtherLabel.
 func (r *Recorder) Record(client, server, tool string, d time.Duration, err error) {
+	client = cleanLabel(client)
+	tool = cleanLabel(tool)
 	if client == "" {
 		client = "unknown"
 	}
@@ -81,11 +129,19 @@ func (r *Recorder) Record(client, server, tool string, d time.Duration, err erro
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	k := counterKey{client: client, tool: tool}
+	k := counterKey{server: server, client: client, tool: tool}
 	ctr := r.counters[k]
 	if ctr == nil {
-		ctr = &Counter{Client: client, Tool: tool, latencies: make([]int64, 0, MaxLatencySamples)}
-		r.counters[k] = ctr
+		// Последний слот зарезервирован под OtherLabel, поэтому реальных пар
+		// не больше MaxCounters-1, а всего счётчиков — не больше MaxCounters.
+		if len(r.counters) >= MaxCounters-1 {
+			k = counterKey{server: OtherLabel, client: OtherLabel, tool: OtherLabel}
+			ctr = r.counters[k]
+		}
+		if ctr == nil {
+			ctr = &Counter{Client: k.client, Server: k.server, Tool: k.tool, latencies: make([]int64, 0, 16)}
+			r.counters[k] = ctr
+		}
 	}
 	ctr.Calls++
 	ctr.TotalMs += ms
@@ -144,23 +200,16 @@ func quantile(xs []int64, q float64) int64 {
 		return 0
 	}
 	sorted := append([]int64(nil), xs...)
-	for i := 1; i < len(sorted); i++ {
-		for j := i; j > 0 && sorted[j] < sorted[j-1]; j-- {
-			sorted[j], sorted[j-1] = sorted[j-1], sorted[j]
-		}
-	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
 	i := int(q * float64(len(sorted)-1))
 	return sorted[i]
 }
 
 func sortCounters(cs []Counter) {
-	for i := 1; i < len(cs); i++ {
-		for j := i; j > 0; j-- {
-			a, b := cs[j-1], cs[j]
-			if a.Client < b.Client || (a.Client == b.Client && a.Tool <= b.Tool) {
-				break
-			}
-			cs[j-1], cs[j] = b, a
+	sort.Slice(cs, func(i, j int) bool {
+		if cs[i].Client != cs[j].Client {
+			return cs[i].Client < cs[j].Client
 		}
-	}
+		return cs[i].Tool < cs[j].Tool
+	})
 }

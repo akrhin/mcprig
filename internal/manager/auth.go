@@ -168,7 +168,22 @@ type auth struct {
 	userHeader   string
 	allowedHosts []string
 	sessions     *sessionStore
+
+	// Защита /api/login: счётчик неудач по IP и один scrypt за раз.
+	loginMu    sync.Mutex
+	loginFails map[string]*failWindow
+	loginSem   chan struct{}
 }
+
+type failWindow struct {
+	count int
+	reset time.Time
+}
+
+const (
+	loginMaxFails   = 5
+	loginFailWindow = time.Minute
+)
 
 func newAuth(o AuthOptions) (*auth, error) {
 	a := &auth{
@@ -210,6 +225,8 @@ func newAuth(o AuthOptions) (*auth, error) {
 		return nil, err
 	}
 	a.sessions = s
+	a.loginFails = map[string]*failWindow{}
+	a.loginSem = make(chan struct{}, 1)
 	return a, nil
 }
 
@@ -218,16 +235,19 @@ func (a *auth) loginEnabled() bool {
 	return a.mode == modePassword || a.mode == modeProxyPassword
 }
 
+// hostOK — Host обязан быть в списке. Пустой список значит loopback, как в
+// internal/httplisten: «не настроено» не должно означать «любой хост».
 func (a *auth) hostOK(host string) bool {
-	if len(a.allowedHosts) == 0 {
-		return true
-	}
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
 	host = strings.ToLower(strings.Trim(host, "[]"))
-	for _, allowed := range a.allowedHosts {
-		if strings.ToLower(allowed) == host {
+	allowed := a.allowedHosts
+	if len(allowed) == 0 {
+		allowed = []string{"127.0.0.1", "localhost", "::1"}
+	}
+	for _, h := range allowed {
+		if h == "*" || strings.ToLower(h) == host {
 			return true
 		}
 	}
@@ -284,6 +304,65 @@ func (a *auth) login(user, password string) bool {
 		return a.hash.verify(password)
 	}
 	return subtle.ConstantTimeCompare([]byte(password), []byte(a.password)) == 1
+}
+
+// clientIP — адрес клиента для счётчика неудачных входов.
+func clientIP(r *http.Request) string {
+	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return h
+	}
+	return r.RemoteAddr
+}
+
+// loginBlocked — попытки с этого IP исчерпаны; возвращает остаток окна.
+func (a *auth) loginBlocked(ip string) (time.Duration, bool) {
+	a.loginMu.Lock()
+	defer a.loginMu.Unlock()
+	w := a.loginFails[ip]
+	if w == nil {
+		return 0, false
+	}
+	now := time.Now()
+	if now.After(w.reset) {
+		delete(a.loginFails, ip)
+		return 0, false
+	}
+	if w.count >= loginMaxFails {
+		return w.reset.Sub(now), true
+	}
+	return 0, false
+}
+
+func (a *auth) loginFailed(ip string) {
+	a.loginMu.Lock()
+	defer a.loginMu.Unlock()
+	now := time.Now()
+	w := a.loginFails[ip]
+	if w == nil || now.After(w.reset) {
+		w = &failWindow{reset: now.Add(loginFailWindow)}
+		a.loginFails[ip] = w
+	}
+	w.count++
+	if len(a.loginFails) > 1024 {
+		for k, v := range a.loginFails {
+			if now.After(v.reset) {
+				delete(a.loginFails, k)
+			}
+		}
+	}
+}
+
+func (a *auth) loginOK(ip string) {
+	a.loginMu.Lock()
+	delete(a.loginFails, ip)
+	a.loginMu.Unlock()
+}
+
+// loginCheck — scrypt под семафором: одновременных проверок не больше одной.
+func (a *auth) loginCheck(user, password string) bool {
+	a.loginSem <- struct{}{}
+	defer func() { <-a.loginSem }()
+	return a.login(user, password)
 }
 
 func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, error) {

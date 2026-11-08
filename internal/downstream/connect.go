@@ -21,6 +21,11 @@ type Connector struct {
 	OAuth   *config.OAuth // set-wide defaults, nil when the set has none
 	Store   *oauth.Store  // nil when tokens cannot be persisted
 	Log     *slog.Logger
+
+	// Env задаёт окружение stdio-процесса. nil — всё окружение вызывающего:
+	// так работает manage/serve. Менеджер подставляет whitelist, чтобы чужие
+	// процессы не увидели его секреты.
+	Env func(*config.Server) []string
 }
 
 // Connect opens one session to a downstream server. The caller owns Close.
@@ -62,7 +67,11 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		cmd.Dir = srv.Cwd
 		// A set runs with an env already narrowed by the manager; the server's
 		// own env wins over it.
-		cmd.Env = append(os.Environ(), flatten(srv.Env)...)
+		base := os.Environ()
+		if c.Env != nil {
+			base = c.Env(srv)
+		}
+		cmd.Env = append(base, flatten(srv.Env)...)
 		return &mcp.CommandTransport{Command: cmd}, nil
 	case config.TransportHTTP:
 		if srv.URL == "" {

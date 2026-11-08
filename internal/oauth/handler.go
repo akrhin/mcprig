@@ -62,12 +62,11 @@ func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, e
 		AuthorizationCodeFetcher: func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
 			log.Info("требуется авторизация MCP-сервера: откройте URL в браузере",
 				"server", o.ServerName, "url", args.URL)
-			cb, err := NewCallback(addr)
+			cb, err := NewCallback(addr, stateFromURL(args.URL))
 			if err != nil {
 				return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
 			}
 			defer cb.Close()
-			cb.ExpectState(stateFromURL(args.URL))
 			if err := browser(args.URL); err != nil {
 				// URL остаётся в логе — его можно открыть вручную.
 				log.Warn("не удалось открыть браузер, откройте URL из лога вручную",

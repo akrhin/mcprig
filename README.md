@@ -45,10 +45,11 @@ path,authToken,allowedHosts}`, `healthMonitor`, `requestTimeout`, обе фор�
 
 ## Статус
 
-Этапы 0–3 приняты: чтение `servers.json`, коннект по stdio и HTTP, четыре
+Этапы 0–4 приняты: чтение `servers.json`, коннект по stdio и HTTP, четыре
 мета-тула с permissions, HTTP-транспорт набора (stateless, 2026-07-28 с
-фолбэком), клиентский OAuth для серверов с 401/403. В работе: менеджер
-(супервизия наборов и HTTP API) — этап 4.
+фолбэком), клиентский OAuth для серверов с 401/403, менеджер (супервизия
+наборов, HTTP API по контракту, счётчик вызовов). В работе: панель и
+дашборд — этап 5.
 
 Этапы и ворота — `docs/plan.md`, что делается сейчас — `docs/CURRENT-GOAL.md`.
 Контракт, который переносим с TS-версии, — `docs/reference/ts-manager-contract.md`.

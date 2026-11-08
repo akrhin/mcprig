@@ -454,7 +454,11 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		res = r
 		return err
 	})
-	if m.Stats != nil {
+	// Счётчик пишется только по разрешённому имени: апстрим ответил (res != nil),
+	// либо ошибки не было вовсе. Неизвестный инструмент и несостоявшееся
+	// соединение дают res == nil — такие имена не должны заводить счётчики,
+	// иначе память растёт от любого выдуманного command_name.
+	if m.Stats != nil && (err == nil || res != nil) {
 		m.Stats.Record(stats.ClientFrom(ctx, clientOf(req)), e.srv.Name, in.CommandName, time.Since(start), err)
 	}
 	if err != nil {

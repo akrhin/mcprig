@@ -18,10 +18,11 @@ import (
 // Store is the manager registry. Every exported method takes the lock, so the
 // HTTP layer may call it from concurrent handlers.
 type Store struct {
-	mu   sync.Mutex
-	dir  string
-	path string
-	data Data
+	mu      sync.Mutex
+	dir     string
+	path    string
+	data    Data
+	dropped []string
 }
 
 // Open reads <dir>/registry.json. A missing file starts an empty registry; an
@@ -109,6 +110,12 @@ func (s *Store) normalize() {
 		if set == nil {
 			continue
 		}
+		// id попадает в путь sets/<id>/servers.json: битый id отбрасывает
+		// запись целиком, но не роняет загрузку остальных.
+		if !namePattern.MatchString(set.ID) {
+			s.dropped = append(s.dropped, fmt.Sprintf("набор %q: id не по шаблону [a-z0-9][a-z0-9_-]{0,63}", set.ID))
+			continue
+		}
 		if set.Name == "" {
 			set.Name = set.ID
 		}
@@ -117,6 +124,14 @@ func (s *Store) normalize() {
 		sets = append(sets, set)
 	}
 	s.data.Sets = sets
+}
+
+// Dropped возвращает записи, отброшенные при загрузке (битые id наборов),
+// с причиной. Реестр при этом не падает — отчёт только для лога вызывающего.
+func (s *Store) Dropped() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.dropped...)
 }
 
 // applySeed fills an empty registry from the token-free seed format.

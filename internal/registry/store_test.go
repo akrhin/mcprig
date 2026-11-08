@@ -492,3 +492,44 @@ func TestSetValidation(t *testing.T) {
 		t.Errorf("UpdateSet потерял поля: %+v", set)
 	}
 }
+
+// id набора уходит в путь sets/<id>/servers.json, поэтому загрузка обязана
+// отбрасывать id вне шаблона, не роняя остальные записи.
+func TestLoadDropsSetWithBadID(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"ok","name":"ok","servers":["fs"],"port":9100,"keys":[{"id":"k1","token":"t1"},{"id":"../k","token":"t2"}]},
+		{"id":"../evil","name":"evil","servers":["fs"],"port":9101,"keys":[{"id":"k2","token":"t3"}]}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+
+	ok := store.Set("ok")
+	if ok == nil {
+		t.Fatal("целый набор ok не загрузился")
+	}
+	if len(ok.Keys) != 1 || ok.Keys[0].ID != "k1" {
+		t.Errorf("ключи ok = %+v, want только k1", ok.Keys)
+	}
+	if store.Set("../evil") != nil {
+		t.Error("набор с id ../evil не отброшен")
+	}
+	if len(store.Sets()) != 1 {
+		t.Errorf("наборов = %d, want 1", len(store.Sets()))
+	}
+	if dropped := store.Dropped(); len(dropped) != 1 || !strings.Contains(dropped[0], "../evil") {
+		t.Errorf("отчёт о загрузке = %v", dropped)
+	}
+}
+
+func TestKeyOpsMissingSet(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	if _, err := store.IssueKey("nope"); err == nil || !strings.Contains(err.Error(), "нет набора") {
+		t.Errorf("IssueKey: err = %v", err)
+	}
+	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "нет набора") {
+		t.Errorf("RevokeKey: err = %v", err)
+	}
+}

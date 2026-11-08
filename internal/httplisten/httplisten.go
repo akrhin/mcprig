@@ -84,14 +84,26 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	})
 	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed))
 	if rec != nil {
-		// The panel polls this endpoint; it carries the same bearer as /mcp so
-		// a counter snapshot is not public.
+		// The panel polls this endpoint; it carries the same bearer as /mcp.
+		// У открытого набора bearer нет ни у кого, поэтому снимок с метками
+		// клиентов и текстами ошибок апстрима анонимно не отдаётся: иначе
+		// первый же прохожий видит чужие ошибки.
 		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if allowAnonymous {
+				writeJSONError(w, http.StatusForbidden, "статистика недоступна для открытого набора")
+				return
+			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			_ = json.NewEncoder(w).Encode(rec.Snapshot())
 		}), token, allowAnonymous, allowed))
 	}
 	return logRequests(mux, log), nil
+}
+
+func writeJSONError(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // guard is the per-request policy in front of the MCP handler: method, Host,
@@ -152,10 +164,18 @@ func clientLabel(r *http.Request) string {
 		ua = fields[0]
 	}
 	key := ""
-	if h := r.Header.Get("Authorization"); len(h) > 7 {
-		sum := sha256.Sum256([]byte(h[7:]))
-		key = "key:" + hex.EncodeToString(sum[:])[:6]
+	const scheme = "bearer "
+	// Отпечаток считается только по реально предъявленному bearer-ключу:
+	// пустой заголовок, "Bearer " без значения или чужую схему нельзя
+	// превращать в «валидный» отпечаток пустой строки.
+	if h := r.Header.Get("Authorization"); len(h) > len(scheme) && strings.EqualFold(h[:len(scheme)], scheme) {
+		if presented := strings.TrimSpace(h[len(scheme):]); presented != "" {
+			sum := sha256.Sum256([]byte(presented))
+			key = hex.EncodeToString(sum[:])[:6]
+		}
 	}
+	// Длину и управляющие символы метки режет stats.Record: это единственная
+	// точка, где сходятся HTTP-метка и clientInfo из initialize.
 	return stats.Label(key, ua)
 }
 

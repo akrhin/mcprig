@@ -38,6 +38,11 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
+// safeKeyID отвергает id ключа, с которым можно выйти из каталога набора.
+func safeKeyID(id string) bool {
+	return !strings.ContainsAny(id, `/\`) && !strings.Contains(id, "..")
+}
+
 // normalizeKeys repairs the "exactly one active key" invariant: invalid keys
 // are dropped, the first active key wins, the rest are revoked at now. A set
 // with no keys at all inherits the legacy single `token`, if any.
@@ -47,7 +52,7 @@ func normalizeKeys(keys []Key, legacyToken, now string) []Key {
 	for _, key := range keys {
 		key.ID = strings.TrimSpace(key.ID)
 		key.Token = strings.TrimSpace(key.Token)
-		if key.ID == "" || key.Token == "" || seen[key.ID] {
+		if key.ID == "" || key.Token == "" || seen[key.ID] || !safeKeyID(key.ID) {
 			continue
 		}
 		seen[key.ID] = true

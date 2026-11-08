@@ -107,7 +107,17 @@ func newBaoFromEnv() *bao {
 		token:  token,
 		mount:  envOr(os.Getenv("BAO_MOUNT"), "secret"),
 		prefix: strings.Trim(envOr(os.Getenv("BAO_PREFIX"), "mcp"), "/"),
-		client: &http.Client{Timeout: 5 * time.Second},
+		client: &http.Client{
+			Timeout: 5 * time.Second,
+			// X-Vault-Token Go не вырезает при смене хоста: редирект на другой
+			// хост увёл бы токен OpenBao наружу.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) > 0 && req.URL.Host != via[0].URL.Host {
+					return errors.New("OpenBao: редирект на другой хост запрещён")
+				}
+				return nil
+			},
+		},
 	}
 }
 

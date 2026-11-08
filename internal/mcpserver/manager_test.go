@@ -600,3 +600,23 @@ func TestStatsCountCallsPerClient(t *testing.T) {
 		t.Fatalf("tail = %+v", snap.Tail)
 	}
 }
+
+// Неизвестное имя инструмента не заводит счётчик: иначе любое придуманное
+// command_name оседает в памяти.
+func TestStatsSkipUnknownTool(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	m.Stats = stats.NewRecorder("t", 8)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{
+		"server": "alpha", "command_name": "no-such-tool", "parameters": map[string]any{},
+	})
+	if !res.IsError {
+		t.Fatalf("неизвестный инструмент прошёл успешно: %s", resultText(t, res))
+	}
+	if snap := m.Stats.Snapshot(); len(snap.Counters) != 0 || len(snap.Tail) != 0 {
+		t.Fatalf("счётчики/хвост от неизвестного имени: %+v", snap)
+	}
+}

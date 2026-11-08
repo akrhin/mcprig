@@ -111,19 +111,30 @@ func New(opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	log := opts.Log
+	if log == nil {
+		log = slog.Default()
+	}
 	a, err := newAuth(opts.Auth)
 	if err != nil {
 		return nil, err
+	}
+	if len(a.allowedHosts) == 0 {
+		log.Warn("менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты")
+	}
+	for _, host := range a.allowedHosts {
+		if host == "*" {
+			log.Warn("менеджер: MCPRIG_ALLOWED_HOSTS содержит \"*\" — защита от DNS rebinding отключена")
+		}
+	}
+	if secret := opts.Auth.ProxySecret; secret != "" && len(secret) < 32 {
+		log.Warn("менеджер: MCPRIG_PROXY_SECRET короче 32 символов")
 	}
 	cli := opts.CLIPath
 	if cli == "" {
 		if cli, err = os.Executable(); err != nil {
 			return nil, err
 		}
-	}
-	log := opts.Log
-	if log == nil {
-		log = slog.Default()
 	}
 	version := envOr(opts.Version, "dev")
 	m := &Manager{
@@ -308,6 +319,16 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		m.methodNotAllowed(w, []string{http.MethodPost})
 		return
 	}
+	ip := clientIP(r)
+	if wait, blocked := m.auth.loginBlocked(ip); blocked {
+		secs := int((wait + time.Second - 1) / time.Second)
+		if secs < 1 {
+			secs = 1
+		}
+		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		m.fail(w, r, &httpError{http.StatusTooManyRequests, "слишком много попыток входа — повторите позже"})
+		return
+	}
 	user, password, isForm := "", "", false
 	if ct := r.Header.Get("Content-Type"); strings.HasPrefix(ct, "application/x-www-form-urlencoded") || strings.HasPrefix(ct, "multipart/form-data") {
 		if err := r.ParseForm(); err != nil {
@@ -326,7 +347,8 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		user, password = body.User, body.Password
 	}
-	if !m.auth.login(user, password) {
+	if !m.auth.loginCheck(user, password) {
+		m.auth.loginFailed(ip)
 		if isForm {
 			writeHTML(w, http.StatusUnauthorized, loginTemplate, loginData{Error: "неверный логин или пароль"})
 			return
@@ -334,6 +356,7 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		m.fail(w, r, &httpError{http.StatusUnauthorized, "неверный логин или пароль"})
 		return
 	}
+	m.auth.loginOK(ip)
 	name, err := m.auth.startSession(w, r)
 	if err != nil {
 		m.fail(w, r, err)
