@@ -346,5 +346,8 @@ dialog::backdrop{background:rgba(6,23,28,.74)}
 
 /* строки лога без времени и уровня: набор пишет свой текст как есть */
 .logline.raw{grid-template-columns:minmax(0,1fr)}
+/* Строка лога без разбора (raw) — главное в ней сообщение, поэтому она
+   переносится, а не обрезается многоточием. */
+.logline.raw .lm{white-space:pre-wrap;overflow-wrap:anywhere}
 .logline .lm.is-warn{color:var(--warn)}
 .logline .lm.is-error{color:var(--error)}

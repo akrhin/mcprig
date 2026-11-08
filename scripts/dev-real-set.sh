@@ -2,14 +2,14 @@
 # Живой стенд на настоящих MCP-серверах: панель + открытый набор с serena
 # (HTTP, LSP), socraticode (npx, индексация) и xerj (stdio, поиск).
 #
-#   bash scripts/dev-real-set.sh            # собрать и поднять на 9097 / 9101
+#   bash scripts/dev-real-set.sh            # собрать и поднять на 9177 / 9101
 #   PANEL_PORT=9197 SET_PORT=9102 bash scripts/dev-real-set.sh
 #   bash scripts/dev-real-set.sh stop       # погасить панель и набор
 #
 # Данные — во временном каталоге, реестр твой не трогает.
 set -euo pipefail
 
-PANEL_PORT=${PANEL_PORT:-9097}
+PANEL_PORT=${PANEL_PORT:-9177}
 SET_PORT=${SET_PORT:-9101}
 DATA=${DATA:-/tmp/mcprig-dev-real}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -43,6 +43,12 @@ for _ in $(seq 1 100); do
 	curl -sf -m 1 "http://127.0.0.1:$PANEL_PORT/healthz" >/dev/null && break
 	sleep 0.1
 done
+# Порт мог быть занят чужой панелью: отвечает 200, а наш процесс уже умер.
+# Без этой проверки POST'ы ушли бы в чужой реестр.
+if ! kill -0 "$(cat "$DATA/panel.pid")" 2>/dev/null; then
+	echo "панель не поднялась на $PANEL_PORT (порт занят?) — см. $DATA/panel.log" >&2
+	exit 1
+fi
 
 api() { curl -s -X"$1" "http://127.0.0.1:$PANEL_PORT$2" -H 'Content-Type: application/json' ${3:+-d "$3"}; }
 api POST /api/servers '{"name":"serena","url":"http://127.0.0.1:8899/mcp"}' >/dev/null
