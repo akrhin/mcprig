@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -886,7 +887,7 @@ func (m *Manager) apiServerAdd(req *request) error {
 	if err != nil {
 		return err
 	}
-	if len(body) == 0 || body[0] != '{' {
+	if len(body) == 0 || !bytes.HasPrefix(bytes.TrimSpace(body), []byte("{")) {
 		return badRequest("ожидался JSON")
 	}
 	var name struct {
@@ -1170,8 +1171,19 @@ func (m *Manager) apiKeyIssue(req *request) error {
 
 func (m *Manager) apiKeyRevoke(req *request) error {
 	id, keyID := req.args[0], req.args[1]
-	if m.store.Set(id) == nil {
+	cur := m.store.Set(id)
+	if cur == nil {
 		return notFound("нет набора " + id)
+	}
+	known := false
+	for _, key := range registry.PublicSet(cur).Keys {
+		if key.ID == keyID {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return notFound("нет ключа " + keyID)
 	}
 	wasActive, err := m.store.RevokeKey(id, keyID)
 	if err != nil {

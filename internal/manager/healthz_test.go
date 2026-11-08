@@ -60,3 +60,20 @@ func TestDeleteServerReportsStoppedSet(t *testing.T) {
 		t.Fatalf("stopped = %v, ждали [%s]: %s", stopped, id, w.Body.String())
 	}
 }
+
+// TestRevokeMissingKeyNotFound: нет ключа — 404, как обещает контракт п.6.
+func TestRevokeMissingKeyNotFound(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "keys", "fake")
+
+	w := e.do(t, http.MethodDelete, "/api/sets/"+id+"/keys/nosuchkey", nil)
+	status(t, w, http.StatusNotFound)
+}
+
+// TestAddServerAcceptsPrettyJSON: форматированный JSON — не ошибка.
+func TestAddServerAcceptsPrettyJSON(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	w := e.do(t, http.MethodPost, "/api/servers", "{\n  \"name\": \"pretty\",\n  \"command\": [\"/bin/true\"]\n}\n")
+	status(t, w, http.StatusCreated)
+}
