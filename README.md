@@ -80,6 +80,18 @@ path,authToken,allowedHosts}`, `healthMonitor`, `requestTimeout`, обе фор�
 `headers.Authorization`. Ключ выдаёт панель или реестр; в API и логах он есть
 только префиксом.
 
+Фрагмент конфига печатает сам бинарник — он ничего не пишет на диск, текст
+вставляете в свой файл:
+
+```bash
+mcprig init --client opencode --set demo --config ~/.config/mcprig/sets/demo/servers.json
+mcprig init --client claude --set demo --remote http://127.0.0.1:9100/mcp --key <ключ>
+mcprig init --client codex --set demo --config ~/.config/mcprig/sets/demo/servers.json
+```
+
+`claude` — JSON для `claude_desktop_config.json`, `codex` — TOML для
+`~/.codex/config.toml`.
+
 Секреты в `servers.json` не пишем: `${VAR}` раскрывается из окружения набора,
 а разворачивание — `docs/reference/ts-manager-contract.md`.
 

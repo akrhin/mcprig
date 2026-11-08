@@ -19,6 +19,7 @@ func TestParseArgs(t *testing.T) {
 		{"serve с флагами", []string{"serve", "--addr", ":9100"}, "serve", []string{"--addr", ":9100"}, false},
 		{"stdio с флагами", []string{"stdio", "--config", "x"}, "stdio", []string{"--config", "x"}, false},
 		{"panel", []string{"panel"}, "panel", nil, false},
+		{"init с флагами", []string{"init", "--client", "codex"}, "init", []string{"--client", "codex"}, false},
 		{"опечатка подкоманды", []string{"serv", "--config", "x"}, "", nil, true},
 		{"лишний позиционный аргумент", []string{"serve", "foo"}, "", nil, true},
 		{"panel с аргументом", []string{"panel", "foo"}, "", nil, true},

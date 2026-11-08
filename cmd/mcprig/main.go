@@ -95,6 +95,11 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 			return "", nil, &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
 		}
 		return "stdio", args[1:], nil
+	case "init":
+		if len(args) > 1 {
+			return "init", args[1:], nil
+		}
+		return "init", nil, nil
 	case "panel":
 		if len(args) > 1 {
 			return "", nil, &usageError{fmt.Sprintf("panel не принимает аргументов: %q", args[1:])}
@@ -114,6 +119,8 @@ func run() error {
 		return runStdio(rest)
 	case "panel":
 		return manager.Run(manager.FromEnv(version))
+	case "init":
+		return runInit(rest)
 	}
 	args := rest
 
