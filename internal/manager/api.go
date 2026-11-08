@@ -654,6 +654,9 @@ func (m *Manager) apiImport(req *request) error {
 		return badRequest("нужен объект mcpServers")
 	}
 	if name, found := importRefsReserved(body.MCPServers); found {
+		if strings.HasPrefix(name, "{file:") {
+			return badRequest(name + ": ссылка на файл отклонена, подключите секрет через ${VAR}")
+		}
 		return reservedRefError(name)
 	}
 	added, skipped := m.store.Import(body.MCPServers)
@@ -892,11 +895,18 @@ func checkReservedRefs(raw json.RawMessage) error {
 	if names := reservedRefs(&srv); len(names) > 0 {
 		return reservedRefError(names[0])
 	}
+	if key, ok := fileRefs(&srv); ok {
+		return fileRefError(key)
+	}
 	return nil
 }
 
 func reservedRefError(name string) error {
 	return badRequest(fmt.Sprintf("переменная ${%s} — служебная, её нельзя подставлять в сервер", name))
+}
+
+func fileRefError(key string) error {
+	return badRequest(fmt.Sprintf("ссылка {file:…} в %s отклонена: файл читается с диска; подключите секрет через ${VAR}", key))
 }
 
 // importRefsReserved ищет служебные ${VAR} в сырых записях mcpServers.
@@ -913,6 +923,9 @@ func importRefsReserved(entries map[string]json.RawMessage) (string, bool) {
 			var srv config.Server
 			if json.Unmarshal(trimmed, &srv) != nil {
 				continue
+			}
+			if key, ok := fileRefs(&srv); ok {
+				return "{file:…} в " + key, true
 			}
 			for _, name := range serverEnvRefs(&srv) {
 				seen[name] = true

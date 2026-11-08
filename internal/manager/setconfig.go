@@ -193,6 +193,24 @@ func reservedRefs(s *config.Server) []string {
 	return out
 }
 
+// fileRefs — {file:…} в env или заголовке: значение читается с диска и уходит
+// в процесс набора или на URL. Импортированный конфиг так уносит env.json с
+// ключами всех наборов, поэтому такая ссылка отклоняется, а не разрешается.
+func fileRefs(s *config.Server) (string, bool) {
+	scan := func(m map[string]string) (string, bool) {
+		for key, value := range m {
+			if strings.HasPrefix(strings.TrimSpace(value), "{file:") {
+				return key, true
+			}
+		}
+		return "", false
+	}
+	if key, ok := scan(s.Env); ok {
+		return key, true
+	}
+	return scan(s.Headers)
+}
+
 // setServers — серверы набора в его порядке.
 func setServers(set *registry.Set, servers []registry.Server) []registry.Server {
 	byName := make(map[string]registry.Server, len(servers))
