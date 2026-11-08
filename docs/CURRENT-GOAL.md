@@ -1,7 +1,7 @@
 # Текущий этап
 
-**Этап 2: OAuth 2.0 + PKCE для remote-серверов**
-**Статус:** не начат
+**Этап 4: менеджер — супервизия наборов и HTTP API**
+**Статус:** в работе
 **Дата:** 2026-11-08
 
 ## Принято
@@ -29,23 +29,35 @@ go test ./e2e -run TestProxyServesMetaTools -v   # PASS 2.2s
 `Origin` по `allowedHosts`; лимит 4 МиБ; `/healthz` публичный; 9 тестов, включая
 `-race`.
 
-## Цель этапа 2
+## Этап 2 — сделано, ждёт ворот
 
-OAuth 2.0 + PKCE для remote-серверов на `auth.NewAuthorizationCodeHandler`.
+`internal/oauth`: хранилище токенов (`sha256(name\0url)` → 32 hex, файл 0600,
+атомарная запись), loopback-приёмник кода (`DefaultCallbackAddr` 8947, один
+поток авторизации, `ExpectState`, таймаут 5 мин), фабрика
+`auth.AuthorizationCodeHandler` (DCR либо предрегистрация, `RequestRefreshToken`,
+`persistingSource`). Подключено к `downstream.Connector`: 401/403 запускают
+авторизацию, токен переиспользуется после рестарта, обновляется по refresh.
+16 тестов пакета под `-race`. Ворота — сквозной прогон против фейкового AS
+(discovery → DCR → authorize → token → refresh) в `internal/downstream`.
 
-## Ворота
+## Цель этапа 4
 
-`httptest`-заглушка сервера авторизации: RFC 8414 discovery → RFC 7591
-dynamic client registration → authorize → token → refresh, плюс протухание
-токена и повторный запрос.
+Менеджер: супервизия наборов (`internal/manager/runtime.go`), материализация
+`servers.json` набора, цепочка секретов (OpenBao → `env.json` → env процесса),
+HTTP API по `docs/reference/ts-manager-contract.md`, auth fail-closed.
+
+## Ворота этапа 4
+
+`go test ./... -race` плюс сквозной сценарий: создать набор через API, он
+стартует на 9100–9199, `list_servers` по его адресу отвечает, `stop` гасит
+процесс, реестр переживает рестарт менеджера.
 
 ## Дальше
 
-1. `internal/oauth`: хранение ключей (`sha256(name\0url)`), loopback callback,
-   single-flight на обновление.
-2. Подключить к `downstream.Connect`: 401 от downstream → пройти авторизацию →
-   повторить запрос.
-3. Этап 4: супервизор наборов поверх `internal/registry` + lifecycle-e2e.
+1. Этап 5: панель по макету `design/ui/` (внешние `app.css`/`app.js`, без
+   inline-JS) и `mcprig init --client …`.
+2. Этап 6: юнит, образ, goreleaser.
+3. Ревью: арбитр и janitor по этапам 1–3 (запущены), паладин — перед сдачей.
 
 ## Проверяет человек
 
