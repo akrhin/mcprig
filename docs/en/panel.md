@@ -47,7 +47,6 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/sets/<id>/servers` | per-server health for one set |
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
-| `POST /api/sets/<id>/servers/<name>/restart` | restart the set containing that server (response says `scope: "set"`) |
 | `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token |
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |

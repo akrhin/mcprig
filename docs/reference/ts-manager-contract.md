@@ -26,7 +26,7 @@ SSE, CORS, OPTIONS нет. Ошибки: `HttpError.status`, иначе `400`.
 | GET | `/api/export` | `?set=<id>` | `{mcpServers:{…}}` с `${VAR}`; `400` без `set`, `404` |
 | GET | `/api/env` | — | `{remoteError?, vars:[{name,set,source:'file'\|'openbao'\|'env'}]}` |
 | PUT | `/api/env/:NAME` | `{value, store?}` | `{name,set:true,source,restarted[]}` |
-| DELETE | `/api/env/:NAME` | `?store=local\|openbao` | `{name,removed,restarted[]}` |
+| DELETE | `/api/env/:NAME` | `?store=local\|file\|openbao` | `{name,removed,source,restarted[]}`; `source` — `openbao`, `file` или пусто, когда удалять было нечего |
 | POST | `/api/servers/:name/probe` | — | `ProbeResult{ok,tools[],error?,ms}` всегда `200` |
 | POST | `/api/browse` | `{server}` \| `{entry}` | `BrowseView`; `502` при ошибке connect |
 | GET/DELETE | `/api/browse/:id` | — | `BrowseView` / `{closed:true}` |
@@ -37,12 +37,15 @@ SSE, CORS, OPTIONS нет. Ошибки: `HttpError.status`, иначе `400`.
 | DELETE | `/api/sets/:id/keys/:keyId` | — | `{ok,wasActive,key,set}`; активный ключ гасит набор |
 | GET | `/api/sets/:id/servers` | — | `{running, servers:[{name,healthy:boolean\|null,error?}]}` |
 | GET | `/api/sets/:id/servers/:name/logs` | `?lines` (200, max 5000) | `{server,logs[]}` |
-| POST | `/api/sets/:id/servers/:name/restart` | — | `{restarted:true,scope:'set'}` |
 | GET/POST | `/api/sets` | `{name,servers[],port?,token?,description?,autostart?,open?}` | `SetEntry[]` / `201`; порт и токен выдаются автоматически |
 | PUT/DELETE | `/api/sets/:id` | частичный | `200` / `{ok:true}` (сначала stop) |
 | GET | `/api/sets/:id/logs` | `?lines` (200, max 5000) | `{logs[]}` |
 | GET | `/api/calls` | `?set=<id>&limit=<n>` (50, max 500) | `{set?, calls:[{time,set?,client,server,tool,ms,failed,error?}], counters:[{set?,client,server,tool,calls,failures,totalMs,p50ms,p95ms}], unreachable?:[…]}`, `404` на неизвестный набор |
 | POST | `/api/sets/:id/{start,stop,restart}` | — | `RuntimeStatus`; иначе `405` |
+
+В `PUT` и `DELETE /api/env` параметр `store` принимает `local` (алиас из
+TS-эталона) и `file`; в ответе источник всегда `file`. `openbao` — хранилище
+OpenBao.
 
 UI: панель — статические файлы из `go:embed`, `GET /api/state` и `GET /api/calls` опрашиваются каждые 5 с; inline-JS нет.
 

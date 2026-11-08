@@ -63,7 +63,7 @@ three real servers, creates an open set and starts it:
 
 ```bash
 bash scripts/dev-real-set.sh
-# panel:  http://127.0.0.1:9097   (auth off, data /tmp/mcprig-dev-real)
+# panel:  http://127.0.0.1:9177   (auth off, data /tmp/mcprig-dev-real)
 # set:    http://127.0.0.1:9101/mcp  (open, no key)
 # log:    /tmp/mcprig-dev-real/sets/real/lazy-mcp.log
 bash scripts/dev-real-set.sh stop
@@ -71,7 +71,7 @@ bash scripts/dev-real-set.sh stop
 
 | variable | default | meaning |
 | --- | --- | --- |
-| `PANEL_PORT` | `9097` | panel port |
+| `PANEL_PORT` | `9177` | panel port |
 | `SET_PORT` | `9101` | set port |
 | `DATA` | `/tmp/mcprig-dev-real` | state directory, pid file and binary |
 

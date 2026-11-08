@@ -113,8 +113,14 @@ The directory is created `0700`. What lives there:
 | `manager.pid` | pid of the running panel; a second panel refuses to start | `0600` |
 | `sets/<id>/servers.json` | materialized config the set process reads | `0600` |
 | `sets/<id>/lazy-mcp.log` | set log; rotates to `.log.1` at 5 MiB | `0600` |
-| `oauth.json` | access and refresh tokens for OAuth downstreams | `0600` |
-| `oauth-clients.json` | dynamic client registration data | `0600` |
+| `sets/<id>/oauth.json` | access and refresh tokens for OAuth downstreams of that set | `0600` |
+| `sets/<id>/oauth-clients.json` | dynamic client registration data of that set | `0600` |
+| `oauth.json` | access and refresh tokens for OAuth downstreams of a standalone `serve`/`stdio` process | `0600` |
+| `oauth-clients.json` | dynamic client registration data of a standalone `serve`/`stdio` process | `0600` |
+
+A set started by the panel gets `MCPRIG_DATA_DIR=<data>/sets/<id>`, so its
+OAuth files live under `sets/<id>/`. The top-level `oauth*.json` files belong to
+`serve`/`stdio` processes started with the root state directory.
 
 All writes go through a temp file and a rename, so a crash never leaves a
 half-written file. Never copy `registry.json` while the panel is running.

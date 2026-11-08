@@ -48,7 +48,6 @@
 | `GET /api/sets/<id>/servers` | здоровье по серверам одного набора |
 | `GET /api/sets/<id>/logs?lines=N` | хвост лога (по умолчанию 200 строк) |
 | `GET /api/sets/<id>/servers/<name>/logs` | строки лога одного нижестоящего сервера |
-| `POST /api/sets/<id>/servers/<name>/restart` | перезапустить набор, содержащий этот сервер (в ответе `scope: "set"`) |
 | `POST /api/sets/<id>/keys` | выпустить ключ; ответ содержит единственную копию токена |
 | `DELETE /api/sets/<id>/keys/<keyID>` | отозвать ключ |
 | `GET /api/servers`, `POST /api/servers` | список и добавление нижестоящих серверов |

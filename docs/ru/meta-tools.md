@@ -65,6 +65,8 @@
 | оба | `Error: укажи server или servers, не оба` |
 | ни одного | `Error: нужен параметр server или servers` |
 
+С `servers` один `requestTimeout` ограничивает весь вызов, а не каждый сервер.
+
 ```json
 [
   {

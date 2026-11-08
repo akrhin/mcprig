@@ -64,7 +64,7 @@ E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 
 ```bash
 bash scripts/dev-real-set.sh
-# панель:  http://127.0.0.1:9097   (аутентификация выключена, данные /tmp/mcprig-dev-real)
+# панель:  http://127.0.0.1:9177   (аутентификация выключена, данные /tmp/mcprig-dev-real)
 # набор:   http://127.0.0.1:9101/mcp  (открыт, без ключа)
 # лог:     /tmp/mcprig-dev-real/sets/real/lazy-mcp.log
 bash scripts/dev-real-set.sh stop
@@ -72,7 +72,7 @@ bash scripts/dev-real-set.sh stop
 
 | переменная | по умолчанию | значение |
 | --- | --- | --- |
-| `PANEL_PORT` | `9097` | порт панели |
+| `PANEL_PORT` | `9177` | порт панели |
 | `SET_PORT` | `9101` | порт набора |
 | `DATA` | `/tmp/mcprig-dev-real` | каталог состояния, pid-файл и бинарник |
 

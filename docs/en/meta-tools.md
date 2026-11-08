@@ -65,6 +65,8 @@ Input is one of two forms:
 | both | `Error: укажи server или servers, не оба` |
 | neither | `Error: нужен параметр server или servers` |
 
+With `servers`, one `requestTimeout` bounds the whole call, not each server.
+
 ```json
 [
   {

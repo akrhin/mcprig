@@ -52,6 +52,8 @@
 | оба сразу | ошибка |
 | ни одного | ошибка `нужен параметр server или servers` |
 
+Один `requestTimeout` покрывает весь вызов с `servers`, а не каждый сервер.
+
 ```json
 [
   { "server": "alpha", "name": "echo", "command": "echo" }
