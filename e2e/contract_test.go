@@ -36,7 +36,13 @@ type resp struct {
 
 func TestMain(m *testing.M) {
 	if baseURL == "" {
+		// A skipped suite must never read as a passed gate: strict mode (an
+		// explicit E2E_STRICT=1) fails instead of skipping.
 		fmt.Println("E2E_BASE is empty: contract tests will skip")
+		if os.Getenv("E2E_STRICT") == "1" {
+			fmt.Println("E2E_STRICT=1: E2E_BASE is required")
+			os.Exit(1)
+		}
 	} else {
 		fmt.Printf("contract suite against %s (strict=%v)\n", baseURL, strict)
 	}
