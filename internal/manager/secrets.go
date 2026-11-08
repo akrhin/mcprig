@@ -215,11 +215,22 @@ func (b *bao) delete(name string) (bool, error) {
 	return err == nil, err
 }
 
+// secretCacheTTL — сколько Get держит ответ. Переменные спрашивают на каждый
+// старт набора и на каждый GET /api/env, а больной OpenBao отдаёт 5 с на запрос.
+const secretCacheTTL = 30 * time.Second
+
+type secretEntry struct {
+	value   string
+	source  string
+	expires time.Time
+}
+
 // Secrets — цепочка OpenBao → env.json → окружение процесса.
 type Secrets struct {
 	local     *envFile
 	bao       *bao
-	mu        sync.Mutex
+	mu        sync.Mutex // защищает cache
+	cache     map[string]secretEntry
 	remoteErr atomic.Pointer[string]
 }
 
@@ -257,11 +268,48 @@ func reservedSecret(name string) bool {
 		strings.HasPrefix(name, "OPENBAO_")
 }
 
-// Get возвращает первое найденное значение и его источник.
+// Get возвращает первое найденное значение и его источник. Ответ кэшируется
+// на secretCacheTTL; пустой ответ тоже — иначе отсутствующая переменная снова
+// идёт в сеть на каждом старте набора.
 func (s *Secrets) Get(name string) (string, string) {
 	if reservedSecret(name) {
 		return "", ""
 	}
+	if v, source, ok := s.cached(name); ok {
+		return v, source
+	}
+	v, source := s.resolve(name)
+	s.cachePut(name, secretEntry{value: v, source: source})
+	return v, source
+}
+
+func (s *Secrets) cached(name string) (string, string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.cache[name]
+	if !ok || time.Now().After(e.expires) {
+		return "", "", false
+	}
+	return e.value, e.source, true
+}
+
+func (s *Secrets) cachePut(name string, e secretEntry) {
+	s.mu.Lock()
+	if s.cache == nil {
+		s.cache = map[string]secretEntry{}
+	}
+	e.expires = time.Now().Add(secretCacheTTL)
+	s.cache[name] = e
+	s.mu.Unlock()
+}
+
+func (s *Secrets) cacheDrop(name string) {
+	s.mu.Lock()
+	delete(s.cache, name)
+	s.mu.Unlock()
+}
+
+func (s *Secrets) resolve(name string) (string, string) {
 	if s.bao != nil {
 		v, err := s.bao.get(name)
 		switch {
@@ -293,6 +341,7 @@ func (s *Secrets) Set(name, value, store string) (string, error) {
 	if !secretNameRe.MatchString(name) {
 		return "", fmt.Errorf("переменная %q: имя должно быть вида A-Za-z_", name)
 	}
+	defer s.cacheDrop(name)
 	if store == "" {
 		if s.bao != nil {
 			store = sourceOpenBao
@@ -319,6 +368,7 @@ func (s *Secrets) Set(name, value, store string) (string, error) {
 }
 
 func (s *Secrets) Delete(name, store string) (bool, error) {
+	defer s.cacheDrop(name)
 	if store == "" {
 		if s.bao != nil {
 			store = sourceOpenBao
