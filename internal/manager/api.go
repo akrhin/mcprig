@@ -1070,7 +1070,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	}
 	if running {
 		if _, err := m.RestartSet(context.Background(), set); err != nil {
-			m.log.Warn("перезапуск набора после правки не удался", "set", id, "err", err)
+			return err
 		}
 	}
 	writeJSON(req.w, http.StatusOK, m.setView(set))
@@ -1213,16 +1213,23 @@ func (m *Manager) apiKeyIssue(req *request) error {
 		return err
 	}
 	updated := m.store.Set(id)
+	var restartErr string
 	if running {
 		if _, err := m.RestartSet(context.Background(), updated); err != nil {
 			m.log.Warn("перезапуск набора после выдачи ключа не удался", "set", id, "err", err)
+			restartErr = err.Error()
 		}
 	}
-	writeJSON(req.w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"token": token,
 		"key":   activeKey(updated),
 		"set":   m.setView(updated),
-	})
+	}
+	// Ключ уже выдан и показан один раз: ошибку рестарта отдаём полем, а не кодом.
+	if restartErr != "" {
+		resp["restartError"] = restartErr
+	}
+	writeJSON(req.w, http.StatusOK, resp)
 	return nil
 }
 

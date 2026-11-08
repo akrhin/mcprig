@@ -506,3 +506,47 @@ func TestDeleteSetRemovesDir(t *testing.T) {
 	}
 }
 
+// failRestart делает перезапуск любого набора невозможным.
+func failRestart(t *testing.T, e *env) {
+	t.Helper()
+	e.m.rt.mu.Lock()
+	e.m.rt.closed = true
+	e.m.rt.mu.Unlock()
+}
+
+// Ошибка перезапуска после правки возвращается клиенту, а не только в лог.
+func TestSetUpdateReturnsRestartError(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+	status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/start", nil), http.StatusOK)
+	failRestart(t, e)
+
+	w := e.do(t, http.MethodPut, "/api/sets/"+id, map[string]any{"description": "x"})
+	status(t, w, http.StatusInternalServerError)
+	if !strings.Contains(w.Body.String(), "менеджер остановлен") {
+		t.Fatalf("причина рестарта не в ответе: %s", w.Body.String())
+	}
+}
+
+// При выдаче ключа токен уже ушёл клиенту: ошибка рестарта — полем restartError.
+func TestKeyIssueReturnsRestartError(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+	status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/start", nil), http.StatusOK)
+	failRestart(t, e)
+
+	w := e.do(t, http.MethodPost, "/api/sets/"+id+"/keys", nil)
+	status(t, w, http.StatusOK)
+	got := decode[struct {
+		Token        string `json:"token"`
+		RestartError string `json:"restartError"`
+	}](t, w)
+	if got.Token == "" {
+		t.Fatal("токен не выдан")
+	}
+	if !strings.Contains(got.RestartError, "менеджер остановлен") {
+		t.Fatalf("restartError = %q", got.RestartError)
+	}
+}
