@@ -56,9 +56,9 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string)
 	out := setFile{
 		Servers: make([]*config.Server, 0, len(set.Servers)),
 		Transport: setTransport{
-			Type:      "http",
-			Host:      bindIP,
-			Port:      set.Port,
+			Type:           "http",
+			Host:           bindIP,
+			Port:           set.Port,
 			Path:           "/mcp",
 			AuthToken:      set.Token,
 			AllowAnonymous: set.Open && set.Token == "",

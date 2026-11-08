@@ -321,8 +321,8 @@ func TestListCommandsForms(t *testing.T) {
 	if err := json.Unmarshal([]byte(resultText(t, single)), &one); err != nil {
 		t.Fatalf("single-server answer must be an array: %v", err)
 	}
-	if len(one) != 2 {
-		t.Fatalf("want echo and danger-zone, got %+v", one)
+	if len(one) != 3 {
+		t.Fatalf("want echo, danger-zone и boom, got %+v", one)
 	}
 	for _, cmd := range one {
 		if cmd.Name != cmd.Command {
@@ -340,7 +340,7 @@ func TestListCommandsForms(t *testing.T) {
 	if err := json.Unmarshal([]byte(resultText(t, multi)), &many); err != nil {
 		t.Fatalf("servers answer must be an object: %v", err)
 	}
-	if len(many) != 2 || len(many["alpha"]) != 2 || len(many["beta"]) != 2 {
+	if len(many) != 2 || len(many["alpha"]) != 3 || len(many["beta"]) != 3 {
 		t.Fatalf("want both servers keyed, got %+v", many)
 	}
 
