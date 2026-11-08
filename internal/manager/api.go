@@ -1346,7 +1346,10 @@ func containsName(list []string, name string) bool {
 	return false
 }
 
+// linesParam — сколько строк лога отдать. Потолок нужен, потому что хвост
+// читается из файла целиком: lines=100000000 — это запрос на всю память.
 func linesParam(r *http.Request, def int) int {
+	const maxLines = 5000
 	v := r.URL.Query().Get("lines")
 	if v == "" {
 		return def
@@ -1354,6 +1357,9 @@ func linesParam(r *http.Request, def int) int {
 	n, err := strconv.Atoi(v)
 	if err != nil || n < 1 {
 		return def
+	}
+	if n > maxLines {
+		return maxLines
 	}
 	return n
 }
