@@ -194,6 +194,24 @@ func (r *Recorder) Snapshot() Snapshot {
 	return out
 }
 
+// AnonymousLabel заменяет метку клиента в редакции для открытого набора.
+const AnonymousLabel = "(аноним)"
+
+// SnapshotRedacted — снимок для анонимного читателя открытого набора: тексты
+// ошибок апстрима и метки клиентов не выходят наружу, остальное (счётчики,
+// латентности, хвост) остаётся.
+func (r *Recorder) SnapshotRedacted() Snapshot {
+	out := r.Snapshot()
+	for i := range out.Counters {
+		out.Counters[i].Client = AnonymousLabel
+	}
+	for i := range out.Tail {
+		out.Tail[i].Client = AnonymousLabel
+		out.Tail[i].Message = ""
+	}
+	return out
+}
+
 // P50 and P95 are computed from the latency reservoir; 0 when there is none.
 func (c Counter) P50() int64 { return quantile(c.latencies, 0.50) }
 func (c Counter) P95() int64 { return quantile(c.latencies, 0.95) }

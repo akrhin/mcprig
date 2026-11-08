@@ -85,25 +85,18 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed))
 	if rec != nil {
 		// The panel polls this endpoint; it carries the same bearer as /mcp.
-		// У открытого набора bearer нет ни у кого, поэтому снимок с метками
-		// клиентов и текстами ошибок апстрима анонимно не отдаётся: иначе
-		// первый же прохожий видит чужие ошибки.
-		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			if allowAnonymous {
-				writeJSONError(w, http.StatusForbidden, "статистика недоступна для открытого набора")
-				return
+		// У открытого набора bearer нет ни у кого, поэтому анонимный снимок
+		// редактируется: без меток клиентов и текстов ошибок апстрима.
+		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			snap := rec.Snapshot()
+			if token == "" || !bearerOK(r, token) {
+				snap = rec.SnapshotRedacted()
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			_ = json.NewEncoder(w).Encode(rec.Snapshot())
+			_ = json.NewEncoder(w).Encode(snap)
 		}), token, allowAnonymous, allowed))
 	}
 	return logRequests(mux, log), nil
-}
-
-func writeJSONError(w http.ResponseWriter, code int, message string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // guard is the per-request policy in front of the MCP handler: method, Host,

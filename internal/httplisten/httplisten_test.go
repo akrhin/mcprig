@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sintez/mcprig/internal/config"
@@ -382,35 +384,39 @@ func newStatsHandler(t *testing.T, token string, allowAnonymous bool, rec *stats
 	return h
 }
 
-// Открытый набор: /mcp анонимно работает, /stats анонимно — 403, иначе первый
-// же прохожий читает метки клиентов и тексты ошибок апстрима.
-func TestOpenSetStatsForbidden(t *testing.T) {
+// Открытый набор: /stats анонимно отдаётся, но с редакцией — без меток
+// клиентов и текстов ошибок апстрима, иначе первый же прохожий читает чужие
+// ошибки. Счётчики и хвост при этом на месте.
+func TestOpenSetStatsRedacted(t *testing.T) {
 	rec := stats.NewRecorder("open", 4)
+	rec.Record("opencode/2.2.6", "fix", "echo", 5*time.Millisecond, errors.New("upstream boom"))
 	srv := httptest.NewServer(newStatsHandler(t, "", true, rec))
 	defer srv.Close()
-
-	res := postMCP(t, srv, "", "", "")
-	body := drain(t, res)
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("/mcp без ключа: статус %d, тело %q", res.StatusCode, body)
-	}
 
 	res, err := srv.Client().Get(srv.URL + "/stats")
 	if err != nil {
 		t.Fatalf("get /stats: %v", err)
 	}
 	raw := drain(t, res)
-	if res.StatusCode != http.StatusForbidden {
+	if res.StatusCode != http.StatusOK {
 		t.Fatalf("/stats открытого набора: статус %d, тело %q", res.StatusCode, raw)
 	}
-	if !strings.Contains(raw, `"error"`) {
-		t.Fatalf("/stats: ожидался JSON с ошибкой, тело %q", raw)
+	for _, want := range []string{stats.AnonymousLabel, `"echo"`} {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("/stats без ключа: нет %q в теле %q", want, raw)
+		}
+	}
+	for _, forbidden := range []string{"upstream boom", "opencode/2.2.6"} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("/stats без ключа отдал %q: %q", forbidden, raw)
+		}
 	}
 }
 
 // Закрытый набор: /stats требует тот же bearer, что и /mcp, и не отдаёт ключ.
 func TestStatsNeedsTokenAndNeverLeaksIt(t *testing.T) {
 	rec := stats.NewRecorder("closed", 4)
+	rec.Record("opencode/2.2.6", "fix", "echo", 5*time.Millisecond, errors.New("upstream boom"))
 	srv := httptest.NewServer(newStatsHandler(t, testToken, false, rec))
 	defer srv.Close()
 
@@ -438,5 +444,10 @@ func TestStatsNeedsTokenAndNeverLeaksIt(t *testing.T) {
 	}
 	if strings.Contains(raw, testToken) {
 		t.Fatalf("токен попал в снимок: %q", raw)
+	}
+	for _, want := range []string{"opencode/2.2.6", "upstream boom"} {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("/stats с ключом: нет %q в теле %q", want, raw)
+		}
 	}
 }
