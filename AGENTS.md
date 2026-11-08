@@ -21,7 +21,7 @@ bash scripts/contract-e2e.sh      # контракт против BASE (по у�
 bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
 ```
 
-Go-тулчейн: локально 1.24.4, модуль требует 1.25.0 — `GOTOOLCHAIN=auto` скачает сам при первой сборке.
+Go-тулчейн: локально 1.24.4, модуль требует 1.27.3 — `GOTOOLCHAIN=auto` скачивает нужный тулчейн сам (проверено: `GOTOOLCHAIN=go1.27.3 go version`).
 
 ## Ссылки
 

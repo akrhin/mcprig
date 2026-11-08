@@ -5,7 +5,7 @@ stand against real MCP servers.
 
 ## Requirements
 
-- Go 1.25 (`go.mod` asks for `1.25.0`; with `GOTOOLCHAIN=auto` the toolchain is
+- Go 1.27 (`go.mod` asks for `1.27.3`; with `GOTOOLCHAIN=auto` the toolchain is
   downloaded on the first build).
 - `bash` and `curl` for the scripts.
 - Optional for the live stand: serena on `127.0.0.1:8899`, `npx`, and

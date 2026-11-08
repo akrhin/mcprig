@@ -35,7 +35,7 @@ with its error; a missing name or invalid JSON fails the load.
 
 ## Quick start
 
-Go 1.25 is required; `GOTOOLCHAIN=auto` downloads it on the first build.
+Go 1.27 is required; `GOTOOLCHAIN=auto` downloads the toolchain on the first build.
 
 ```bash
 # 1. build

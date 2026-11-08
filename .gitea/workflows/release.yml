@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.27.3'
   GORELEASER_VERSION: v2.20.0
   GITEA_URL: https://frosty-ad-gt.cloudpub.ru
 

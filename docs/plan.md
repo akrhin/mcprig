@@ -3,7 +3,7 @@
 **Вход:** `docs/reference/ts-manager-contract.md` (поведение + 10 обязательных
 исправлений), решение `docs/decisions/0001-two-repos.md`.
 **Приоритет владельца:** вес и холодный старт. Один бинарник на всё.
-**Стек:** Go 1.25, `github.com/modelcontextprotocol/go-sdk` v1.8.0
+**Стек:** Go 1.27, `github.com/modelcontextprotocol/go-sdk` v1.8.0
 (протокол по умолчанию `2026-07-28`), stdlib для HTTP и шаблонов, без внешних
 веб-зависимостей.
 
