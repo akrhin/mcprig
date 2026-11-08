@@ -23,6 +23,7 @@ type callsBody struct {
 		Server string `json:"server"`
 		Tool   string `json:"tool"`
 		MS     int64  `json:"ms"`
+		Failed bool   `json:"failed"`
 		Error  string `json:"error"`
 	} `json:"calls"`
 	Counters []struct {
@@ -132,6 +133,9 @@ func TestCallsMergeAndLimit(t *testing.T) {
 	}
 	if got.Calls[0].Set != openID || got.Calls[1].Set != closedID || got.Calls[2].Set != openID {
 		t.Fatalf("порядок слияния: %+v", got.Calls)
+	}
+	if !got.Calls[1].Failed || got.Calls[1].Error == "" || got.Calls[0].Failed {
+		t.Fatalf("провал должен быть помечен: %+v", got.Calls)
 	}
 	if got.Calls[1].Error != "boom" || got.Calls[1].MS != 40 {
 		t.Fatalf("хвост закрытого набора: %+v", got.Calls[1])

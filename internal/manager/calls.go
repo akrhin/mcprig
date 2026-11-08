@@ -30,6 +30,7 @@ type callRow struct {
 	Server string    `json:"server"`
 	Tool   string    `json:"tool"`
 	MS     int64     `json:"ms"`
+	Failed bool      `json:"failed"`
 	Error  string    `json:"error"`
 }
 
@@ -89,7 +90,7 @@ func (m *Manager) apiCalls(req *request) error {
 			continue
 		}
 		for _, c := range snap.Tail {
-			row := callRow{Time: c.Time, Client: c.Client, Server: c.Server, Tool: c.Tool, MS: c.Millis, Error: c.Message}
+			row := callRow{Time: c.Time, Client: c.Client, Server: c.Server, Tool: c.Tool, MS: c.Millis, Failed: c.Failed, Error: c.Message}
 			if id == "" {
 				row.Set = t.set.ID
 			}

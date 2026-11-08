@@ -19,7 +19,7 @@ SSE, CORS, OPTIONS нет. Ошибки: `HttpError.status`, иначе `400`.
 | GET | `/login` | — | HTML; `404`, если парольный режим выключен |
 | POST | `/api/login` | `{user,password}` | `{ok,user}` + cookie `mcp_session=<tok>.<sig>`, `HttpOnly; SameSite=Lax; Max-Age=43200`; `401` |
 | POST | `/api/logout` | — | `{ok:true}`, cookie с `Max-Age=0` |
-| GET | `/` , `/ui` | — | UI одним HTML; `/ui` → `302 /` |
+| GET | `/` , `/ui` | — | панель: `web/` из `go:embed` (index.html, app.css, app.js, favicon, `mock/`), CSP `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`; `/ui` → `302 /` |
 | GET | `/api/state` | — | `{servers, sets, firstPort:9100}`; токены маскируются в `prefix` (8 символов) |
 | POST | `/api/import` | `{mcpServers:{name:{command\|string\|[],args,url,env,headers,cwd,description,tags,enabled}}}` | `{added[],skipped[{name,reason}]}` |
 | GET | `/api/export/registry` | — | сид реестра без токенов |
@@ -40,10 +40,16 @@ SSE, CORS, OPTIONS нет. Ошибки: `HttpError.status`, иначе `400`.
 | POST | `/api/sets/:id/servers/:name/restart` | — | `{restarted:true,scope:'set'}` |
 | GET/POST | `/api/sets` | `{name,servers[],port?,token?,description?,autostart?,open?}` | `SetEntry[]` / `201`; порт и токен выдаются автоматически |
 | PUT/DELETE | `/api/sets/:id` | частичный | `200` / `{ok:true}` (сначала stop) |
-| GET | `/api/sets/:id/logs` | — | `{logs[]}` |
+| GET | `/api/sets/:id/logs` | `?lines` (200, max 5000) | `{logs[]}` |
+| GET | `/api/calls` | `?set=<id>&limit=<n>` (50, max 500) | `{set?, calls:[{time,set?,client,server,tool,ms,failed,error?}], counters:[{set?,client,server,tool,calls,failures,totalMs,p50ms,p95ms}], unreachable?:[…]}`, `404` на неизвестный набор |
 | POST | `/api/sets/:id/{start,stop,restart}` | — | `RuntimeStatus`; иначе `405` |
 
-UI: одна inline-страница, `GET /api/state` каждые 5 с, статики нет (`ui.ts:1160`).
+UI: панель — статические файлы из `go:embed`, `GET /api/state` и `GET /api/calls` опрашиваются каждые 5 с; inline-JS нет.
+
+`/stats` набора (не панели): `GET /stats` с тем же bearer, что `/mcp`;
+снимок `{set,counters[],tail[]}` с `p50ms`/`p95ms`. У открытого набора без ключа
+снимок редактированный: `client` = `"(аноним)"`, тексты ошибок пусты; счётчики,
+латентности и хвост остаются. Полного снимка анонимно не отдаём.
 
 ## Модель данных
 
@@ -83,6 +89,13 @@ RegistryData  {version:1, servers, sets, nextPort}
 - Падение → авто-рестарт до 5 раз, backoff `min(1000·2^(n-1), 30 000)`.
 - `stop`: `SIGTERM`, ожидание 5 000 мс, `SIGKILL`; `stopAll` — 3 000 мс на процесс.
 - Набор без активного ключа (и не `open`) стартовать отказывается.
+- Открытый набор (`allowAnonymous`): пустой `authToken`, старт без ключа. Запрос
+  без `Authorization` проходит, но **любой предъявленный `Authorization` получает
+  `401`**: значение сравнивается с пустым токеном, и сравнение всегда ложно. Это
+  не уязвимость, а свойство открытого набора — клиент, который шлёт заголовок
+  всегда, в него не пройдёт и должен либо получить ключ, либо не слать заголовок.
+  `/stats` открытого набора доступен анонимно в редакции: без меток клиентов и
+  текстов ошибок апстрима.
 - Конфиг набора: `transport{type:"http",host:"0.0.0.0",port,path:"/mcp",authToken,allowedHosts}`,
   `healthMonitor{interval:60000,timeout:120000}`, `requestTimeout:120000`.
 - Env ребёнка — whitelist (`PATH, HOME, LANG, LC_*, TZ, TMPDIR, XDG_*, SSL_*, NODE_EXTRA_CA_CERTS`)
