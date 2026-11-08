@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sintez/mcp-manager/internal/atomicfile"
 	"github.com/sintez/mcp-manager/internal/config"
 )
 
@@ -184,68 +185,49 @@ func (s *Store) Save() error {
 	return s.saveLocked()
 }
 
-// saveLocked writes tmp + fsync + rename, keeps the previous version in
-// registry.json.bak and never leaves a partial registry.json behind.
+// saveLocked writes the live state; used where the state is already final
+// (Open normalization, seeding, explicit Save).
 func (s *Store) saveLocked() error {
 	body, err := marshalData(s.data)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(s.dir, 0o700); err != nil {
+	return s.writeLocked(body)
+}
+
+// commitLocked persists next and only then makes it the live state: a failed
+// write leaves memory as it was, never ahead of disk.
+func (s *Store) commitLocked(next Data) error {
+	body, err := marshalData(next)
+	if err != nil {
 		return err
 	}
+	if err := s.writeLocked(body); err != nil {
+		return err
+	}
+	s.data = next
+	return nil
+}
+
+// writeLocked writes bytes atomically, keeps the previous version in
+// registry.json.bak and never leaves a partial registry.json behind.
+func (s *Store) writeLocked(body []byte) error {
 	if old, err := os.ReadFile(s.path); err == nil {
-		if err := writeFile(s.path+".bak", old); err != nil {
+		if err := atomicfile.Write(s.path+".bak", old); err != nil {
 			return fmt.Errorf("резервная копия реестра: %w", err)
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-
-	tmp, err := os.CreateTemp(s.dir, RegistryFile+".tmp-*")
-	if err != nil {
-		return err
-	}
-	name := tmp.Name()
-	if _, err := tmp.Write(body); err != nil {
-		tmp.Close()
-		os.Remove(name)
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		os.Remove(name)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(name)
-		return err
-	}
-	if err := os.Rename(name, s.path); err != nil {
-		os.Remove(name)
-		return err
-	}
-	if d, err := os.Open(s.dir); err == nil {
-		_ = d.Sync()
-		_ = d.Close()
-	}
-	return nil
+	return atomicfile.Write(s.path, body)
 }
 
-func writeFile(name string, body []byte) error {
-	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-	if _, err := f.Write(body); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	return f.Close()
+// clone copies the slice headers, so a mutation of the copy cannot reach the
+// live state. The entries themselves are never mutated in place.
+func (d Data) clone() Data {
+	d.Servers = append([]Server(nil), d.Servers...)
+	d.Sets = append([]*Set(nil), d.Sets...)
+	return d
 }
 
 // Servers returns a copy of the server list.
@@ -263,12 +245,26 @@ func (s *Store) Server(name string) Server {
 }
 
 func (s *Store) serverLocked(name string) Server {
-	for _, srv := range s.data.Servers {
-		if srv.Name == name {
-			return srv
-		}
+	if i := s.serverIndexLocked(name); i >= 0 {
+		return s.data.Servers[i]
 	}
 	return nil
+}
+
+func (s *Store) serverIndexLocked(name string) int {
+	for i, srv := range s.data.Servers {
+		if srv.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+// removeAt drops element i and copies the rest, so the result never aliases in.
+func removeAt[T any](in []T, i int) []T {
+	out := make([]T, 0, len(in)-1)
+	out = append(out, in[:i]...)
+	return append(out, in[i+1:]...)
 }
 
 // AddServer validates and stores one server entry given as a JSON object.
@@ -290,8 +286,9 @@ func (s *Store) AddServer(raw json.RawMessage) (Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.data.Servers = append(s.data.Servers, srv)
-	if err := s.saveLocked(); err != nil {
+	next := s.data.clone()
+	next.Servers = append(next.Servers, srv)
+	if err := s.commitLocked(next); err != nil {
 		return nil, err
 	}
 	return srv, nil
@@ -317,13 +314,9 @@ func (s *Store) UpdateServer(name string, patch json.RawMessage) (Server, error)
 	if err != nil {
 		return nil, err
 	}
-	for i, old := range s.data.Servers {
-		if old.Name == name {
-			s.data.Servers[i] = srv
-			break
-		}
-	}
-	if err := s.saveLocked(); err != nil {
+	next := s.data.clone()
+	next.Servers[s.serverIndexLocked(name)] = srv
+	if err := s.commitLocked(next); err != nil {
 		return nil, err
 	}
 	return srv, nil
@@ -333,18 +326,13 @@ func (s *Store) UpdateServer(name string, patch json.RawMessage) (Server, error)
 func (s *Store) DeleteServer(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	idx := -1
-	for i, srv := range s.data.Servers {
-		if srv.Name == name {
-			idx = i
-			break
-		}
-	}
+	idx := s.serverIndexLocked(name)
 	if idx < 0 {
 		return fmt.Errorf("нет сервера %s", name)
 	}
-	s.data.Servers = append(append([]Server(nil), s.data.Servers[:idx]...), s.data.Servers[idx+1:]...)
-	for i, set := range s.data.Sets {
+	next := s.data.clone()
+	next.Servers = removeAt(next.Servers, idx)
+	for i, set := range next.Sets {
 		kept := make([]string, 0, len(set.Servers))
 		for _, serverName := range set.Servers {
 			if serverName != name {
@@ -356,32 +344,55 @@ func (s *Store) DeleteServer(name string) error {
 		}
 		cp := *set
 		cp.Servers = kept
-		s.data.Sets[i] = &cp
+		next.Sets[i] = &cp
 	}
-	return s.saveLocked()
+	return s.commitLocked(next)
 }
 
-// Sets returns a copy of the set list.
+// Sets returns a snapshot of the set list; callers never get live pointers.
 func (s *Store) Sets() []*Set {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]*Set(nil), s.data.Sets...)
+	out := make([]*Set, 0, len(s.data.Sets))
+	for _, set := range s.data.Sets {
+		out = append(out, set.snapshot())
+	}
+	return out
 }
 
-// Set returns the set with this id, or nil.
+// Set returns a snapshot of the set with this id, or nil.
 func (s *Store) Set(id string) *Set {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.setLocked(id)
+	if set := s.setLocked(id); set != nil {
+		return set.snapshot()
+	}
+	return nil
+}
+
+// snapshot copies the mutable parts of a set, so a caller cannot write back
+// into registry state through the returned pointer.
+func (set *Set) snapshot() *Set {
+	cp := *set
+	cp.Servers = append([]string(nil), set.Servers...)
+	cp.Keys = append([]Key(nil), set.Keys...)
+	return &cp
 }
 
 func (s *Store) setLocked(id string) *Set {
-	for _, set := range s.data.Sets {
-		if set.ID == id {
-			return set
-		}
+	if i := s.setIndexLocked(id); i >= 0 {
+		return s.data.Sets[i]
 	}
 	return nil
+}
+
+func (s *Store) setIndexLocked(id string) int {
+	for i, set := range s.data.Sets {
+		if set.ID == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // AddSet validates and stores one set, allocating a port and an initial key
@@ -404,8 +415,10 @@ func (s *Store) AddSet(raw json.RawMessage) (*Set, error) {
 		set.Keys = []Key{newKey(time.Now().UTC().Format(time.RFC3339))}
 		set.Token = set.Keys[0].Token
 	}
-	s.data.Sets = append(s.data.Sets, set)
-	if err := s.saveLocked(); err != nil {
+	next := s.data.clone()
+	next.Sets = append(next.Sets, set)
+	next.NextPort = nextPort(set.Port)
+	if err := s.commitLocked(next); err != nil {
 		return nil, err
 	}
 	return set, nil
@@ -416,13 +429,7 @@ func (s *Store) AddSet(raw json.RawMessage) (*Set, error) {
 func (s *Store) UpdateSet(id string, patch json.RawMessage) (*Set, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	idx := -1
-	for i, set := range s.data.Sets {
-		if set.ID == id {
-			idx = i
-			break
-		}
-	}
+	idx := s.setIndexLocked(id)
 	if idx < 0 {
 		return nil, fmt.Errorf("нет набора %s", id)
 	}
@@ -434,8 +441,9 @@ func (s *Store) UpdateSet(id string, patch json.RawMessage) (*Set, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.data.Sets[idx] = set
-	if err := s.saveLocked(); err != nil {
+	next := s.data.clone()
+	next.Sets[idx] = set
+	if err := s.commitLocked(next); err != nil {
 		return nil, err
 	}
 	return set, nil
@@ -445,13 +453,13 @@ func (s *Store) UpdateSet(id string, patch json.RawMessage) (*Set, error) {
 func (s *Store) DeleteSet(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for i, set := range s.data.Sets {
-		if set.ID == id {
-			s.data.Sets = append(append([]*Set(nil), s.data.Sets[:i]...), s.data.Sets[i+1:]...)
-			return s.saveLocked()
-		}
+	idx := s.setIndexLocked(id)
+	if idx < 0 {
+		return fmt.Errorf("нет набора %s", id)
 	}
-	return fmt.Errorf("нет набора %s", id)
+	next := s.data.clone()
+	next.Sets = removeAt(next.Sets, idx)
+	return s.commitLocked(next)
 }
 
 // IssueKey revokes the current active key and returns the new plaintext token.
@@ -475,8 +483,9 @@ func (s *Store) IssueKey(setID string) (string, error) {
 	cp := *set
 	cp.Keys = keys
 	cp.Token = key.Token
-	s.replaceSet(set, &cp)
-	if err := s.saveLocked(); err != nil {
+	next := s.data.clone()
+	next.Sets[s.setIndexLocked(setID)] = &cp
+	if err := s.commitLocked(next); err != nil {
 		return "", err
 	}
 	return key.Token, nil
@@ -509,22 +518,12 @@ func (s *Store) RevokeKey(setID, keyID string) (wasActive bool, err error) {
 	cp := *set
 	cp.Keys = keys
 	cp.Token = activeToken(keys)
-	s.replaceSet(set, &cp)
-	if err := s.saveLocked(); err != nil {
+	next := s.data.clone()
+	next.Sets[s.setIndexLocked(setID)] = &cp
+	if err := s.commitLocked(next); err != nil {
 		return wasActive, err
 	}
 	return wasActive, nil
-}
-
-// replaceSet swaps a published set for an updated copy: a reader holding the
-// old pointer keeps reading a consistent snapshot.
-func (s *Store) replaceSet(old, next *Set) {
-	for i, set := range s.data.Sets {
-		if set == old {
-			s.data.Sets[i] = next
-			return
-		}
-	}
 }
 
 // AllocatePort reserves the next free port in 9100–9199.
@@ -535,12 +534,15 @@ func (s *Store) AllocatePort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := s.saveLocked(); err != nil {
+	next := s.data.clone()
+	next.NextPort = nextPort(port)
+	if err := s.commitLocked(next); err != nil {
 		return 0, err
 	}
 	return port, nil
 }
 
+// allocPortLocked picks a free port without changing the live state.
 func (s *Store) allocPortLocked() (int, error) {
 	used := make(map[int]bool, len(s.data.Sets))
 	for _, set := range s.data.Sets {
@@ -552,13 +554,11 @@ func (s *Store) allocPortLocked() (int, error) {
 	}
 	for port := start; port <= LastPort; port++ {
 		if !used[port] {
-			s.data.NextPort = nextPort(port)
 			return port, nil
 		}
 	}
 	for port := FirstPort; port < start; port++ {
 		if !used[port] {
-			s.data.NextPort = nextPort(port)
 			return port, nil
 		}
 	}

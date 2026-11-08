@@ -320,30 +320,144 @@ func TestServerValidation(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
-		ok   bool
+		want string // "" — сервер должен приняться
 	}{
-		{"stdio", `{"name":"a","command":["npx","x"]}`, true},
-		{"command строкой", `{"name":"a","command":"npx -y x"}`, true},
-		{"http", `{"name":"a","url":"http://127.0.0.1/mcp"}`, true},
-		{"stdio без command", `{"name":"a","transport":"stdio"}`, false},
-		{"http без url", `{"name":"a","transport":"http","description":"d"}`, false},
-		{"command и url", `{"name":"a","command":["x"],"url":"http://x"}`, false},
-		{"cwd на http", `{"name":"a","url":"http://x","cwd":"/tmp"}`, false},
-		{"env числом", `{"name":"a","command":["x"],"env":{"A":1}}`, false},
-		{"headers числом", `{"name":"a","url":"http://x","headers":{"A":1}}`, false},
-		{"имя заглавными", `{"name":"A","command":["x"]}`, false},
+		{"stdio", `{"name":"a","command":["npx","x"]}`, ""},
+		{"command строкой", `{"name":"a","command":"npx -y x"}`, ""},
+		{"http", `{"name":"a","url":"http://127.0.0.1/mcp"}`, ""},
+		{"stdio без command", `{"name":"a","transport":"stdio"}`, "нужен command[] или url"},
+		{"http без url", `{"name":"a","transport":"http","description":"d"}`, "нужен command[] или url"},
+		{"command и url", `{"name":"a","command":["x"],"url":"http://x"}`, "что-то одно"},
+		{"cwd на http", `{"name":"a","url":"http://x","cwd":"/tmp"}`, "cwd допустим только"},
+		{"env числом", `{"name":"a","command":["x"],"env":{"A":1}}`, "env.A: ожидалась строка"},
+		{"headers числом", `{"name":"a","url":"http://x","headers":{"A":1}}`, "headers.A: ожидалась строка"},
+		{"имя заглавными", `{"name":"A","command":["x"]}`, "имя сервера"},
+		{"enabled строкой", `{"name":"a","command":["x"],"enabled":"yes"}`, "enabled: ожидалось true или false"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			store := openStore(t, t.TempDir())
 			_, err := store.AddServer(json.RawMessage(tc.body))
-			if tc.ok && err != nil {
-				t.Fatalf("ожидался успех, ошибка: %v", err)
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("ожидался успех, ошибка: %v", err)
+				}
+				return
 			}
-			if !tc.ok && err == nil {
-				t.Fatal("ожидалась ошибка, сервер принят")
+			if err == nil {
+				t.Fatalf("ожидалась ошибка с %q, сервер принят", tc.want)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ошибка %q не содержит %q", err, tc.want)
 			}
 		})
+	}
+}
+
+// A string command names the executable; splitting it into argv is MCPHub
+// import shorthand only.
+func TestCommandStringIsOneArgument(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	str := addServer(t, store, `{"name":"str","command":"npx -y pkg"}`)
+	if len(str.Command) != 1 || str.Command[0] != "npx -y pkg" {
+		t.Fatalf("command строкой: want [\"npx -y pkg\"], got %v", str.Command)
+	}
+	arr := addServer(t, store, `{"name":"arr","command":["npx","-y","pkg"]}`)
+	if len(arr.Command) != 3 || arr.Command[2] != "pkg" {
+		t.Fatalf("command массивом: want [npx -y pkg], got %v", arr.Command)
+	}
+}
+
+// Merging a patch rebuilds the entry from its marshalled form; enabled:false
+// must survive both a patch without the field and an explicit false.
+func TestUpdateKeepsEnabled(t *testing.T) {
+	dir := t.TempDir()
+	store := openStore(t, dir)
+	addServer(t, store, `{"name":"off","command":["x"],"enabled":false}`)
+	addServer(t, store, `{"name":"on","command":["x"]}`)
+
+	srv, err := store.UpdateServer("off", json.RawMessage(`{"description":"d"}`))
+	if err != nil {
+		t.Fatalf("UpdateServer(off): %v", err)
+	}
+	if srv.Enabled {
+		t.Fatal("патч без enabled включил выключенный сервер")
+	}
+	if on := store.Server("on"); on == nil || !on.Enabled {
+		t.Fatal("create без enabled должен давать true")
+	}
+	if srv, err = store.UpdateServer("on", json.RawMessage(`{"enabled":false}`)); err != nil || srv.Enabled {
+		t.Fatalf("явный enabled:false не применён: %+v %v", srv, err)
+	}
+	if srv, err = store.UpdateServer("on", json.RawMessage(`{"description":"e"}`)); err != nil || srv.Enabled {
+		t.Fatalf("патч без enabled включил сервер обратно: %+v %v", srv, err)
+	}
+
+	reopened := openStore(t, dir)
+	if got := reopened.Server("off"); got == nil || got.Enabled {
+		t.Errorf("enabled:false не пережил перезагрузку: %+v", got)
+	}
+}
+
+// CanServe is the single rule for "this set may be started".
+func TestCanServe(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	addServer(t, store, `{"name":"fs","command":["x"]}`)
+	keyed := addSet(t, store, `{"name":"keyed","servers":["fs"],"port":9101}`)
+	open := addSet(t, store, `{"name":"open","servers":["fs"],"port":9102,"open":true}`)
+	if !CanServe(keyed) || !CanServe(open) {
+		t.Fatal("набор с активным ключом или open должен стартовать")
+	}
+	if CanServe(&Set{Name: "bare"}) || CanServe(nil) {
+		t.Fatal("набор без ключа и не open стартовать не должен")
+	}
+}
+
+// A failed write must leave memory as it was: memory never runs ahead of disk.
+func TestFailedWriteKeepsMemory(t *testing.T) {
+	dir := t.TempDir()
+	store := openStore(t, dir)
+	addServer(t, store, `{"name":"keep","command":["x"]}`)
+	servers, sets := len(store.Servers()), len(store.Sets())
+
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	if _, err := store.AddServer(json.RawMessage(`{"name":"lost","command":["x"]}`)); err == nil {
+		t.Fatal("запись в каталог только на чтение должна падать")
+	}
+	if _, err := store.AddSet(json.RawMessage(`{"name":"lost","servers":["keep"],"port":9150}`)); err == nil {
+		t.Fatal("запись набора в каталог только на чтение должна падать")
+	}
+	if added, skipped := store.Import(map[string]json.RawMessage{
+		"imp": json.RawMessage(`{"command":["x"]}`),
+	}); added != nil || len(skipped) == 0 {
+		t.Fatalf("Import при ошибке записи: added %v, skipped %v", added, skipped)
+	}
+	if len(store.Servers()) != servers || len(store.Sets()) != sets {
+		t.Fatalf("после ошибки записи состояние изменилось: серверов %d/%d, наборов %d/%d",
+			len(store.Servers()), servers, len(store.Sets()), sets)
+	}
+}
+
+// Sets()/Set() hand out snapshots: writing through them cannot reach the store.
+func TestSetSnapshots(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	addServer(t, store, `{"name":"fs","command":["x"]}`)
+	addSet(t, store, `{"name":"demo","servers":["fs"],"port":9100}`)
+
+	got := store.Set("demo")
+	got.Name = "hacked"
+	got.Servers[0] = "gone"
+	got.Keys[0].Token = "leak"
+	for _, set := range store.Sets() {
+		set.Name = "list-hacked"
+	}
+	kept := store.Set("demo")
+	if kept.Name != "demo" || kept.Servers[0] != "fs" || kept.Token == "leak" {
+		t.Fatalf("запись через снапшот изменила реестр: %+v", kept)
 	}
 }
 

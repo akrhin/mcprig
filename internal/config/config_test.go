@@ -1,8 +1,11 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -165,5 +168,102 @@ func TestIdentifiableFailsLoad(t *testing.T) {
 	path = write(t, `{"servers": [{"name": "ok", "command": ["x"], "command2": 1}`)
 	if _, err := Load(path); err == nil {
 		t.Fatal("broken JSON must fail the load")
+	}
+}
+
+// enabled:false must be serialized: a partial update rebuilds the entry from
+// the marshalled form, and a dropped field would silently flip the server on.
+func TestEnabledFalseIsMarshalled(t *testing.T) {
+	body, err := json.Marshal(&Server{Name: "off", Enabled: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"enabled":false`) {
+		t.Fatalf("enabled:false потеряно при сериализации: %s", body)
+	}
+}
+
+// A string command is the executable name, not an argv line: arguments come
+// only from `args`, like the TS reference.
+func TestStringCommandStaysWhole(t *testing.T) {
+	path := write(t, `{"servers":[
+	  {"name":"str","command":"npx -y pkg"},
+	  {"name":"str-args","command":"npx","args":["-y","pkg"]}
+	]}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	byName := map[string]*Server{}
+	for _, s := range cfg.Servers {
+		byName[s.Name] = s
+	}
+	if got := byName["str"].Command; len(got) != 1 || got[0] != "npx -y pkg" {
+		t.Errorf("command строкой: want [\"npx -y pkg\"], got %v", got)
+	}
+	if got := byName["str-args"].Command; len(got) != 3 || got[2] != "pkg" {
+		t.Errorf("command + args: want [npx -y pkg], got %v", got)
+	}
+}
+
+// `${VAR}` and `{file:/abs}` are expanded at load, in env, headers and the
+// transport token — otherwise a child process receives the literal reference.
+func TestExpandSecrets(t *testing.T) {
+	secret := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(secret, []byte("s3cret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MCP_TEST_TOKEN", "from-env")
+	path := write(t, fmt.Sprintf(`{
+	  "servers": [{"name":"s","command":["x"],
+	    "env":{"TOKEN":"${MCP_TEST_TOKEN}","FILE":"{file:%s}","LITERAL":"a$b"},
+	    "headers":{"Authorization":"Bearer ${MCP_TEST_TOKEN}"}}],
+	  "transport":{"type":"http","port":9100,"authToken":"${MCP_TEST_TOKEN}"}
+	}`, secret))
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Servers[0].ConfigError != "" {
+		t.Fatalf("неожиданная ошибка: %s", cfg.Servers[0].ConfigError)
+	}
+	env := cfg.Servers[0].Env
+	if env["TOKEN"] != "from-env" {
+		t.Errorf("env.TOKEN: got %q", env["TOKEN"])
+	}
+	if env["FILE"] != "s3cret" {
+		t.Errorf("env.FILE: хвостовой перевод строки не обрезан, got %q", env["FILE"])
+	}
+	if env["LITERAL"] != "a$b" {
+		t.Errorf("строка без фигурных скобок изменена: %q", env["LITERAL"])
+	}
+	if got := cfg.Servers[0].Headers["Authorization"]; got != "Bearer from-env" {
+		t.Errorf("headers.Authorization: got %q", got)
+	}
+	if got := cfg.Transport.AuthToken; got != "from-env" {
+		t.Errorf("transport.authToken: got %q", got)
+	}
+}
+
+// A broken reference is a soft ConfigError of that server, like any other
+// validation defect.
+func TestExpandSecretsSoftFail(t *testing.T) {
+	path := write(t, `{"servers":[
+	  {"name":"missing","command":["x"],"env":{"TOKEN":"${MCP_TEST_ABSENT_VAR}"}},
+	  {"name":"relative","command":["x"],"env":{"TOKEN":"{file:rel/token}"}}
+	]}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("broken references must not fail the load: %v", err)
+	}
+	if got := cfg.Servers[0].ConfigError; !strings.Contains(got, "env.TOKEN") ||
+		!strings.Contains(got, "MCP_TEST_ABSENT_VAR") {
+		t.Errorf("незаданная переменная: got %q", got)
+	}
+	if got := cfg.Servers[1].ConfigError; !strings.Contains(got, "нужен абсолютный путь") {
+		t.Errorf("относительный путь: got %q", got)
+	}
+	if len(cfg.Usable()) != 0 {
+		t.Errorf("сломанные записи не должны быть пригодны: %d", len(cfg.Usable()))
 	}
 }

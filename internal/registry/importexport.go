@@ -29,6 +29,7 @@ func (s *Store) Import(entries map[string]json.RawMessage) ([]string, []Skip) {
 	}
 	sort.Strings(names)
 
+	next := s.data.clone()
 	var added []string
 	var skipped []Skip
 	for _, name := range names {
@@ -46,11 +47,11 @@ func (s *Store) Import(entries map[string]json.RawMessage) ([]string, []Skip) {
 			skipped = append(skipped, Skip{Name: name, Reason: err.Error()})
 			continue
 		}
-		s.data.Servers = append(s.data.Servers, srv)
+		next.Servers = append(next.Servers, srv)
 		added = append(added, name)
 	}
 	if len(added) > 0 {
-		if err := s.saveLocked(); err != nil {
+		if err := s.commitLocked(next); err != nil {
 			return nil, append(skipped, Skip{Reason: err.Error()})
 		}
 	}
@@ -72,6 +73,9 @@ func importObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 		if err := json.Unmarshal(trimmed, &command); err != nil {
 			return nil, errors.New("command: ожидалась строка")
 		}
+		// MCPHub shorthand: here a bare string is a whole shell line, so it is
+		// split into argv. Everywhere else (commandOf) a plain string names the
+		// executable only.
 		argv, err := json.Marshal(strings.Fields(command))
 		if err != nil {
 			return nil, err

@@ -15,6 +15,8 @@ import (
 	"sync"
 
 	"golang.org/x/oauth2"
+
+	"github.com/sintez/mcp-manager/internal/atomicfile"
 )
 
 // Key возвращает ключ хранилища для пары «имя сервера + URL»: первые 32 hex
@@ -173,40 +175,14 @@ func (s *Store) SaveClient(key string, info ClientInfo) error {
 	return nil
 }
 
-// writeAtomic пишет файл целиком: tmp в том же каталоге → Sync → rename →
-// fsync каталога. Вызывать под s.mu.
+// writeAtomic пишет файл целиком атомарной заменой. Вызывать под s.mu.
 func (s *Store) writeAtomic(path string, v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return fmt.Errorf("oauth: сериализовать %s: %w", path, err)
 	}
-	tmp, err := os.CreateTemp(s.dir, ".oauth-*.tmp")
-	if err != nil {
-		return fmt.Errorf("oauth: создать временный файл в %s: %w", s.dir, err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName) // после успешного rename уже ничего не удалит
-	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
-		return fmt.Errorf("oauth: права на %s: %w", tmpName, err)
-	}
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return fmt.Errorf("oauth: записать %s: %w", tmpName, err)
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return fmt.Errorf("oauth: fsync %s: %w", tmpName, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("oauth: закрыть %s: %w", tmpName, err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("oauth: переименовать %s в %s: %w", tmpName, path, err)
-	}
-	if d, err := os.Open(s.dir); err == nil {
-		d.Sync() // ENOTSUP на некоторых ФС — не повод считать запись неудачной
-		d.Close()
+	if err := atomicfile.Write(path, data); err != nil {
+		return fmt.Errorf("oauth: записать %s: %w", path, err)
 	}
 	return nil
 }

@@ -455,7 +455,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		return err
 	})
 	if m.Stats != nil {
-		m.Stats.Record(clientOf(req), e.srv.Name, in.CommandName, time.Since(start), err)
+		m.Stats.Record(stats.ClientFrom(ctx, clientOf(req)), e.srv.Name, in.CommandName, time.Since(start), err)
 	}
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {

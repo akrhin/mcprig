@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 type TransportKind string
@@ -28,7 +31,7 @@ type Server struct {
 	URL         string            `json:"url,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
-	Enabled     bool              `json:"enabled,omitempty"`
+	Enabled     bool              `json:"enabled"`
 	Permissions *Permissions      `json:"permissions,omitempty"`
 	OAuth       *OAuth            `json:"oauth,omitempty"`
 	ConfigError string            `json:"_configError,omitempty"`
@@ -239,6 +242,70 @@ func stringMap(in map[string]any, configErr *string, field string) map[string]st
 	return out
 }
 
+var (
+	varRefPattern  = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+	fileRefPattern = regexp.MustCompile(`\{file:([^}]+)\}`)
+)
+
+// expandSecrets resolves the two reference forms the TS manager supports:
+// `{file:/abs/path}` reads a secret file (one trailing newline stripped),
+// `${VAR}` takes the variable from the process environment. A relative secret
+// path or an unset variable is an error; the caller turns it into a ConfigError.
+func expandSecrets(value string) (string, error) {
+	var firstErr error
+	out := fileRefPattern.ReplaceAllStringFunc(value, func(match string) string {
+		if firstErr != nil {
+			return match
+		}
+		path := strings.TrimSpace(match[len("{file:") : len(match)-1])
+		if !filepath.IsAbs(path) {
+			firstErr = fmt.Errorf("{file:%s}: нужен абсолютный путь", path)
+			return match
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			firstErr = fmt.Errorf("{file:%s}: %v", path, err)
+			return match
+		}
+		return strings.TrimSuffix(strings.TrimSuffix(string(data), "\n"), "\r")
+	})
+	if firstErr != nil {
+		return "", firstErr
+	}
+	out = varRefPattern.ReplaceAllStringFunc(out, func(match string) string {
+		if firstErr != nil {
+			return match
+		}
+		name := match[2 : len(match)-1]
+		val, ok := os.LookupEnv(name)
+		if !ok {
+			firstErr = fmt.Errorf("переменная %s не задана", name)
+			return match
+		}
+		return val
+	})
+	return out, firstErr
+}
+
+// expandSecrets resolves references in env and headers; a failure is a
+// soft ConfigError of this server, like every other validation defect.
+func (s *Server) expandSecrets() {
+	expandMap := func(field string, m map[string]string) {
+		for key, value := range m {
+			out, err := expandSecrets(value)
+			if err != nil {
+				if s.ConfigError == "" {
+					s.ConfigError = fmt.Sprintf("%s.%s: %v", field, key, err)
+				}
+				continue
+			}
+			m[key] = out
+		}
+	}
+	expandMap("env", s.Env)
+	expandMap("headers", s.Headers)
+}
+
 // validate fills ConfigError. Returns false when the entry is unusable.
 func (s *Server) validate() bool {
 	if s.ConfigError != "" {
@@ -290,12 +357,16 @@ func (s *Server) validate() bool {
 
 // HTTPTransport is the listener the set exposes to MCP clients.
 type HTTPTransport struct {
-	Type         string   `json:"type,omitempty"`
-	Host         string   `json:"host,omitempty"`
-	Port         int      `json:"port,omitempty"`
-	Path         string   `json:"path,omitempty"`
-	AuthToken    string   `json:"authToken,omitempty"`
-	AllowedHosts []string `json:"allowedHosts,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Host      string `json:"host,omitempty"`
+	Port      int    `json:"port,omitempty"`
+	Path      string `json:"path,omitempty"`
+	AuthToken string `json:"authToken,omitempty"`
+	// AllowAnonymous lets the listener start without an authToken and accepts
+	// requests carrying no Authorization header; a presented token is still
+	// checked. Set only for an open set.
+	AllowAnonymous bool     `json:"allowAnonymous,omitempty"`
+	AllowedHosts   []string `json:"allowedHosts,omitempty"`
 }
 
 type HealthMonitor struct {
@@ -341,6 +412,13 @@ func Load(path string) (*Config, error) {
 	if err := json.Unmarshal(data, &shape); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
+	if shape.Transport != nil && shape.Transport.AuthToken != "" {
+		token, err := expandSecrets(shape.Transport.AuthToken)
+		if err != nil {
+			return nil, fmt.Errorf("%s: transport.authToken: %w", path, err)
+		}
+		shape.Transport.AuthToken = token
+	}
 	cfg := &Config{Transport: shape.Transport, HealthMonitor: shape.HealthMonitor, RequestTimeout: shape.RequestTimeout}
 	// A broken global OAuth block is dropped too: a typo must not brick the set.
 	if shape.OAuth.validate("oauth") == "" {
@@ -363,6 +441,7 @@ func Load(path string) (*Config, error) {
 			srv.ConfigError = "дубль имени"
 		}
 		seen[srv.Name] = true
+		srv.expandSecrets()
 		srv.validate()
 		cfg.Servers = append(cfg.Servers, srv)
 	}

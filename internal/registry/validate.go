@@ -91,8 +91,10 @@ func stringSliceStrict(in map[string]json.RawMessage, key string) ([]string, err
 	return out, nil
 }
 
-// commandOf accepts both command forms: an argv array, or a shell-style string
-// (plus the legacy `args` array).
+// commandOf accepts both command forms: an argv array, or a string naming the
+// executable (its arguments come only from the legacy `args` array, like the
+// TS reference). Splitting a string into fields is MCPHub import shorthand and
+// lives only in importObject.
 func commandOf(in map[string]json.RawMessage) ([]string, error) {
 	var command []string
 	if raw, ok := in["command"]; ok && !isNull(raw) {
@@ -101,7 +103,7 @@ func commandOf(in map[string]json.RawMessage) ([]string, error) {
 			if err := json.Unmarshal(raw, &one); err != nil {
 				return nil, errors.New("command: ожидалась строка или массив строк")
 			}
-			command = strings.Fields(one)
+			command = []string{one}
 		}
 	}
 	args, err := stringSliceStrict(in, "args")

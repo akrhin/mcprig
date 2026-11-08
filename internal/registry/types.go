@@ -53,6 +53,12 @@ type Data struct {
 	NextPort int      `json:"nextPort"`
 }
 
+// CanServe reports whether a set may be started: it has an active key or is
+// explicitly open. A set with no key and not open must never run.
+func CanServe(set *Set) bool {
+	return set != nil && (set.Open || activeToken(set.Keys) != "")
+}
+
 // PublicKey is a key as a client may see it: no token.
 type PublicKey struct {
 	ID        string `json:"id"`

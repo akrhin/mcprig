@@ -4,7 +4,10 @@
 package httplisten
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
@@ -15,14 +18,16 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sintez/mcp-manager/internal/config"
+	"github.com/sintez/mcp-manager/internal/stats"
 )
 
 // maxBodyBytes is the contract limit for one proxied MCP request.
 const maxBodyBytes = 4 << 20
 
-// New builds the set's HTTP handler. An empty AuthToken is a startup error:
-// the proxy never listens without authentication.
-func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger) (http.Handler, error) {
+// New builds the set's HTTP handler. A missing authToken is a startup error
+// unless the set is open (AllowAnonymous): the proxy never listens without
+// authentication by accident.
+func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recorder) (http.Handler, error) {
 	if cfg == nil || cfg.Transport == nil {
 		return nil, errors.New("httplisten: в конфиге нет transport")
 	}
@@ -30,7 +35,8 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger) (http.Handler, e
 		return nil, errors.New("httplisten: нет mcp-сервера")
 	}
 	token := cfg.Transport.AuthToken
-	if token == "" {
+	allowAnonymous := cfg.Transport.AllowAnonymous
+	if token == "" && !allowAnonymous {
 		return nil, errors.New("httplisten: пустой authToken — без авторизации набор не стартует")
 	}
 	if log == nil {
@@ -38,7 +44,16 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger) (http.Handler, e
 	}
 	allowed := cfg.Transport.AllowedHosts
 	if len(allowed) == 0 {
-		log.Warn("httplisten: allowedHosts пуст — принимаем любой Host и Origin")
+		// The SDK's own DNS-rebinding guard is intentionally off, so this list
+		// is the only Host policy: an empty config must not mean "any host".
+		allowed = []string{"127.0.0.1", "localhost", "::1"}
+		log.Warn("httplisten: allowedHosts пуст — принимаем только loopback", "hosts", allowed)
+	} else {
+		for _, host := range allowed {
+			if host == "*" {
+				log.Warn("httplisten: allowedHosts содержит \"*\" — защита от rebinding отключена для любого Host")
+			}
+		}
 	}
 	path := cfg.Transport.Path
 	if path == "" {
@@ -67,13 +82,21 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger) (http.Handler, e
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.Handle(path, guard(mcpHandler, token, allowed))
+	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed))
+	if rec != nil {
+		// The panel polls this endpoint; it carries the same bearer as /mcp so
+		// a counter snapshot is not public.
+		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_ = json.NewEncoder(w).Encode(rec.Snapshot())
+		}), token, allowAnonymous, allowed))
+	}
 	return logRequests(mux, log), nil
 }
 
 // guard is the per-request policy in front of the MCP handler: method, Host,
 // Origin, bearer token, body cap.
-func guard(next http.Handler, token string, allowed []string) http.Handler {
+func guard(next http.Handler, token string, allowAnonymous bool, allowed []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet, http.MethodPost, http.MethodDelete:
@@ -97,17 +120,43 @@ func guard(next http.Handler, token string, allowed []string) http.Handler {
 			}
 		}
 
-		if !bearerOK(r, token) {
+		// No header at all is allowed only for an open set; a token that is
+		// presented must always be the right one.
+		if r.Header.Get("Authorization") == "" {
+			if !allowAnonymous {
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		} else if !bearerOK(r, token) {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+
+		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r)))
 
 		if r.Body != nil {
 			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// clientLabel names the caller for the counters: the User-Agent product token
+// plus a short fingerprint of the presented key, so two harnesses on one key
+// stay apart without the key itself ever reaching the stats.
+func clientLabel(r *http.Request) string {
+	ua := ""
+	if fields := strings.Fields(r.UserAgent()); len(fields) > 0 {
+		ua = fields[0]
+	}
+	key := ""
+	if h := r.Header.Get("Authorization"); len(h) > 7 {
+		sum := sha256.Sum256([]byte(h[7:]))
+		key = "key:" + hex.EncodeToString(sum[:])[:6]
+	}
+	return stats.Label(key, ua)
 }
 
 func bearerOK(r *http.Request, token string) bool {
@@ -130,11 +179,8 @@ func hostOnly(hostport string) string {
 }
 
 func hostAllowed(host string, allowed []string) bool {
-	if len(allowed) == 0 {
-		return true
-	}
 	for _, a := range allowed {
-		if strings.EqualFold(hostOnly(a), host) {
+		if a == "*" || strings.EqualFold(hostOnly(a), host) {
 			return true
 		}
 	}

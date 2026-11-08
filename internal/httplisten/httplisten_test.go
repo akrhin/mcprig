@@ -30,7 +30,7 @@ func newHandler(t *testing.T, token string, allowed []string) (http.Handler, *by
 	t.Helper()
 	cfg := &config.Config{Transport: &config.HTTPTransport{AuthToken: token, AllowedHosts: allowed}}
 	var buf bytes.Buffer
-	h, err := New(cfg, testServer(), slog.New(slog.NewTextHandler(&buf, nil)))
+	h, err := New(cfg, testServer(), slog.New(slog.NewTextHandler(&buf, nil)), nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -252,7 +252,86 @@ func TestMethodNotAllowed(t *testing.T) {
 
 func TestEmptyTokenRefusesToStart(t *testing.T) {
 	cfg := &config.Config{Transport: &config.HTTPTransport{}}
-	if _, err := New(cfg, testServer(), nil); err == nil {
+	if _, err := New(cfg, testServer(), nil, nil); err == nil {
 		t.Fatal("пустой authToken принят, ожидалась ошибка")
+	}
+}
+
+// allowAnonymous lets the set run with no token at all: a request without an
+// Authorization header passes, but a presented token must still be right.
+func TestAnonymousAllowed(t *testing.T) {
+	cfg := &config.Config{Transport: &config.HTTPTransport{AllowAnonymous: true}}
+	h, err := New(cfg, testServer(), nil, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	res := postMCP(t, srv, "", "", "")
+	body := drain(t, res)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("анонимный запрос: статус %d, тело %q", res.StatusCode, body)
+	}
+
+	res = postMCP(t, srv, "wrong", "", "")
+	drain(t, res)
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("неверный токен при allowAnonymous: статус %d, ожидался 401", res.StatusCode)
+	}
+}
+
+// An empty allowedHosts is loopback only: the SDK rebinding guard is off, so
+// this list is the whole Host policy.
+func TestEmptyAllowedHostsIsLoopback(t *testing.T) {
+	h, _ := newHandler(t, testToken, nil)
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	res := postMCP(t, srv, testToken, "", "")
+	body := drain(t, res)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("loopback Host: статус %d, тело %q", res.StatusCode, body)
+	}
+
+	res = postMCP(t, srv, testToken, "evil.example", "")
+	drain(t, res)
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("чужой Host при пустом списке: статус %d, ожидался 403", res.StatusCode)
+	}
+}
+
+// "*" is the explicit escape hatch and is announced in the log.
+func TestWildcardAllowedHosts(t *testing.T) {
+	h, logs := newHandler(t, testToken, []string{"*"})
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	res := postMCP(t, srv, testToken, "evil.example", "http://evil.example")
+	drain(t, res)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("Host/Origin при \"*\": статус %d, ожидался 200", res.StatusCode)
+	}
+	if !strings.Contains(logs.String(), "rebinding") {
+		t.Errorf("нет предупреждения о \"*\": %s", logs.String())
+	}
+}
+
+// The label the counters see: User-Agent product token plus a key
+// fingerprint, without the key itself.
+func TestClientLabel(t *testing.T) {
+	req := httptest.NewRequest("POST", "/mcp", nil)
+	req.Header.Set("User-Agent", "opencode/2.2.6 (linux)")
+	req.Header.Set("Authorization", "Bearer secret-token")
+
+	got := clientLabel(req)
+	if !strings.HasPrefix(got, "key:") || !strings.HasSuffix(got, "/opencode/2.2.6") {
+		t.Fatalf("label = %q", got)
+	}
+	if strings.Contains(got, "secret-token") {
+		t.Fatalf("label leaks the key: %q", got)
+	}
+	if open := clientLabel(httptest.NewRequest("POST", "/mcp", nil)); open != "" {
+		t.Fatalf("anonymous label = %q, want empty", open)
 	}
 }

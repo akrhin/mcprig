@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -13,14 +12,17 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/sintez/mcp-manager/internal/config"
 	"github.com/sintez/mcp-manager/internal/downstream"
 	"github.com/sintez/mcp-manager/internal/httplisten"
+	"github.com/sintez/mcp-manager/internal/manager"
 	"github.com/sintez/mcp-manager/internal/mcpserver"
 	"github.com/sintez/mcp-manager/internal/oauth"
+	"github.com/sintez/mcp-manager/internal/stats"
 )
 
 // version is set by the release build.
@@ -29,26 +31,99 @@ var version = "dev"
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "mcp-manager:", err)
+		if _, ok := err.(*usageError); ok {
+			os.Exit(2)
+		}
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	args := os.Args[1:]
-	if len(args) > 0 {
-		switch args[0] {
-		case "stdio":
-			return runStdio(args[1:])
-		case "serve":
-			args = args[1:]
-		}
-	}
+// usageError — ошибка командной строки: код возврата 2, как у пакета flag.
+type usageError struct{ msg string }
 
-	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	cfgPath := fs.String("config", defaultConfigPath(), "путь к servers.json")
-	showVersion := fs.Bool("version", false, "показать версию и выйти")
-	addr := fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из transport")
-	_ = fs.Parse(args)
+func (e *usageError) Error() string { return e.msg }
+
+// newServeFlags описывает флаги serve один раз: их разбирает и parseArgs, и run.
+func newServeFlags() (fs *flag.FlagSet, cfgPath *string, showVersion *bool, addr *string) {
+	fs = flag.NewFlagSet("serve", flag.ContinueOnError)
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	showVersion = fs.Bool("version", false, "показать версию и выйти")
+	addr = fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из transport")
+	return fs, cfgPath, showVersion, addr
+}
+
+func newStdioFlags() (fs *flag.FlagSet, cfgPath *string) {
+	fs = flag.NewFlagSet("stdio", flag.ContinueOnError)
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	return fs, cfgPath
+}
+
+// parseArgs отделяет подкоманду от её флагов и отбивает лишние позиционные
+// аргументы. Неизвестная подкоманда — ошибка, а не молчаливый serve: иначе
+// опечатка поднимает прокси с конфигом по умолчанию.
+func parseArgs(args []string) (mode string, rest []string, err error) {
+	if len(args) == 0 {
+		return "serve", nil, nil
+	}
+	// Флаги без подкоманды — это serve: так исторически запускают прокси.
+	if strings.HasPrefix(args[0], "-") {
+		fs, _, _, _ := newServeFlags()
+		if err := fs.Parse(args); err != nil {
+			return "", nil, &usageError{err.Error()}
+		}
+		if fs.NArg() > 0 {
+			return "", nil, &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		}
+		return "serve", args, nil
+	}
+	switch args[0] {
+	case "serve":
+		fs, _, _, _ := newServeFlags()
+		if err := fs.Parse(args[1:]); err != nil {
+			return "", nil, &usageError{err.Error()}
+		}
+		if fs.NArg() > 0 {
+			return "", nil, &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		}
+		return "serve", args[1:], nil
+	case "stdio":
+		fs, _ := newStdioFlags()
+		if err := fs.Parse(args[1:]); err != nil {
+			return "", nil, &usageError{err.Error()}
+		}
+		if fs.NArg() > 0 {
+			return "", nil, &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		}
+		return "stdio", args[1:], nil
+	case "panel":
+		if len(args) > 1 {
+			return "", nil, &usageError{fmt.Sprintf("panel не принимает аргументов: %q", args[1:])}
+		}
+		return "panel", nil, nil
+	}
+	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel", args[0])}
+}
+
+func run() error {
+	mode, rest, err := parseArgs(os.Args[1:])
+	if err != nil {
+		return err
+	}
+	switch mode {
+	case "stdio":
+		return runStdio(rest)
+	case "panel":
+		return manager.Run(manager.FromEnv(version))
+	}
+	args := rest
+
+	fs, cfgPath, showVersion, addr := newServeFlags()
+	if err := fs.Parse(args); err != nil {
+		return &usageError{err.Error()}
+	}
+	if fs.NArg() > 0 {
+		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+	}
 
 	if *showVersion {
 		fmt.Println(version)
@@ -58,9 +133,6 @@ func run() error {
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		return err
-	}
-	if cfg.Transport == nil || cfg.Transport.AuthToken == "" {
-		return errors.New("в конфиге нет transport.authToken: прокси не стартует без ключа")
 	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -72,7 +144,9 @@ func run() error {
 	mgr := mcpserver.New(cfg, version, conn)
 	defer mgr.Close()
 
-	handler, err := httplisten.New(cfg, mgr.Server(), log)
+	rec := stats.NewRecorder(os.Getenv("MCPRIG_SET"), 0)
+	mgr.Stats = rec
+	handler, err := httplisten.New(cfg, mgr.Server(), log, rec)
 	if err != nil {
 		return err
 	}
@@ -119,9 +193,13 @@ func defaultConfigPath() string {
 // runStdio serves one set over stdin/stdout: the client spawns us and owns the
 // process. No listener, no key — the transport is the boundary.
 func runStdio(args []string) error {
-	fs := flag.NewFlagSet("stdio", flag.ExitOnError)
-	cfgPath := fs.String("config", defaultConfigPath(), "путь к servers.json")
-	_ = fs.Parse(args)
+	fs, cfgPath := newStdioFlags()
+	if err := fs.Parse(args); err != nil {
+		return &usageError{err.Error()}
+	}
+	if fs.NArg() > 0 {
+		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+	}
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
