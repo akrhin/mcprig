@@ -1107,7 +1107,7 @@ func (m *Manager) apiSetServers(req *request) error {
 		return nil
 	}
 	view := m.health.get(req.r.Context(), id, func(ctx context.Context) setHealth {
-		return fetchSetHealth(ctx, set.Port, set.Token, set.Open, names, m.version)
+		return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, names, m.version)
 	})
 	view.Running = status.Running
 	writeJSON(req.w, http.StatusOK, view)

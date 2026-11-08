@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
@@ -106,7 +107,7 @@ func (t *bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 // fetchSetHealth спрашивает list_servers у самого набора. Сетевая ошибка —
 // healthy:null: это «неизвестно», а не «сломан».
-func fetchSetHealth(ctx context.Context, port int, token string, open bool, names []string, version string) setHealth {
+func fetchSetHealth(ctx context.Context, host string, port int, token string, open bool, names []string, version string) setHealth {
 	out := setHealth{Running: true, Servers: make([]serverHealth, len(names))}
 	for i, name := range names {
 		out.Servers[i] = serverHealth{Name: name}
@@ -120,7 +121,7 @@ func fetchSetHealth(ctx context.Context, port int, token string, open bool, name
 	}
 	client := mcp.NewClient(&mcp.Implementation{Name: "mcprig", Version: version}, nil)
 	transport := &mcp.StreamableClientTransport{
-		Endpoint:             "http://127.0.0.1:" + strconv.Itoa(port) + "/mcp",
+		Endpoint:             "http://" + net.JoinHostPort(host, strconv.Itoa(port)) + "/mcp",
 		HTTPClient:           &http.Client{Transport: &bearerTransport{token: token}, Timeout: healthTimeout},
 		DisableStandaloneSSE: true,
 	}

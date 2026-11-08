@@ -63,8 +63,10 @@ type Runtime struct {
 	dataDir string
 	cliPath string
 	bindIP  string
-	sec     *Secrets
-	log     *slog.Logger
+	// probeAddr — адрес проб: bindIP, а для «все интерфейсы» — loopback.
+	probeAddr string
+	sec       *Secrets
+	log       *slog.Logger
 
 	mu     sync.Mutex
 	procs  map[string]*process
@@ -78,15 +80,28 @@ func NewRuntime(dataDir, cliPath, bindIP string, sec *Secrets, log *slog.Logger)
 		log = slog.Default()
 	}
 	return &Runtime{
-		dataDir: dataDir,
-		cliPath: cliPath,
-		bindIP:  bindIP,
-		sec:     sec,
-		log:     log,
-		procs:   map[string]*process{},
-		rings:   map[string]*ring{},
-		locks:   map[string]*sync.Mutex{},
+		dataDir:   dataDir,
+		cliPath:   cliPath,
+		bindIP:    bindIP,
+		probeAddr: loopbackAddr(bindIP),
+		sec:       sec,
+		log:       log,
+		procs:     map[string]*process{},
+		rings:     map[string]*ring{},
+		locks:     map[string]*sync.Mutex{},
 	}
+}
+
+// loopbackAddr — адрес, по которому пробы достают набор: сам bindIP, а для
+// «все интерфейсы» — соответствующий loopback.
+func loopbackAddr(bindIP string) string {
+	switch bindIP {
+	case "", "0.0.0.0":
+		return "127.0.0.1"
+	case "::", "[::]":
+		return "::1"
+	}
+	return bindIP
 }
 
 func (rt *Runtime) setLock(id string) *sync.Mutex {
@@ -180,7 +195,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 
 	go rt.wait(set.ID, set, servers, p, logFile)
 
-	if !waitPort(set.Port, readyBudget) {
+	if !waitPort(rt.probeAddr, set.Port, readyBudget) {
 		rt.mu.Lock()
 		p.stopping = true
 		p.err = fmt.Sprintf("порт %d не слушает", set.Port)
@@ -462,8 +477,8 @@ func managerEnv(sec *Secrets) func(*config.Server) []string {
 	}
 }
 
-func waitPort(port int, budget time.Duration) bool {
-	addr := "127.0.0.1:" + strconv.Itoa(port)
+func waitPort(host string, port int, budget time.Duration) bool {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	deadline := time.Now().Add(budget)
 	for {
 		conn, err := net.DialTimeout("tcp", addr, time.Second)
