@@ -45,13 +45,42 @@ path,authToken,allowedHosts}`, `healthMonitor`, `requestTimeout`, обе фор�
 
 ## Статус
 
-Этап 1 из 6. Готово: чтение `servers.json` (`internal/config`), подключение к
-downstream по stdio и HTTP (`internal/downstream`). В работе: мета-тулы
-(`internal/mcpserver`), реестр менеджера (`internal/registry`), HTTP-транспорт
-набора (`internal/httplisten`).
+Этапы 0–3 приняты: чтение `servers.json`, коннект по stdio и HTTP, четыре
+мета-тула с permissions, HTTP-транспорт набора (stateless, 2026-07-28 с
+фолбэком), клиентский OAuth для серверов с 401/403. В работе: менеджер
+(супервизия наборов и HTTP API) — этап 4.
 
 Этапы и ворота — `docs/plan.md`, что делается сейчас — `docs/CURRENT-GOAL.md`.
 Контракт, который переносим с TS-версии, — `docs/reference/ts-manager-contract.md`.
+
+## Установка и подключение
+
+Три способа, подробно — `docs/decisions/0002-installation.md`.
+
+**Сервис (HTTP).** Один набор — один юнит `mcprig-set@<набор>.service`,
+конфиг в `~/.config/mcprig/sets/<набор>/servers.json`, ключ в env-файле рядом.
+Клиент подключается к `http://127.0.0.1:9100/mcp` с `Authorization: Bearer …`.
+
+**Контейнер.** Для наборов из HTTP-серверов; stdio-серверы внутри образа есть
+только те, что мы положили (образ `full` с node и python).
+
+**Клиент.** `mcprig stdio --config <servers.json>` — клиент запускает бинарник
+сам, ни порта, ни ключа. Для opencode:
+
+```jsonc
+// ~/.config/opencode/opencode.jsonc
+"mcp": { "servers": { "demo": {
+  "type": "local",
+  "command": ["mcprig", "stdio", "--config", "/home/me/.config/mcprig/sets/demo/servers.json"]
+} } }
+```
+
+Для общего процесса на несколько клиентов — `serve` и `type: "remote"` с
+`headers.Authorization`. Ключ выдаёт панель или реестр; в API и логах он есть
+только префиксом.
+
+Секреты в `servers.json` не пишем: `${VAR}` раскрывается из окружения набора,
+а разворачивание — `docs/reference/ts-manager-contract.md`.
 
 ## Сборка
 
@@ -59,7 +88,7 @@ downstream по stdio и HTTP (`internal/downstream`). В работе: мета
 go build ./...
 go test ./...
 go build -o mcprig ./cmd/mcp-manager
-./mcprig version
+./mcprig -version
 ```
 
 Нужен Go 1.25 (модуль просит 1.25.0, `GOTOOLCHAIN=auto` подтянет сам).
