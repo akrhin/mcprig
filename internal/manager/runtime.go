@@ -195,7 +195,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 
 	go rt.wait(set.ID, set, servers, p, logFile)
 
-	if !waitPort(rt.probeAddr, set.Port, readyBudget) {
+	if !waitPort(rt.probeAddr, set.Port, readyBudget, p.done) {
 		rt.mu.Lock()
 		p.stopping = true
 		p.err = fmt.Sprintf("порт %d не слушает", set.Port)
@@ -410,7 +410,8 @@ func (rt *Runtime) ServerLogs(id, server string, lines int) []string {
 	return out
 }
 
-// Close гасит все наборы, по 3 с на процесс.
+// Close гасит все наборы, по 3 с на процесс. Блокировку набора ждёт, а не
+// пропускает: иначе набор, который в этот момент стартует, остался бы сиротой.
 func (rt *Runtime) Close() {
 	rt.mu.Lock()
 	rt.closed = true
@@ -422,11 +423,28 @@ func (rt *Runtime) Close() {
 	sort.Strings(ids)
 	for _, id := range ids {
 		l := rt.setLock(id)
-		if !l.TryLock() {
-			continue // набор уже стартует/гаснет сам
+		acquired := make(chan struct{})
+		go func() {
+			l.Lock()
+			close(acquired)
+		}()
+		timedOut := false
+		select {
+		case <-acquired:
+		case <-time.After(readyBudget + stopGrace):
+			timedOut = true
+			rt.log.Warn("набор не отдал блокировку при остановке — гашу по известному pid", "set", id)
 		}
 		if p := rt.proc(id); p != nil {
 			rt.kill(p, closeGrace)
+		}
+		if timedOut {
+			// Старт ещё держит лок: отпустим его из горутины, когда закончит.
+			go func() {
+				<-acquired
+				l.Unlock()
+			}()
+			continue
 		}
 		l.Unlock()
 	}
@@ -477,7 +495,9 @@ func managerEnv(sec *Secrets) func(*config.Server) []string {
 	}
 }
 
-func waitPort(host string, port int, budget time.Duration) bool {
+// waitPort ждёт слушателя; done закрывается, когда процесс умер, — ждать
+// оставшийся бюджет незачем.
+func waitPort(host string, port int, budget time.Duration, done <-chan struct{}) bool {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	deadline := time.Now().Add(budget)
 	for {
@@ -485,6 +505,11 @@ func waitPort(host string, port int, budget time.Duration) bool {
 		if err == nil {
 			conn.Close()
 			return true
+		}
+		select {
+		case <-done:
+			return false
+		default:
 		}
 		if time.Now().After(deadline) {
 			return false
