@@ -9,14 +9,39 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/sintez/mcp-manager/internal/config"
 	"github.com/sintez/mcp-manager/internal/downstream"
+	"github.com/sintez/mcp-manager/internal/stats"
 )
+
+const (
+	// healthTTL keeps one probe result (including a failure) before re-checking.
+	healthTTL = 15 * time.Second
+	// healthTimeout bounds one server's status probe.
+	healthTimeout = 5 * time.Second
+	// closeWait bounds how long Close waits for an in-flight connect.
+	closeWait = 5 * time.Second
+	// maxPages stops a server that keeps handing out cursors.
+	maxPages = 20
+	// maxProbes caps concurrent status probes in one list_servers call.
+	maxProbes = 8
+)
+
+var (
+	errClosed    = errors.New("менеджер закрыт")
+	errNoTargets = errors.New("нужен параметр server или servers")
+)
+
+// probeSlots bounds how many servers one list_servers probes at once.
+var probeSlots = make(chan struct{}, maxProbes)
 
 // dialer opens one downstream session. Tests point it at in-memory transports.
 type dialer func(context.Context, *config.Server) (*mcp.ClientSession, error)
@@ -27,11 +52,28 @@ type Manager struct {
 	version string
 	dial    dialer
 	entries []*entry
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	// Stats, when set, counts every downstream invocation per client and
+	// tool. The panel reads the recorder; the proxy works without it.
+	Stats *stats.Recorder
 }
 
 type entry struct {
 	srv  *config.Server
 	conn conn
+
+	healthMu sync.Mutex
+	health   healthState
+}
+
+// healthState is one cached probe result.
+type healthState struct {
+	at      time.Time
+	ok      bool
+	errText string
 }
 
 // New builds a manager. Nothing is connected until a tool needs a server.
@@ -50,14 +92,16 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 			return conn.Connect(ctx, srv)
 		},
 	}
+	m.ctx, m.cancel = context.WithCancel(context.Background())
 	for _, srv := range cfg.Servers {
 		m.entries = append(m.entries, &entry{srv: srv})
 	}
 	return m
 }
 
-// Close shuts every open downstream session.
+// Close cancels in-flight connects and shuts every open downstream session.
 func (m *Manager) Close() error {
+	m.cancel()
 	var errs []error
 	for _, e := range m.entries {
 		if err := e.conn.close(); err != nil {
@@ -81,10 +125,15 @@ func (m *Manager) Server() *mcp.Server {
 	}, m.listServers)
 	s.AddTool(&mcp.Tool{
 		Name: "list_commands",
-		Description: "List commands from a specific server, or from all servers when server is omitted. " +
-			"Triggers discovery if not yet loaded.",
+		Description: "List commands from one server (server) or several at once (servers). " +
+			"One of server or servers is required.",
 		InputSchema: objectSchema(map[string]any{
-			"server": map[string]any{"type": "string", "description": "Server name; omit to list every server"},
+			"server": map[string]any{"type": "string", "description": "Server name; returns an array of commands"},
+			"servers": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Server names; returns an object keyed by server name",
+			},
 		}),
 	}, m.listCommands)
 	s.AddTool(&mcp.Tool{
@@ -123,28 +172,40 @@ type listServersInput struct {
 }
 
 type serverInfo struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Type        string `json:"type"`
-	Enabled     bool   `json:"enabled"`
-	Healthy     bool   `json:"healthy"`
-	Error       string `json:"error,omitempty"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Type        string   `json:"type"`
+	Enabled     bool     `json:"enabled"`
+	Healthy     bool     `json:"healthy"`
+	Error       string   `json:"error,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
 }
 
 func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in listServersInput
-	if err := decodeArgs(req, &in); err != nil {
+	if err := strictArgs(req, &in, "", "filter"); err != nil {
 		return errResult(err)
+	}
+	// Filtering happens before any probe: a narrow filter must not dial the set.
+	targets := m.entries
+	if filter := strings.ToLower(in.Filter); filter != "" {
+		targets = nil
+		for _, e := range m.entries {
+			if matches(e.srv, filter) {
+				targets = append(targets, e)
+			}
+		}
 	}
 	out := struct {
 		Servers []serverInfo `json:"servers"`
+		Version string       `json:"version"`
 		PID     int          `json:"pid"`
-	}{Servers: make([]serverInfo, len(m.entries)), PID: os.Getpid()}
+	}{Servers: make([]serverInfo, len(targets)), Version: m.version, PID: os.Getpid()}
 
 	var wg sync.WaitGroup
-	for i, e := range m.entries {
+	for i, e := range targets {
 		wg.Add(1)
-		go func(i int, e *entry) {
+		go func() {
 			defer wg.Done()
 			healthy, errText := m.status(ctx, e)
 			out.Servers[i] = serverInfo{
@@ -154,108 +215,127 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 				Enabled:     e.srv.Enabled,
 				Healthy:     healthy,
 				Error:       errText,
+				Tags:        e.srv.Tags,
 			}
-		}(i, e)
+		}()
 	}
 	wg.Wait()
-
-	if in.Filter != "" {
-		filtered := make([]serverInfo, 0, len(out.Servers))
-		for _, s := range out.Servers {
-			if strings.Contains(strings.ToLower(s.Name+" "+s.Description), strings.ToLower(in.Filter)) {
-				filtered = append(filtered, s)
-			}
-		}
-		out.Servers = filtered
-	}
 	return jsonResult(out)
 }
 
-// status reports health; an enabled server is connected on first check.
+// matches reports whether name, description or a tag carries the filter.
+func matches(srv *config.Server, lowerFilter string) bool {
+	haystack := srv.Name + " " + srv.Description + " " + strings.Join(srv.Tags, " ")
+	return strings.Contains(strings.ToLower(haystack), lowerFilter)
+}
+
+// status reports health from the TTL cache or one bounded probe. A server
+// switched off on purpose is not unhealthy: nothing is dialed for it.
 func (m *Manager) status(ctx context.Context, e *entry) (bool, string) {
 	if e.srv.ConfigError != "" {
 		return false, e.srv.ConfigError
 	}
 	if !e.srv.Enabled {
-		return false, ""
+		return true, ""
 	}
-	if _, err := e.conn.session(ctx, m.dialFor(e.srv)); err != nil {
-		return false, err.Error()
+	e.healthMu.Lock()
+	h := e.health
+	e.healthMu.Unlock()
+	if !h.at.IsZero() && time.Since(h.at) < healthTTL {
+		return h.ok, h.errText
 	}
-	return true, ""
+
+	var ok bool
+	var errText string
+	if err := m.probe(ctx, e); err != nil {
+		errText = err.Error()
+	} else {
+		ok = true
+	}
+	e.healthMu.Lock()
+	e.health = healthState{at: time.Now(), ok: ok, errText: errText}
+	e.healthMu.Unlock()
+	return ok, errText
+}
+
+// probe connects with its own 5 s budget so one hung server cannot stall a list.
+func (m *Manager) probe(ctx context.Context, e *entry) error {
+	probeCtx, cancel := context.WithTimeout(ctx, healthTimeout)
+	defer cancel()
+	select {
+	case probeSlots <- struct{}{}:
+		defer func() { <-probeSlots }()
+	case <-probeCtx.Done():
+		return probeCtx.Err()
+	}
+	_, err := e.conn.session(probeCtx, m.dialFor(e.srv))
+	return err
 }
 
 // ─── list_commands ────────────────────────────────────────────────────────────
 
 type listCommandsInput struct {
-	Server string `json:"server,omitempty"`
+	Server  string   `json:"server,omitempty"`
+	Servers []string `json:"servers,omitempty"`
 }
 
 type commandInfo struct {
 	Server      string `json:"server"`
-	Command     string `json:"command"`
+	Name        string `json:"name"`
+	Command     string `json:"command"` // kept for older callers; same as name
 	Description string `json:"description,omitempty"`
 }
 
 func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in listCommandsInput
-	if err := decodeArgs(req, &in); err != nil {
+	if err := strictArgs(req, &in, "", "server", "servers"); err != nil {
 		return errResult(err)
 	}
-	var targets []*entry
-	if in.Server != "" {
-		e := m.find(in.Server)
-		if e == nil {
-			return errResult(fmt.Errorf("неизвестный сервер %q", in.Server))
+	switch {
+	case in.Server != "" && len(in.Servers) > 0:
+		return errResult(errors.New("укажи server или servers, не оба"))
+	case in.Server != "":
+		cmds, err := m.commandsOf(ctx, in.Server)
+		if err != nil {
+			return errResult(err)
 		}
-		if !usable(e.srv) {
-			return errResult(serverProblem(e.srv))
-		}
-		targets = []*entry{e}
-	} else {
-		for _, e := range m.entries {
-			if usable(e.srv) {
-				targets = append(targets, e)
-			}
-		}
-	}
-
-	perServer := make([][]commandInfo, len(targets))
-	errs := make([]error, len(targets))
-	var wg sync.WaitGroup
-	for i, e := range targets {
-		wg.Add(1)
-		go func(i int, e *entry) {
-			defer wg.Done()
-			sess, err := e.conn.session(ctx, m.dialFor(e.srv))
+		return jsonResult(cmds)
+	case len(in.Servers) > 0:
+		out := make(map[string][]commandInfo, len(in.Servers))
+		for _, name := range in.Servers {
+			cmds, err := m.commandsOf(ctx, name)
 			if err != nil {
-				errs[i] = err
-				return
+				return errResult(err)
 			}
-			res, err := sess.ListTools(ctx, nil)
-			if err != nil {
-				errs[i] = fmt.Errorf("%s: %w", e.srv.Name, err)
-				return
-			}
-			for _, tool := range res.Tools {
-				perServer[i] = append(perServer[i], commandInfo{Server: e.srv.Name, Command: tool.Name, Description: tool.Description})
-			}
-		}(i, e)
+			out[name] = cmds
+		}
+		return jsonResult(out)
 	}
-	wg.Wait()
+	return errResult(errNoTargets)
+}
 
-	var found error
-	for _, err := range errs {
-		found = errors.Join(found, err)
+func (m *Manager) commandsOf(ctx context.Context, name string) ([]commandInfo, error) {
+	e := m.find(name)
+	if e == nil {
+		return nil, fmt.Errorf("неизвестный сервер %q", name)
 	}
-	if found != nil {
-		return errResult(found)
+	if !usable(e.srv) {
+		return nil, serverProblem(e.srv)
 	}
-	out := make([]commandInfo, 0, len(targets))
-	for _, cmds := range perServer {
-		out = append(out, cmds...)
+	var tools []*mcp.Tool
+	err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
+		var err error
+		tools, err = listAllTools(ctx, sess)
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
-	return jsonResult(out)
+	out := make([]commandInfo, 0, len(tools))
+	for _, tool := range tools {
+		out = append(out, commandInfo{Server: name, Name: tool.Name, Command: tool.Name, Description: tool.Description})
+	}
+	return out, nil
 }
 
 // ─── describe_commands ────────────────────────────────────────────────────────
@@ -272,9 +352,14 @@ type commandSchema struct {
 	OutputSchema any    `json:"outputSchema,omitempty"`
 }
 
+type describeOut struct {
+	Commands []commandSchema `json:"commands"`
+	Missing  []string        `json:"missing"`
+}
+
 func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in describeCommandsInput
-	if err := decodeArgs(req, &in); err != nil {
+	if err := strictArgs(req, &in, "", "server", "command_names"); err != nil {
 		return errResult(err)
 	}
 	if in.Server == "" {
@@ -287,25 +372,28 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	if !usable(e.srv) {
 		return errResult(serverProblem(e.srv))
 	}
-	sess, err := e.conn.session(ctx, m.dialFor(e.srv))
+	var tools []*mcp.Tool
+	err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
+		var err error
+		tools, err = listAllTools(ctx, sess)
+		return err
+	})
 	if err != nil {
 		return errResult(err)
 	}
-	res, err := sess.ListTools(ctx, nil)
-	if err != nil {
-		return errResult(fmt.Errorf("%s: %w", e.srv.Name, err))
-	}
-	byName := make(map[string]*mcp.Tool, len(res.Tools))
-	for _, tool := range res.Tools {
+	byName := make(map[string]*mcp.Tool, len(tools))
+	for _, tool := range tools {
 		byName[tool.Name] = tool
 	}
-	out := make([]commandSchema, 0, len(in.CommandNames))
+	out := describeOut{Commands: make([]commandSchema, 0, len(in.CommandNames)), Missing: []string{}}
 	for _, name := range in.CommandNames {
 		tool := byName[name]
 		if tool == nil {
-			return errResult(fmt.Errorf("команда %q не найдена на сервере %q", name, in.Server))
+			// One absent name must not hide the schemas that do exist.
+			out.Missing = append(out.Missing, name)
+			continue
 		}
-		out = append(out, commandSchema{
+		out.Commands = append(out.Commands, commandSchema{
 			Name:         tool.Name,
 			Description:  tool.Description,
 			InputSchema:  tool.InputSchema,
@@ -325,7 +413,7 @@ type invokeCommandInput struct {
 
 func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in invokeCommandInput
-	if err := decodeArgs(req, &in); err != nil {
+	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "parameters"); err != nil {
 		return errResult(err)
 	}
 	if in.Server == "" {
@@ -346,25 +434,56 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 
 	args := any(map[string]any{})
-	if len(in.Parameters) > 0 {
-		if !strings.HasPrefix(strings.TrimSpace(string(in.Parameters)), "{") {
+	if trimmed := strings.TrimSpace(string(in.Parameters)); trimmed != "" && trimmed != "null" {
+		if !strings.HasPrefix(trimmed, "{") {
 			return errResult(errors.New("parameters: ожидался объект"))
 		}
 		args = in.Parameters
 	}
 
-	sess, err := e.conn.session(ctx, m.dialFor(e.srv))
-	if err != nil {
-		return errResult(err)
+	callCtx := ctx
+	if m.cfg.RequestTimeout > 0 {
+		var cancel context.CancelFunc
+		callCtx, cancel = context.WithTimeout(ctx, time.Duration(m.cfg.RequestTimeout)*time.Millisecond)
+		defer cancel()
 	}
-	res, err := sess.CallTool(ctx, &mcp.CallToolParams{Name: in.CommandName, Arguments: args})
+	var res *mcp.CallToolResult
+	start := time.Now()
+	err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
+		r, err := sess.CallTool(callCtx, &mcp.CallToolParams{Name: in.CommandName, Arguments: args})
+		res = r
+		return err
+	})
+	if m.Stats != nil {
+		m.Stats.Record(clientOf(req), e.srv.Name, in.CommandName, time.Since(start), err)
+	}
 	if err != nil {
-		return errResult(fmt.Errorf("%s: %w", e.srv.Name, err))
+		if callCtx.Err() == context.DeadlineExceeded {
+			return errResult(fmt.Errorf("таймаут вызова %d мс", m.cfg.RequestTimeout))
+		}
+		return errResult(err)
 	}
 	return res, nil
 }
 
 // ─── shared helpers ───────────────────────────────────────────────────────────
+
+// clientOf names the harness behind a call: the initialize handshake carries
+// clientInfo (name and version), so any client labels itself. A client that
+// sends nothing is "unknown" rather than a guess.
+func clientOf(req *mcp.CallToolRequest) string {
+	if req == nil || req.Session == nil {
+		return "unknown"
+	}
+	p := req.Session.InitializeParams()
+	if p == nil || p.ClientInfo == nil || p.ClientInfo.Name == "" {
+		return "unknown"
+	}
+	if p.ClientInfo.Version != "" {
+		return p.ClientInfo.Name + "/" + p.ClientInfo.Version
+	}
+	return p.ClientInfo.Name
+}
 
 func (m *Manager) find(name string) *entry {
 	for _, e := range m.entries {
@@ -375,8 +494,60 @@ func (m *Manager) find(name string) *entry {
 	return nil
 }
 
+// dialFor merges the manager context into the dial so Close aborts a connect
+// that has not finished yet.
 func (m *Manager) dialFor(srv *config.Server) func(context.Context) (*mcp.ClientSession, error) {
-	return func(ctx context.Context) (*mcp.ClientSession, error) { return m.dial(ctx, srv) }
+	return func(ctx context.Context) (*mcp.ClientSession, error) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		stop := context.AfterFunc(m.ctx, cancel)
+		defer stop()
+		return m.dial(ctx, srv)
+	}
+}
+
+// withSession runs fn on the server's session. A dead cached session
+// (ErrConnectionClosed) is closed and dialed once more; a second failure is
+// returned with its cause.
+func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.ClientSession) error) error {
+	sess, err := e.conn.session(ctx, m.dialFor(e.srv))
+	if err != nil {
+		return fmt.Errorf("%s: %w", e.srv.Name, err)
+	}
+	err = fn(sess)
+	if !errors.Is(err, mcp.ErrConnectionClosed) {
+		if err != nil {
+			return fmt.Errorf("%s: %w", e.srv.Name, err)
+		}
+		return nil
+	}
+	e.conn.reset()
+	sess, err = e.conn.session(ctx, m.dialFor(e.srv))
+	if err != nil {
+		return fmt.Errorf("%s: переподключение после обрыва: %w", e.srv.Name, err)
+	}
+	if err := fn(sess); err != nil {
+		return fmt.Errorf("%s: после переподключения: %w", e.srv.Name, err)
+	}
+	return nil
+}
+
+// listAllTools reads every page, capped so a looping server cannot hang us.
+func listAllTools(ctx context.Context, sess *mcp.ClientSession) ([]*mcp.Tool, error) {
+	var tools []*mcp.Tool
+	cursor := ""
+	for page := 0; page < maxPages; page++ {
+		res, err := sess.ListTools(ctx, &mcp.ListToolsParams{Cursor: cursor})
+		if err != nil {
+			return nil, err
+		}
+		tools = append(tools, res.Tools...)
+		if res.NextCursor == "" {
+			return tools, nil
+		}
+		cursor = res.NextCursor
+	}
+	return tools, nil
 }
 
 func usable(srv *config.Server) bool { return srv.ConfigError == "" && srv.Enabled }
@@ -412,9 +583,29 @@ func objectSchema(props map[string]any, required ...string) map[string]any {
 	return s
 }
 
-func decodeArgs(req *mcp.CallToolRequest, v any) error {
+// strictArgs rejects unknown top-level keys before decoding into v. The hint,
+// when set, tells the caller where those keys belong instead.
+func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string) error {
 	if req == nil || req.Params == nil || len(req.Params.Arguments) == 0 {
 		return nil
+	}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(req.Params.Arguments, &keys); err != nil {
+		return fmt.Errorf("аргументы: %w", err)
+	}
+	var extra []string
+	for key := range keys {
+		if !slices.Contains(allowed, key) {
+			extra = append(extra, key)
+		}
+	}
+	if len(extra) > 0 {
+		sort.Strings(extra)
+		message := "лишние ключи: " + strings.Join(extra, ", ")
+		if hint != "" {
+			message += " — " + hint
+		}
+		return errors.New(message)
 	}
 	if err := json.Unmarshal(req.Params.Arguments, v); err != nil {
 		return fmt.Errorf("аргументы: %w", err)
@@ -458,7 +649,7 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
-		return nil, errors.New("менеджер закрыт")
+		return nil, errClosed
 	}
 	if c.sess != nil {
 		s := c.sess
@@ -478,33 +669,64 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 	c.try = a
 	c.mu.Unlock()
 
-	sess, err := dial(ctx)
-	c.mu.Lock()
-	a.sess, a.err = sess, err
-	if err == nil {
-		c.sess = sess
+	// The connect belongs to the manager, not to the caller: cancelling one
+	// waiting request must not abort a connect another request is waiting on.
+	go func() {
+		sess, err := dial(context.WithoutCancel(ctx))
+		c.mu.Lock()
+		if c.closed {
+			a.sess, a.err = nil, errClosed
+		} else {
+			a.sess, a.err = sess, err
+			if err == nil {
+				c.sess = sess
+			}
+		}
+		closed := c.closed
+		c.try = nil
+		c.mu.Unlock()
+		close(a.done)
+		if closed && sess != nil {
+			_ = sess.Close()
+		}
+	}()
+
+	select {
+	case <-a.done:
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-	c.try = nil
-	c.mu.Unlock()
-	close(a.done)
-	return sess, err
+	return a.sess, a.err
 }
 
+// reset drops the cached session; the next call dials again.
+func (c *conn) reset() {
+	c.mu.Lock()
+	s := c.sess
+	c.sess = nil
+	c.mu.Unlock()
+	if s != nil {
+		_ = s.Close()
+	}
+}
+
+// close marks the conn closed, waits at most closeWait for an in-flight
+// connect and closes the session.
 func (c *conn) close() error {
 	c.mu.Lock()
 	c.closed = true
 	a := c.try
+	c.mu.Unlock()
+	if a != nil {
+		select {
+		case <-a.done:
+		case <-time.After(closeWait):
+		}
+	}
+	c.mu.Lock()
 	s := c.sess
 	c.sess = nil
 	c.mu.Unlock()
-	if a != nil {
-		// A connect was in flight; take whatever it produced.
-		<-a.done
-		c.mu.Lock()
-		s = c.sess
-		c.sess = nil
-		c.mu.Unlock()
-	}
 	if s == nil {
 		return nil
 	}
