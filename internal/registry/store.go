@@ -427,6 +427,11 @@ func (s *Store) AddSet(raw json.RawMessage) (*Set, error) {
 	if s.setLocked(set.ID) != nil {
 		return nil, fmt.Errorf("набор %s уже есть", set.ID)
 	}
+	// Явный порт проверяем в системе и при создании: иначе набор запишется и
+	// упадёт на старте.
+	if raw, ok := in["port"]; ok && !isNull(raw) && portBusy(set.Port) {
+		return nil, fmt.Errorf("порт %d занят процессом", set.Port)
+	}
 	if !set.Open {
 		set.Keys = []Key{newKey(time.Now().UTC().Format(time.RFC3339))}
 		set.Token = set.Keys[0].Token

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -477,6 +478,28 @@ func TestUpdateSetRejectsBusyPort(t *testing.T) {
 	if msg := decode[map[string]string](t, w)["error"]; !strings.Contains(msg, "занят процессом") {
 		t.Fatalf("ошибка = %q", msg)
 	}
+}
+
+// Создание с явным занятым портом отбивается 409, а не падением на старте.
+func TestAddSetRejectsBusyPort(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+
+	busy := freePort(t)
+	ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(busy)))
+	if err != nil {
+		t.Fatalf("занять порт %d: %v", busy, err)
+	}
+	defer ln.Close()
+
+	w := e.do(t, http.MethodPost, "/api/sets", map[string]any{"name": "busy", "servers": []string{"a"}, "port": busy})
+	status(t, w, http.StatusConflict)
+	if msg := decode[map[string]string](t, w)["error"]; !strings.Contains(msg, "занят процессом") {
+		t.Fatalf("ошибка = %q", msg)
+	}
+
+	w = e.do(t, http.MethodPost, "/api/sets", map[string]any{"name": "free", "servers": []string{"a"}, "port": freePort(t)})
+	status(t, w, http.StatusCreated)
 }
 
 // Перезапуск сервера внутри набора не существует: остаётся наборный.

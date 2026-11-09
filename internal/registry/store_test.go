@@ -3,14 +3,35 @@ package registry
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 )
+
+// freePort ищет свободный порт диапазона наборов: 9100 может занимать живой
+// стенд или другой пакет тестов.
+func freePort(t *testing.T, skip ...int) int {
+	t.Helper()
+	for port := FirstPort; port <= LastPort; port++ {
+		if slices.Contains(skip, port) {
+			continue
+		}
+		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+		if err != nil {
+			continue
+		}
+		ln.Close()
+		return port
+	}
+	t.Fatal("нет свободного порта в диапазоне наборов")
+	return 0
+}
 
 func openStore(t *testing.T, dir string) *Store {
 	t.Helper()
@@ -53,7 +74,8 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	store := openStore(t, dir)
 	addServer(t, store, `{"name":"fs","command":["npx","-y","server-fs"]}`)
-	addSet(t, store, `{"name":"demo","servers":["fs"],"port":9100}`)
+	port := freePort(t)
+	addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(port)+`}`)
 
 	path := filepath.Join(dir, RegistryFile)
 	info, err := os.Stat(path)
@@ -82,7 +104,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if set == nil {
 		t.Fatal("набор demo не пережил перезагрузку")
 	}
-	if set.Port != 9100 || len(set.Servers) != 1 || set.Servers[0] != "fs" {
+	if set.Port != port || len(set.Servers) != 1 || set.Servers[0] != "fs" {
 		t.Errorf("набор demo после загрузки: %+v", set)
 	}
 	if len(set.Keys) != 1 || set.Token != set.Keys[0].Token {
@@ -116,7 +138,7 @@ func TestKeysSingleActive(t *testing.T) {
 	dir := t.TempDir()
 	store := openStore(t, dir)
 	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
-	first := addSet(t, store, `{"name":"demo","servers":["fs"],"port":9100}`)
+	first := addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(freePort(t))+`}`)
 	if len(first.Keys) != 1 || len(first.Token) != 48 || first.Token != first.Keys[0].Token {
 		t.Fatalf("первый ключ: %+v", first)
 	}
@@ -163,19 +185,25 @@ func TestPortRange(t *testing.T) {
 	if _, err := store.AddSet(json.RawMessage(`{"name":"low","servers":["fs"],"port":9099}`)); err == nil {
 		t.Error("порт 9099 принят, а должен быть отвергнут")
 	}
-	addSet(t, store, `{"name":"demo","servers":["fs"],"port":9100}`)
-	addSet(t, store, `{"name":"second","servers":["fs"],"port":9101}`)
+	first, second := freePort(t), 0
+	second = freePort(t, first)
+	addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(first)+`}`)
+	addSet(t, store, `{"name":"second","servers":["fs"],"port":`+strconv.Itoa(second)+`}`)
 
 	port, err := store.AllocatePort()
 	if err != nil {
 		t.Fatalf("AllocatePort: %v", err)
 	}
-	if port == 9100 || port == 9101 || port < FirstPort || port > LastPort {
-		t.Errorf("AllocatePort = %d, ждали свободный порт вне 9100 и 9101", port)
+	if port == first || port == second || port < FirstPort || port > LastPort {
+		t.Errorf("AllocatePort = %d, ждали свободный порт вне %d и %d", port, first, second)
 	}
 
-	// Занять остаток диапазона: свободных портов быть не должно.
-	for p := 9102; p <= LastPort; p++ {
+	// Занять остаток диапазона: свободных портов быть не должно. Занятые в
+	// системе порты пропускаем — их и AllocatePort не выдаст.
+	for p := FirstPort; p <= LastPort; p++ {
+		if p == first || p == second || portBusy(p) {
+			continue
+		}
 		addSet(t, store, `{"name":"fill`+strconv.Itoa(p)+`","servers":["fs"],"port":`+strconv.Itoa(p)+`}`)
 	}
 	if _, err := store.AllocatePort(); err == nil {
@@ -206,7 +234,7 @@ func TestDeleteServerStripsSets(t *testing.T) {
 	store := openStore(t, dir)
 	addServer(t, store, `{"name":"a","command":["x"]}`)
 	addServer(t, store, `{"name":"b","command":["y"]}`)
-	addSet(t, store, `{"name":"demo","servers":["a","b"],"port":9100}`)
+	addSet(t, store, `{"name":"demo","servers":["a","b"],"port":`+strconv.Itoa(freePort(t))+`}`)
 
 	if err := store.DeleteServer("a"); err != nil {
 		t.Fatalf("DeleteServer: %v", err)
@@ -227,7 +255,7 @@ func TestDeleteServerStripsSets(t *testing.T) {
 func TestPublicSetHidesTokens(t *testing.T) {
 	store := openStore(t, t.TempDir())
 	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
-	set := addSet(t, store, `{"name":"demo","servers":["fs"],"port":9100}`)
+	set := addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(freePort(t))+`}`)
 	token := set.Token
 
 	public := PublicSet(store.Set("demo"))
@@ -290,7 +318,7 @@ func TestImport(t *testing.T) {
 		t.Errorf("повторный импорт: added=%v skipped=%d", added, len(skipped))
 	}
 
-	addSet(t, store, `{"name":"demo","servers":["arr","obj"],"port":9100}`)
+	addSet(t, store, `{"name":"demo","servers":["arr","obj"],"port":`+strconv.Itoa(freePort(t))+`}`)
 	exported, err := store.ExportSet("demo")
 	if err != nil {
 		t.Fatalf("ExportSet: %v", err)
@@ -425,8 +453,10 @@ func TestUpdateKeepsEnabled(t *testing.T) {
 func TestCanServe(t *testing.T) {
 	store := openStore(t, t.TempDir())
 	addServer(t, store, `{"name":"fs","command":["x"]}`)
-	keyed := addSet(t, store, `{"name":"keyed","servers":["fs"],"port":9101}`)
-	open := addSet(t, store, `{"name":"open","servers":["fs"],"port":9102,"open":true}`)
+	keyedPort := freePort(t)
+	openPort := freePort(t, keyedPort)
+	keyed := addSet(t, store, `{"name":"keyed","servers":["fs"],"port":`+strconv.Itoa(keyedPort)+`}`)
+	open := addSet(t, store, `{"name":"open","servers":["fs"],"port":`+strconv.Itoa(openPort)+`,"open":true}`)
 	if !CanServe(keyed) || !CanServe(open) {
 		t.Fatal("набор с активным ключом или open должен стартовать")
 	}
@@ -454,7 +484,7 @@ func TestFailedWriteKeepsMemory(t *testing.T) {
 	if _, err := store.AddServer(json.RawMessage(`{"name":"lost","command":["x"]}`)); err == nil {
 		t.Fatal("запись в каталог только на чтение должна падать")
 	}
-	if _, err := store.AddSet(json.RawMessage(`{"name":"lost","servers":["keep"],"port":9150}`)); err == nil {
+	if _, err := store.AddSet(json.RawMessage(`{"name":"lost","servers":["keep"],"port":` + strconv.Itoa(freePort(t)) + `}`)); err == nil {
 		t.Fatal("запись набора в каталог только на чтение должна падать")
 	}
 	if added, skipped := store.Import(map[string]json.RawMessage{
@@ -472,7 +502,7 @@ func TestFailedWriteKeepsMemory(t *testing.T) {
 func TestSetSnapshots(t *testing.T) {
 	store := openStore(t, t.TempDir())
 	addServer(t, store, `{"name":"fs","command":["x"]}`)
-	addSet(t, store, `{"name":"demo","servers":["fs"],"port":9100}`)
+	addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(freePort(t))+`}`)
 
 	got := store.Set("demo")
 	got.Name = "hacked"
@@ -491,17 +521,18 @@ func TestSetValidation(t *testing.T) {
 	store := openStore(t, t.TempDir())
 	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
 
+	taken := freePort(t)
 	cases := []struct {
 		name string
 		body string
 	}{
-		{"без серверов", `{"name":"demo","servers":[],"port":9101}`},
-		{"сервер не в реестре", `{"name":"demo","servers":["nope"],"port":9102}`},
-		{"autostart не bool", `{"name":"demo","servers":["fs"],"port":9103,"autostart":"true"}`},
-		{"open не bool", `{"name":"demo","servers":["fs"],"port":9104,"open":1}`},
-		{"порт занят", `{"name":"demo","servers":["fs"],"port":9100}`},
+		{"без серверов", `{"name":"demo","servers":[]}`},
+		{"сервер не в реестре", `{"name":"demo","servers":["nope"]}`},
+		{"autostart не bool", `{"name":"demo","servers":["fs"],"autostart":"true"}`},
+		{"open не bool", `{"name":"demo","servers":["fs"],"open":1}`},
+		{"порт занят", `{"name":"demo","servers":["fs"],"port":` + strconv.Itoa(taken) + `}`},
 	}
-	addSet(t, store, `{"name":"taken","servers":["fs"],"port":9100}`)
+	addSet(t, store, `{"name":"taken","servers":["fs"],"port":`+strconv.Itoa(taken)+`}`)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := store.AddSet(json.RawMessage(tc.body)); err == nil {
@@ -514,7 +545,7 @@ func TestSetValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateSet: %v", err)
 	}
-	if set.ID != "taken" || set.Port != 9100 || len(set.Keys) != 1 {
+	if set.ID != "taken" || set.Port != taken || len(set.Keys) != 1 {
 		t.Errorf("UpdateSet потерял поля: %+v", set)
 	}
 }
