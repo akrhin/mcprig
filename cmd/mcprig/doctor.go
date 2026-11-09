@@ -69,6 +69,10 @@ func runDoctor(args []string) error {
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	// env панели читаем до сборки отчёта: в нём порт панели и пароль,
+	// а порядок «сначала окружение, потом значения по умолчанию» важен.
+	envLine, haveEnv := loadPanelEnv(filepath.Dir(*cfgPath))
+	_ = envLine
 	rep := buildDoctorReport(doctorOptions{
 		ConfigPath: *cfgPath,
 		DataDir:    stateDir(),
@@ -79,7 +83,7 @@ func runDoctor(args []string) error {
 		LastPort:   registry.LastPort,
 		Version:    version,
 		Executable: executablePath(),
-	})
+	}, envLine, haveEnv)
 
 	var out []byte
 	if *asJSON {
@@ -100,7 +104,7 @@ func runDoctor(args []string) error {
 	return nil
 }
 
-func buildDoctorReport(o doctorOptions) doctorReport {
+func buildDoctorReport(o doctorOptions, envLine doctorLine, haveEnv bool) doctorReport {
 	rep := doctorReport{
 		Version: []doctorLine{{OK: true, Text: fmt.Sprintf("версия %s (%s)", o.Version, o.Executable)}},
 	}
@@ -108,7 +112,13 @@ func buildDoctorReport(o doctorOptions) doctorReport {
 	var scanRaw []byte
 	rep.Config, scanRaw = checkConfig(o.ConfigPath, reg, regRaw)
 	rep.Sets, rep.Keys = checkSets(reg, regErr, o.DataDir, o.BindIP)
-	rep.Secrets = checkSecrets(scanRaw, o.DataDir)
+	if haveEnv {
+		// env панели — документированное место для секретов; без него doctor
+		// из голого шелла показывал бы все имена как проблемы.
+		rep.Secrets = append([]doctorLine{envLine}, checkSecrets(scanRaw, o.DataDir)...)
+	} else {
+		rep.Secrets = checkSecrets(scanRaw, o.DataDir)
+	}
 	rep.Services = checkServices(o, reg, regErr)
 
 	for _, lines := range [][]doctorLine{rep.Version, rep.Config, rep.Sets, rep.Keys, rep.Secrets, rep.Services} {
@@ -268,6 +278,35 @@ func checkSets(reg *registry.Data, regErr error, dataDir, bindIP string) (sets, 
 		sets = append(sets, doctorLine{true, fmt.Sprintf("%s: порт %d, %s, /healthz 200", set.ID, set.Port, state)})
 	}
 	return sets, keys
+}
+
+// loadPanelEnv читает <dir>/env рядом с конфигом и добавляет недостающие
+// переменные в окружение процесса. Значения наружу не печатаются.
+func loadPanelEnv(dir string) (doctorLine, bool) {
+	path := filepath.Join(dir, "env")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return doctorLine{}, false
+	}
+	n := 0
+	for _, raw := range strings.Split(string(body), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimPrefix(line, "export ")
+		name, value, found := strings.Cut(line, "=")
+		if !found || name == "" {
+			continue
+		}
+		if _, set := os.LookupEnv(name); set {
+			continue
+		}
+		if err := os.Setenv(name, strings.Trim(value, `"'`)); err == nil {
+			n++
+		}
+	}
+	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d переменных", path, n)}, true
 }
 
 func checkSecrets(raw []byte, dataDir string) []doctorLine {

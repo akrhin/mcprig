@@ -142,7 +142,7 @@ func TestBuildDoctorReportGreen(t *testing.T) {
 		LastPort:   port,
 		Version:    "test",
 		Executable: "/bin/mcprig",
-	})
+	}, doctorLine{}, false)
 	if !rep.OK || rep.Problems != 0 {
 		t.Fatalf("ожидался зелёный отчёт, проблем %d:\n%s", rep.Problems, renderDoctor(rep))
 	}
