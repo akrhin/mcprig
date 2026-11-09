@@ -41,3 +41,51 @@ func TestListCommandsPartialFailure(t *testing.T) {
 		t.Fatalf("все упали — ожидалась ошибка, получили %s", resultText(t, all))
 	}
 }
+
+// prefix keeps only names starting with it, in both forms, without touching
+// the cache used by later calls.
+func TestListCommandsPrefixFilter(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha"), stdio("beta")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	single := call(t, cs, "list_commands", map[string]any{"server": "alpha", "prefix": "DA"})
+	var one []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(resultText(t, single)), &one); err != nil {
+		t.Fatalf("ответ не массив: %v", err)
+	}
+	if len(one) != 1 || one[0].Name != "danger-zone" {
+		t.Fatalf("prefix case-insensitive: got %+v", one)
+	}
+
+	multi := call(t, cs, "list_commands", map[string]any{
+		"servers": []string{"alpha", "beta"}, "prefix": "ec",
+	})
+	var many map[string][]struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(resultText(t, multi)), &many); err != nil {
+		t.Fatalf("ответ не карта: %v", err)
+	}
+	for _, server := range []string{"alpha", "beta"} {
+		if len(many[server]) != 1 || many[server][0].Name != "echo" {
+			t.Fatalf("%s: prefix не отфильтровал: %+v", server, many[server])
+		}
+	}
+
+	if empty := call(t, cs, "list_commands", map[string]any{"server": "alpha", "prefix": "zzz"}); empty.IsError ||
+		strings.TrimSpace(resultText(t, empty)) != "[]" {
+		t.Fatalf("пустой фильтр должен дать [], получили %s", resultText(t, empty))
+	}
+
+	unfiltered := call(t, cs, "list_commands", map[string]any{"server": "alpha"})
+	var all []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(resultText(t, unfiltered)), &all); err != nil || len(all) != 3 {
+		t.Fatalf("кэш схем испорчен фильтром: %v, %s", err, resultText(t, unfiltered))
+	}
+}

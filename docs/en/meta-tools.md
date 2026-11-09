@@ -62,8 +62,12 @@ Input is one of two forms:
 | --- | --- |
 | `{"server": "alpha"}` | array of commands |
 | `{"servers": ["alpha", "beta"]}` | object keyed by server name, each value an array; a failed server's value is `{"error": "…"}` |
+| `{"prefix": "se"}` | with either form above: keep only command names starting with the prefix (case-insensitive); no match gives `[]` |
 | both | `Error: укажи server или servers, не оба` |
 | neither | `Error: нужен параметр server или servers` |
+
+`prefix` filters the response after the tool list is read, so the cached schemas
+stay intact and a later call without it sees every command.
 
 With `servers`, one `requestTimeout` bounds the whole call, not each server.
 Servers are queried in parallel, eight at a time.
@@ -134,6 +138,7 @@ Input:
 | `server` | required |
 | `command_name` | required |
 | `parameters` | optional object; `null` and an empty string mean `{}` |
+| `maxBytes` | optional cap on the returned answer in bytes; default 32768, at most 1048576; `0` means the default |
 
 Downstream arguments go **inside** `parameters`. Any other top-level key is an
 error, so a call cannot silently run with empty arguments:
@@ -147,6 +152,21 @@ The downstream result is returned as-is: `content`, `structuredContent` and
 (`ErrConnectionClosed`), the proxy reconnects once and repeats the call; a
 second failure is returned with its reason. `requestTimeout`, when set,
 applies to one call.
+
+An answer longer than `maxBytes` is cut at a UTF-8 boundary; the returned text
+ends with a marker naming the kept and full sizes and the file holding the full
+answer:
+
+```text
+…обрезанный текст
+[обрезано: 32768 из 149873 байт, полный ответ — /tmp/mcprig-data/tool-out/1f3c9a2b7d4e5f60.txt]
+```
+
+The full answer is written `0600` to
+`${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/<random>.txt`; the directory is created
+on first use. An answer within the cap is returned untouched — no file, no
+marker. A non-numeric or negative `maxBytes`, or one above 1048576, is an
+error like any other bad argument.
 
 ## Permissions
 

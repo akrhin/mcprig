@@ -156,13 +156,17 @@ func (m *Manager) Server() *mcp.Server {
 	s.AddTool(&mcp.Tool{
 		Name: "list_commands",
 		Description: "List commands from one server (server) or several at once (servers). " +
-			"One of server or servers is required.",
+			"One of server or servers is required. Use prefix to keep only tool names starting with it.",
 		InputSchema: objectSchema(map[string]any{
 			"server": map[string]any{"type": "string", "description": "Server name; returns an array of commands"},
 			"servers": map[string]any{
 				"type":        "array",
 				"items":       map[string]any{"type": "string"},
 				"description": "Server names; returns an object keyed by server name",
+			},
+			"prefix": map[string]any{
+				"type":        "string",
+				"description": "Optional: keep only commands whose name starts with this prefix (case-insensitive)",
 			},
 		}),
 	}, m.listCommands)
@@ -181,7 +185,7 @@ func (m *Manager) Server() *mcp.Server {
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_command",
 		Description: "Execute a command from a specific server (auto-discovers if needed). " +
-			"This is a wrapper tool: keep only server and command_name at the top level, " +
+			"This is a wrapper tool: keep only server, command_name and maxBytes at the top level, " +
 			"and put downstream tool inputs inside parameters.",
 		InputSchema: objectSchema(map[string]any{
 			"server":       map[string]any{"type": "string", "description": "Server name"},
@@ -189,6 +193,10 @@ func (m *Manager) Server() *mcp.Server {
 			"parameters": map[string]any{
 				"type":        "object",
 				"description": "Optional downstream command input object. Put the target command inputs here, not alongside server or command_name.",
+			},
+			"maxBytes": map[string]any{
+				"type":        "integer",
+				"description": "Optional: cap the returned answer at this many bytes (default 32768, at most 1048576). A longer answer is cut and the full one is saved to a file named in the marker.",
 			},
 		}, "server", "command_name"),
 	}, m.invokeCommand)
@@ -307,6 +315,7 @@ func (m *Manager) probe(ctx context.Context, e *entry) error {
 type listCommandsInput struct {
 	Server  string   `json:"server,omitempty"`
 	Servers []string `json:"servers,omitempty"`
+	Prefix  string   `json:"prefix,omitempty"`
 	Refresh bool     `json:"refresh,omitempty"`
 }
 
@@ -319,7 +328,7 @@ type commandInfo struct {
 
 func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in listCommandsInput
-	if err := strictArgs(req, &in, "", "server", "servers", "refresh"); err != nil {
+	if err := strictArgs(req, &in, "", "server", "servers", "prefix", "refresh"); err != nil {
 		return errResult(err)
 	}
 	if in.Refresh {
@@ -335,7 +344,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if err != nil {
 			return errResult(err)
 		}
-		return jsonResult(cmds)
+		return jsonResult(filterCommands(cmds, in.Prefix))
 	case len(in.Servers) > 0:
 		// Ответ остальных не теряется из-за одного упавшего: у него в карте
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
@@ -369,7 +378,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 					}
 					return
 				}
-				out[name] = cmds
+				out[name] = filterCommands(cmds, in.Prefix)
 			}(name)
 		}
 		wg.Wait()
@@ -492,11 +501,12 @@ type invokeCommandInput struct {
 	Server      string          `json:"server"`
 	CommandName string          `json:"command_name"`
 	Parameters  json.RawMessage `json:"parameters"`
+	MaxBytes    int             `json:"maxBytes,omitempty"`
 }
 
 func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in invokeCommandInput
-	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "parameters"); err != nil {
+	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "parameters", "maxBytes"); err != nil {
 		return errResult(err)
 	}
 	if in.Server == "" {
@@ -504,6 +514,16 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 	if in.CommandName == "" {
 		return errResult(errors.New("command_name обязателен"))
+	}
+	maxBytes := in.MaxBytes
+	if maxBytes < 0 {
+		return errResult(errors.New("maxBytes: не может быть отрицательным"))
+	}
+	if maxBytes > maxAllowedBytes {
+		return errResult(fmt.Errorf("maxBytes: допустимо не больше %d байт", maxAllowedBytes))
+	}
+	if maxBytes == 0 {
+		maxBytes = defaultMaxBytes
 	}
 	e := m.find(in.Server)
 	if e == nil {
@@ -552,7 +572,10 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		}
 		return errResult(err)
 	}
-	return res, nil
+	if res == nil {
+		return res, nil
+	}
+	return truncateResult(res, maxBytes)
 }
 
 // ─── shared helpers ───────────────────────────────────────────────────────────
