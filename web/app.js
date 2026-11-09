@@ -108,7 +108,9 @@
   function mockName(path) {
     if (path.indexOf('/api/state') === 0) { return 'state'; }
     if (path.indexOf('/api/env') === 0) { return 'env'; }
-    if (/\/servers$/.test(path)) { return 'set-servers'; }
+    // у каждого набора свой health: иначе статусы соседей переезжают между наборами
+    var m = /^\/api\/sets\/([^/]+)\/servers$/.exec(path);
+    if (m) { return 'set-' + m[1] + '-servers'; }
     if (/\/logs/.test(path)) { return 'logs'; }
     if (path.indexOf('/api/calls') === 0) { return 'calls'; }
     return 'state';
@@ -217,7 +219,8 @@
         } else {
           rate.textContent = state.text;
         }
-        a.title = (s.description || s.id) + ' · порт ' + s.port;
+        var names = s.servers || [];
+        a.title = (s.description || s.id) + ' · порт ' + s.port + (names.length ? ' · ' + names.join(', ') : '');
       });
   }
 
@@ -233,12 +236,25 @@
     return all;
   }
 
+  // Состав набора прямо в строке таблицы: до четырёх имён, остальные — «+N».
+  // Пятое имя уступает место «+N», иначе счётчик падает на вторую строку один.
+  function srvsChips(box, names) {
+    var shown = names.slice(0, names.length > 4 ? 3 : 4);
+    box.replaceChildren.apply(box, shown.map(function (n) { return el('span', 'srvchip', n); }));
+    if (names.length > shown.length) {
+      box.appendChild(el('span', 'srvchip more', '+' + (names.length - shown.length)));
+    }
+    if (!names.length) { box.appendChild(el('span', 'srvchip none', 'нет серверов')); }
+  }
+
   function renderSetsTable() {
     var agg = aggregated();
     sync($('sets-body'), st.sets, function (s) { return s.id; },
       function () {
         var tr = el('tr');
         var name = tr.appendChild(el('td', 'tb-name'));
+        name.appendChild(el('span', 'setlabel'));
+        name.appendChild(el('div', 'srvs'));
         tr.appendChild(el('td', 'portcell'));
         var cell = tr.appendChild(el('td'));
         var pill = cell.appendChild(el('span', 'state'));
@@ -255,7 +271,11 @@
         var state = setState(s);
         var pill = tr.children[2].querySelector('.state');
         tr.classList.toggle('row-warn', state.cls !== 'ok');
-        tr.children[0].textContent = s.name || s.id;
+        var cell = tr.children[0];
+        var names = s.servers || [];
+        cell.firstChild.textContent = s.name || s.id;
+        srvsChips(cell.querySelector('.srvs'), names);
+        cell.title = names.length ? names.join(', ') : 'серверов нет';
         tr.children[1].textContent = s.port;
         pill.querySelector('.dot').className = 'dot ' + state.cls;
         pill.lastChild.textContent = state.text;

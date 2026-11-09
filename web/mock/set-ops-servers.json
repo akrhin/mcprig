@@ -1,0 +1,17 @@
+{
+  "running": true,
+  "servers": [
+    {
+      "name": "fetch",
+      "healthy": true
+    },
+    {
+      "name": "time",
+      "healthy": true
+    },
+    {
+      "name": "memory",
+      "healthy": true
+    }
+  ]
+}

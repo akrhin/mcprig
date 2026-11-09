@@ -245,6 +245,12 @@ tr.row-warn td:first-child{color:var(--warn)}
 tr.row-warn .st{color:var(--warn)}
 .slow{color:var(--warn)}
 .tb-name{color:var(--text)}
+.tb-name .setlabel{display:block;font-weight:500}
+/* состав набора в строке: имена внахлёст переносятся, поэтому колонка не расползается */
+.tb-name .srvs{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;min-width:186px;max-width:210px}
+.srvchip{font:10.5px/1.4 var(--font-mono);color:var(--text-dim);border:1px solid var(--border);border-radius:2px;padding:0 3px}
+.srvchip.more{color:var(--text);border-style:dashed}
+.srvchip.none{border:0;padding-left:0}
 .portcell{color:var(--text-dim);font-family:var(--font-mono)}
 .emptyrow td{color:var(--text-dim);padding:14px 0}
 

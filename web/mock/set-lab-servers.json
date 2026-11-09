@@ -1,0 +1,13 @@
+{
+  "running": false,
+  "servers": [
+    {
+      "name": "memory",
+      "error": "набор не запущен"
+    },
+    {
+      "name": "context7",
+      "error": "набор не запущен"
+    }
+  ]
+}

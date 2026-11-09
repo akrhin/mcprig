@@ -1,0 +1,18 @@
+{
+  "running": true,
+  "servers": [
+    {
+      "name": "fetch",
+      "healthy": true
+    },
+    {
+      "name": "fs",
+      "healthy": false,
+      "error": "npx: ENOTFOUND registry.npmjs.org"
+    },
+    {
+      "name": "time",
+      "healthy": true
+    }
+  ]
+}
