@@ -110,9 +110,9 @@ opencode: 56 вызовов, 7 провалов — и все семь заве�
   `mcprig doctor` — 0 проблем.
 - **serena** 2.1.0 на `/home/sintez/git/mcprig`: `find_symbol`,
   `find_referencing_symbols`, `get_symbols_overview`, `get_diagnostics_for_file`
-  (пусто — ошибок в `manager.go` нет), `activate_project`. ⚠️ Схема теперь
-  требует `session` из `initial_instructions` — маршрут в скилле `serena-mcp` и
-  `AGENTS.md` (`{ project }`) это не отражает.
+  (пусто — ошибок в `manager.go` нет), `activate_project`. Схема теперь требует
+  `session` из `initial_instructions`; маршрут поправлен 09.11 в скиллах
+  `serena-mcp` и `mcp-usage`, в `AGENTS.md` и в четырёх `*_append.md`.
 - **socraticode:** индекс 138 файлов / 1146 чанков за 64 с, watcher активен,
   `codebase_search`, `codebase_symbol`, `codebase_graph_circular` — ok.
 - **остальные девять:** context7 (resolve + query-docs, 0.9 с), xerj (поиск по
@@ -120,6 +120,21 @@ opencode: 56 вызовов, 7 провалов — и все семь заве�
   (панель `:9088` → экран входа, snapshot, close), raven (12 систем токенов),
   designer-skill (контракт, anti-slop), gitea (теги v0.1.0–v0.3.1, `go.mod`,
   релизы), portainer (systemStatus 2.45.3, три endpoint'а).
+
+Под нагрузкой (сырой HTTP на `/mcp`, stateless, имя тула без префикса —
+`invoke_command`; 09.11.2026):
+
+- 200 параллельных вызовов, 50 в полёте, четыре сервера (serena `find_symbol`,
+  xerj, raven, open-design): 200/200 успешных, p50 49 мс, p95 153 мс, максимум
+  196 мс; `/healthz` под нагрузкой — среднее 1 мс, максимум 8 мс; после прогона
+  RSS 28 МБ, 36 дескрипторов, 12 потоков — течи нет.
+- 40 параллельных усечений `maxBytes:150` по одному и тому же большому ответу:
+  40 разных файлов в `tool-out`, полные ответы по 3979 Б, совпадений нет.
+- 100 вызовов вперемешку с несуществующей командой: 50 успешных, 50 ошибок,
+  p50 11 мс, максимум 59 мс — ошибка соседа не тормозит остальные.
+- Из сессии opencode те же 120 вызовов шли 796 мс (p50 370 мс) — внутри одной
+  сессии вызовы сериализует клиент opencode: серверные p50 в `/stats` держались
+  5–116 мс. Это ограничение харнесса, не прокси.
 
 ## Цель этапа 5
 
