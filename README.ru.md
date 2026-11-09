@@ -33,6 +33,15 @@ mcprig — это три вещи в одном бинарнике:
 `requestTimeout`. Сервер с битым полем остаётся в списке нездоровым со своей
 ошибкой; отсутствующее имя или невалидный JSON валят загрузку.
 
+## Архитектура
+
+[![архитектура mcprig](docs/diagrams/mcprig.architecture.ru.png)](docs/diagrams/mcprig.architecture.ru.html)
+
+Целиком: интерактивный HTML (темы, zoom, экспорт PNG/SVG) —
+`docs/diagrams/mcprig.architecture.ru.html`, источник, из которого он
+собирается, — `docs/diagrams/mcprig.architecture.ru.json`. Английская
+версия — `…en.html` / `…en.json`.
+
 ## По сравнению с lazy-mcp
 
 lazy-mcp — проект, из которого вырос mcprig; конфиг он понимает без правок.

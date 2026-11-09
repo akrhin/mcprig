@@ -33,6 +33,15 @@ forms, `url`, `env`, `headers`, `transport`, `healthMonitor`,
 `requestTimeout`. A server with a broken field stays in the list as unhealthy
 with its error; a missing name or invalid JSON fails the load.
 
+## Architecture
+
+[![mcprig architecture](docs/diagrams/mcprig.architecture.en.png)](docs/diagrams/mcprig.architecture.en.html)
+
+The picture in full: an interactive HTML version (themes, zoom, PNG/SVG export)
+is `docs/diagrams/mcprig.architecture.en.html`, and the spec it is generated
+from is `docs/diagrams/mcprig.architecture.en.json`. Russian: `…ru.html` /
+`…ru.json`.
+
 ## Compared to lazy-mcp
 
 lazy-mcp is the project mcprig grew out of, and mcprig speaks its configuration.
