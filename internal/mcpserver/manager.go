@@ -71,6 +71,29 @@ type entry struct {
 
 	healthMu sync.Mutex
 	health   healthState
+
+	// tools кэширует tools/list до переподключения: без него каждый
+	// list_commands заново обходил все апстримы (порт 205 мс у одного portainer).
+	toolsMu sync.Mutex
+	tools   []*mcp.Tool
+}
+
+func (e *entry) cachedTools() []*mcp.Tool {
+	e.toolsMu.Lock()
+	defer e.toolsMu.Unlock()
+	return e.tools
+}
+
+func (e *entry) storeTools(tools []*mcp.Tool) {
+	e.toolsMu.Lock()
+	e.tools = tools
+	e.toolsMu.Unlock()
+}
+
+// dropSession closes the cached session and the tool list that came with it.
+func (e *entry) dropSession() {
+	e.conn.reset()
+	e.storeTools(nil)
 }
 
 // healthState is one cached probe result.
@@ -309,23 +332,38 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
 		out := make(map[string]any, len(in.Servers))
 		var firstErr error
+		var mu sync.Mutex
 		failed := 0
 		// Один общий бюджет на весь обзор: иначе десять зависших серверов дают
 		// десять requestTimeout подряд, и клиент ждёт часы.
 		ctx, cancel := m.callCtx(ctx)
 		defer cancel()
+		// Параллельно: последовательный обход стоил 300 мс на одиннадцати серверах,
+		// хотя каждый отвечает за 8–10 мс. Порядок ответа задаёт in.Servers.
+		const parallel = 8
+		sem := make(chan struct{}, parallel)
+		var wg sync.WaitGroup
 		for _, name := range in.Servers {
-			cmds, err := m.commandsOf(ctx, name)
-			if err != nil {
-				out[name] = map[string]string{"error": err.Error()}
-				if firstErr == nil {
-					firstErr = fmt.Errorf("%s: %w", name, err)
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(name string) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				cmds, err := m.commandsOf(ctx, name)
+				mu.Lock()
+				defer mu.Unlock()
+				if err != nil {
+					out[name] = map[string]string{"error": err.Error()}
+					failed++
+					if firstErr == nil {
+						firstErr = fmt.Errorf("%s: %w", name, err)
+					}
+					return
 				}
-				failed++
-				continue
-			}
-			out[name] = cmds
+				out[name] = cmds
+			}(name)
 		}
+		wg.Wait()
 		if failed == len(in.Servers) {
 			return errResult(firstErr)
 		}
@@ -344,10 +382,17 @@ func (m *Manager) commandsOf(ctx context.Context, name string) ([]commandInfo, e
 	if !usable(e.srv) {
 		return nil, serverProblem(e.srv)
 	}
+	if tools := e.cachedTools(); tools != nil {
+		out := make([]commandInfo, 0, len(tools))
+		for _, tool := range tools {
+			out = append(out, commandInfo{Server: name, Name: tool.Name, Command: tool.Name, Description: tool.Description})
+		}
+		return out, nil
+	}
 	var tools []*mcp.Tool
 	err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
 		var err error
-		tools, err = listAllTools(ctx, sess)
+		tools, err = m.toolsOf(ctx, e, sess)
 		return err
 	})
 	if err != nil {
@@ -397,12 +442,13 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 		return errResult(serverProblem(e.srv))
 	}
 	var tools []*mcp.Tool
-	err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
+	if cached := e.cachedTools(); cached != nil {
+		tools = cached
+	} else if err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
 		var err error
-		tools, err = listAllTools(ctx, sess)
+		tools, err = m.toolsOf(ctx, e, sess)
 		return err
-	})
-	if err != nil {
+	}); err != nil {
 		return errResult(err)
 	}
 	byName := make(map[string]*mcp.Tool, len(tools))
@@ -560,7 +606,7 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 		}
 		return nil
 	}
-	e.conn.reset()
+	e.dropSession()
 	sess, err = e.conn.session(ctx, m.dialFor(e.srv))
 	if err != nil {
 		return fmt.Errorf("%s: переподключение после обрыва: %w", e.srv.Name, err)
@@ -569,6 +615,20 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 		return fmt.Errorf("%s: после переподключения: %w", e.srv.Name, err)
 	}
 	return nil
+}
+
+// toolsOf returns the server's tools from the cache, fetching them once per
+// connection. The cache is dropped when the session is reset.
+func (m *Manager) toolsOf(ctx context.Context, e *entry, sess *mcp.ClientSession) ([]*mcp.Tool, error) {
+	if cached := e.cachedTools(); cached != nil {
+		return cached, nil
+	}
+	tools, err := listAllTools(ctx, sess)
+	if err != nil {
+		return nil, err
+	}
+	e.storeTools(tools)
+	return tools, nil
 }
 
 // listAllTools reads every page, capped so a looping server cannot hang us.
