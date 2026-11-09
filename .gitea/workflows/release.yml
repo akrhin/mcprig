@@ -120,4 +120,10 @@ jobs:
           # не выдаёт — заведите секрет RELEASE_TOKEN (PAT со scope write:repository).
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
         run: |
-          "$GORELEASER_BIN" release --clean
+          notes="${RUNNER_TEMP:-/tmp}/release-notes.md"
+          bash scripts/release-notes.sh "${{ gitea.ref_name }}" > "$notes"
+          if [ -s "$notes" ]; then
+            "$GORELEASER_BIN" release --clean --release-notes "$notes"
+          else
+            "$GORELEASER_BIN" release --clean
+          fi
