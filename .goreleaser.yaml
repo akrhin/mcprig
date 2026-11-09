@@ -51,3 +51,8 @@ release:
   gitea:
     owner: sintez
     name: mcprig
+
+# Без этого goreleaser не знает адрес инстанса: «failed to publish artifacts: invalid URL: ""».
+gitea_urls:
+  api: https://frosty-ad-gt.cloudpub.ru/api/v1
+  download: https://frosty-ad-gt.cloudpub.ru
