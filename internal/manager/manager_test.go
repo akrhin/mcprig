@@ -131,6 +131,27 @@ func (e *env) addSet(t *testing.T, name string, servers ...string) string {
 	}](t, w).ID
 }
 
+// Токен нового набора приходит в ответе на создание: иначе его берут из
+// registry.json, где рядом лежит отозванный ключ, и получают 401.
+func TestCreateSetReturnsTokenOnce(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+
+	w := e.do(t, http.MethodPost, "/api/sets", map[string]any{"name": "s1", "servers": []string{"fake"}})
+	status(t, w, http.StatusCreated)
+	created := decode[struct {
+		Token string `json:"token"`
+	}](t, w)
+	if len(created.Token) < 8 {
+		t.Fatalf("в ответе на создание нет токена: %s", w.Body.String())
+	}
+	list := e.do(t, http.MethodGet, "/api/sets", nil)
+	status(t, list, http.StatusOK)
+	if strings.Contains(list.Body.String(), created.Token) {
+		t.Fatal("список наборов не должен повторять токен")
+	}
+}
+
 func TestAuthFailClosed(t *testing.T) {
 	if _, err := New(Options{DataDir: t.TempDir(), Auth: AuthOptions{}, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}); err == nil {
 		t.Fatal("без пароля и без MCPRIG_AUTH=off менеджер обязан не стартовать")
@@ -164,6 +185,11 @@ func TestLoginLogout(t *testing.T) {
 
 	w := e.do(t, http.MethodPost, "/api/login", map[string]any{"user": "admin", "password": "bad"})
 	status(t, w, http.StatusUnauthorized)
+
+	// Пустое поле — ошибка запроса: клиент не должен править пароль, когда
+	// забыл поле, и 400 отличает это от неверных данных.
+	status(t, e.do(t, http.MethodPost, "/api/login", map[string]any{"password": "pw"}), http.StatusBadRequest)
+	status(t, e.do(t, http.MethodPost, "/api/login", map[string]any{"user": "admin"}), http.StatusBadRequest)
 
 	w = e.do(t, http.MethodPost, "/api/login", map[string]any{"user": "admin", "password": "pw"})
 	status(t, w, http.StatusOK)
@@ -359,7 +385,10 @@ func TestSetIgnoresClientIDAndToken(t *testing.T) {
 	if got.ID != "s" {
 		t.Fatalf("id навязан клиентом: %q", got.ID)
 	}
-	if got.Token != "" {
+	if got.Token == "" {
+		t.Fatal("в ответе на создание ожидался выданный токен")
+	}
+	if got.Token == "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef" {
 		t.Fatalf("клиентский token принят: %q", got.Token)
 	}
 }

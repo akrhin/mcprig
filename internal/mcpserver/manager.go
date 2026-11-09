@@ -77,6 +77,10 @@ type entry struct {
 	srv  *config.Server
 	conn conn
 
+	// secrets — значения env и заголовков сервера, которые нельзя выпускать
+	// наружу: апстрим повторяет их в тексте ошибки.
+	secrets []string
+
 	healthMu sync.Mutex
 	health   healthState
 
@@ -160,7 +164,7 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 	}
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	for _, srv := range cfg.Servers {
-		m.entries = append(m.entries, &entry{srv: srv})
+		m.entries = append(m.entries, &entry{srv: srv, secrets: serverSecrets(srv)})
 	}
 	// A downstream that gains or drops tools at runtime says so with
 	// notifications/tools/list_changed. Dropping the cached list here makes the
@@ -650,6 +654,9 @@ func (m *Manager) callWithRetry(ctx context.Context, label string, e *entry, nam
 	// иначе память растёт от любого выдуманного command_name.
 	// Инструмент может вернуть ошибку содержимым (isError) вместо ошибки
 	// протокола — для счётчика это провал, иначе «ошибки» в панели всегда 0.
+	// Секреты маскируются до счётчика: ошибка апстрима повторяет ключ в теле,
+	// а он не должен попасть ни в контекст модели, ни в выгрузку tool-out.
+	res = scrubSecrets(res, e.secrets)
 	recErr := err
 	if recErr == nil && res != nil && res.IsError {
 		recErr = errors.New(resultMessage(res))

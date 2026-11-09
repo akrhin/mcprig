@@ -390,6 +390,16 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		user, password = body.User, body.Password
 	}
+	if user == "" || password == "" {
+		// Пустое поле — ошибка запроса, а не неверный пароль: иначе клиент
+		// правит пароль, когда забыл поле.
+		if isForm {
+			writeHTML(w, http.StatusBadRequest, loginTemplate, loginData{Error: "укажите логин и пароль"})
+			return
+		}
+		m.fail(w, r, &httpError{http.StatusBadRequest, "user и password обязательны"})
+		return
+	}
 	ok, busy := m.auth.loginCheck(user, password)
 	if busy {
 		// Очередь на scrypt заполнена: пароль даже не проверялся.
@@ -1122,7 +1132,13 @@ func (m *Manager) apiSetAdd(req *request) error {
 		}
 		return err
 	}
-	writeJSON(req.w, http.StatusCreated, m.setView(set))
+	// Токен отдаётся один раз — в ответе на создание: иначе его берут из
+	// registry.json, где рядом лежит уже отозванный, и получают 401 на живом
+	// наборе.
+	writeJSON(req.w, http.StatusCreated, struct {
+		setView
+		Token string `json:"token,omitempty"`
+	}{m.setView(set), set.Token})
 	return nil
 }
 

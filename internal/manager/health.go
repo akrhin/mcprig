@@ -134,10 +134,14 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 	client := mcp.NewClient(&mcp.Implementation{Name: "mcprig", Version: version}, nil)
 	transport := &mcp.StreamableClientTransport{
 		Endpoint:             "http://" + net.JoinHostPort(host, strconv.Itoa(port)) + "/mcp",
-		HTTPClient:           &http.Client{Transport: &bearerTransport{token: token}, Timeout: healthTimeout},
+		HTTPClient:           &http.Client{Transport: &bearerTransport{token: token}, Timeout: healthLoadTimeout},
 		DisableStandaloneSSE: true,
 	}
-	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
+	// Бюджет запроса — healthLoadTimeout, а не healthTimeout: неразогретый набор
+	// тратит до healthTimeout на пробу каждого сервера, и внешний таймаут,
+	// равный внутреннему, истекал одновременно с ним — панель показывала
+	// «context deadline exceeded» у всех серверов, хотя часть уже поднялась.
+	ctx, cancel := context.WithTimeout(ctx, healthLoadTimeout)
 	defer cancel()
 	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
