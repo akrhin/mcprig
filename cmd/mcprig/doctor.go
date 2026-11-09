@@ -20,6 +20,7 @@ import (
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/manager"
 	"github.com/sintez/mcprig/internal/registry"
+	"github.com/sintez/mcprig/internal/toolout"
 )
 
 // errDoctorProblems — отчёт уже напечатан; main выходит с кодом 1 без лишней
@@ -389,16 +390,7 @@ func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLi
 		}
 	}
 
-	toolOut := filepath.Join(o.DataDir, "tool-out")
-	size, count, err := dirUsage(toolOut)
-	switch {
-	case err == nil:
-		lines = append(lines, doctorLine{true, fmt.Sprintf("tool-out: %d файлов, %s", count, humanBytes(size))})
-	case errors.Is(err, fs.ErrNotExist):
-		lines = append(lines, doctorLine{true, "tool-out нет"})
-	default:
-		lines = append(lines, doctorLine{false, fmt.Sprintf("tool-out: %v", err)})
-	}
+	lines = append(lines, toolOutLine(o.DataDir))
 
 	addr := net.JoinHostPort(loopbackHost(o.PanelHost), strconv.Itoa(o.PanelPort))
 	code, err := healthz(addr)
@@ -493,25 +485,35 @@ func loopbackHost(host string) string {
 	return host
 }
 
-func dirUsage(dir string) (int64, int, error) {
-	var size int64
-	count := 0
-	err := filepath.WalkDir(dir, func(_ string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+// toolOutLine describes the saved truncated answers: how many, how big and how
+// old the next one to expire is.
+func toolOutLine(dataDir string) doctorLine {
+	size, count, oldest, err := toolout.Usage(dataDir)
+	switch {
+	case err == nil:
+		line := fmt.Sprintf("tool-out: %d файлов, %s", count, humanBytes(size))
+		if count > 0 {
+			line += fmt.Sprintf(", самый старый %s", humanAge(time.Since(oldest)))
 		}
-		if !entry.Type().IsRegular() {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		size += info.Size()
-		count++
-		return nil
-	})
-	return size, count, err
+		return doctorLine{true, line}
+	case errors.Is(err, fs.ErrNotExist):
+		return doctorLine{true, "tool-out нет"}
+	default:
+		return doctorLine{false, fmt.Sprintf("tool-out: %v", err)}
+	}
+}
+
+func humanAge(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "меньше минуты назад"
+	case d < time.Hour:
+		return fmt.Sprintf("%d мин назад", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%d ч назад", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%d дн назад", int(d.Hours()/24))
+	}
 }
 
 func humanBytes(n int64) string {

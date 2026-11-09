@@ -11,6 +11,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/sintez/mcprig/internal/toolout"
 )
 
 const (
@@ -22,13 +24,7 @@ const (
 )
 
 // toolOutDir is where an oversized answer is written; created on first use.
-func toolOutDir() string {
-	base := os.Getenv("MCPRIG_DATA_DIR")
-	if base == "" {
-		base = os.TempDir()
-	}
-	return filepath.Join(base, "tool-out")
-}
+func toolOutDir() string { return toolout.Dir(toolout.Base()) }
 
 // truncateResult caps a downstream answer at maxBytes and points at the file
 // carrying the full one. An answer that fits is returned untouched: no file,

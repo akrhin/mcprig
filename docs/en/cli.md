@@ -50,6 +50,22 @@ that warm-up returns in milliseconds instead of waiting for eleven `npx`/`uvx`
 servers to unpack. `MCPRIG_PPROF=127.0.0.1:6060` exposes `net/http/pprof` on
 that address for any subcommand; unset by default, so nothing is exposed.
 
+### tool-out retention
+
+A truncated answer is saved under `${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/`. Both
+`serve` and `panel` sweep those files at startup and then hourly, until the
+process exits:
+
+| variable | default | meaning |
+| --- | --- | --- |
+| `MCPRIG_TOOLOUT_TTL` | `24h` | files older than this are removed; `time.ParseDuration` syntax |
+| `MCPRIG_TOOLOUT_MAX` | `256MiB` | size cap of a tool-out directory; oldest files go first, `B`/`K`/`KiB`/`M`/`MiB`/`G`/`GiB` accepted |
+
+A file younger than five minutes is never evicted by size — a client may still
+be reading the path from the truncation marker. A value that does not parse logs
+a warning and the default is used. `mcprig doctor` shows the file count, the
+size and the age of the oldest file.
+
 ## stdio
 
 ```bash

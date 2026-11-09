@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sintez/mcprig/internal/registry"
 )
@@ -145,5 +146,32 @@ func TestBuildDoctorReportGreen(t *testing.T) {
 	}, doctorLine{}, false)
 	if !rep.OK || rep.Problems != 0 {
 		t.Fatalf("ожидался зелёный отчёт, проблем %d:\n%s", rep.Problems, renderDoctor(rep))
+	}
+}
+
+// Строка tool-out: число файлов, объём и возраст самого старого — он же
+// ближайший к истечению срока.
+func TestToolOutLine(t *testing.T) {
+	dataDir := t.TempDir()
+	dir := filepath.Join(dataDir, "tool-out")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.txt", "b.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-6 * time.Hour)
+	if err := os.Chtimes(filepath.Join(dir, "a.txt"), old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	line := toolOutLine(dataDir)
+	if !line.OK || !strings.Contains(line.Text, "2 файлов") || !strings.Contains(line.Text, "самый старый") || !strings.Contains(line.Text, "ч назад") {
+		t.Fatalf("строка: %+v", line)
+	}
+	if got := toolOutLine(t.TempDir()); got.Text != "tool-out нет" {
+		t.Fatalf("пустой каталог: %q", got.Text)
 	}
 }

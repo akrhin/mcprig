@@ -24,6 +24,7 @@ import (
 
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/registry"
+	"github.com/sintez/mcprig/internal/toolout"
 )
 
 const maxBody = 1 << 20
@@ -212,6 +213,15 @@ func Run(opts Options) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Панель чистит и свой tool-out, и tool-out наборов: их процессы живут
+	// в тех же каталогах данных.
+	toolCfg, warns := toolout.FromEnv()
+	for _, w := range warns {
+		m.log.Warn("tool-out: " + w)
+	}
+	toolout.Run(ctx, opts.DataDir, toolCfg, toolout.Interval, m.log)
+
 	select {
 	case err := <-errc:
 		if errors.Is(err, http.ErrServerClosed) {

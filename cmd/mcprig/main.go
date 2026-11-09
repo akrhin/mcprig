@@ -25,6 +25,7 @@ import (
 	"github.com/sintez/mcprig/internal/mcpserver"
 	"github.com/sintez/mcprig/internal/oauth"
 	"github.com/sintez/mcprig/internal/stats"
+	"github.com/sintez/mcprig/internal/toolout"
 )
 
 // version is set by the release build.
@@ -234,6 +235,13 @@ func run() error {
 	srv := &http.Server{Addr: listen, Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Выгрузки усечённых ответов чистятся при старте и дальше раз в час.
+	toolCfg, warns := toolout.FromEnv()
+	for _, w := range warns {
+		log.Warn("tool-out: " + w)
+	}
+	toolout.Run(ctx, toolout.Base(), toolCfg, toolout.Interval, log)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
