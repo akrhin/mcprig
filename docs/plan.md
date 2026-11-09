@@ -36,6 +36,14 @@ E2E_BASE=http://127.0.0.1:9091 go test ./e2e -v
 (`internal/httplisten`: stateless `2026-07-28`, legacy `initialize` 2025-06-18,
 bearer, `Host`/`Origin`, 4 МиБ, 9 тестов).
 
+**Этап 6 принят (2026-11-09):** `.gitea/workflows/release.yml` на тег `v*` —
+`verify` (gofmt, `vet`, тесты `-p 1`), `vuln` (`govulncheck` с повтором установки),
+`release` (goreleaser v2.20.0, сверка контрольной суммы, `GITEA_TOKEN`); кэш
+`setup-go` работает (`Cache restored from key: setup-go-Linux-x64-ubuntu20-go-1.27.3-…`).
+Релиз `v0.1.0` опубликован: четыре архива (linux/darwin × amd64/arm64) + `checksums.txt`;
+скачанный `linux_amd64` отвечает `0.1.0`. Homebrew-формула и образ с Node остались
+за рамками — издаём только архивы (решение владельца).
+
 ## Дашборд
 
 Отдельный трек, начинается после этапа 4 (нужны живые данные: статусы наборов,
