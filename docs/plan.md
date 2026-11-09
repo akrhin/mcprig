@@ -106,6 +106,42 @@ health, вызовы). Экран показывает то, чего сейча
    «все серверы»: рецепты со `servers=[…]` поддерживаются, аргументы инструмента
    всегда лежат в `parameters`.
 
+## Песочница для недоверенных MCP (предложение, 2026-11-10)
+
+Полный разбор — `docs/research/untrusted-mcp-sandbox.md` (модель угроз,
+варианты, источники, 381 строка). Коротко:
+
+Граница одна: `internal/downstream/connect.go:88-103` — `exec.Command` на :94,
+env на :98-102. Песочница — это префикс argv, транспорт не меняется.
+
+| вариант | что даёт | цена |
+| --- | --- | --- |
+| `bwrap` (userns, `--unshare-all`) | нет сети, нет `/home`, своё дерево ФС; 10 мс; без root | нет лимитов CPU/RAM/PID (нужен `prlimit` рядом); bind-ы под node/python надо подобрать |
+| Docker/Podman rootless | лимиты и образы из коробки, `--network none`, read-only | общий kernel — не граница для недоверенного кода; образ на каждый сервер; CVE-2026-55887 в docker/mcp-gateway показал, что сборка argv — тоже attack surface |
+| gVisor (`runsc`) | сильнее контейнера, обычные Linux-бинари | совместимость node/python, отдельная эксплуатация |
+| microVM (Firecracker/microsandbox) | сильнейшая практичная граница | KVM, образы, vsock; инфраструктура |
+| Landlock + seccomp | вторая стенка внутри своей же песочницы, fallback | сеть только по портам, не по адресам; нужен re-exec-хелпер |
+| systemd-run --user | готовые свойства юнита | `--scope` не принимает `ProtectHome` (проверено), lifecycle уходит в systemctl |
+| WASM | capability-модель, мгновенный старт | зрелого рантайма под произвольный node/python MCP нет |
+
+Этапы:
+0. Без песочницы, один вечер: whitelist env для stdio (`cmd/mcprig/main.go:204`
+   и `:285` сейчас создают `Connector` без `Env` → вниз уходит весь
+   `os.Environ()`), `envAllow`, предупреждение на `npx -y`/`uvx` без пина,
+   `sandbox:"required"` для тега `untrusted` (без песочницы — `disabled`).
+1. `bwrap` + `prlimit` для stdio: `Server.Sandbox{mode,onUnavailable,ro,rw,network,
+   memoryMb,pids,timeoutSec}`, пакет `internal/sandbox.Wrap`, fail-closed
+   (`onUnavailable:"deny"`). Проверено на хосте: ядро 6.12.115, userns включён,
+   `--unshare-all` → `NET-BLOCKED`, `~/.ssh` недоступен.
+2. Docker-режим и управляемый egress (allowlist хостов, инъекция секретов).
+3. microVM — когда появятся серверы, которым нужен полный OS.
+
+Изоляция не лечит tool poisoning, confused deputy и prompt injection — для них
+отдельные механизмы (пиннинг `tools/list`, allowlist инструментов).
+
+Проверка — `scripts/sandbox-e2e.sh`/Go-тест: `~/.ssh`, `registry.json`, curl
+наружу, запись в `/`, `env`, fork-бомба, `/proc/1/root`, `mount`, unix-сокет.
+
 ## Долг, принятый сознательно (2026-11-09)
 
 Ревью паладина и арбитра по `4399e9e` закрыто правками; ниже — то, что
