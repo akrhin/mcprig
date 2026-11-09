@@ -3,6 +3,8 @@ package downstream
 import (
 	"context"
 	"net/http"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -101,5 +103,36 @@ func TestConnectorEnvHook(t *testing.T) {
 	}
 	if len(cmd.Env) != len(want) {
 		t.Errorf("env = %v, ожидались только %v", cmd.Env, want)
+	}
+}
+
+// TestConnectStdioLegacyServer: сервер на mcp SDK ≤ 1.9 не отвечает на
+// server/discover (падает), поэтому stdio обязан идти через initialize.
+func TestConnectStdioLegacyServer(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "legacyserver")
+	build := exec.Command("go", "build", "-o", bin, "./testdata/legacyserver")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("сборка legacyserver: %v\n%s", err, out)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	c := &Connector{Version: "test"}
+	session, err := c.Connect(ctx, &config.Server{
+		Name:      "legacy",
+		Transport: config.TransportStdio,
+		Command:   []string{bin},
+	})
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer session.Close()
+
+	res, err := session.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("tools/list: %v", err)
+	}
+	if len(res.Tools) != 0 {
+		t.Fatalf("инструментов %d, ждали 0", len(res.Tools))
 	}
 }

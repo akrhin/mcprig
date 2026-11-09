@@ -45,11 +45,25 @@ func (c *Connector) Connect(ctx context.Context, srv *config.Server) (*mcp.Clien
 		version = "dev"
 	}
 	client := mcp.NewClient(&mcp.Implementation{Name: "mcprig", Version: version}, c.clientOptions(srv))
-	session, err := client.Connect(ctx, tr, nil)
+	session, err := client.Connect(ctx, tr, connectOptions(srv))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", srv.Name, err)
 	}
 	return session, nil
+}
+
+// legacyProtocol — последняя ревизия до stateless server/discover (SEP-2575).
+const legacyProtocol = "2025-11-25"
+
+// connectOptions держит stdio на initialize: сервер на mcp SDK ≤ 1.9 не знает
+// server/discover, не отвечает на него и падает в приёмном цикле (pydantic
+// ValidationError), а initialize понимают все — потерь нет, подписка на
+// tools/list_changed объявляется и в нём.
+func connectOptions(srv *config.Server) *mcp.ClientSessionOptions {
+	if srv.Transport != config.TransportStdio {
+		return nil
+	}
+	return &mcp.ClientSessionOptions{ProtocolVersion: legacyProtocol}
 }
 
 // clientOptions wires the tool-list notification. The handler runs on the SDK
