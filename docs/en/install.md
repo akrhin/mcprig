@@ -71,6 +71,15 @@ The `Dockerfile` has two targets:
 | `slim` (default) | binary, CA roots, non-root user `10001` | HTTP only |
 | `full` | `slim` plus node and python | stdio servers launched with `npx` / `uvx` |
 
+Both are published to the project's Gitea registry, so you can skip the build:
+
+```bash
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
+```
+
+Or build them yourself:
+
 ```bash
 docker build -t mcprig:slim .
 docker build --target full -t mcprig:full .
@@ -89,7 +98,7 @@ default port, so with another `transport.port` pass `--health-cmd` or set the
 healthcheck in compose.
 
 `deploy/docker-compose.yml` runs two sets (`demo` on 9100, `ops` on 9101) from
-`ghcr.io/sintez/mcprig:latest`, mounts each `servers.json` read-only and keeps
+`frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, mounts each `servers.json` read-only and keeps
 state in named volumes.
 
 Measured on this host: the bare `docker build .` gives `slim` (32 MB, binary

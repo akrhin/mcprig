@@ -69,6 +69,15 @@ systemctl --user enable --now mcprig.service
 | `slim` (по умолчанию) | бинарник, корневые CA, пользователь без root `10001` | только HTTP |
 | `full` | `slim` плюс node и python | stdio-серверы, запускаемые через `npx` / `uvx` |
 
+Оба образа опубликованы в реестре Gitea проекта, так что сборку можно пропустить:
+
+```bash
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
+```
+
+Либо собрать самому:
+
 ```bash
 docker build -t mcprig:slim .
 docker build --target full -t mcprig:full .
@@ -87,7 +96,7 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 compose.
 
 `deploy/docker-compose.yml` запускает два набора (`demo` на 9100, `ops` на 9101)
-из `ghcr.io/sintez/mcprig:latest`, монтирует каждый `servers.json` только для
+из `frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, монтирует каждый `servers.json` только для
 чтения и держит состояние в именованных томах.
 
 Замерено на этом хосте: `docker build .` без `--target` даёт `slim` — 32 МБ,

@@ -67,7 +67,7 @@ docker run -d --name mcprig-demo \
   -v ~/.config/mcprig/sets/demo/servers.json:/config/servers.json:ro \
   -v mcprig-state:/state \
   --env-file ~/.config/mcprig/sets/demo/env \
-  ghcr.io/sintez/mcprig:latest serve --config /config/servers.json --addr 0.0.0.0:9100
+  frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest serve --config /config/servers.json --addr 0.0.0.0:9100
 ```
 
 `docker-compose.yml` для нескольких наборов отличается только именем сервиса,

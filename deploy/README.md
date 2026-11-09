@@ -63,6 +63,11 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 `slim`, `ops` — stdio-сервер через `npx`, ему нужен образ с node.
 
 ```bash
+# образы уже в реестре Gitea: latest (slim) и latest-full
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest
+docker compose up -d
+
+# либо собрать локально и указать свои теги
 docker build -t mcprig:slim .                    # 32 МБ, только бинарник
 docker build --target full -t mcprig:full .      # 334 МБ, плюс node и python
 MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d

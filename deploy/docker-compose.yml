@@ -9,7 +9,7 @@
 # port and the config port must match.
 services:
   demo:
-    image: ${MCPRIG_IMAGE:-ghcr.io/sintez/mcprig:latest}
+    image: ${MCPRIG_IMAGE:-frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest}
     command: ["serve", "--config", "/config/servers.json"]
     ports:
       - "127.0.0.1:9100:9100"
@@ -34,7 +34,7 @@ services:
   # ops везёт stdio-сервер через npx, поэтому ему нужен образ с node:
   #   MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
   ops:
-    image: ${MCPRIG_IMAGE_FULL:-ghcr.io/sintez/mcprig:latest-full}
+    image: ${MCPRIG_IMAGE_FULL:-frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full}
     command: ["serve", "--config", "/config/servers.json"]
     ports:
       - "127.0.0.1:9101:9101"
