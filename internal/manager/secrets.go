@@ -268,23 +268,69 @@ func reservedSecret(name string) bool {
 		strings.HasPrefix(name, "OPENBAO_")
 }
 
+// secretValue — значение переменной и его источник.
+type secretValue struct {
+	value  string
+	source string
+}
+
 // Get возвращает первое найденное значение и его источник. Ответ кэшируется
 // на secretCacheTTL; пустой ответ тоже — иначе отсутствующая переменная снова
 // идёт в сеть на каждом старте набора.
 func (s *Secrets) Get(name string) (string, string) {
-	if reservedSecret(name) {
-		return "", ""
-	}
-	if v, source, ok := s.cached(name); ok {
-		return v, source
-	}
-	v, source, transient := s.resolve(name)
-	// Ошибку OpenBao не кэшируем: иначе 30 секунд секрет «отсутствует» даже
-	// после того, как хранилище вернулось.
-	if !transient {
-		s.cachePut(name, secretEntry{value: v, source: source})
+	v, source, err, touched := s.lookup(name)
+	if touched {
+		s.setRemoteErr(err)
 	}
 	return v, source
+}
+
+// Resolve резолвит переменные параллельно, не больше 8 сразу, и отдаёт их в
+// порядке объявленных имён. Больной OpenBao отвечает до 5 с на переменную, и
+// последовательный обход растягивал старт набора и первый GET /api/env на
+// минуты. remoteErr ставится в том же порядке, что и при последовательном
+// обходе, поэтому его текст не зависит от того, кто ответил первым.
+func (s *Secrets) Resolve(names []string) []secretValue {
+	out := make([]secretValue, len(names))
+	errs := make([]error, len(names))
+	touched := make([]bool, len(names))
+	const parallel = 8
+	sem := make(chan struct{}, parallel)
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, name string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			out[i].value, out[i].source, errs[i], touched[i] = s.lookup(name)
+		}(i, name)
+	}
+	wg.Wait()
+	for i := range names {
+		if touched[i] {
+			s.setRemoteErr(errs[i])
+		}
+	}
+	return out
+}
+
+// lookup — Get без записи remoteErr: ответ из кэша или служебная переменная
+// OpenBao не спрашивают, и touched=false говорит об этом вызывающему.
+func (s *Secrets) lookup(name string) (v, source string, err error, touched bool) {
+	if reservedSecret(name) {
+		return "", "", nil, false
+	}
+	if v, source, ok := s.cached(name); ok {
+		return v, source, nil, false
+	}
+	v, source, err = s.resolve(name)
+	// Ошибку OpenBao не кэшируем: иначе 30 секунд секрет «отсутствует» даже
+	// после того, как хранилище вернулось.
+	if err == nil {
+		s.cachePut(name, secretEntry{value: v, source: source})
+	}
+	return v, source, err, true
 }
 
 func (s *Secrets) cached(name string) (string, string, bool) {
@@ -313,36 +359,28 @@ func (s *Secrets) cacheDrop(name string) {
 	s.mu.Unlock()
 }
 
-// resolve идёт по цепочке OpenBao → env.json → окружение. transient=true,
-// когда OpenBao ответил не «нет секрета», а ошибкой: такой ответ кэшировать
-// нельзя.
-func (s *Secrets) resolve(name string) (string, string, bool) {
-	transient := false
+// resolve идёт по цепочке OpenBao → env.json → окружение. Ошибка OpenBao
+// возвращается текстом: это сбой, а не «нет секрета», и такой ответ не
+// кэшируется.
+func (s *Secrets) resolve(name string) (string, string, error) {
+	var remoteErr error
 	if s.bao != nil {
 		v, err := s.bao.get(name)
 		switch {
 		case err == nil:
-			s.setRemoteErr(nil)
-			return v, sourceOpenBao, false
+			return v, sourceOpenBao, nil
 		case errors.Is(err, errSecretNotFound):
-			s.setRemoteErr(nil)
 		default:
-			s.setRemoteErr(err)
-			transient = true
+			remoteErr = err
 		}
 	}
 	if v, ok := s.local.get(name); ok {
-		return v, sourceFile, transient
+		return v, sourceFile, remoteErr
 	}
 	if v, ok := os.LookupEnv(name); ok {
-		return v, sourceEnv, transient
+		return v, sourceEnv, remoteErr
 	}
-	return "", "", transient
-}
-
-func (s *Secrets) Lookup(name string) (string, bool) {
-	v, source := s.Get(name)
-	return v, source != ""
+	return "", "", remoteErr
 }
 
 // Set пишет в явный store или в первый доступный (OpenBao, если настроен).

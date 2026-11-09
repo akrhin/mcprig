@@ -232,11 +232,17 @@ func setServers(set *registry.Set, servers []registry.Server) []registry.Server 
 // expandServer копирует сервер, раскрыв ${VAR} из цепочки секретов: менеджеру
 // это нужно для probe и browse, сам набор раскрывает переменные у себя.
 func expandServer(srv *config.Server, sec *Secrets) *config.Server {
-	lookup := func(name string) (string, bool) {
-		if sec == nil {
-			return "", false
+	// Параллельно: последовательный обход даёт 5 с на ссылку больного OpenBao.
+	vals := map[string]secretValue{}
+	if sec != nil {
+		names := serverEnvRefs(srv)
+		for i, v := range sec.Resolve(names) {
+			vals[names[i]] = v
 		}
-		return sec.Lookup(name)
+	}
+	lookup := func(name string) (string, bool) {
+		v := vals[name]
+		return v.value, v.source != ""
 	}
 	expand := func(text string) string {
 		return envRefRe.ReplaceAllStringFunc(text, func(m string) string {

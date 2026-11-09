@@ -492,9 +492,10 @@ func childEnv(servers []registry.Server, sec *Secrets) []string {
 		}
 	}
 	if sec != nil {
-		for _, name := range envRefs(servers) {
-			if v, ok := sec.Lookup(name); ok {
-				values[name] = v
+		names := envRefs(servers)
+		for i, v := range sec.Resolve(names) {
+			if v.source != "" {
+				values[names[i]] = v.value
 			}
 		}
 	}

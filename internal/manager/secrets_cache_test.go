@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // fakeBao — OpenBao KV v2 на httptest: считает GET, чтобы видеть, ходит ли
@@ -16,7 +17,16 @@ type fakeBao struct {
 	mu     sync.Mutex
 	values map[string]string
 	gets   int
-	fail   int // сколько следующих GET ответить 500 (сбой, а не «нет секрета»)
+	fail   int                      // сколько следующих GET ответить 500 (сбой, а не «нет секрета»)
+	delay  time.Duration            // задержка ответа на GET
+	lags   map[string]time.Duration // задержка по ключу: проверка порядка ответов
+}
+
+// setDelay — задержка всех GET: проверка параллельности обхода.
+func (f *fakeBao) setDelay(d time.Duration) {
+	f.mu.Lock()
+	f.delay = d
+	f.mu.Unlock()
 }
 
 func (f *fakeBao) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -30,6 +40,15 @@ func (f *fakeBao) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 		return
+	}
+	f.mu.Lock()
+	delay := f.delay
+	if d, ok := f.lags[key]; ok {
+		delay = d
+	}
+	f.mu.Unlock()
+	if r.Method == http.MethodGet && delay > 0 {
+		time.Sleep(delay)
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()

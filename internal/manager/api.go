@@ -768,10 +768,10 @@ func (m *Manager) apiExportSet(req *request) error {
 
 func (m *Manager) apiEnvList(req *request) error {
 	names := envRefs(m.store.Servers())
+	got := m.sec.Resolve(names)
 	vars := make([]envVar, 0, len(names))
-	for _, name := range names {
-		value, source := m.sec.Get(name)
-		vars = append(vars, envVar{Name: name, Set: value != "", Source: source})
+	for i, name := range names {
+		vars = append(vars, envVar{Name: name, Set: got[i].value != "", Source: got[i].source})
 	}
 	resp := map[string]any{"vars": vars}
 	if remoteErr := m.sec.RemoteError(); remoteErr != "" {
