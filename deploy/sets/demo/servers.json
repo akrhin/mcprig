@@ -1,0 +1,24 @@
+{
+  "servers": [
+    {
+      "name": "serena",
+      "description": "Семантический поиск и правки по LSP (пример удалённого сервера)",
+      "url": "http://127.0.0.1:8899/mcp",
+      "enabled": true,
+      "tags": [
+        "code"
+      ]
+    }
+  ],
+  "transport": {
+    "type": "http",
+    "host": "0.0.0.0",
+    "port": 9100,
+    "path": "/mcp",
+    "allowedHosts": [
+      "127.0.0.1",
+      "localhost"
+    ],
+    "authToken": "${MCPRIG_SET_TOKEN}"
+  }
+}

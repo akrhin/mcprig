@@ -1,0 +1,28 @@
+{
+  "servers": [
+    {
+      "name": "everything",
+      "description": "Эталонный MCP-сервер на stdio (пример локального процесса)",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ],
+      "enabled": true,
+      "tags": [
+        "demo"
+      ]
+    }
+  ],
+  "transport": {
+    "type": "http",
+    "host": "0.0.0.0",
+    "port": 9101,
+    "path": "/mcp",
+    "allowedHosts": [
+      "127.0.0.1",
+      "localhost"
+    ],
+    "authToken": "${MCPRIG_SET_TOKEN}"
+  }
+}

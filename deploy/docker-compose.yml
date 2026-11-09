@@ -1,9 +1,16 @@
 # Two sets, one container each. Configs stay on the host and are mounted read-only;
 # OAuth tokens and anything else the process must not lose live in named volumes.
+#
+#   MCPRIG_IMAGE=mcprig:slim docker compose up -d
+#
+# The image is overridable because published images live on a private registry:
+# build them first with `docker build -t mcprig:slim .` (see install docs).
+# The listen port comes from transport.port in each servers.json, so the published
+# port and the config port must match.
 services:
   demo:
-    image: ghcr.io/sintez/mcprig:latest
-    command: ["serve", "--config", "/config/servers.json", "--addr", "0.0.0.0:9100"]
+    image: ${MCPRIG_IMAGE:-ghcr.io/sintez/mcprig:latest}
+    command: ["serve", "--config", "/config/servers.json"]
     ports:
       - "127.0.0.1:9100:9100"
     volumes:
@@ -13,14 +20,22 @@ services:
       - ./sets/demo/env
     environment:
       MCPRIG_DATA_DIR: /data
+    # healthcheck образа смотрит на порт 9100 — для demo он совпадает,
+    # для ops ниже задан свой.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9100/healthz"]
+      interval: 30s
+      timeout: 3s
     restart: unless-stopped
     read_only: true
     tmpfs:
       - /tmp
 
+  # ops везёт stdio-сервер через npx, поэтому ему нужен образ с node:
+  #   MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
   ops:
-    image: ghcr.io/sintez/mcprig:latest
-    command: ["serve", "--config", "/config/servers.json", "--addr", "0.0.0.0:9101"]
+    image: ${MCPRIG_IMAGE_FULL:-ghcr.io/sintez/mcprig:latest-full}
+    command: ["serve", "--config", "/config/servers.json"]
     ports:
       - "127.0.0.1:9101:9101"
     volumes:
@@ -30,10 +45,18 @@ services:
       - ./sets/ops/env
     environment:
       MCPRIG_DATA_DIR: /data
+      # read_only: true — npx пишет кэш в $HOME, ему нужен tmpfs.
+      HOME: /tmp
+      npm_config_cache: /tmp/npm
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9101/healthz"]
+      interval: 30s
+      timeout: 3s
     restart: unless-stopped
     read_only: true
     tmpfs:
-      - /tmp
+      # exec — npx запускает скачанный бинарь прямо из кэша в /tmp
+      - /tmp:rw,exec
 
 volumes:
   mcprig-demo-state:

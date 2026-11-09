@@ -27,10 +27,33 @@ systemctl --user enable --now mcprig-set@demo.service
 ```
 
 В контейнере состояние — том на `/data`, поэтому `MCPRIG_DATA_DIR=/data` уже
-выставлен в `docker-compose.yml`. Образы здесь **не собирались**: реестр
-`docker.io` на этом хосте недоступен (`DeadlineExceeded` на
-`load metadata for node:22-alpine`), так что сборку надо проверить там, где
-registry доступен.
+выставлен в `docker-compose.yml`.
+
+## Compose
+
+`docker-compose.yml` поднимает два набора: `demo` — удалённый сервер на образе
+`slim`, `ops` — stdio-сервер через `npx`, ему нужен образ с node.
+
+```bash
+docker build -t mcprig:slim .                    # 32 МБ, только бинарник
+docker build --target full -t mcprig:full .      # 334 МБ, плюс node и python
+MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
+```
+
+Проверено на этом хосте: оба контейнера `healthy`, `demo` отвечает
+`list_servers`, `ops` отвечает `Echo: compose ok`. Что важно знать:
+
+- Конфиги наборов лежат в `sets/<набор>/servers.json` и монтируются read-only;
+  `sets/<набор>/env` — переменные для `${VAR}` внутри конфига, там же
+  `MCPRIG_SET_TOKEN` (замени `change-me-before-exposing`).
+- `transport.authToken` обязателен: без него `serve` не стартует
+  (`пустой authToken — без авторизации набор не стартует`).
+- Порт берётся из `transport.port` конфига, а не из команды: опубликованный
+  порт и порт в конфиге должны совпадать. Healthcheck образа смотрит на 9100,
+  поэтому у `ops` он переопределён.
+- `read_only: true` требует `tmpfs: /tmp:rw,exec` и `HOME=/tmp` с
+  `npm_config_cache=/tmp/npm`: `npx` скачивает и запускает бинарь из `/tmp`, а
+  без `exec` падает с `mcp-server-everything: Permission denied`.
 
 Юниты проверены `systemd-analyze verify`: ошибок нет, кроме отсутствующего по
 пути `/home/<user>/.local/bin/mcprig` — он появится после установки бинарника.
