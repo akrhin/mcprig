@@ -269,7 +269,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	if !m.auth.hostOK(r.Host) {
+	if !m.hostAllowed(r) {
 		m.fail(w, r, &httpError{http.StatusForbidden, "хост не разрешён"})
 		return
 	}
@@ -282,7 +282,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.healthz(w)
 		return
 	}
-	if err := checkCSRF(r); err != nil {
+	if err := m.checkCSRF(r); err != nil {
 		m.fail(w, r, err)
 		return
 	}
@@ -542,7 +542,7 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
-func checkCSRF(r *http.Request) error {
+func (m *Manager) checkCSRF(r *http.Request) error {
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		return nil
 	}
@@ -551,7 +551,7 @@ func checkCSRF(r *http.Request) error {
 	}
 	if origin := r.Header.Get("Origin"); origin != "" {
 		u, err := url.Parse(origin)
-		if err != nil || !strings.EqualFold(u.Host, r.Host) {
+		if err != nil || !m.originOK(u.Host, r) {
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
 	}
@@ -559,6 +559,31 @@ func checkCSRF(r *http.Request) error {
 		return badRequest("ожидался JSON")
 	}
 	return nil
+}
+
+// originOK пускает Origin, равный Host, либо Host, под который прокси
+// переписал заголовок, либо имя из MCPRIG_ALLOWED_HOSTS: за обратным прокси
+// Origin остаётся публичным, а Host приходит уже внутренним.
+func (m *Manager) originOK(originHost string, r *http.Request) bool {
+	if strings.EqualFold(originHost, r.Host) {
+		return true
+	}
+	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" && strings.EqualFold(originHost, fwd) {
+		return true
+	}
+	return m.auth.hostOK(originHost)
+}
+
+// hostAllowed — то же послабление для самого Host: прокси переписывает его на
+// внутренний адрес, а публичное имя приходит в X-Forwarded-Host.
+func (m *Manager) hostAllowed(r *http.Request) bool {
+	if m.auth.hostOK(r.Host) {
+		return true
+	}
+	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {
+		return m.auth.hostOK(fwd)
+	}
+	return false
 }
 
 func isJSON(contentType string) bool {
