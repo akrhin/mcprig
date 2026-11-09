@@ -51,9 +51,11 @@ journalctl --user -u mcprig-warm@main -n 20    # строка «итог: 1 на
 systemctl --user start mcprig-warm@main.service # прогнать немедленно
 ```
 
-Юнит читает `~/.config/mcprig/panel.env` (если есть) и берёт токен набора из
+Юнит берёт порт панели из `MCPRIG_PANEL_URL` (в шаблоне —
+`http://127.0.0.1:9088`, переопределяется в `~/.config/mcprig/panel.env`), пароль
+панели — из `~/.config/mcprig/env`, токен набора — из
 `~/.config/mcprig/<набор>.token`; набор с `open: true` прогревается без токена.
-Вручную то же самое: `mcprig warm --set main` (или `--all` через панель).
+Вручную то же самое: `mcprig warm --set main` (или `--all --panel <адрес>`).
 
 ## Compose
 

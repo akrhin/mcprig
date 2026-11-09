@@ -33,6 +33,7 @@ var errWarmProblems = errors.New("warm: есть ошибки")
 // warmConfig — всё, что нужно прогреву; в тестах подставляется целиком.
 type warmConfig struct {
 	URL       string
+	Panel     string
 	Set       string
 	All       bool
 	Timeout   time.Duration
@@ -59,7 +60,8 @@ type warmResult struct {
 func newWarmFlags() (*flag.FlagSet, *warmConfig) {
 	c := &warmConfig{}
 	fs := flag.NewFlagSet("warm", flag.ContinueOnError)
-	fs.StringVar(&c.URL, "url", "", "адрес набора, напр. http://127.0.0.1:9101/mcp; с --all — адрес панели")
+	fs.StringVar(&c.URL, "url", "", "MCP-адрес набора, напр. http://127.0.0.1:9101/mcp (минует панель)")
+	fs.StringVar(&c.Panel, "panel", "", "адрес панели для --all и для резолва порта по имени набора (по умолчанию MCPRIG_PANEL_URL, иначе MCPRIG_PORT)")
 	fs.StringVar(&c.Set, "set", "main", "имя набора: под ним берётся ~/.config/mcprig/<set>.token и печатается строка")
 	fs.BoolVar(&c.All, "all", false, "все наборы из панели")
 	fs.DurationVar(&c.Timeout, "timeout", 2*time.Minute, "бюджет одного набора")
@@ -83,6 +85,8 @@ func runWarm(args []string) error {
 		return &usageError{"--all и --config несовместимы"}
 	case o.All && o.Set != "main":
 		return &usageError{"--all и --set несовместимы: прогреваются все наборы"}
+	case o.All && o.URL != "":
+		return &usageError{"--all ходит в панель: укажите --panel, а не --url"}
 	case o.Token != "" && o.TokenFile != "":
 		return &usageError{"выберите что-то одно: --token или --token-file"}
 	case o.Timeout <= 0:
@@ -347,11 +351,14 @@ type panelSet struct {
 	Open      bool   `json:"open"`
 }
 
-// panelBaseURL: с --all --url — адрес самой панели; иначе локальная панель на
+// panelBaseURL: --panel, иначе MCPRIG_PANEL_URL, иначе локальная панель на
 // MCPRIG_PORT (9091 по умолчанию, как в deploy/mcprig.service).
 func panelBaseURL(o *warmConfig) string {
-	if o.URL != "" {
-		return o.URL
+	if o.Panel != "" {
+		return o.Panel
+	}
+	if v := os.Getenv("MCPRIG_PANEL_URL"); v != "" {
+		return v
 	}
 	return "http://127.0.0.1:" + envDefault("MCPRIG_PORT", "9091")
 }

@@ -144,7 +144,7 @@ func TestWarmAllPanelDown(t *testing.T) {
 
 	var runErr error
 	out := captureStdout(t, func() {
-		runErr = runWarm([]string{"--all", "--url", srv.URL})
+		runErr = runWarm([]string{"--all", "--panel", srv.URL})
 	})
 	if !errors.Is(runErr, errWarmProblems) {
 		t.Fatalf("err = %v, want errWarmProblems", runErr)
@@ -179,7 +179,7 @@ func TestEndpointForMarksOpenSet(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	o := &warmConfig{URL: srv.URL}
+	o := &warmConfig{Panel: srv.URL}
 	endpoint, err := endpointFor(context.Background(), o, "main")
 	if err != nil || endpoint != "http://127.0.0.1:9101/mcp" || !o.setOpen {
 		t.Fatalf("endpoint=%q open=%v err=%v", endpoint, o.setOpen, err)

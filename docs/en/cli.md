@@ -168,7 +168,7 @@ ok: панель 127.0.0.1:9088: /healthz 200
 
 ```bash
 mcprig warm --set main
-mcprig warm --all --url http://127.0.0.1:9091 --password "$MCPRIG_PASSWORD"
+mcprig warm --all --panel http://127.0.0.1:9088 --password "$MCPRIG_PASSWORD"
 mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 ```
 
@@ -180,7 +180,8 @@ unpack. The path is the client's: an HTTP MCP request to the set, or, with
 
 | flag | default | meaning |
 | --- | --- | --- |
-| `-url` | empty: the set's address from the panel `/api/sets`; with `-all` — the panel address | set endpoint (`http://127.0.0.1:9101/mcp`) or panel URL |
+| `-url` | empty: the set endpoint comes from the panel `/api/sets` | direct set endpoint (`http://127.0.0.1:9101/mcp`), no panel needed |
+| `-panel` | `MCPRIG_PANEL_URL`, else `http://127.0.0.1:$MCPRIG_PORT` | panel address: the set's port for `-set`, every set for `-all` |
 | `-set` | `main` | set name: token file and report line |
 | `-all` | | every set listed by the panel; one line per set |
 | `-timeout` | `2m` | budget for one set |
@@ -188,7 +189,7 @@ unpack. The path is the client's: an HTTP MCP request to the set, or, with
 | `-token-file` | empty | file with the bearer key |
 | `-config` | empty | local `servers.json`: in-process warm, no network |
 | `-json` | | the same lines as an array of `{set, tools, ms, error}` |
-| `-password` | `MCPRIG_PASSWORD` | panel password for `-all` |
+| `-password` | `MCPRIG_PASSWORD` | panel password for `-all` and for resolving a set's port by name |
 | `-secret` | `MCPRIG_PROXY_SECRET` | panel proxy secret for `-all` |
 | `-user` | `admin` | panel login name |
 

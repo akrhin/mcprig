@@ -166,7 +166,7 @@ ok: панель 127.0.0.1:9088: /healthz 200
 
 ```bash
 mcprig warm --set main
-mcprig warm --all --url http://127.0.0.1:9091 --password "$MCPRIG_PASSWORD"
+mcprig warm --all --panel http://127.0.0.1:9088 --password "$MCPRIG_PASSWORD"
 mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 ```
 
@@ -178,7 +178,8 @@ mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 
 | флаг | по умолчанию | значение |
 | --- | --- | --- |
-| `-url` | пусто: адрес набора из `/api/sets` панели; с `-all` — адрес панели | адрес набора (`http://127.0.0.1:9101/mcp`) или адрес панели |
+| `-url` | пусто: адрес набора берётся из `/api/sets` панели | прямой MCP-адрес набора (`http://127.0.0.1:9101/mcp`), панель не нужна |
+| `-panel` | `MCPRIG_PANEL_URL`, иначе `http://127.0.0.1:$MCPRIG_PORT` | адрес панели: порт набора для `-set` и все наборы для `-all` |
 | `-set` | `main` | имя набора: файл токена и строка отчёта |
 | `-all` | | все наборы из панели; по строке на набор |
 | `-timeout` | `2m` | бюджет на один набор |
@@ -186,7 +187,7 @@ mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 | `-token-file` | пусто | файл с bearer-ключом |
 | `-config` | пусто | локальный `servers.json`: прогрев в процессе, без сети |
 | `-json` | | те же строки массивом `{set, tools, ms, error}` |
-| `-password` | `MCPRIG_PASSWORD` | пароль панели для `-all` |
+| `-password` | `MCPRIG_PASSWORD` | пароль панели для `-all` и для резолва порта по имени набора |
 | `-secret` | `MCPRIG_PROXY_SECRET` | секрет обратного прокси панели для `-all` |
 | `-user` | `admin` | имя пользователя панели |
 
