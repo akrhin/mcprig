@@ -1,0 +1,72 @@
+name: release
+# Релиз на GitHub. Сборку гоняет Gitea CI по тегу (тесты, govulncheck, goreleaser
+# в Gitea); здесь — те же архивы ещё раз, чтобы у GitHub-релиза были свои файлы:
+# публичный репозиторий, минуты Actions бесплатны.
+#
+# Публикации в Gitea отсюда нет: goreleaser идёт с --skip=publish, ассеты
+# загружает gh. Так .goreleaser.yaml (с gitea_urls и draft) не приходится
+# держать в двух вариантах.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'существующий тег, например v0.3.2'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.27.3'
+  GORELEASER_VERSION: v2.20.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Сборка
+        run: go build ./...
+      # Бинарник goreleaser берём готовый и сверяем sha256: он собирается
+      # тулчейном новее нашего.
+      - name: Установить goreleaser
+        run: |
+          set -euo pipefail
+          tmp="${RUNNER_TEMP:-/tmp}/goreleaser"
+          mkdir -p "$tmp"
+          base="https://github.com/goreleaser/goreleaser/releases/download/${GORELEASER_VERSION}"
+          file="goreleaser_Linux_x86_64.tar.gz"
+          for i in 1 2 3; do
+            if curl -sfL --retry 3 -o "$tmp/$file" "$base/$file" && curl -sfL --retry 3 -o "$tmp/checksums.txt" "$base/checksums.txt"; then
+              break
+            fi
+            echo "скачивание goreleaser: попытка $i не удалась, повтор через 10с"; sleep 10
+          done
+          grep " $file\$" "$tmp/checksums.txt" | (cd "$tmp" && sha256sum -c -)
+          tar -xzf "$tmp/$file" -C "$tmp" goreleaser
+          echo "GORELEASER_BIN=$tmp/goreleaser" >> "$GITHUB_ENV"
+      - name: Собрать архивы
+        run: '"$GORELEASER_BIN" release --clean --skip=publish'
+      - name: Опубликовать релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag || github.ref_name }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/*.tar.gz dist/checksums.txt --clobber
+          else
+            gh release create "$tag" --title "$tag" --generate-notes \
+              dist/*.tar.gz dist/checksums.txt
+          fi
