@@ -76,20 +76,24 @@ jobs:
           cache: true
       # goreleaser не собирается нашим Go (нужен тулчейн новее) — берём готовый
       # бинарник, но только после сверки sha256 по их же checksums.txt.
+      # Качаем в RUNNER_TEMP, а не в рабочее дерево: goreleaser падает на грязном git.
       - name: Установить goreleaser
         run: |
           set -euo pipefail
+          tmp="${RUNNER_TEMP:-/tmp}/goreleaser"
+          mkdir -p "$tmp"
           base="https://github.com/goreleaser/goreleaser/releases/download/${GORELEASER_VERSION}"
           file="goreleaser_Linux_x86_64.tar.gz"
           for i in 1 2 3; do
-            if curl -sfL --retry 3 -o "$file" "$base/$file" && curl -sfL --retry 3 -o checksums.txt "$base/checksums.txt"; then
+            if curl -sfL --retry 3 -o "$tmp/$file" "$base/$file" && curl -sfL --retry 3 -o "$tmp/checksums.txt" "$base/checksums.txt"; then
               break
             fi
             echo "скачивание goreleaser: попытка $i не удалась, повтор через 10с"; sleep 10
           done
-          grep " $file\$" checksums.txt | sha256sum -c -
-          tar -xzf "$file" goreleaser
-          ./goreleaser --version
+          grep " $file\$" "$tmp/checksums.txt" | (cd "$tmp" && sha256sum -c -)
+          tar -xzf "$tmp/$file" -C "$tmp" goreleaser
+          "$tmp/goreleaser" --version
+          echo "GORELEASER_BIN=$tmp/goreleaser" >> "$GITHUB_ENV"
       - name: Релиз
         env:
           # Встроенный токен задачи с permissions.contents=write. Если инстанс его
