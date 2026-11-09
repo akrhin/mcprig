@@ -53,7 +53,10 @@ jobs:
             fi
             echo "скачивание goreleaser: попытка $i не удалась, повтор через 10с"; sleep 10
           done
-          grep " $file\$" "$tmp/checksums.txt" | (cd "$tmp" && sha256sum -c -)
+          # Провал скачивания не должен превращаться в невнятную ошибку sha256sum.
+          test -s "$tmp/$file" && test -s "$tmp/checksums.txt" || { echo "не удалось скачать goreleaser ${GORELEASER_VERSION}"; exit 1; }
+          line=$(grep " $file\$" "$tmp/checksums.txt") || { echo "в checksums.txt нет строки $file"; exit 1; }
+          printf '%s\n' "$line" | (cd "$tmp" && sha256sum -c -)
           tar -xzf "$tmp/$file" -C "$tmp" goreleaser
           echo "GORELEASER_BIN=$tmp/goreleaser" >> "$GITHUB_ENV"
       - name: Собрать архивы
