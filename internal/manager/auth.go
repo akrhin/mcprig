@@ -169,10 +169,11 @@ type auth struct {
 	allowedHosts []string
 	sessions     *sessionStore
 
-	// Защита /api/login: счётчик неудач по IP и один scrypt за раз.
-	loginMu    sync.Mutex
-	loginFails map[string]*failWindow
-	loginSem   chan struct{}
+	// Защита /api/login: счётчик неудач по IP и ограниченный параллелизм scrypt.
+	loginMu      sync.Mutex
+	loginFails   map[string]*failWindow
+	loginSem     chan struct{}
+	loginPending int
 }
 
 type failWindow struct {
@@ -183,6 +184,11 @@ type failWindow struct {
 const (
 	loginMaxFails   = 5
 	loginFailWindow = time.Minute
+
+	// loginMaxConcurrent — сколько scrypt считается одновременно; остальные ждут.
+	loginMaxConcurrent = 2
+	// loginMaxPending — предел считающих и ждущих вместе; сверх него сразу 429.
+	loginMaxPending = 8
 )
 
 func newAuth(o AuthOptions) (*auth, error) {
@@ -226,7 +232,7 @@ func newAuth(o AuthOptions) (*auth, error) {
 	}
 	a.sessions = s
 	a.loginFails = map[string]*failWindow{}
-	a.loginSem = make(chan struct{}, 1)
+	a.loginSem = make(chan struct{}, loginMaxConcurrent)
 	return a, nil
 }
 
@@ -376,11 +382,26 @@ func (a *auth) loginOK(ip string) {
 	a.loginMu.Unlock()
 }
 
-// loginCheck — scrypt под семафором: одновременных проверок не больше одной.
-func (a *auth) loginCheck(user, password string) bool {
+// loginCheck — scrypt под семафором: одновременно не больше loginMaxConcurrent
+// проверок, остальные ждут. Когда считающих и ждущих вместе уже loginMaxPending,
+// отвечаем busy: очередь не растёт, CPU не выедается залпом первых попыток.
+func (a *auth) loginCheck(user, password string) (ok, busy bool) {
+	a.loginMu.Lock()
+	if a.loginPending >= loginMaxPending {
+		a.loginMu.Unlock()
+		return false, true
+	}
+	a.loginPending++
+	a.loginMu.Unlock()
+	defer func() {
+		a.loginMu.Lock()
+		a.loginPending--
+		a.loginMu.Unlock()
+	}()
+
 	a.loginSem <- struct{}{}
 	defer func() { <-a.loginSem }()
-	return a.login(user, password)
+	return a.login(user, password), false
 }
 
 func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, error) {
