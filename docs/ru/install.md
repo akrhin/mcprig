@@ -10,9 +10,9 @@
 | --- | --- |
 | ОС / архитектура | linux, darwin × amd64, arm64 |
 | архив | `mcprig_<version>_<os>_<arch>.tar.gz` |
-| содержимое | `mcprig`, `README.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
+| содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
 | контрольная сумма | `checksums.txt` |
-| релиз | черновик, changelog из git без коммитов `docs:` и `test:` |
+| релиз | черновик в Gitea; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
 Релиз публикуется дважды: в Gitea (источник истины — на тег там идут тесты,

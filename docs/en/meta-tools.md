@@ -206,6 +206,17 @@ Bad input fails the whole request with `isError: true` and nothing is run: no
 calls, more than 8, an unknown key inside a call, a missing `server` or
 `command_name`, `parameters` that is not an object, or a bad `maxBytes`.
 
+## Secret scrubbing
+
+Before an answer is counted or written to `tool-out`, its text content is
+scrubbed of the server's own secrets: values of that server's `env` and
+`headers` whose names contain `key`, `token`, `secret`, `pass`, `auth` or
+`credential` are replaced with `***`. A leading `Bearer ` is stripped first, and
+a value shorter than 8 characters is left alone. `structuredContent` is not
+rewritten — that would break clients reading it. The reason: an upstream repeats
+the key in an error body (tavily returns `api_key` in validation details), and
+that text would otherwise reach the model context.
+
 ## Permissions
 
 The allow/deny block is checked before the server is connected; see

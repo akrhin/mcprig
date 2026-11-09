@@ -16,12 +16,15 @@ stand against real MCP servers.
 ```bash
 go build ./...
 go vet ./...
-go test ./... -race -count=1
+go test ./... -race -count=1 -p 1
 ```
 
 The race-enabled suite is the stage gate. It covers config loading, both
-transports, the four meta-tools, permissions, OAuth against a fake authorization
+transports, the five meta-tools, permissions, OAuth against a fake authorization
 server, HTTP transport rules, the manager API, supervision and statistics.
+
+`-p 1` is required: `internal/manager` and `e2e` start real sets on the shared
+9100–9199 range and take each other's ports when packages run in parallel.
 
 Useful narrower runs:
 
@@ -94,5 +97,7 @@ Logs: the panel writes `$DATA/panel.log`, the set writes
 ## Release build
 
 `.goreleaser.yaml` is the release definition (`goreleaser release --snapshot
---clean` to check locally). `goreleaser` is not installed on the development
-host, so neither the archives nor the changelog rules have been exercised.
+--clean` to check locally). CI builds and publishes the archives on a `v*` tag
+(Gitea, mirrored to GitHub); release notes are the tag's `CHANGELOG.md` section
+via `scripts/release-notes.sh`. `goreleaser` itself is not installed on the
+development host.

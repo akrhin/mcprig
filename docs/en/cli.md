@@ -79,7 +79,9 @@ mcprig stdio --config ~/.config/mcprig/sets/demo/servers.json
 There is no listener and no key: the client owns the process, and the
 transport is the boundary. The proxy writes MCP messages to stdout and logs to
 stderr. `transport` in the file is ignored. Call counters are not collected in
-this mode.
+this mode. Downstream stdio servers are opened with the `initialize` handshake
+(protocol `2025-11-25`), which every server understands; HTTP downstreams keep
+the modern `server/discover` handshake.
 
 ## panel
 

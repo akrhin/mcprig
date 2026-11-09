@@ -135,6 +135,8 @@ Gruvbox, Solarized и Tokyo Night: выбор в шапке, запоминае�
 | `stdio` | отдаёт один набор через stdin/stdout; процессом владеет клиент | `mcprig stdio --config ./servers.json` |
 | `panel` | запускает менеджер и веб-панель | `MCPRIG_PASSWORD=... mcprig panel` |
 | `init` | печатает фрагмент конфигурации клиента; файлов не пишет | `mcprig init --client claude --set demo --remote http://127.0.0.1:9100/mcp --key-file ./demo.key` |
+| `doctor` | отчёт за один проход: конфиг, наборы, ключи, секреты, служебное | `mcprig doctor -json` |
+| `warm` | загружает кэш инструментов набора, чтобы первый вызов клиента был быстрым | `mcprig warm --set demo` |
 
 Флаги, дословно:
 
@@ -144,6 +146,8 @@ Gruvbox, Solarized и Tokyo Night: выбор в шапке, запоминае�
 | `stdio` | `-config` (тот же дефолт) |
 | `panel` | нет; настраивается переменными окружения `MCPRIG_*` |
 | `init` | `-client` (по умолчанию `opencode`), `-set` (по умолчанию `demo`), `-remote`, `-key`, `-key-file`, `-binary` (по умолчанию `mcprig`), `-config` |
+| `doctor` | `-config` (тот же дефолт), `-json` |
+| `warm` | `-url`, `-panel`, `-set` (по умолчанию `main`), `-all`, `-timeout` (по умолчанию `2m`), `-token`, `-token-file`, `-config`, `-json`, `-password`, `-secret`, `-user` |
 
 Флаги принимают одно или два тире (`-config` и `--config` — одно и то же). Коды
 возврата: `0` для справки, `2` для ошибки командной строки, `1` для всего
@@ -220,22 +224,23 @@ true. Полный справочник полей: [docs/ru/configuration.md](d
 | сессия панели | cookie `mcp_session`: случайный id, подписанный HMAC-SHA256, TTL 12 ч, `HttpOnly`, `SameSite=Lax`, `Secure` поверх TLS; сессии живут в памяти, поэтому перезапуск разлогинивает всех |
 | CSRF | записи отклоняют `Sec-Fetch-Site: cross-site`, требуют совпадения `Origin` с `Host` и JSON-тела |
 | политика Host | пустые `allowedHosts` / `MCPRIG_ALLOWED_HOSTS` означают только loopback; `*` отключает проверку |
-| токены | панель и API возвращают только 8-символьный префикс; полный токен показывается один раз, при выпуске ключа |
+| токены | панель и API возвращают только 8-символьный префикс; полный токен показывается один раз — при выпуске ключа или создании набора (`POST /api/sets` отдаёт его в `201`) |
+| ответы тулов | значения `env`/`headers` сервера с секретным именем заменяются на `***` в текстовых ответах до счётчиков и `tool-out` |
 | `/stats` | у открытого набора метки клиентов становятся `(аноним)`, текст ошибок отбрасывается |
 | тело запроса | ограничение 4 МиБ на точке MCP |
 
 ## Установка
 
-Релизные архивы собирает `.goreleaser.yaml` для linux и darwin на amd64 и
-arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, плюс `checksums.txt`).
-Конфигурация написана; `goreleaser` на хосте разработки не установлен, поэтому
-сама сборка архивов не проверена.
+Релизные архивы собирает CI (`.gitea/workflows/release.yml`) для linux и darwin
+на amd64 и arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, плюс `checksums.txt`) и
+публикует в Gitea; GitHub-зеркало (`akrhin/mcprig`) отдаёт те же архивы.
+Заметки релиза берутся из `CHANGELOG.md`.
 
 - юниты systemd (пользовательские): `deploy/mcprig.service` (панель) и
   `deploy/mcprig-set@.service` (один набор на юнит).
 - Docker: `slim` (только бинарник, HTTP-нижестоящие) и `full` (добавляет node и
-  python для stdio-серверов `npx`/`uvx`). Образы на этом хосте не собирались:
-  реестр был недоступен.
+  python для stdio-серверов `npx`/`uvx`). Оба опубликованы в реестре Gitea как
+  `0.3.3-slim`, `0.3.3-full`, а `latest`/`latest-full` идут за релизом.
 
 Подробности: [docs/ru/install.md](docs/ru/install.md).
 
@@ -244,7 +249,7 @@ arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, плюс `checksums.txt`).
 ```bash
 go build ./...
 go vet ./...
-go test ./... -race -count=1
+go test ./... -race -count=1 -p 1
 E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 bash scripts/dev-real-set.sh
 ```
@@ -257,7 +262,8 @@ bash scripts/dev-real-set.sh
 ## Статус
 
 До 1.0, один оператор: одна панель, один пароль, без ролей на пользователя.
-Этапы 0–4 приняты (конфигурация, ядро прокси, OAuth, HTTP-транспорт, менеджер);
-этап 5 (панель) в работе. Справка CLI и строки логов в этой сборке — на русском.
+Этапы 0–6 приняты (конфигурация, ядро прокси, OAuth, HTTP-транспорт, менеджер,
+панель, поставка); релизы до 0.3.3 опубликованы. Справка CLI и строки логов в
+этой сборке — на русском.
 
 Лицензия: MIT, см. [LICENSE](LICENSE).

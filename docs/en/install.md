@@ -10,9 +10,9 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | --- | --- |
 | OS / arch | linux, darwin × amd64, arm64 |
 | archive | `mcprig_<version>_<os>_<arch>.tar.gz` |
-| contents | `mcprig`, `README.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
+| contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
 | checksum | `checksums.txt` |
-| release | draft, changelog from git without `docs:` and `test:` commits |
+| release | draft in Gitea; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
 Releases are published twice: on Gitea (source of truth — tests, `govulncheck`

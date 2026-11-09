@@ -137,6 +137,8 @@ Gruvbox, Solarized and Tokyo Night — picked in the header and remembered in
 | `stdio` | serves one set over stdin/stdout; the client owns the process | `mcprig stdio --config ./servers.json` |
 | `panel` | runs the manager and the web panel | `MCPRIG_PASSWORD=... mcprig panel` |
 | `init` | prints a client config fragment; writes no files | `mcprig init --client claude --set demo --remote http://127.0.0.1:9100/mcp --key-file ./demo.key` |
+| `doctor` | one-pass health report: config, sets, keys, secrets, services | `mcprig doctor -json` |
+| `warm` | loads a set's tool cache so the first client call is fast | `mcprig warm --set demo` |
 
 Flags, verbatim:
 
@@ -146,6 +148,8 @@ Flags, verbatim:
 | `stdio` | `-config` (same default) |
 | `panel` | none; configured through `MCPRIG_*` environment variables |
 | `init` | `-client` (default `opencode`), `-set` (default `demo`), `-remote`, `-key`, `-key-file`, `-binary` (default `mcprig`), `-config` |
+| `doctor` | `-config` (same default), `-json` |
+| `warm` | `-url`, `-panel`, `-set` (default `main`), `-all`, `-timeout` (default `2m`), `-token`, `-token-file`, `-config`, `-json`, `-password`, `-secret`, `-user` |
 
 Flags accept one or two dashes (`-config` and `--config` are the same).
 Exit codes: `0` for help, `2` for a command-line error, `1` for everything
@@ -222,22 +226,24 @@ All five are thin wrappers over the downstream MCP servers. Response forms:
 | panel session | `mcp_session` cookie: random id signed with HMAC-SHA256, 12 h TTL, `HttpOnly`, `SameSite=Lax`, `Secure` over TLS; sessions live in memory, so a restart logs everyone out |
 | CSRF | writes reject `Sec-Fetch-Site: cross-site`, require `Origin` to match `Host`, and require a JSON body |
 | Host policy | empty `allowedHosts` / `MCPRIG_ALLOWED_HOSTS` means loopback only; `*` disables the check |
-| tokens | the panel and API return only the 8-character prefix; the full token is shown once, when a key is issued |
+| tokens | the panel and API return only the 8-character prefix; the full token is shown once, when a key is issued or a set is created (`POST /api/sets` returns it in `201`) |
+| tool answers | values of a server's `env`/`headers` with a secret-like name are replaced with `***` in text answers before counters and `tool-out` |
 | `/stats` | on an open set, client labels become `(аноним)` and error text is dropped |
 | request body | 4 MiB cap on the MCP endpoint |
 
 ## Install
 
-Release archives are built by `.goreleaser.yaml` for linux and darwin on amd64
-and arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, plus `checksums.txt`). The
-config is written; `goreleaser` is not installed on the development host, so
-the archive build itself has not been verified.
+Release archives are built by CI (`.gitea/workflows/release.yml`) for linux and
+darwin on amd64 and arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, plus
+`checksums.txt`) and published on Gitea; the GitHub mirror (`akrhin/mcprig`)
+ships the same archives. Release notes for a tag come from `CHANGELOG.md`.
 
 - systemd user units: `deploy/mcprig.service` (panel) and
   `deploy/mcprig-set@.service` (one set per unit).
 - Docker: `slim` (binary only, HTTP downstreams) and `full` (adds node and
-  python for `npx`/`uvx` stdio servers). The images were not built on this
-  host because the registry was unreachable.
+  python for `npx`/`uvx` stdio servers). Both are published to the Gitea
+  registry as `0.3.3-slim`, `0.3.3-full`, and `latest`/`latest-full` following
+  the release.
 
 Details: [docs/en/install.md](docs/en/install.md).
 
@@ -246,7 +252,7 @@ Details: [docs/en/install.md](docs/en/install.md).
 ```bash
 go build ./...
 go vet ./...
-go test ./... -race -count=1
+go test ./... -race -count=1 -p 1
 E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 bash scripts/dev-real-set.sh
 ```
@@ -257,8 +263,9 @@ shuts it down. More: [docs/en/development.md](docs/en/development.md).
 
 ## Status
 
-Pre-1.0, single operator: one panel, one password, no per-user roles. Stages
-0–4 are accepted (config, proxy core, OAuth, HTTP transport, manager); stage 5
-(the panel) is in progress. CLI help and log lines are Russian in this build.
+Pre-1.0, single operator: one panel, one password, no per-user roles. Stages 0–6
+are accepted (config, proxy core, OAuth, HTTP transport, manager, panel,
+delivery); releases up to 0.3.3 are published. CLI help and log lines are
+Russian in this build.
 
 License: MIT, see [LICENSE](LICENSE).

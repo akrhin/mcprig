@@ -149,5 +149,5 @@ check` (`b2ce4cb`) — шаг в джобе `release` перед `release --clea
 образы Docker публикуются в реестр Gitea — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`
 (`latest` = slim 32 МБ, `latest-full` = с node и python, 334 МБ, плюс теги
 `0.3.3-slim`/`0.3.3-full`);
-путь модуля остаётся `github.com/sintez/mcprig`, репозиторий на GitHub появится,
-когда изделие будет готово.
+путь модуля остаётся `github.com/sintez/mcprig`, публичный репозиторий на GitHub —
+зеркало `akrhin/mcprig` (п. 6 выше).

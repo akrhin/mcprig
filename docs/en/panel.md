@@ -23,13 +23,24 @@ CSP: no inline scripts or styles.
 | footer | totals and last refresh time |
 
 Everything on the page comes from the panel API below plus `GET /stats` of the
-running sets. Nothing is stored in the browser.
+running sets. Nothing else is stored in the browser but the chosen colour
+scheme.
 
 The **Keys** dialog lists key ids, creation and revocation dates and notes. It
-shows only the 8-character prefix; a newly issued token is displayed once.
-Creating a closed set generates its first key but does not reveal the token:
-issue a key to get one. Issuing a key revokes the previous active key and
-restarts the set if it is running; revoking the active key stops the set.
+shows only the 8-character prefix. A newly issued token is displayed once, and
+so is the token of a newly created closed set: `POST /api/sets` returns it in
+the `201` body, while `GET /api/sets` never repeats it. Issuing a key later
+revokes the previous active key and restarts the set if it is running; revoking
+the active key stops the set.
+
+## Themes
+
+The panel ships six colour schemes: mcprig dark (default), light, Nord, Gruvbox,
+Solarized and Tokyo Night. The choice sits in the header, is stored in
+`localStorage['mcprig.theme']`, and the first visit follows
+`prefers-color-scheme`. A scheme is the `data-theme` attribute on `<html>` plus
+its colour rule: the default lives in `app.css`, the other five in `themes.css`;
+the CSP is unchanged (no inline styles).
 
 ## Routes
 
@@ -41,7 +52,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /` | panel (redirects to `/login` when auth is on and there is no session) |
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
 | `GET /api/state` | servers, sets, `firstPort` — the first paint |
-| `GET /api/sets`, `POST /api/sets` | list and create sets |
+| `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
 | `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update (restarts a running set) and delete (stops it) |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
 | `GET /api/sets/<id>/servers` | per-server health for one set |
@@ -87,6 +98,12 @@ set has filled its cache once. The panel prints it in the card head as
 | `GET /healthz` (set) | plain `ok` |
 | `GET /stats` (set) | JSON snapshot for the panel; `Authorization` required unless the set is open |
 
+The panel's own health view (`GET /api/sets/<id>/servers`) uses a 30 s load
+budget — twice the set's 15 s probe timeout — so a set that is still warming is
+not reported as `context deadline exceeded` for every server at once, and the
+answer is cached for 15 s with a single-flight guard, so opening the dashboard
+does not multiply probes across browser tabs.
+
 Both panel health endpoints are public so a container or systemd check can use
 them without credentials. The panel's `/healthz` contains no set names.
 
@@ -106,7 +123,9 @@ both      password and proxy secret
 With password auth the panel sets `mcp_session` (HMAC-SHA256, 12 h, `HttpOnly`,
 `SameSite=Lax`, `Secure` over TLS) and keeps sessions in memory. Login is
 limited to 5 failures per minute per IP and runs at most one scrypt at a time.
-An unauthenticated `GET /` redirects to `/login`; API calls get
+`POST /api/login` answers `400` when `user` or `password` is empty (`401` is
+reserved for a wrong password). An unauthenticated `GET /` redirects to
+`/login`; API calls get
 `401 {"error":"нужна авторизация","login":true}`.
 
 Proxy auth accepts a request when the user header (`Remote-User` by default)
