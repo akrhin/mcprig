@@ -58,11 +58,14 @@ flat (34 → 30 MiB, GC returns the rest).
 
 Honest caveats: the eleven downstream servers dominate either footprint — a
 warm set holds node/python processes worth ~1.5 GiB, of which the proxy is 29
-MiB. The first `list_commands` after a start takes ~11 s because eleven
-`npx`/`uvx` servers are still booting; lazy-mcp pays the same price in the same
-place. Health probes are cached for 15 s, and the tool list is cached for the
-life of a session, so a downstream that changes its tools on a live connection
-would look stale until it reconnects.
+MiB. The first `list_commands` after a start takes ~11 s if it arrives while
+the set is still warming (eleven `npx`/`uvx` servers booting in the
+background); once the warm-up finishes, the same call answers in 6 ms and the
+first client request after it in ~27 ms. lazy-mcp pays the same cold price in
+the same place. Health probes are cached for 15 s, and the tool list is cached
+for the life of a session, so a downstream that changes its tools on a live
+connection would look stale until it reconnects or the client sends
+`{"refresh": true}`.
 
 ## Quick start
 
