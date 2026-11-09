@@ -37,7 +37,7 @@ SSE, CORS, OPTIONS нет. Ошибки: `HttpError.status`, иначе `400`.
 | DELETE | `/api/sets/:id/keys/:keyId` | — | `{ok,wasActive,key,set}`; активный ключ гасит набор |
 | GET | `/api/sets/:id/servers` | — | `{running, servers:[{name,healthy:boolean\|null,error?}]}` |
 | GET | `/api/sets/:id/servers/:name/logs` | `?lines` (200, max 5000) | `{server,logs[]}` |
-| GET/POST | `/api/sets` | `{name,servers[],port?,token?,description?,autostart?,open?}` | `SetEntry[]` / `201`; порт и токен выдаются автоматически |
+| GET/POST | `/api/sets` | `{name,servers[],port?,token?,description?,autostart?,open?}` | `SetEntry[]` / `201`; порт и токен выдаются автоматически; явный порт занят процессом → `409` |
 | PUT/DELETE | `/api/sets/:id` | частичный | `200` / `{ok:true}` (сначала stop) |
 | GET | `/api/sets/:id/logs` | `?lines` (200, max 5000) | `{logs[]}` |
 | GET | `/api/calls` | `?set=<id>&limit=<n>` (50, max 500) | `{set?, calls:[{time,set?,client,server,tool,ms,failed,error?}], counters:[{set?,client,server,tool,calls,failures,totalMs,p50ms,p95ms}], unreachable?:[…]}`, `404` на неизвестный набор |

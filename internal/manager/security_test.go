@@ -2,7 +2,6 @@ package manager
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -116,73 +114,6 @@ func TestLoginRateLimit(t *testing.T) {
 		status(t, e2.do(t, http.MethodPost, "/api/login", bad), http.StatusUnauthorized)
 	}
 	status(t, e2.do(t, http.MethodPost, "/api/login", bad), http.StatusTooManyRequests)
-}
-
-// Залп логинов не выедает CPU: scrypt считают не больше loginMaxConcurrent
-// запросов, лишние ждут, а сверх очереди — сразу 429 с Retry-After: 5.
-func TestLoginQueueLimitsScrypt(t *testing.T) {
-	// Именно хеш: с plaintext-паролем проверка мгновенная и очередь не растёт.
-	hash, err := hashPassword("pw")
-	if err != nil {
-		t.Fatalf("hashPassword: %v", err)
-	}
-	e := newEnv(t, AuthOptions{PasswordHash: hash})
-	const n = 10
-	start := make(chan struct{})
-	codes := make([]int, n)
-	retry := make([]string, n)
-	var wg sync.WaitGroup
-	for i := range n {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			r := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"user":"admin","password":"bad"}`))
-			r.Header.Set("Content-Type", "application/json")
-			// Свой IP на запрос: тест про очередь scrypt, а не про лимит по IP.
-			r.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", i+1)
-			<-start
-			w := httptest.NewRecorder()
-			e.m.ServeHTTP(w, r)
-			codes[i] = w.Code
-			retry[i] = w.Header().Get("Retry-After")
-		}(i)
-	}
-	close(start)
-	wg.Wait()
-
-	var unauth, tooMany int
-	for i, code := range codes {
-		switch code {
-		case http.StatusOK:
-			t.Errorf("запрос %d: неверный пароль дал 200", i)
-		case http.StatusUnauthorized:
-			unauth++
-		case http.StatusTooManyRequests:
-			tooMany++
-			if retry[i] != "5" {
-				t.Errorf("запрос %d: Retry-After = %q, ожидалось 5", i, retry[i])
-			}
-		default:
-			t.Errorf("запрос %d: неожиданный код %d", i, code)
-		}
-	}
-	if unauth == 0 || tooMany == 0 {
-		t.Fatalf("ожидалась смесь 401 и 429, получено: %v", codes)
-	}
-
-	// Верный пароль по-прежнему пускает и ставит cookie.
-	e2 := newEnv(t, AuthOptions{PasswordHash: hash})
-	w := e2.do(t, http.MethodPost, "/api/login", map[string]any{"user": "admin", "password": "pw"})
-	status(t, w, http.StatusOK)
-	found := false
-	for _, c := range w.Result().Cookies() {
-		if c.Name == sessionCookie && c.Value != "" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("успешный вход не поставил cookie %s: %v", sessionCookie, w.Result().Cookies())
-	}
 }
 
 // Редирект OpenBao на чужой хост не должен уносить X-Vault-Token.

@@ -61,8 +61,10 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `POST /api/browse/<id>/{tool,resource,prompt}` | call something in the browse session |
 
 Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
-least one existing server; its `port`, when given, must be 9100–9199, otherwise
-the manager allocates one. `id` and `token` in a create body are ignored.
+least one existing server; its `port`, when given, must be 9100–9199 and free
+in the system, otherwise the manager allocates one; a port held by a process
+gives `409` "port N is taken by a process". `id` and `token` in a create body
+are ignored.
 
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
 registry key. A set that does not answer is listed in `unreachable` by id; its
