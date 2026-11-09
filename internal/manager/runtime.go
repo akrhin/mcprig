@@ -66,8 +66,11 @@ type Runtime struct {
 	bindIP  string
 	// probeAddr — адрес проб: bindIP, а для «все интерфейсы» — loopback.
 	probeAddr string
-	sec       *Secrets
-	log       *slog.Logger
+	// allowedHosts попадает в конфиг каждого набора: без него набор отвечает
+	// «forbidden host» на своё же имя из локальной сети, хотя панель открыта.
+	allowedHosts []string
+	sec          *Secrets
+	log          *slog.Logger
 
 	mu     sync.Mutex
 	procs  map[string]*process
@@ -163,7 +166,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		return RuntimeStatus{}, err
 	}
 
-	body, err := BuildSetConfig(set, setServers(set, servers), rt.bindIP)
+	body, err := BuildSetConfig(set, setServers(set, servers), rt.bindIP, rt.allowedHosts)
 	if err != nil {
 		return RuntimeStatus{}, err
 	}

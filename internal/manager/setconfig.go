@@ -40,7 +40,7 @@ type setFile struct {
 }
 
 // BuildSetConfig собирает конфиг набора из реестра.
-func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string) ([]byte, error) {
+func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string, allowedHosts []string) ([]byte, error) {
 	if set.Token == "" && !set.Open {
 		return nil, fmt.Errorf("у набора %s нет активного ключа — выдайте новый", set.ID)
 	}
@@ -61,6 +61,7 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string)
 			Port:           set.Port,
 			Path:           "/mcp",
 			AuthToken:      set.Token,
+			AllowedHosts:   allowedHosts,
 			AllowAnonymous: set.Open && set.Token == "",
 		},
 		Logging:        map[string]any{"level": "info"},

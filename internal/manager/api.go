@@ -152,6 +152,7 @@ func New(opts Options) (*Manager, error) {
 		browse:  newBrowser(sec, version),
 	}
 	m.rt = NewRuntime(opts.DataDir, cli, opts.BindIP, sec, log)
+	m.rt.allowedHosts = opts.Auth.AllowedHosts
 	m.rt.reload = func(id string) (*registry.Set, []registry.Server) {
 		set := m.store.Set(id)
 		if set == nil {
