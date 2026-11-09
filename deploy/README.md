@@ -6,6 +6,7 @@
 | --- | --- |
 | `mcprig-set@.service` | шаблонный юнит: один набор на порту из `servers.json` |
 | `mcprig.service` | панель: реестр, супервизия наборов (дашборд — этап 5) |
+| `mcprig-warm.service`, `mcprig-warm.timer` | шаблонный прогрев набора раз в 10 минут: первый вызов клиента не платит за холодный кэш |
 | `Dockerfile` | два таргета: `slim` (только бинарник) и `full` (плюс node и python) |
 | `docker-compose.yml` | два набора, конфиги смонтированы read-only, состояние в томах |
 
@@ -28,6 +29,31 @@ systemctl --user enable --now mcprig-set@demo.service
 
 В контейнере состояние — том на `/data`, поэтому `MCPRIG_DATA_DIR=/data` уже
 выставлен в `docker-compose.yml`.
+
+## Прогрев набора
+
+`mcprig warm` загружает кэш инструментов набора: `list_servers`, затем один
+`list_commands` без `refresh` (с `refresh` кэш, наоборот, сбрасывается).
+Таймер ставится на **каждый autostart-набор** — `%i` здесь имя набора:
+
+```bash
+install -Dm644 deploy/mcprig-warm.service ~/.config/systemd/user/mcprig-warm@.service
+install -Dm644 deploy/mcprig-warm.timer   ~/.config/systemd/user/mcprig-warm@.timer
+systemctl --user daemon-reload
+systemctl --user enable --now mcprig-warm@main.timer
+systemctl --user list-timers 'mcprig-warm*'
+```
+
+Проверить, что прогрев идёт:
+
+```bash
+journalctl --user -u mcprig-warm@main -n 20    # строка «итог: 1 набор, N инструмент(ов), X мс»
+systemctl --user start mcprig-warm@main.service # прогнать немедленно
+```
+
+Юнит читает `~/.config/mcprig/panel.env` (если есть) и берёт токен набора из
+`~/.config/mcprig/<набор>.token`; набор с `open: true` прогревается без токена.
+Вручную то же самое: `mcprig warm --set main` (или `--all` через панель).
 
 ## Compose
 

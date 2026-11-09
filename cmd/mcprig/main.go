@@ -53,7 +53,7 @@ func main() {
 			return
 		}
 		// doctor напечатал отчёт сам; лишняя строка об ошибке только шумит.
-		if errors.Is(err, errDoctorProblems) {
+		if errors.Is(err, errDoctorProblems) || errors.Is(err, errWarmProblems) {
 			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, "mcprig:", err)
@@ -146,13 +146,19 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 			return "", nil, err
 		}
 		return "doctor", args[1:], nil
+	case "warm":
+		fs, _ := newWarmFlags()
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
+		}
+		return "warm", args[1:], nil
 	case "panel":
 		if len(args) > 1 {
 			return "", nil, &usageError{fmt.Sprintf("panel не принимает аргументов: %q", args[1:])}
 		}
 		return "panel", nil, nil
 	}
-	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel, init, doctor", args[0])}
+	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel, init, doctor, warm", args[0])}
 }
 
 func run() error {
@@ -169,6 +175,8 @@ func run() error {
 		return runInit(rest)
 	case "doctor":
 		return runDoctor(rest)
+	case "warm":
+		return runWarm(rest)
 	}
 	args := rest
 

@@ -2,7 +2,7 @@ This file lists every subcommand and flag with real examples and their output.
 
 # CLI
 
-`mcprig` has five subcommands. Running it with no subcommand is the same as
+`mcprig` has six subcommands. Running it with no subcommand is the same as
 `mcprig serve`; running it with flags only (`mcprig -config …`) is also
 `serve`.
 
@@ -13,11 +13,12 @@ This file lists every subcommand and flag with real examples and their output.
 | `panel` | manager and web panel (registry, sets, keys, call tail) |
 | `init` | print a client configuration fragment; writes nothing |
 | `doctor` | one-pass health report: config, sets, keys, secrets, services |
+| `warm` | load a set's tool cache so the first client call is fast |
 
 Exit codes: `0` after help, `2` for a command-line error (unknown subcommand,
 extra positional argument, unknown client), `1` for a runtime error (config
-missing, port busy, refused to start without auth) and for a `doctor` report
-with at least one problem.
+missing, port busy, refused to start without auth) and for a `doctor` or
+`warm` report with at least one problem.
 
 ## serve
 
@@ -162,6 +163,60 @@ ok: панель 127.0.0.1:9088: /healthz 200
 
 итог: 1 проблема
 ```
+
+## warm
+
+```bash
+mcprig warm --set main
+mcprig warm --all --url http://127.0.0.1:9091 --password "$MCPRIG_PASSWORD"
+mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
+```
+
+`warm` loads the set's tool cache: `list_servers`, then one `list_commands`
+without `refresh` (that flag would clear the cache instead). A client call right
+after returns in milliseconds instead of waiting for every downstream to
+unpack. The path is the client's: an HTTP MCP request to the set, or, with
+`-config`, `internal/mcpserver` in-process with no network at all.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-url` | empty: the set's address from the panel `/api/sets`; with `-all` — the panel address | set endpoint (`http://127.0.0.1:9101/mcp`) or panel URL |
+| `-set` | `main` | set name: token file and report line |
+| `-all` | | every set listed by the panel; one line per set |
+| `-timeout` | `2m` | budget for one set |
+| `-token` | empty | bearer key (visible in `ps`; prefer `-token-file`) |
+| `-token-file` | empty | file with the bearer key |
+| `-config` | empty | local `servers.json`: in-process warm, no network |
+| `-json` | | the same lines as an array of `{set, tools, ms, error}` |
+| `-password` | `MCPRIG_PASSWORD` | panel password for `-all` |
+| `-secret` | `MCPRIG_PROXY_SECRET` | panel proxy secret for `-all` |
+| `-user` | `admin` | panel login name |
+
+Key precedence: `-token`, `-token-file`, `MCPRIG_TOKEN`, then
+`~/.config/mcprig/<set>.token`; with none of them the command fails and points
+to `mcprig init`. An open set is warmed without a key.
+
+```text
+main: 421 инструмент(ов), 5.6 мс
+итог: 1 набор, 421 инструмент(ов), 5.6 мс
+```
+
+`-json` prints the same rows:
+
+```json
+[
+  {
+    "set": "main",
+    "tools": 421,
+    "ms": 5.6
+  }
+]
+```
+
+Exit code: `0` when every set warmed, `1` when any set failed (panel
+unreachable, missing key, timeout); the failing line carries the reason.
+`deploy/mcprig-warm.timer` repeats this every ten minutes — see
+`deploy/README.md`.
 
 ## init
 

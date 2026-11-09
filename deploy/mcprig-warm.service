@@ -1,0 +1,18 @@
+# Шаблон на один набор. Ставится как mcprig-warm@.service:
+#   install -Dm644 deploy/mcprig-warm.service ~/.config/systemd/user/mcprig-warm@.service
+# Имя с @ обязательно: %i — имя набора, у обычного юнита он пуст.
+[Unit]
+Description=mcprig warm set %i
+Documentation=file://%h/.config/mcprig/sets/%i/servers.json
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Панель даёт порт набора и пароль для /api/sets; без файла тоже работает,
+# если панель открыта или вызов идёт с --url.
+EnvironmentFile=-%h/.config/mcprig/panel.env
+ExecStart=%h/.local/bin/mcprig warm --set %i
+SyslogIdentifier=mcprig-warm-%i
+NoNewPrivileges=yes
+PrivateTmp=yes

@@ -1,0 +1,13 @@
+# Ставится как mcprig-warm@.timer; один таймер на каждый autostart-набор.
+#   install -Dm644 deploy/mcprig-warm.timer ~/.config/systemd/user/mcprig-warm@.timer
+[Unit]
+Description=mcprig warm set %i every 10 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=10min
+Persistent=true
+Unit=mcprig-warm@%i.service
+
+[Install]
+WantedBy=timers.target
