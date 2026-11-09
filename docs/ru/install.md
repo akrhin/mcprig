@@ -15,8 +15,15 @@
 | релиз | черновик, changelog из git без коммитов `docs:` и `test:` |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Конфигурация написана, но `goreleaser` на хосте разработки не установлен,
-поэтому архивы здесь не собраны и не проверены. Собрать тот же бинарник руками:
+Релиз публикуется дважды: в Gitea (источник истины — на тег там идут тесты,
+`govulncheck` и `goreleaser`) и на GitHub в публичном зеркале `akrhin/mcprig`,
+где `.github/workflows/release.yml` собирает те же архивы через
+`goreleaser --skip=publish` и загружает их `gh`. Скачивать с
+<https://github.com/akrhin/mcprig/releases>; любой тег можно выпустить и
+руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
+
+`goreleaser` на хосте разработки не установлен, архивы собирает CI, а не он.
+Собрать тот же бинарник руками:
 
 ```bash
 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(git describe --tags)" -o mcprig ./cmd/mcprig
@@ -74,18 +81,18 @@ systemctl --user enable --now mcprig.service
 ```bash
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.1-slim    # закреплённый релиз
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.1-full
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.2-slim    # закреплённый релиз
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.2-full
 ```
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
-(`0.3.1-slim`, `0.3.1-full` — текущая).
+(`0.3.2-slim`, `0.3.2-full` — текущая).
 
 Либо собрать самому:
 
 ```bash
-docker build --build-arg VERSION=v0.3.1 -t mcprig:slim .
-docker build --build-arg VERSION=v0.3.1 --target full -t mcprig:full .
+docker build --build-arg VERSION=v0.3.2 -t mcprig:slim .
+docker build --build-arg VERSION=v0.3.2 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \

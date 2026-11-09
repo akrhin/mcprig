@@ -80,6 +80,14 @@ health, вызовы). Экран показывает то, чего сейча
    `context deadline exceeded`. `initialize` понимают все, подписка на
    `tools/list_changed` объявляется и в нём, так что потерь нет. HTTP-транспорт
    остался на современном хендшейке: там stateless-обнаружение и есть смысл.
+6. GitHub — публичное зеркало `akrhin/mcprig` (push-зеркало из Gitea, мастер и
+   теги уезжают сами). Релиз там собирает `.github/workflows/release.yml`:
+   goreleaser идёт с `--skip=publish`, архивы и `checksums.txt` загружает `gh`
+   (`.goreleaser.yaml` остаётся один — с `gitea_urls` и `draft`). Публичный
+   репозиторий — минуты Actions бесплатны, так что дубль сборки ничего не
+   стоит, а локальные минуты Gitea тратятся один раз, как раньше. Тег без
+   пушнутого workflow запускается вручную: `gh workflow run release.yml -f
+   tag=vX.Y.Z`. Контрибутор дашборда — `V0rt` (write).
 
 ## Долг, принятый сознательно (2026-11-09)
 

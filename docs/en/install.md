@@ -15,9 +15,15 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | release | draft, changelog from git without `docs:` and `test:` commits |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-The config is written but `goreleaser` is not installed on the development
-host, so archives have not been produced or verified here. To build the same
-binary by hand:
+Releases are published twice: on Gitea (source of truth — tests, `govulncheck`
+and `goreleaser` run there on a tag) and on GitHub in the public mirror
+`akrhin/mcprig`, where `.github/workflows/release.yml` builds the same archives
+with `goreleaser --skip=publish` and uploads them with `gh`. Download from
+<https://github.com/akrhin/mcprig/releases>; any tag can also be released by
+hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
+
+`goreleaser` is not installed on the development host, so archives are built by
+CI, not here. To build the same binary by hand:
 
 ```bash
 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(git describe --tags)" -o mcprig ./cmd/mcprig
@@ -76,18 +82,18 @@ Both are published to the project's Gitea registry, so you can skip the build:
 ```bash
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.1-slim    # pinned release
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.1-full
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.2-slim    # pinned release
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.2-full
 ```
 
 `latest` and `latest-full` follow the newest release; the version tags pin one
-pair (`0.3.1-slim`, `0.3.1-full` are the current pair).
+pair (`0.3.2-slim`, `0.3.2-full` are the current pair).
 
 Or build them yourself:
 
 ```bash
-docker build --build-arg VERSION=v0.3.1 -t mcprig:slim .
-docker build --build-arg VERSION=v0.3.1 --target full -t mcprig:full .
+docker build --build-arg VERSION=v0.3.2 -t mcprig:slim .
+docker build --build-arg VERSION=v0.3.2 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
