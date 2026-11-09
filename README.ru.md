@@ -121,6 +121,10 @@ curl -s http://127.0.0.1:9091/healthz
 
 ![mcprig panel](design/ui/panel.png)
 
+В панели шесть цветовых схем — mcprig dark (по умолчанию), светлая, Nord,
+Gruvbox, Solarized и Tokyo Night: выбор в шапке, запоминается в `localStorage`,
+первый визит следует `prefers-color-scheme`.
+
 ## CLI
 
 | команда | что делает | пример |

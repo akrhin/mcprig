@@ -123,6 +123,10 @@ a key (**Keys** → issue). The token is shown once; save it to `demo.key`
 
 ![mcprig panel](design/ui/panel.png)
 
+The panel ships six colour schemes — mcprig dark (default), light, Nord,
+Gruvbox, Solarized and Tokyo Night — picked in the header and remembered in
+`localStorage`; the first visit follows `prefers-color-scheme`.
+
 ## CLI
 
 | command | what it does | example |

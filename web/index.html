@@ -1,11 +1,14 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="mcprig">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mcprig — панель</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="themes.css">
+<!-- без defer: тема ставится до первой отрисовки, иначе вспышка чужой схемы -->
+<script src="theme.js"></script>
 <script src="app.js" defer></script>
 </head>
 <body>
@@ -38,6 +41,17 @@
         <span class="sr">Поиск по вызовам</span>
         <input type="search" id="q" placeholder="поиск по вызовам" autocomplete="off">
         <kbd>/</kbd>
+      </label>
+      <label class="themesel">
+        <span class="sr">Цветовая схема</span>
+        <select id="theme">
+          <option value="mcprig">mcprig</option>
+          <option value="light">Светлая</option>
+          <option value="nord">Nord</option>
+          <option value="gruvbox">Gruvbox</option>
+          <option value="solarized">Solarized</option>
+          <option value="tokyo">Tokyo Night</option>
+        </select>
       </label>
       <button class="iconbtn" type="button" id="dim" aria-pressed="false" aria-label="Понизить яркость панели">
         <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">

@@ -1,7 +1,6 @@
 /*
-  mcprig — панель. Тёмная тема, единственная.
-  Токены (--background, --surface, --text-dim, --success, --error, шкалы) — копия
-  design/tokens.css: значения палитры живут только там.
+  mcprig — панель. Оболочка и компоненты; цвета — только токены.
+  Схемы на выбор живут в themes.css (data-theme на <html>), здесь — дефолт mcprig dark.
   Правила: без градиентов, теней, стекла и радиусов больше 6px; состояние всегда
   дублируется точкой цвета и текстом, поэтому цвет сам по себе ничего не значит.
 */
@@ -87,6 +86,8 @@
   --chart-3: #a98be0;
   --chart-4: #e0b15c;
 
+  --scrim: rgb(6 23 28 / 0.74); /* затемнение под диалогом */
+
   /* типографика: без веб-шрифтов, только системные стеки */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
@@ -119,15 +120,11 @@
 
 }
 
-/* разделитель-волосок: единственный цвет, которого нет в токенах палитры */
-:root { --hair: rgb(36 80 90 / 0.5); }
-/* приглушённый режим (кнопка в топбаре): только поверхности, текст не трогаем */
-html.dim {
-  --surface: #081a20;
-  --surface-2: #0d262d;
-  --border: #1e434c;
-  --hair: rgb(30 67 76 / 0.55);
-}
+/* разделитель-волосок: половина цвета разделителя из текущей темы */
+:root { --hair: color-mix(in srgb, var(--border) 50%, transparent); }
+/* приглушённый режим (кнопка в топбаре): гасим корпус целиком, а не отдельные
+   токены — так кнопка работает в любой схеме, светлой и тёмной */
+html.dim .shell { filter: brightness(.86); }
 
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -157,11 +154,15 @@ button{font:inherit;color:inherit}
 .counters{display:flex;align-items:center;gap:18px;font-size:12px;color:var(--text-dim);min-width:0;white-space:nowrap}
 .counters b{color:var(--text);font-weight:500}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex:none}
-.search{display:flex;align-items:center;gap:7px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);background:transparent}
+.search{display:flex;align-items:center;gap:7px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);background:transparent;min-width:0}
 .search:focus-within{border-color:var(--text-dim)}
-.search input{width:168px;background:none;border:0;outline:none;color:var(--text);font:inherit}
+.search input{width:168px;min-width:0;background:none;border:0;outline:none;color:var(--text);font:inherit}
 .search input::placeholder{color:var(--text-dim)}
 .search kbd{font:11px/1 var(--font-mono);border:1px solid var(--border);border-radius:2px;padding:2px 4px;color:var(--text-dim)}
+/* выбор схемы: тот же размер, что у поиска и кнопки, чтобы шапка осталась в одну линию */
+.themesel{display:flex;align-items:center;flex:none}
+.themesel select{height:28px;max-width:132px;padding:0 4px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-dim);font:12px var(--font-sans);cursor:pointer;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+.themesel select:hover{background:var(--surface-2);color:var(--text)}
 .iconbtn{width:28px;height:28px;display:grid;place-items:center;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);cursor:pointer}
 .iconbtn:hover{background:var(--surface-2);color:var(--text)}
 .iconbtn[aria-pressed="true"]{color:var(--text);background:var(--surface-2)}
@@ -209,7 +210,7 @@ code{font-family:var(--font-mono);font-size:12px;color:var(--text);letter-spacin
 .btn{background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:5px 12px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--surface-2)}
 .btn.primary{border-color:var(--accent);color:var(--accent)}
-.btn.primary:hover{background:rgba(43,179,163,.1)}
+.btn.primary:hover{background:color-mix(in srgb, var(--accent) 12%, transparent)}
 .btn:disabled{color:var(--text-dim);border-color:var(--border);background:transparent;cursor:default}
 
 /* ---------- KPI strip ---------- */
@@ -281,7 +282,7 @@ ul.list{list-style:none;margin:0;padding:0;display:grid}
 
 /* ---------- dialog ---------- */
 dialog{border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);padding:0;width:min(620px,calc(100% - 32px))}
-dialog::backdrop{background:rgba(6,23,28,.74)}
+dialog::backdrop{background:var(--scrim)}
 .dlg-h{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)}
 .dlg-h h3{font-size:13px;font-weight:600;margin:0}
 .dlg-h .mini{margin-left:auto}
@@ -325,6 +326,17 @@ dialog::backdrop{background:rgba(6,23,28,.74)}
   .search input{width:96px}
   .kpi .spark{display:none}
   .status .optional{display:none}
+}
+/* узкий телефон: шапка обязана остаться в одну строку, поэтому поле поиска и
+   выбор схемы сжимаются, а декоративный аватар уходит */
+@media (max-width:430px){
+  .search input{width:64px}
+  .themesel select{max-width:108px}
+  .avatar{display:none}
+}
+/* уже 356px четыре контрола в шапку не влезают: поиск уступает место выбору схемы */
+@media (max-width:355px){
+  .search{display:none}
 }
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important}

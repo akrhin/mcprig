@@ -7,7 +7,7 @@ import (
 	"io/fs"
 )
 
-//go:embed index.html app.css app.js favicon.svg mock/*.json
+//go:embed index.html app.css themes.css app.js theme.js favicon.svg mock/*.json
 var assets embed.FS
 
 // FS отдаёт файлы панели без каталога mock/.

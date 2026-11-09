@@ -604,6 +604,14 @@
     document.documentElement.classList.toggle('dim', !on);
   });
 
+  // схему выбирает select в шапке; сам атрибут ставит theme.js до первой отрисовки
+  var themeSel = $('theme');
+  themeSel.value = document.documentElement.getAttribute('data-theme');
+  themeSel.addEventListener('change', function () {
+    document.documentElement.setAttribute('data-theme', themeSel.value);
+    try { localStorage.setItem('mcprig.theme', themeSel.value); } catch (e) { /* приватный режим */ }
+  });
+
   $('copy').addEventListener('click', function () {
     var btn = this;
     var text = $('endpoint').textContent;
