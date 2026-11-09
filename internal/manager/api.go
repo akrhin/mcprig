@@ -380,7 +380,18 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		user, password = body.User, body.Password
 	}
-	if !m.auth.loginCheck(user, password) {
+	ok, busy := m.auth.loginCheck(user, password)
+	if busy {
+		// Очередь на scrypt заполнена: пароль даже не проверялся.
+		w.Header().Set("Retry-After", "5")
+		if isForm {
+			writeHTML(w, http.StatusTooManyRequests, loginTemplate, loginData{Error: "слишком много попыток входа, повторите позже"})
+			return
+		}
+		m.fail(w, r, &httpError{http.StatusTooManyRequests, "слишком много попыток входа, повторите позже"})
+		return
+	}
+	if !ok {
 		m.auth.loginFailed(ip)
 		if isForm {
 			writeHTML(w, http.StatusUnauthorized, loginTemplate, loginData{Error: "неверный логин или пароль"})
