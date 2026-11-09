@@ -83,6 +83,19 @@ E2E_BASE=http://127.0.0.1:9093 E2E_STRICT=1 ./scripts/contract-e2e.sh  # PASS п
 опрос в `/api/calls`, потолок `lines=5000`. Осталось сознательно: `caps.Logging`
 (deprecated в SDK, поле видно в browse до смены ревизии протокола).
 
+## Выпуск 0.3.1 и эксплуатация (2026-11-09)
+
+- Образы в реестре Gitea обновлены до `0.3.1`: `0.3.1-slim` (32.5 МБ) и
+  `0.3.1-full` (334 МБ), на них же переставлены `latest`/`latest-full`.
+  Собраны с `--build-arg VERSION=v0.3.1`, внутри `mcprig -version` → `v0.3.1`
+  (прежние `0.3.0-*` отвечали `dev`). Дайджест индекса у версии и у `latest`
+  один: slim `sha256:3abe59392f8c…`, full `sha256:8d1f6e38263c…`.
+- Плагин маршрута `~/.config/opencode/plugins/mcprig-route.ts` загружен
+  процессом панели (`msg="loading plugin" id=…/mcprig-route.ts … role=server`),
+  подсказка проверена в новой сессии панели — ответ дословно цитирует «MCP
+  живёт за mcprig…». `opencode plugin list` проверкой не годится: это список
+  сервера, к которому подключён CLI.
+
 ## Цель этапа 5
 
 Панель по макету `design/ui/`: страница из внешних `app.css`/`app.js` (без

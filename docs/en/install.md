@@ -76,13 +76,18 @@ Both are published to the project's Gitea registry, so you can skip the build:
 ```bash
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.1-slim    # pinned release
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.1-full
 ```
+
+`latest` and `latest-full` follow the newest release; the version tags pin one
+pair (`0.3.1-slim`, `0.3.1-full` are the current pair).
 
 Or build them yourself:
 
 ```bash
-docker build -t mcprig:slim .
-docker build --target full -t mcprig:full .
+docker build --build-arg VERSION=v0.3.1 -t mcprig:slim .
+docker build --build-arg VERSION=v0.3.1 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \

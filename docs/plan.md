@@ -85,11 +85,13 @@ health, вызовы). Экран показывает то, чего сейча
 
 - **`caps.Logging`** в browse: поле deprecated в SDK (SEP-2577), исчезнет в
   следующей ревизии протокола — тогда убрать.
-- **Плагин маршрута** `~/.config/opencode/plugins/mcprig-route.ts` лежит на диске,
-  импортируется, но загружает его только новый процесс opencode: сервер,
-  работающий с 10:50, стартовал раньше файла и каталог заново не читает.
-  Включается сам после планового рестарта; проверка — `opencode plugin list`
-  должен показать `host.mcprig-route`.
+- **Плагин маршрута** `~/.config/opencode/plugins/mcprig-route.ts` загружается
+  процессом панели: в `~/.local/share/opencode/log/opencode.log` есть строка
+  `msg="loading plugin" id=…/mcprig-route.ts … role=server`, а новая сессия
+  панели цитирует подсказку «MCP живёт за mcprig…». `opencode plugin list` для
+  проверки не годится: команда печатает список того сервера, к которому
+  подключился сам CLI, и при живом инстансе может ответить
+  `No plugins found`.
 - **Выгрузки `tool-out`** чистятся по TTL 24 ч и потолку 256 MiB (`5a98eea`);
   `stdio` чистку не запускает — процесс короткоживущий.
 
@@ -106,6 +108,6 @@ check` (`b2ce4cb`) — шаг в джобе `release` перед `release --clea
 Нет. Каналы — только архивы goreleaser (обёртки npm/PyPI/crates не заводим);
 образы Docker публикуются в реестр Gitea — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`
 (`latest` = slim 32 МБ, `latest-full` = с node и python, 334 МБ, плюс теги
-`0.3.0-slim`/`0.3.0-full`);
+`0.3.1-slim`/`0.3.1-full`);
 путь модуля остаётся `github.com/sintez/mcprig`, репозиторий на GitHub появится,
 когда изделие будет готово.
