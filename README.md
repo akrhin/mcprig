@@ -28,6 +28,8 @@ Each set runs as its own `mcprig serve` process on its own port with its own
 bearer key (or explicitly open), so a restart or a crash of one set does not
 touch the others.
 
+Release notes live in [CHANGELOG.md](CHANGELOG.md).
+
 `servers.json` is the lazy-mcp format, read as-is: `servers[]`, both `command`
 forms, `url`, `env`, `headers`, `transport`, `healthMonitor`,
 `requestTimeout`. A server with a broken field stays in the list as unhealthy
