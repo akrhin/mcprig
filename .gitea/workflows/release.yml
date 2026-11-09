@@ -102,6 +102,15 @@ jobs:
           tar -xzf "$tmp/$file" -C "$tmp" goreleaser
           "$tmp/goreleaser" --version
           echo "GORELEASER_BIN=$tmp/goreleaser" >> "$GITHUB_ENV"
+      # Конфиг проверяем до сборки: невалидный .goreleaser.yaml иначе уронит
+      # релиз уже после публикации части артефактов.
+      - name: Проверить конфиг goreleaser
+        run: |
+          set -euo pipefail
+          if ! "$GORELEASER_BIN" check; then
+            echo "goreleaser check: .goreleaser.yaml невалиден — релиз остановлен"
+            exit 1
+          fi
       - name: Релиз
         env:
           # Встроенный токен задачи с permissions.contents=write. Если инстанс его
