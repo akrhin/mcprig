@@ -83,7 +83,7 @@ func TestStdioModeIsClientOwned(t *testing.T) {
 	msg := read(2)
 	result, _ := msg["result"].(map[string]any)
 	tools, _ := result["tools"].([]any)
-	if len(tools) != 4 {
-		t.Fatalf("ожидалось 4 мета-тула, получено %d: %v", len(tools), result)
+	if len(tools) != 5 {
+		t.Fatalf("ожидалось 5 мета-тулов, получено %d: %v", len(tools), result)
 	}
 }

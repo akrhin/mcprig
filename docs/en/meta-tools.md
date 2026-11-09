@@ -1,9 +1,9 @@
-This file documents the four meta-tools a client sees, with the exact response
+This file documents the meta-tools a client sees, with the exact response
 shapes and error text.
 
 # Meta tools
 
-A set exposes exactly four MCP tools. Downstream tools are not listed to the
+A set exposes five MCP tools. Downstream tools are not listed to the
 client; they are reached through `invoke_command`.
 
 | tool | purpose |
@@ -12,6 +12,7 @@ client; they are reached through `invoke_command`.
 | `list_commands` | tool names of one or more servers |
 | `describe_commands` | input schemas for named tools |
 | `invoke_command` | call one downstream tool |
+| `invoke_many` | call up to 8 independent tools in one request |
 
 Every error below is returned as a normal tool result with `isError: true` and
 one text item whose text starts with `Error: `. The MCP call itself does not
@@ -172,6 +173,39 @@ on first use. An answer within the cap is returned untouched — no file, no
 marker. A non-numeric or negative `maxBytes`, or one above 1048576, is an
 error like any other bad argument.
 
+## invoke_many
+
+Input: `{"calls": [{"server": "echo", "command_name": "echo", "parameters": {"text": "a"}}, …], "maxBytes": 4096}`
+
+| field | meaning |
+| --- | --- |
+| `calls` | required; 1 to 8 calls, each shaped like one `invoke_command` call |
+| `maxBytes` | optional cap applied to **each** answer; same default and limits as `invoke_command` |
+
+Calls run in parallel. At most 4 calls hit one downstream server at the same
+time (eight at once made a downstream drop the batch), and at most 8 run in
+total. One `requestTimeout` bounds the whole fan-out, not each call.
+
+The answer is an array with one entry per call, **in the order of `calls`**, not
+in completion order:
+
+```json
+[
+  {"ok": true, "server": "echo", "command_name": "echo", "result": "echo:{\"text\":\"a\"}", "ms": 12},
+  {"ok": false, "server": "nope", "command_name": "x", "error": "неизвестный сервер \"nope\"", "ms": 0}
+]
+```
+
+`result` is what `invoke_command` would return: the text of a single text item,
+or the whole result object otherwise, truncated at `maxBytes`. A call that
+failed — unknown or disabled server, denied by permissions, transport error,
+timeout, or a downstream result with `isError: true` — keeps its slot with
+`ok: false` and `error`; the other calls are unaffected.
+
+Bad input fails the whole request with `isError: true` and nothing is run: no
+calls, more than 8, an unknown key inside a call, a missing `server` or
+`command_name`, `parameters` that is not an object, or a bad `maxBytes`.
+
 ## Permissions
 
 The allow/deny block is checked before the server is connected; see
@@ -189,10 +223,11 @@ The `_meta.lazyMcpPolicy` marker is what host hooks look for.
 
 ## Counters
 
-Every completed `invoke_command` is counted in the set process: per client, per
-server and per tool, with p50/p95 and a ring of recent calls. A downstream
-result carrying `isError: true` counts as a failure. The panel reads this
-through `GET /stats`; stdio mode does not collect counters.
+Every completed `invoke_command` — and every call inside `invoke_many` — is
+counted in the set process: per client, per server and per tool, with p50/p95
+and a ring of recent calls. A downstream result carrying `isError: true` counts
+as a failure. The panel reads this through `GET /stats`; stdio mode does not
+collect counters.
 
 The client label comes from `_meta["io.modelcontextprotocol/clientInfo"]` of the
 request being counted — the SEP-2575 per-request client info. It is written as

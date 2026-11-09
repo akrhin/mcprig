@@ -1,5 +1,5 @@
 // Package mcpserver aggregates a set's downstream servers into one MCP server
-// exposing lazy-mcp's four meta-tools. Sessions are opened on first use and
+// exposing lazy-mcp's meta-tools. Sessions are opened on first use and
 // shared by every later call.
 package mcpserver
 
@@ -188,7 +188,7 @@ func (m *Manager) Close() error {
 	return errors.Join(errs...)
 }
 
-// Server builds the MCP server carrying the four meta-tools.
+// Server builds the MCP server carrying the meta-tools.
 func (m *Manager) Server() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "mcprig", Version: m.version}, nil)
 	s.AddTool(&mcp.Tool{
@@ -247,6 +247,34 @@ func (m *Manager) Server() *mcp.Server {
 			},
 		}, "server", "command_name"),
 	}, m.invokeCommand)
+	s.AddTool(&mcp.Tool{
+		Name: "invoke_many",
+		Description: "Выполнить до 8 независимых вызовов одним запросом. " +
+			"Каждый вызов — как invoke_command: server, command_name и parameters. " +
+			"Ответ — массив в порядке calls; ошибка одного вызова не валит остальные.",
+		InputSchema: objectSchema(map[string]any{
+			"calls": map[string]any{
+				"type":        "array",
+				"description": "Вызовы (не больше 8): server, command_name и необязательные parameters",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"server":       map[string]any{"type": "string", "description": "Server name"},
+						"command_name": map[string]any{"type": "string", "description": "Command name to execute"},
+						"parameters": map[string]any{
+							"type":        "object",
+							"description": "Optional downstream command input object. Put the target command inputs here.",
+						},
+					},
+					"required": []string{"server", "command_name"},
+				},
+			},
+			"maxBytes": map[string]any{
+				"type":        "integer",
+				"description": "Optional: cap each returned answer at this many bytes (default 32768, at most 1048576).",
+			},
+		}, "calls"),
+	}, m.invokeMany)
 	return s
 }
 
@@ -562,15 +590,9 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if in.CommandName == "" {
 		return errResult(errors.New("command_name обязателен"))
 	}
-	maxBytes := in.MaxBytes
-	if maxBytes < 0 {
-		return errResult(errors.New("maxBytes: не может быть отрицательным"))
-	}
-	if maxBytes > maxAllowedBytes {
-		return errResult(fmt.Errorf("maxBytes: допустимо не больше %d байт", maxAllowedBytes))
-	}
-	if maxBytes == 0 {
-		maxBytes = defaultMaxBytes
+	maxBytes, err := resolveMaxBytes(in.MaxBytes)
+	if err != nil {
+		return errResult(err)
 	}
 	e := m.find(in.Server)
 	if e == nil {
@@ -583,19 +605,33 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		return blockedResult(e.srv.Name, in.CommandName, message), nil
 	}
 
-	args := any(map[string]any{})
-	if trimmed := strings.TrimSpace(string(in.Parameters)); trimmed != "" && trimmed != "null" {
-		if !strings.HasPrefix(trimmed, "{") {
-			return errResult(errors.New("parameters: ожидался объект"))
-		}
-		args = in.Parameters
+	args, err := parametersOf(in.Parameters)
+	if err != nil {
+		return errResult(err)
 	}
 
 	callCtx, cancel := m.callCtx(ctx)
 	defer cancel()
-	params := &mcp.CallToolParams{Name: in.CommandName, Arguments: args}
+	res, err := m.callWithRetry(callCtx, labelOf(ctx, req), e, in.CommandName, args)
+	if err != nil {
+		if callCtx.Err() == context.DeadlineExceeded {
+			return errResult(fmt.Errorf("таймаут вызова %d мс", m.cfg.RequestTimeout))
+		}
+		return errResult(err)
+	}
+	if res == nil {
+		return res, nil
+	}
+	return truncateResult(res, maxBytes)
+}
+
+// callWithRetry runs one downstream call under invoke_command's retry rule and
+// counts the outcome. Only a drop before the first response byte is repeated,
+// so a side effect is never performed twice.
+func (m *Manager) callWithRetry(ctx context.Context, label string, e *entry, name string, args any) (*mcp.CallToolResult, error) {
+	params := &mcp.CallToolParams{Name: name, Arguments: args}
 	start := time.Now()
-	res, err := m.callTool(callCtx, e, params)
+	res, err := m.callTool(ctx, e, params)
 	if retryableCall(res, err) {
 		// Only a drop before any response byte reaches here: nothing was
 		// returned, so the call did not produce a result to hand back. Repeat it
@@ -604,8 +640,8 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		m.dropSession(e)
 		select {
 		case <-time.After(invokeRetryDelay):
-			res, err = m.callTool(callCtx, e, params)
-		case <-callCtx.Done():
+			res, err = m.callTool(ctx, e, params)
+		case <-ctx.Done():
 		}
 	}
 	// Счётчик пишется только по разрешённому имени: апстрим ответил (res != nil),
@@ -619,18 +655,35 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		recErr = errors.New(resultMessage(res))
 	}
 	if m.Stats != nil && (err == nil || res != nil) {
-		m.Stats.Record(labelOf(ctx, req), e.srv.Name, in.CommandName, time.Since(start), recErr)
+		m.Stats.Record(label, e.srv.Name, name, time.Since(start), recErr)
 	}
-	if err != nil {
-		if callCtx.Err() == context.DeadlineExceeded {
-			return errResult(fmt.Errorf("таймаут вызова %d мс", m.cfg.RequestTimeout))
-		}
-		return errResult(err)
+	return res, err
+}
+
+// resolveMaxBytes validates the optional cap and applies the default.
+func resolveMaxBytes(requested int) (int, error) {
+	if requested < 0 {
+		return 0, errors.New("maxBytes: не может быть отрицательным")
 	}
-	if res == nil {
-		return res, nil
+	if requested > maxAllowedBytes {
+		return 0, fmt.Errorf("maxBytes: допустимо не больше %d байт", maxAllowedBytes)
 	}
-	return truncateResult(res, maxBytes)
+	if requested == 0 {
+		return defaultMaxBytes, nil
+	}
+	return requested, nil
+}
+
+// parametersOf decodes the wrapper's parameters: absent and null mean {}.
+func parametersOf(raw json.RawMessage) (any, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return map[string]any{}, nil
+	}
+	if !strings.HasPrefix(trimmed, "{") {
+		return nil, errors.New("parameters: ожидался объект")
+	}
+	return raw, nil
 }
 
 // ─── shared helpers ───────────────────────────────────────────────────────────
@@ -850,18 +903,11 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 	if req == nil || req.Params == nil || len(req.Params.Arguments) == 0 {
 		return nil
 	}
-	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(req.Params.Arguments, &keys); err != nil {
+	extra, err := extraKeys(req.Params.Arguments, allowed...)
+	if err != nil {
 		return fmt.Errorf("аргументы: %w", err)
 	}
-	var extra []string
-	for key := range keys {
-		if !slices.Contains(allowed, key) {
-			extra = append(extra, key)
-		}
-	}
 	if len(extra) > 0 {
-		sort.Strings(extra)
 		message := "лишние ключи: " + strings.Join(extra, ", ")
 		if hint != "" {
 			message += " — " + hint
@@ -872,6 +918,22 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 		return fmt.Errorf("аргументы: %w", err)
 	}
 	return nil
+}
+
+// extraKeys lists sorted top-level keys of a JSON object that are not allowed.
+func extraKeys(raw json.RawMessage, allowed ...string) ([]string, error) {
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &keys); err != nil {
+		return nil, err
+	}
+	var extra []string
+	for key := range keys {
+		if !slices.Contains(allowed, key) {
+			extra = append(extra, key)
+		}
+	}
+	sort.Strings(extra)
+	return extra, nil
 }
 
 func jsonResult(v any) (*mcp.CallToolResult, error) {

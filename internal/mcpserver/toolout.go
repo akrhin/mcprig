@@ -56,6 +56,21 @@ func truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult,
 	}, nil
 }
 
+// truncateValue applies the invoke_command cap and hands back what a caller
+// would see: the text of a single text item, anything else serialized.
+func truncateValue(res *mcp.CallToolResult, maxBytes int) (any, error) {
+	cut, err := truncateResult(res, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	if len(cut.Content) == 1 && cut.StructuredContent == nil {
+		if t, ok := cut.Content[0].(*mcp.TextContent); ok {
+			return t.Text, nil
+		}
+	}
+	return cut, nil
+}
+
 // payload is the text the caller would see: a single text item as-is, anything
 // else as its serialized form so nothing (images, structured content) is lost.
 func payload(res *mcp.CallToolResult) ([]byte, error) {
