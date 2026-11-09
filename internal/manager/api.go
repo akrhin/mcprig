@@ -549,9 +549,12 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		return &httpError{http.StatusForbidden, "запрос с чужого сайта"}
 	}
-	if origin := r.Header.Get("Origin"); origin != "" {
+	if origin := r.Header.Get("Origin"); origin != "" && origin != "null" {
 		u, err := url.Parse(origin)
 		if err != nil || !m.originOK(u.Host, r) {
+			// Значения в лог: без них отказ не отладить с чужой машины.
+			m.log.Warn("csrf: origin не совпал", "origin", origin, "host", r.Host,
+				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
 	}
@@ -565,13 +568,26 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 // переписал заголовок, либо имя из MCPRIG_ALLOWED_HOSTS: за обратным прокси
 // Origin остаётся публичным, а Host приходит уже внутренним.
 func (m *Manager) originOK(originHost string, r *http.Request) bool {
-	if strings.EqualFold(originHost, r.Host) {
+	if sameHost(originHost, r.Host) {
 		return true
 	}
-	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" && strings.EqualFold(originHost, fwd) {
+	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" && sameHost(originHost, fwd) {
 		return true
 	}
 	return m.auth.hostOK(originHost)
+}
+
+// sameHost сравнивает без учёта порта и регистра: за прокси Origin может
+// прийти без порта, а Host — с ним.
+func sameHost(a, b string) bool {
+	return strings.EqualFold(hostOnly(a), hostOnly(b))
+}
+
+func hostOnly(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return strings.ToLower(strings.Trim(host, "[]"))
 }
 
 // hostAllowed — то же послабление для самого Host: прокси переписывает его на
