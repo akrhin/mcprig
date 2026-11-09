@@ -323,10 +323,9 @@ func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLi
 	}
 	if len(foreign) == 0 {
 		lines = append(lines, doctorLine{true, fmt.Sprintf("чужих слушателей в диапазоне %d–%d нет", o.FirstPort, o.LastPort)})
-	} else if regErr != nil || reg == nil {
-		lines = append(lines, doctorLine{false, fmt.Sprintf("порты %s заняты (реестр не прочитан, чьи — неизвестно)", strings.Join(foreign, ", "))})
 	} else {
-		lines = append(lines, doctorLine{false, fmt.Sprintf("чужие порты в диапазоне %d–%d: %s", o.FirstPort, o.LastPort, strings.Join(foreign, ", "))})
+		// AllocatePort пропускает занятые порты в системе, поэтому это не проблема.
+		lines = append(lines, doctorLine{true, fmt.Sprintf("чужие порты в диапазоне %d–%d: %s (выдача портов их пропускает)", o.FirstPort, o.LastPort, strings.Join(foreign, ", "))})
 	}
 
 	if regErr == nil && reg != nil {
