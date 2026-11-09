@@ -74,8 +74,9 @@ Servers are queried in parallel, eight at a time.
 
 `{"refresh": true}` (with `list_commands` and `describe_commands`) drops the
 cached tool list and asks the servers again. The cache otherwise lives as long
-as the connection and is dropped with it, so a downstream that changes its
-tools mid-connection stays invisible until a reconnect or a refresh.
+as the connection: the set drops it when the downstream sends
+`notifications/tools/list_changed`, so a tool that appears mid-connection is
+visible on the next call without a refresh.
 
 ```json
 [
@@ -148,10 +149,13 @@ Error: лишние ключи: path — аргументы инструмент
 ```
 
 The downstream result is returned as-is: `content`, `structuredContent` and
-`isError` are preserved. If the downstream closes the session
-(`ErrConnectionClosed`), the proxy reconnects once and repeats the call; a
-second failure is returned with its reason. `requestTimeout`, when set,
-applies to one call.
+`isError` are preserved. If the connection dies before the first response byte
+(`ErrConnectionClosed`, `io.EOF`, a network error), the proxy reconnects, waits
+250 ms and repeats the call once. If the response has already started or the
+tool returned `isError`, there is no retry — the result is returned as it is,
+so a side effect is never performed twice. `list_commands` and
+`describe_commands` are never repeated: they have their own timeouts.
+`requestTimeout`, when set, applies to one call.
 
 An answer longer than `maxBytes` is cut at a UTF-8 boundary; the returned text
 ends with a marker naming the kept and full sizes and the file holding the full

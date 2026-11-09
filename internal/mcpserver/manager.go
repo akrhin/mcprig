@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"os"
 	"slices"
 	"sort"
@@ -40,6 +42,9 @@ const (
 	// warmTimeout bounds one server's warm-up at start: холодный npx/uvx
 	// распаковывается десятками секунд, но не бесконечно.
 	warmTimeout = 2 * time.Minute
+	// invokeRetryDelay is the pause before repeating an invoke whose connection
+	// died before the first response byte.
+	invokeRetryDelay = 250 * time.Millisecond
 )
 
 var (
@@ -125,6 +130,17 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	for _, srv := range cfg.Servers {
 		m.entries = append(m.entries, &entry{srv: srv})
+	}
+	// A downstream that gains or drops tools at runtime says so with
+	// notifications/tools/list_changed. Dropping the cached list here makes the
+	// next list_commands see the change without refresh: true. A caller-supplied
+	// hook wins.
+	if conn.OnToolsChanged == nil {
+		conn.OnToolsChanged = func(srv *config.Server) {
+			if e := m.find(srv.Name); e != nil {
+				e.storeTools(nil)
+			}
+		}
 	}
 	return m
 }
@@ -546,13 +562,21 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 
 	callCtx, cancel := m.callCtx(ctx)
 	defer cancel()
-	var res *mcp.CallToolResult
+	params := &mcp.CallToolParams{Name: in.CommandName, Arguments: args}
 	start := time.Now()
-	err := m.withSession(callCtx, e, func(sess *mcp.ClientSession) error {
-		r, err := sess.CallTool(callCtx, &mcp.CallToolParams{Name: in.CommandName, Arguments: args})
-		res = r
-		return err
-	})
+	res, err := m.callTool(callCtx, e, params)
+	if retryableCall(res, err) {
+		// Only a drop before any response byte reaches here: nothing was
+		// returned, so the call did not produce a result to hand back. Repeat it
+		// once on a fresh session, after a short pause, and let the second
+		// failure speak for itself.
+		e.dropSession()
+		select {
+		case <-time.After(invokeRetryDelay):
+			res, err = m.callTool(callCtx, e, params)
+		case <-callCtx.Done():
+		}
+	}
 	// Счётчик пишется только по разрешённому имени: апстрим ответил (res != nil),
 	// либо ошибки не было вовсе. Неизвестный инструмент и несостоявшееся
 	// соединение дают res == nil — такие имена не должны заводить счётчики,
@@ -651,6 +675,40 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 		return fmt.Errorf("%s: после переподключения: %w", e.srv.Name, err)
 	}
 	return nil
+}
+
+// callTool runs one call on the cached session. Unlike withSession it never
+// retries: invokeCommand decides from the outcome whether a repeat is safe.
+func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolParams) (*mcp.CallToolResult, error) {
+	sess, err := e.conn.session(ctx, m.dialFor(e.srv))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", e.srv.Name, err)
+	}
+	res, err := sess.CallTool(ctx, params)
+	if err != nil {
+		return res, fmt.Errorf("%s: %w", e.srv.Name, err)
+	}
+	return res, nil
+}
+
+// retryableCall reports whether a failed invoke may be repeated. Only a
+// transport failure that produced no result qualifies: ErrConnectionClosed and
+// a clean EOF mean nothing was read back. io.ErrUnexpectedEOF means the reader
+// saw the response start, and any result — including isError — is an answer, so
+// neither is repeated. A context error is the caller's deadline, not a drop.
+func retryableCall(res *mcp.CallToolResult, err error) bool {
+	if err == nil || res != nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, io.ErrUnexpectedEOF) {
+		return false
+	}
+	if errors.Is(err, mcp.ErrConnectionClosed) || errors.Is(err, io.EOF) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr)
 }
 
 // Warm connects every enabled server and fills the tool cache, so the first

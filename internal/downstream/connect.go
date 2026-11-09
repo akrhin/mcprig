@@ -26,6 +26,13 @@ type Connector struct {
 	// так работает manage/serve. Менеджер подставляет whitelist, чтобы чужие
 	// процессы не увидели его секреты.
 	Env func(*config.Server) []string
+
+	// OnToolsChanged вызывается, когда сервер прислал
+	// notifications/tools/list_changed. Набор по ней сбрасывает кэш
+	// tools/list, и новый инструмент виден без refresh: true. SDK подписывается
+	// на уведомление только если сервер объявил tools.listChanged в
+	// InitializeResult (client.go:341 в go-sdk v1.8.0).
+	OnToolsChanged func(*config.Server)
 }
 
 func (c *Connector) Connect(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
@@ -37,12 +44,25 @@ func (c *Connector) Connect(ctx context.Context, srv *config.Server) (*mcp.Clien
 	if version == "" {
 		version = "dev"
 	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "mcprig", Version: version}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "mcprig", Version: version}, c.clientOptions(srv))
 	session, err := client.Connect(ctx, tr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", srv.Name, err)
 	}
 	return session, nil
+}
+
+// clientOptions wires the tool-list notification. The handler runs on the SDK
+// read loop, so it must stay cheap: dropping a cache is all it does.
+func (c *Connector) clientOptions(srv *config.Server) *mcp.ClientOptions {
+	if c.OnToolsChanged == nil {
+		return nil
+	}
+	return &mcp.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) {
+			c.OnToolsChanged(srv)
+		},
+	}
 }
 
 // oauthBlock merges the set-wide block under the server's own.
@@ -82,7 +102,11 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		if err != nil {
 			return nil, err
 		}
-		tr.OAuthHandler = handler
+		// A typed-nil handler would put a non-nil OAuthHandler interface into the
+		// transport, and the SDK would call TokenSource on a nil receiver.
+		if handler != nil {
+			tr.OAuthHandler = handler
+		}
 		return tr, nil
 	default:
 		return nil, fmt.Errorf("неизвестный transport %q", srv.Transport)
