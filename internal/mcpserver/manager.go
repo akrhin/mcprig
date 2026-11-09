@@ -92,16 +92,47 @@ func (e *entry) cachedTools() []*mcp.Tool {
 	return e.tools
 }
 
-func (e *entry) storeTools(tools []*mcp.Tool) {
+func (m *Manager) storeTools(e *entry, tools []*mcp.Tool) {
 	e.toolsMu.Lock()
 	e.tools = tools
 	e.toolsMu.Unlock()
+	m.publishSchema()
 }
 
 // dropSession closes the cached session and the tool list that came with it.
-func (e *entry) dropSession() {
+func (m *Manager) dropSession(e *entry) {
 	e.conn.reset()
-	e.storeTools(nil)
+	m.storeTools(e, nil)
+}
+
+// publishSchema pushes the whole-set list_commands weight to the panel's
+// recorder. Bytes are the JSON of the same answer list_commands builds from
+// the cache, so the number costs no downstream call. A server that has no
+// cached tools yet is simply absent, as it would be from a live answer.
+func (m *Manager) publishSchema() {
+	if m.Stats == nil {
+		return
+	}
+	out := make(map[string][]commandInfo, len(m.entries))
+	tools := 0
+	for _, e := range m.entries {
+		cached := e.cachedTools()
+		if len(cached) == 0 {
+			continue
+		}
+		cmds := make([]commandInfo, 0, len(cached))
+		for _, tool := range cached {
+			cmds = append(cmds, commandInfo{Server: e.srv.Name, Name: tool.Name, Command: tool.Name, Description: tool.Description})
+		}
+		out[e.srv.Name] = cmds
+		tools += len(cmds)
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		return
+	}
+	size := int64(len(raw))
+	m.Stats.SetSchema(stats.Schema{Bytes: size, Tokens: stats.TokensOf(size), Tools: tools})
 }
 
 // healthState is one cached probe result.
@@ -138,7 +169,7 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 	if conn.OnToolsChanged == nil {
 		conn.OnToolsChanged = func(srv *config.Server) {
 			if e := m.find(srv.Name); e != nil {
-				e.storeTools(nil)
+				m.storeTools(e, nil)
 			}
 		}
 	}
@@ -349,7 +380,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 	if in.Refresh {
 		for _, e := range m.entries {
-			e.storeTools(nil)
+			m.storeTools(e, nil)
 		}
 	}
 	switch {
@@ -477,7 +508,7 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 		return errResult(serverProblem(e.srv))
 	}
 	if in.Refresh {
-		e.storeTools(nil)
+		m.storeTools(e, nil)
 	}
 	var tools []*mcp.Tool
 	if cached := e.cachedTools(); cached != nil {
@@ -570,7 +601,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		// returned, so the call did not produce a result to hand back. Repeat it
 		// once on a fresh session, after a short pause, and let the second
 		// failure speak for itself.
-		e.dropSession()
+		m.dropSession(e)
 		select {
 		case <-time.After(invokeRetryDelay):
 			res, err = m.callTool(callCtx, e, params)
@@ -588,7 +619,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		recErr = errors.New(resultMessage(res))
 	}
 	if m.Stats != nil && (err == nil || res != nil) {
-		m.Stats.Record(stats.ClientFrom(ctx, clientOf(req)), e.srv.Name, in.CommandName, time.Since(start), recErr)
+		m.Stats.Record(labelOf(ctx, req), e.srv.Name, in.CommandName, time.Since(start), recErr)
 	}
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {
@@ -604,21 +635,32 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 
 // ─── shared helpers ───────────────────────────────────────────────────────────
 
-// clientOf names the harness behind a call: the initialize handshake carries
-// clientInfo (name and version), so any client labels itself. A client that
-// sends nothing is "unknown" rather than a guess.
-func clientOf(req *mcp.CallToolRequest) string {
-	if req == nil || req.Session == nil {
-		return "unknown"
+// labelOf names the harness behind a call. A per-request clientInfo
+// (_meta["io.modelcontextprotocol/clientInfo"], SEP-2575) wins: a stateless
+// HTTP caller sends it on every request and has no initialize handshake.
+// Without it the transport label stands — key fingerprint plus User-Agent on
+// HTTP — and only a caller that names itself nowhere is "unknown".
+func labelOf(ctx context.Context, req *mcp.CallToolRequest) string {
+	if who := clientInfoOf(req); who != "" {
+		return who
 	}
-	p := req.Session.InitializeParams()
-	if p == nil || p.ClientInfo == nil || p.ClientInfo.Name == "" {
-		return "unknown"
+	return stats.ClientFrom(ctx, "unknown")
+}
+
+// clientInfoOf reads name/version from _meta first, then from the initialize
+// handshake (req.ClientInfo does both). No version — the bare name.
+func clientInfoOf(req *mcp.CallToolRequest) string {
+	if req == nil {
+		return ""
 	}
-	if p.ClientInfo.Version != "" {
-		return p.ClientInfo.Name + "/" + p.ClientInfo.Version
+	info := req.ClientInfo()
+	if info == nil || info.Name == "" {
+		return ""
 	}
-	return p.ClientInfo.Name
+	if info.Version != "" {
+		return info.Name + "/" + info.Version
+	}
+	return info.Name
 }
 
 func (m *Manager) find(name string) *entry {
@@ -666,7 +708,7 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 		}
 		return nil
 	}
-	e.dropSession()
+	m.dropSession(e)
 	sess, err = e.conn.session(ctx, m.dialFor(e.srv))
 	if err != nil {
 		return fmt.Errorf("%s: переподключение после обрыва: %w", e.srv.Name, err)
@@ -747,7 +789,7 @@ func (m *Manager) toolsOf(ctx context.Context, e *entry, sess *mcp.ClientSession
 	if err != nil {
 		return nil, err
 	}
-	e.storeTools(tools)
+	m.storeTools(e, tools)
 	return tools, nil
 }
 

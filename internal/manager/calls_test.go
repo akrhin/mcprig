@@ -38,6 +38,11 @@ type callsBody struct {
 		P95Ms    int64  `json:"p95ms"`
 	} `json:"counters"`
 	Unreachable []string `json:"unreachable"`
+	Schema      *struct {
+		Bytes  int64 `json:"schemaBytes"`
+		Tokens int64 `json:"schemaTokens"`
+		Tools  int   `json:"tools"`
+	} `json:"schema"`
 }
 
 // addSetBody заводит набор с произвольным телом (open, port).
@@ -110,6 +115,9 @@ func TestCallsMergeAndLimit(t *testing.T) {
 	})
 	closedSrv, closedAuth := fakeStats(t, stats.Snapshot{
 		Set: closedID,
+		Schema: &stats.Schema{
+			Bytes: 174 * 1024, Tokens: stats.TokensOf(174 * 1024), Tools: 421,
+		},
 		Counters: []stats.Counter{{
 			Client: "opencode/2.2.6", Server: "git", Tool: "status",
 			Calls: 1, Failures: 1, TotalMs: 40, P50Ms: 40, P95Ms: 40,
@@ -133,6 +141,9 @@ func TestCallsMergeAndLimit(t *testing.T) {
 	}
 	if got.Calls[0].Set != openID || got.Calls[1].Set != closedID || got.Calls[2].Set != openID {
 		t.Fatalf("порядок слияния: %+v", got.Calls)
+	}
+	if got.Schema != nil {
+		t.Fatalf("объединённый ответ несёт вес одного набора: %+v", got.Schema)
 	}
 	if !got.Calls[1].Failed || got.Calls[1].Error == "" || got.Calls[0].Failed {
 		t.Fatalf("провал должен быть помечен: %+v", got.Calls)
@@ -167,6 +178,9 @@ func TestCallsMergeAndLimit(t *testing.T) {
 	got = decode[callsBody](t, w)
 	if got.Set != closedID || len(got.Calls) != 1 || got.Calls[0].Set != "" || len(got.Counters) != 1 {
 		t.Fatalf("/api/calls?set=%s: %s", closedID, w.Body.String())
+	}
+	if got.Schema == nil || got.Schema.Tools != 421 || got.Schema.Tokens != 44544 {
+		t.Fatalf("/api/calls?set=%s: schema = %+v, ожидался вес 174 КБ / 421", closedID, got.Schema)
 	}
 
 	w = e.do(t, http.MethodGet, "/api/calls?set="+openID+"&limit=1", nil)

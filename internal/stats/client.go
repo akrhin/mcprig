@@ -5,8 +5,9 @@ import "context"
 type clientKey struct{}
 
 // WithClient labels the call in flight with the harness behind it: a key id
-// plus User-Agent product token for HTTP callers, the client name from
-// initialize for stdio. The recorder falls back to "unknown".
+// plus User-Agent product token for HTTP callers. The request's _meta client
+// info wins over this label when it is present. The recorder falls back to
+// "unknown".
 func WithClient(ctx context.Context, client string) context.Context {
 	if client == "" {
 		return ctx

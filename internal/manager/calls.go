@@ -49,10 +49,11 @@ type counterRow struct {
 }
 
 type callsResponse struct {
-	Set         string       `json:"set,omitempty"`
-	Calls       []callRow    `json:"calls"`
-	Counters    []counterRow `json:"counters"`
-	Unreachable []string     `json:"unreachable,omitempty"`
+	Set         string        `json:"set,omitempty"`
+	Calls       []callRow     `json:"calls"`
+	Counters    []counterRow  `json:"counters"`
+	Schema      *stats.Schema `json:"schema,omitempty"`
+	Unreachable []string      `json:"unreachable,omitempty"`
 }
 
 // apiCalls собирает /stats запущенных наборов в один ответ панели.
@@ -107,6 +108,10 @@ func (m *Manager) apiCalls(req *request) error {
 		if err != nil {
 			out.Unreachable = append(out.Unreachable, t.set.ID)
 			continue
+		}
+		// Вес схем — свойство одного набора: в объединённом ответе молчим.
+		if id != "" && snap.Schema != nil {
+			out.Schema = snap.Schema
 		}
 		for _, c := range snap.Tail {
 			row := callRow{Time: c.Time, Client: c.Client, Server: c.Server, Tool: c.Tool, MS: c.Millis, Failed: c.Failed, Error: c.Message}

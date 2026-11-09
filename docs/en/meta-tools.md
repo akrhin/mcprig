@@ -193,3 +193,14 @@ Every completed `invoke_command` is counted in the set process: per client, per
 server and per tool, with p50/p95 and a ring of recent calls. A downstream
 result carrying `isError: true` counts as a failure. The panel reads this
 through `GET /stats`; stdio mode does not collect counters.
+
+The client label comes from `_meta["io.modelcontextprotocol/clientInfo"]` of the
+request being counted — the SEP-2575 per-request client info. It is written as
+`name/version` (`opencode/2.2.6`) or as the bare `name` when the client sends no
+version (`mcprig`). This matters for stateless HTTP, where there is no
+`initialize` handshake: the label follows every request, not the session. When
+`_meta` has no client info, the label falls back to the transport: `key:<6 hex
+of a token hash>/<User-Agent product token>` for a keyed set, the `User-Agent`
+alone without a key, and `unknown` when neither is present. Reading the
+`/stats` of an open set without its token still redacts every label to
+`(аноним)`.

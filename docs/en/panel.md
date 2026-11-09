@@ -15,7 +15,7 @@ CSP: no inline scripts or styles.
 | --- | --- |
 | header | counters: sets, servers, calls in the tail, errors |
 | left rail | all sets, their state and port; **+ set** |
-| set card | name, port, state, endpoint, active key prefix, **Start/Stop**, **Keys** |
+| set card | name, port, state, endpoint, active key prefix, `list_commands` weight (bytes, tokens, tool count), **Start/Stop**, **Keys** |
 | KPIs | calls in the tail, p50, p95, errors for the selected set |
 | sets table | name, port, state, server count, uptime, calls, errors |
 | calls table | time, server, tool, client, milliseconds, status; search box |
@@ -52,7 +52,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
-| `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500 |
+| `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500; for one set it also carries `schema` |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | export the registry or one set |
@@ -69,6 +69,15 @@ are ignored.
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
 registry key. A set that does not answer is listed in `unreachable` by id; its
 error text is not forwarded.
+
+An answer with `?set=<id>` carries a `schema` field — what the set's tool list
+costs in context: `schemaBytes` (the length of the JSON `list_commands` returns
+for the whole set), `schemaTokens` (the same length divided by 4, rounded up)
+and `tools` (tool count). The numbers come from the set's `/stats` snapshot,
+i.e. its tool cache, with no calls to downstream servers. The merged answer
+without `set` has no such field: the weight is per set. It is absent until the
+set has filled its cache once. The panel prints it in the card head as
+`list_commands`: `20 КБ · 5 067 ток · 22 инстр.`
 
 ## Health
 

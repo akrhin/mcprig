@@ -117,6 +117,40 @@ func TestClientLabelFromContext(t *testing.T) {
 	}
 }
 
+// TokensOf rounds up at four bytes per token: an empty answer costs nothing,
+// the historical 174 KiB one lands on 44 544.
+func TestTokensOf(t *testing.T) {
+	cases := []struct {
+		bytes, want int64
+	}{
+		{0, 0},
+		{-10, 0},
+		{1, 1},
+		{4, 1},
+		{5, 2},
+		{174 * 1024, 44544},
+	}
+	for _, c := range cases {
+		if got := TokensOf(c.bytes); got != c.want {
+			t.Errorf("TokensOf(%d) = %d, want %d", c.bytes, got, c.want)
+		}
+	}
+}
+
+// The recorder hands the schema weight back in every snapshot, including the
+// redacted one: it describes the set, not its callers.
+func TestSnapshotCarriesSchema(t *testing.T) {
+	r := NewRecorder("s", 0)
+	if got := r.Snapshot().Schema; got != nil {
+		t.Fatalf("schema before any publish = %+v, want nil", got)
+	}
+	r.SetSchema(Schema{Bytes: 4096, Tokens: 1024, Tools: 12})
+	got := r.SnapshotRedacted().Schema
+	if got == nil || got.Bytes != 4096 || got.Tokens != 1024 || got.Tools != 12 {
+		t.Fatalf("schema = %+v, want 4096/1024/12", got)
+	}
+}
+
 func find(cs []Counter, server, client, tool string) *Counter {
 	for i := range cs {
 		if cs[i].Server == server && cs[i].Client == client && cs[i].Tool == tool {

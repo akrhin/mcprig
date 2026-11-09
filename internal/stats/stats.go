@@ -109,6 +109,7 @@ type Recorder struct {
 	tail     []Call
 	tailNext int
 	tailCap  int
+	schema   *Schema
 }
 
 // counterKey включает сервер: два сервера с одинаковым именем инструмента —
@@ -186,6 +187,34 @@ type Snapshot struct {
 	Set      string    `json:"set,omitempty"`
 	Counters []Counter `json:"counters"`
 	Tail     []Call    `json:"tail"`
+	// Schema — вес list_commands набора, если прокси уже снял его с кэша.
+	Schema *Schema `json:"schema,omitempty"`
+}
+
+// Schema is what list_commands costs the caller's context: the JSON of the
+// whole-set answer in bytes, and the same in tokens at four bytes per token.
+type Schema struct {
+	Bytes  int64 `json:"schemaBytes"`
+	Tokens int64 `json:"schemaTokens"`
+	Tools  int   `json:"tools"`
+}
+
+// TokensOf estimates the context cost of an answer at four bytes per token,
+// rounded up: the panel's rough yardstick, not a tokenizer.
+func TokensOf(bytes int64) int64 {
+	if bytes <= 0 {
+		return 0
+	}
+	return (bytes + 3) / 4
+}
+
+// SetSchema replaces the list_commands weight the panel shows for this set.
+// The proxy pushes it whenever a tool cache changes, so /stats stays a plain
+// snapshot and no extra downstream call is made.
+func (r *Recorder) SetSchema(s Schema) {
+	r.mu.Lock()
+	r.schema = &s
+	r.mu.Unlock()
 }
 
 // Snapshot copies the state. Counters are sorted by client, server, then tool,
@@ -206,7 +235,7 @@ func (r *Recorder) snapshot(redacted bool) Snapshot {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	out := Snapshot{Set: r.set, Counters: make([]Counter, 0, len(r.counters))}
+	out := Snapshot{Set: r.set, Counters: make([]Counter, 0, len(r.counters)), Schema: r.schema}
 	for _, c := range r.counters {
 		cp := *c
 		cp.latencies = append([]int64(nil), c.latencies...)

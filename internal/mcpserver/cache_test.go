@@ -34,7 +34,7 @@ func TestToolsCacheFilledAndDropped(t *testing.T) {
 		t.Fatalf("подключений %d, ожидалось 1", n)
 	}
 
-	m.entries[0].dropSession()
+	m.dropSession(m.entries[0])
 	if m.entries[0].cachedTools() != nil {
 		t.Fatal("кэш пережил переподключение")
 	}

@@ -29,6 +29,18 @@
 
   function fmtN(v) { return v == null || v === '' ? '—' : Number(v).toLocaleString('ru-RU'); }
 
+  function fmtBytes(v) {
+    if (v == null) { return '—'; }
+    if (v < 10240) { return fmtN(v) + ' Б'; }
+    return fmtN(Math.round(v / 1024)) + ' КБ';
+  }
+
+  // schemaLine — вес list_commands набора: байты, токены и число инструментов.
+  function schemaLine(s) {
+    if (!s) { return '—'; }
+    return fmtBytes(s.schemaBytes) + ' · ' + fmtN(s.schemaTokens) + ' ток · ' + fmtN(s.tools) + ' инстр.';
+  }
+
   function pct(fail, all) {
     if (!all) { return '—'; }
     return (fail / all * 100).toFixed(1).replace('.', ',') + ' %';
@@ -290,6 +302,7 @@
     if (!set) {
       show($('set-error'), false);
       $('k-calls').textContent = $('k-p50').textContent = $('k-p95').textContent = $('k-err').textContent = '—';
+      $('schema').textContent = '—';
       return;
     }
     var state = setState(set);
@@ -299,6 +312,7 @@
     pill.replaceChildren(el('span', 'dot ' + state.cls), document.createTextNode(state.text));
     $('endpoint').textContent = 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp';
     $('key').textContent = set.keyPrefix ? set.keyPrefix + '…' : (set.open ? 'набор открыт' : 'ключа нет');
+    $('schema').textContent = schemaLine(st.calls && st.calls.schema);
     $('run').textContent = set.runtime && set.runtime.running ? 'Перезапустить' : 'Запустить';
     $('dlg-set').textContent = set.name || set.id;
 
@@ -386,6 +400,7 @@
       renderKpis(st.calls);
       renderCalls(st.calls);
       renderSetsTable();
+      $('schema').textContent = schemaLine(data.schema);
     }).catch(function (e) { fail(e.message, e); });
   }
 
