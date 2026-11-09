@@ -96,6 +96,31 @@ E2E_BASE=http://127.0.0.1:9093 E2E_STRICT=1 ./scripts/contract-e2e.sh  # PASS п
   живёт за mcprig…». `opencode plugin list` проверкой не годится: это список
   сервера, к которому подключён CLI.
 
+## Проверка через mcprig (2026-11-09)
+
+Живой набор `main` (`:9101`, 11 серверов, 421 инструмент) гоняли из сессии
+opencode: 56 вызовов, 7 провалов — и все семь заведомо неверные аргументы самой
+проверки (несуществующий инструмент, чужой параметр, опечатка в пути), отказов
+серверов не было.
+
+- **mcprig:** `list_commands` из кэша 8–12 мс против 27 мс с `refresh`;
+  `invoke_many` — два вызова одним ответом; `maxBytes` режет ответ и пишет
+  полный в `sets/main/tool-out/…` (3149 Б); неизвестный сервер/инструмент и
+  лишний ключ дают понятную ошибку; `/healthz` и `/stats` набора — 200,
+  `mcprig doctor` — 0 проблем.
+- **serena** 2.1.0 на `/home/sintez/git/mcprig`: `find_symbol`,
+  `find_referencing_symbols`, `get_symbols_overview`, `get_diagnostics_for_file`
+  (пусто — ошибок в `manager.go` нет), `activate_project`. ⚠️ Схема теперь
+  требует `session` из `initial_instructions` — маршрут в скилле `serena-mcp` и
+  `AGENTS.md` (`{ project }`) это не отражает.
+- **socraticode:** индекс 138 файлов / 1146 чанков за 64 с, watcher активен,
+  `codebase_search`, `codebase_symbol`, `codebase_graph_circular` — ok.
+- **остальные девять:** context7 (resolve + query-docs, 0.9 с), xerj (поиск по
+  `*-docs`), open-design (проект `mcprig-ui`, файлы), tavily-search, playwright
+  (панель `:9088` → экран входа, snapshot, close), raven (12 систем токенов),
+  designer-skill (контракт, anti-slop), gitea (теги v0.1.0–v0.3.1, `go.mod`,
+  релизы), portainer (systemStatus 2.45.3, три endpoint'а).
+
 ## Цель этапа 5
 
 Панель по макету `design/ui/`: страница из внешних `app.css`/`app.js` (без
