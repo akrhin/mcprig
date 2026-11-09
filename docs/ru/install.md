@@ -79,18 +79,21 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 ```
 
 Точка входа образа — `mcprig`; команда по умолчанию —
-`serve --config /config/servers.json --addr 0.0.0.0:9100`. Рабочий каталог —
+`serve --config /config/servers.json`; адрес берётся из `transport.host` и `transport.port` — в конфиге должно стоять `0.0.0.0` и тот порт, который публикуешь. Рабочий каталог —
 `/data`, владелец — uid 10001; смонтируйте туда том и задайте
 `MCPRIG_DATA_DIR=/data`, чтобы токены OAuth и прочее состояние переживали
-перезапуск. `slim` везёт healthcheck на `http://127.0.0.1:9100/healthz`.
+перезапуск. `slim` везёт healthcheck на `http://127.0.0.1:9100/healthz`; он рассчитан на порт
+по умолчанию, при другом `transport.port` задай `--health-cmd` или healthcheck в
+compose.
 
 `deploy/docker-compose.yml` запускает два набора (`demo` на 9100, `ops` на 9101)
 из `ghcr.io/sintez/mcprig:latest`, монтирует каждый `servers.json` только для
 чтения и держит состояние в именованных томах.
 
-Образы **на этом хосте не собирались**: `docker.io` был недоступен
-(`DeadlineExceeded` на `load metadata for node:22-alpine`). Собирайте их там,
-где доступен реестр.
+Замерено на этом хосте: `docker build .` без `--target` даёт `slim` — 32 МБ,
+бинарь плюс корневые сертификаты; `--target full` добавляет node и python и
+весит 334 МБ. Оба образа запускались: `slim` отдал удалённую `serena` через сеть
+хоста и ответил `find_symbol` через `invoke_command`, healthcheck — `ok`.
 
 ## Состояние на диске
 

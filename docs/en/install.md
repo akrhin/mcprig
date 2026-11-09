@@ -81,18 +81,21 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 ```
 
 The image entrypoint is `mcprig`; the default command is
-`serve --config /config/servers.json --addr 0.0.0.0:9100`. The working
+`serve --config /config/servers.json`; the listen address comes from `transport.host` and `transport.port`, so mount a config whose transport says `0.0.0.0` and the port you publish. The working
 directory is `/data`, owned by uid 10001; mount a volume there and set
 `MCPRIG_DATA_DIR=/data` so OAuth tokens and other state survive a restart.
-`slim` ships a healthcheck against `http://127.0.0.1:9100/healthz`.
+`slim` ships a healthcheck against `http://127.0.0.1:9100/healthz`; it assumes the
+default port, so with another `transport.port` pass `--health-cmd` or set the
+healthcheck in compose.
 
 `deploy/docker-compose.yml` runs two sets (`demo` on 9100, `ops` on 9101) from
 `ghcr.io/sintez/mcprig:latest`, mounts each `servers.json` read-only and keeps
 state in named volumes.
 
-The images were **not built on this host**: `docker.io` was unreachable
-(`DeadlineExceeded` on `load metadata for node:22-alpine`). Build them where a
-registry is available.
+Measured on this host: the bare `docker build .` gives `slim` (32 MB, binary
+plus CA roots); `--target full` adds node and python and weighs 334 MB. Both
+were run: `slim` served a remote `serena` over the host network and answered
+`find_symbol` through `invoke_command`, and its healthcheck reports `ok`.
 
 ## State on disk
 
