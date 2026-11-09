@@ -33,6 +33,37 @@ forms, `url`, `env`, `headers`, `transport`, `healthMonitor`,
 `requestTimeout`. A server with a broken field stays in the list as unhealthy
 with its error; a missing name or invalid JSON fails the load.
 
+## Compared to lazy-mcp
+
+lazy-mcp is the project mcprig grew out of, and mcprig speaks its configuration.
+The numbers below are measured on one host against the **same** eleven
+downstream servers (`serena`, `socraticode`, `xerj`, `open-design`, `context7`,
+`tavily-mcp`, `playwright`, `raven`, `designer-skill`, `gitea`,
+`portainer-mcp`, 421 tools), through the same four meta-tools.
+
+| | mcprig 0.1.0 | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
+| --- | --- | --- |
+| proxy process RSS, warmed up, 421 tools cached | **29 MiB** | 67 MiB |
+| RSS before the first call | **13 MiB** | — |
+| start until the listener is up | **7–8 ms** | 95–137 ms (bare node) plus the container entrypoint |
+| `tools/list`, p50 | **0.9 ms** | 3.2 ms |
+| `list_commands` over all 11 servers, p50 | **5.6 ms** | 10.9 ms |
+| `list_servers` (health from cache), p50 | **1.3 ms** | — |
+| distribution | **one 12 MB static binary, no runtime dependencies** | 4.9 GB image with node, npm and baked MCP servers |
+| crash of one set | own process, other sets keep serving | the whole proxy is one process |
+
+Both proxies stay out of the way: a warm `list_commands` costs the proxy under
+10 ms while the answer is 174 KiB of JSON, and 2 000 calls in a row leave RSS
+flat (34 → 30 MiB, GC returns the rest).
+
+Honest caveats: the eleven downstream servers dominate either footprint — a
+warm set holds node/python processes worth ~1.5 GiB, of which the proxy is 29
+MiB. The first `list_commands` after a start takes ~11 s because eleven
+`npx`/`uvx` servers are still booting; lazy-mcp pays the same price in the same
+place. Health probes are cached for 15 s, and the tool list is cached for the
+life of a session, so a downstream that changes its tools on a live connection
+would look stale until it reconnects.
+
 ## Quick start
 
 Go 1.27 is required; `GOTOOLCHAIN=auto` downloads the toolchain on the first build.
