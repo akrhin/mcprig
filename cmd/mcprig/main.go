@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -29,7 +30,23 @@ import (
 // version is set by the release build.
 var version = "dev"
 
+// startPprof слушает MCPRIG_PPROF (например 127.0.0.1:6060), когда он задан:
+// профиль нужен на живой нагрузке, а не только в бенчмарках.
+func startPprof() {
+	addr := os.Getenv("MCPRIG_PPROF")
+	if addr == "" {
+		return
+	}
+	go func() {
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			fmt.Fprintln(os.Stderr, "mcprig: pprof:", err)
+		}
+	}()
+	fmt.Fprintln(os.Stderr, "mcprig: pprof на", addr)
+}
+
 func main() {
+	startPprof()
 	if err := run(); err != nil {
 		// -h: flag уже напечатал usage, это не ошибка.
 		if errors.Is(err, flag.ErrHelp) {
@@ -168,6 +185,10 @@ func run() error {
 	defer mgr.Close()
 
 	rec := stats.NewRecorder(os.Getenv("MCPRIG_SET"), 0)
+
+	// Прогрев в фоне: иначе первый list_commands ждёт, пока поднимутся все
+	// npx/uvx-серверы (на одиннадцати это ~11 с).
+	go mgr.Warm(context.Background())
 	mgr.Stats = rec
 	handler, err := httplisten.New(cfg, mgr.Server(), log, rec)
 	if err != nil {

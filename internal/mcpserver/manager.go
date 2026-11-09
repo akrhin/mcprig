@@ -37,6 +37,9 @@ const (
 	maxPages = 20
 	// maxProbes caps concurrent status probes in one list_servers call.
 	maxProbes = 8
+	// warmTimeout bounds one server's warm-up at start: холодный npx/uvx
+	// распаковывается десятками секунд, но не бесконечно.
+	warmTimeout = 2 * time.Minute
 )
 
 var (
@@ -304,6 +307,7 @@ func (m *Manager) probe(ctx context.Context, e *entry) error {
 type listCommandsInput struct {
 	Server  string   `json:"server,omitempty"`
 	Servers []string `json:"servers,omitempty"`
+	Refresh bool     `json:"refresh,omitempty"`
 }
 
 type commandInfo struct {
@@ -315,8 +319,13 @@ type commandInfo struct {
 
 func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in listCommandsInput
-	if err := strictArgs(req, &in, "", "server", "servers"); err != nil {
+	if err := strictArgs(req, &in, "", "server", "servers", "refresh"); err != nil {
 		return errResult(err)
+	}
+	if in.Refresh {
+		for _, e := range m.entries {
+			e.storeTools(nil)
+		}
 	}
 	switch {
 	case in.Server != "" && len(in.Servers) > 0:
@@ -410,6 +419,7 @@ func (m *Manager) commandsOf(ctx context.Context, name string) ([]commandInfo, e
 type describeCommandsInput struct {
 	Server       string   `json:"server"`
 	CommandNames []string `json:"command_names"`
+	Refresh      bool     `json:"refresh,omitempty"`
 }
 
 type commandSchema struct {
@@ -428,7 +438,7 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	ctx, cancel := m.callCtx(ctx)
 	defer cancel()
 	var in describeCommandsInput
-	if err := strictArgs(req, &in, "", "server", "command_names"); err != nil {
+	if err := strictArgs(req, &in, "", "server", "command_names", "refresh"); err != nil {
 		return errResult(err)
 	}
 	if in.Server == "" {
@@ -440,6 +450,9 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	}
 	if !usable(e.srv) {
 		return errResult(serverProblem(e.srv))
+	}
+	if in.Refresh {
+		e.storeTools(nil)
 	}
 	var tools []*mcp.Tool
 	if cached := e.cachedTools(); cached != nil {
@@ -615,6 +628,32 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 		return fmt.Errorf("%s: после переподключения: %w", e.srv.Name, err)
 	}
 	return nil
+}
+
+// Warm connects every enabled server and fills the tool cache, so the first
+// client call does not pay for eleven cold starts. Failures are left to the
+// regular health probe: warming never blocks the listener.
+func (m *Manager) Warm(ctx context.Context) {
+	sem := make(chan struct{}, maxProbes)
+	var wg sync.WaitGroup
+	for _, e := range m.entries {
+		if !usable(e.srv) {
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(e *entry) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			ctx, cancel := context.WithTimeout(ctx, warmTimeout)
+			defer cancel()
+			_ = m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
+				_, err := m.toolsOf(ctx, e, sess)
+				return err
+			})
+		}(e)
+	}
+	wg.Wait()
 }
 
 // toolsOf returns the server's tools from the cache, fetching them once per

@@ -66,6 +66,12 @@ Input is one of two forms:
 | neither | `Error: нужен параметр server или servers` |
 
 With `servers`, one `requestTimeout` bounds the whole call, not each server.
+Servers are queried in parallel, eight at a time.
+
+`{"refresh": true}` (with `list_commands` and `describe_commands`) drops the
+cached tool list and asks the servers again. The cache otherwise lives as long
+as the connection and is dropped with it, so a downstream that changes its
+tools mid-connection stays invisible until a reconnect or a refresh.
 
 ```json
 [

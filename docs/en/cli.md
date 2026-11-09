@@ -41,6 +41,12 @@ time=2026-11-09T00:10:09.939+03:00 level=INFO msg="прокси слушает" 
 
 `servers` counts usable entries: enabled and with no configuration error.
 
+The listener comes up before any downstream is touched, and every enabled
+server is warmed in the background right after it: the first client call after
+that warm-up returns in milliseconds instead of waiting for eleven `npx`/`uvx`
+servers to unpack. `MCPRIG_PPROF=127.0.0.1:6060` exposes `net/http/pprof` on
+that address for any subcommand; unset by default, so nothing is exposed.
+
 ## stdio
 
 ```bash
