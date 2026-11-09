@@ -786,8 +786,20 @@ func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolPa
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", e.srv.Name, err)
 	}
+	// Сервер в песочнице получает свой, более короткий предел: чужая
+	// песочница не должна держать вызов столько же, сколько свои серверы.
+	var sandboxed bool
+	if limit := e.srv.CallTimeout(); limit > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, limit)
+		defer cancel()
+		sandboxed = true
+	}
 	res, err := sess.CallTool(ctx, params)
 	if err != nil {
+		if sandboxed && ctx.Err() == context.DeadlineExceeded {
+			return res, fmt.Errorf("%s: таймаут %s (sandbox)", e.srv.Name, e.srv.CallTimeout())
+		}
 		return res, fmt.Errorf("%s: %w", e.srv.Name, err)
 	}
 	return res, nil

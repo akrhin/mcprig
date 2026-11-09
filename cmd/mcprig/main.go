@@ -201,7 +201,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log}
+	// Env: ребёнку уходит whitelist плюс envAllow сервера, а не весь os.Environ().
+	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log, Env: downstream.EnvFor}
 	mgr := mcpserver.New(cfg, version, conn)
 	defer mgr.Close()
 
@@ -282,7 +283,8 @@ func runStdio(args []string) error {
 	if err != nil {
 		return err
 	}
-	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log}
+	// Env: ребёнку уходит whitelist плюс envAllow сервера, а не весь os.Environ().
+	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log, Env: downstream.EnvFor}
 	mgr := mcpserver.New(cfg, version, conn)
 	defer mgr.Close()
 

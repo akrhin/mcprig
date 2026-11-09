@@ -60,13 +60,40 @@ governed by the 15 s cache described in
 | `args` | array | empty | arguments appended to a string-form `command` (legacy) |
 | `cwd` | string | empty | working directory; stdio only |
 | `env` | object of strings | empty | extra environment for a stdio process |
+| `envAllow` | array of strings | empty | host variables passed through to a stdio process besides the fixed base (`PATH`, `HOME`, `LANG`, `TMPDIR`, `LC_*`, `XDG_*`, `SSL_*`, `NODE_EXTRA_CA_CERTS`); nothing else from the host environment reaches it |
 | `url` | string | | HTTP endpoint; http only |
 | `headers` | object of strings | empty | extra headers for every HTTP request |
 | `tags` | array of strings | empty | labels for `list_servers` and `filter` |
+| `sandbox` | object | absent — no isolation | bubblewrap block for a stdio server, see below. A server tagged `untrusted` must have it or the config is rejected |
 | `enabled` | bool | `true` | disabled servers are listed but never connected |
 | `permissions` | object | | per-server allow/deny block |
 | `oauth` | object | | per-server OAuth settings |
 | `_configError` | string | | written by the loader, never by a user |
+
+### Sandbox
+
+A `sandbox` block runs the stdio server under `bwrap`: its own mount tree,
+read-only root, no `/home`, no network, no `/proc/1/root`, and `prlimit` limits
+inside the namespace.
+
+| field | type | default | meaning |
+| --- | --- | --- | --- |
+| `mode` | `bwrap` / `none` | `bwrap` | `none` turns isolation off for this server |
+| `onUnavailable` | `deny` / `warn` / `allow` | `deny` | what happens when bubblewrap cannot start: refuse the server (fail-closed), run it and log a warning, or run it silently |
+| `ro` | array of absolute paths | `/usr /bin /lib /lib64 /etc/ssl /etc/resolv.conf /etc/passwd /etc/group` | mounted read-only; missing paths are skipped |
+| `rw` | array of absolute paths | empty | mounted read-write; wins over `ro` on the same path |
+| `network` | `none` / `allow` | `none` | `allow` keeps the host network namespace |
+| `memoryMb` | int | `512` | `RLIMIT_AS` — virtual memory, not RSS; 512 fits interpreters, node needs 2048 and more |
+| `pids` | int | `256` | `RLIMIT_NPROC`, the fork-bomb stop |
+| `timeoutSec` | int | `30` | per-tool-call deadline once the sandbox is on |
+
+```json
+{"name": "unknown", "command": ["npx", "-y", "some-mcp@1.2.3"], "tags": ["untrusted"],
+ "sandbox": {"network": "none", "memoryMb": 1024}}
+```
+
+A binary outside `/usr` or `/home` — node from a user prefix, for instance —
+must be listed in `ro`, or the child cannot start.
 
 ### Both command forms
 

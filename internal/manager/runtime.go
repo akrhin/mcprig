@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/sintez/mcprig/internal/config"
+	"github.com/sintez/mcprig/internal/downstream"
 	"github.com/sintez/mcprig/internal/registry"
 )
 
@@ -478,17 +479,17 @@ func (rt *Runtime) Close() {
 // секретов менеджера.
 func childEnv(servers []registry.Server, sec *Secrets) []string {
 	values := map[string]string{}
-	keep := map[string]bool{
-		"PATH": true, "HOME": true, "LANG": true, "TZ": true, "TMPDIR": true,
-		"NODE_EXTRA_CA_CERTS": true,
+	for _, kv := range downstream.BaseEnv() {
+		name, value, _ := strings.Cut(kv, "=")
+		values[name] = value
 	}
-	for _, kv := range os.Environ() {
-		name, value, ok := strings.Cut(kv, "=")
-		if !ok {
-			continue
-		}
-		if keep[name] || strings.HasPrefix(name, "LC_") || strings.HasPrefix(name, "XDG_") || strings.HasPrefix(name, "SSL_") {
-			values[name] = value
+	// envAllow сервера — единственный способ получить переменную владельца.
+	for _, srv := range servers {
+		for _, kv := range downstream.EnvFor(srv) {
+			name, value, ok := strings.Cut(kv, "=")
+			if ok {
+				values[name] = value
+			}
 		}
 	}
 	if sec != nil {

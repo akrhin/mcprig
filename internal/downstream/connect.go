@@ -12,6 +12,7 @@ import (
 
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/oauth"
+	"github.com/sintez/mcprig/internal/sandbox"
 )
 
 // Connector opens sessions to downstream servers. OAuth is optional: without a
@@ -91,7 +92,13 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		if len(srv.Command) == 0 {
 			return nil, fmt.Errorf("пустой command")
 		}
-		cmd := exec.Command(srv.Command[0], srv.Command[1:]...)
+		// Песочница — префикс argv, транспорт не меняется. Ошибка здесь значит
+		// fail-closed: сервер не стартует, а не стартует «как раньше».
+		argv, err := sandbox.Wrap(srv, srv.Command)
+		if err != nil {
+			return nil, err
+		}
+		cmd := exec.Command(argv[0], argv[1:]...)
 		cmd.Dir = srv.Cwd
 		// A set runs with an env already narrowed by the manager; the server's
 		// own env wins over it.

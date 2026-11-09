@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type TransportKind string
@@ -28,13 +29,158 @@ type Server struct {
 	Command     []string          `json:"command,omitempty"`
 	Cwd         string            `json:"cwd,omitempty"`
 	Env         map[string]string `json:"env,omitempty"`
+	// EnvAllow — имена переменных окружения владельца, которые сервер получает
+	// вдобавок к whitelist. Больше ничего из os.Environ() вниз не уходит.
+	EnvAllow    []string          `json:"envAllow,omitempty"`
 	URL         string            `json:"url,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
 	Enabled     bool              `json:"enabled"`
 	Permissions *Permissions      `json:"permissions,omitempty"`
 	OAuth       *OAuth            `json:"oauth,omitempty"`
+	Sandbox     *Sandbox          `json:"sandbox,omitempty"`
 	ConfigError string            `json:"_configError,omitempty"`
+}
+
+// Sandbox — изоляция stdio-сервера. Пустой блок означает умолчания: bwrap,
+// сеть выключена, при недоступной песочнице сервер не стартует.
+type Sandbox struct {
+	Mode          string   `json:"mode,omitempty"`          // none | bwrap
+	OnUnavailable string   `json:"onUnavailable,omitempty"` // deny | warn | allow
+	RO            []string `json:"ro,omitempty"`
+	RW            []string `json:"rw,omitempty"`
+	Network       string   `json:"network,omitempty"` // none | allow
+	MemoryMb      int      `json:"memoryMb,omitempty"`
+	Pids          int      `json:"pids,omitempty"`
+	TimeoutSec    int      `json:"timeoutSec,omitempty"`
+}
+
+const (
+	SandboxModeNone  = "none"
+	SandboxModeBwrap = "bwrap"
+
+	OnUnavailableDeny  = "deny"
+	OnUnavailableWarn  = "warn"
+	OnUnavailableAllow = "allow"
+
+	SandboxNetworkNone  = "none"
+	SandboxNetworkAllow = "allow"
+
+	// DefaultSandboxMemoryMb ограничивает виртуальную память (RLIMIT_AS), а не
+	// RSS: node под 512 МиБ не поднимается, ему нужно ≥2048, python — хватает.
+	DefaultSandboxMemoryMb = 512
+	DefaultSandboxPids     = 256
+	DefaultSandboxTimeout  = 30
+)
+
+// DefaultSandboxRO — минимум, без которого не живёт ни один интерпретатор.
+// Несуществующие пути Wrap пропускает: bwrap падает на отсутствующем источнике.
+var DefaultSandboxRO = []string{"/usr", "/bin", "/lib", "/lib64", "/etc/ssl", "/etc/resolv.conf", "/etc/passwd", "/etc/group"}
+
+// setDefaults заполняет незаданные поля умолчаниями.
+func (s *Sandbox) setDefaults() {
+	if s.Mode == "" {
+		s.Mode = SandboxModeBwrap
+	}
+	if s.OnUnavailable == "" {
+		s.OnUnavailable = OnUnavailableDeny
+	}
+	if s.Network == "" {
+		s.Network = SandboxNetworkNone
+	}
+	if len(s.RO) == 0 {
+		s.RO = append([]string(nil), DefaultSandboxRO...)
+	}
+	if s.MemoryMb == 0 {
+		s.MemoryMb = DefaultSandboxMemoryMb
+	}
+	if s.Pids == 0 {
+		s.Pids = DefaultSandboxPids
+	}
+	if s.TimeoutSec == 0 {
+		s.TimeoutSec = DefaultSandboxTimeout
+	}
+}
+
+// validate rejects a block whose values would become bwrap flags as-is: argv
+// is an attack surface here (CVE-2026-55887), so paths must be absolute and
+// every enum must be known.
+func (s *Sandbox) validate() string {
+	switch s.Mode {
+	case SandboxModeNone, SandboxModeBwrap:
+	default:
+		return fmt.Sprintf("sandbox.mode: %q, допустимо none|bwrap", s.Mode)
+	}
+	switch s.OnUnavailable {
+	case OnUnavailableDeny, OnUnavailableWarn, OnUnavailableAllow:
+	default:
+		return fmt.Sprintf("sandbox.onUnavailable: %q, допустимо deny|warn|allow", s.OnUnavailable)
+	}
+	switch s.Network {
+	case SandboxNetworkNone, SandboxNetworkAllow:
+	default:
+		return fmt.Sprintf("sandbox.network: %q, допустимо none|allow", s.Network)
+	}
+	for _, field := range []struct {
+		name  string
+		paths []string
+	}{{"ro", s.RO}, {"rw", s.RW}} {
+		for _, p := range field.paths {
+			if !filepath.IsAbs(p) || strings.HasPrefix(p, "-") {
+				return fmt.Sprintf("sandbox.%s: %q — нужен абсолютный путь", field.name, p)
+			}
+		}
+	}
+	if s.MemoryMb < 0 || s.Pids < 0 || s.TimeoutSec < 0 {
+		return "sandbox: memoryMb, pids и timeoutSec не могут быть отрицательными"
+	}
+	return ""
+}
+
+// CallTimeout — свой предел одного вызова инструмента; 0 — действует
+// requestTimeout набора.
+func (s *Server) CallTimeout() time.Duration {
+	if s.Sandbox == nil || s.Sandbox.Mode == SandboxModeNone || s.Sandbox.TimeoutSec <= 0 {
+		return 0
+	}
+	return time.Duration(s.Sandbox.TimeoutSec) * time.Second
+}
+
+// Warnings — некритичные замечания: npx/uvx без пина версии ставят «сегодняшний
+// latest», а не тот код, который проверяли.
+func (s *Server) Warnings() []string {
+	if len(s.Command) == 0 {
+		return nil
+	}
+	var out []string
+	switch filepath.Base(s.Command[0]) {
+	case "npx", "uvx":
+		pinned := false
+		for _, a := range s.Command[1:] {
+			if strings.HasPrefix(a, "-") {
+				continue
+			}
+			if strings.Contains(strings.TrimPrefix(a, "@"), "@") || strings.Contains(a, "==") {
+				pinned = true
+			}
+			break
+		}
+		if !pinned {
+			out = append(out, fmt.Sprintf("%s без пина версии: код подменяется молча", filepath.Base(s.Command[0])))
+		}
+	}
+	return out
+}
+
+// untrusted требует песочницы: сервер без неё может выгрести ключи хоста,
+// а тег ставится именно на недоверенные серверы.
+func (s *Server) untrusted() bool {
+	for _, tag := range s.Tags {
+		if strings.EqualFold(tag, "untrusted") {
+			return true
+		}
+	}
+	return false
 }
 
 // OAuth tunes the client-side authorization code flow for one server. An empty
@@ -170,6 +316,8 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 		Enabled     *bool           `json:"enabled"`
 		Permissions json.RawMessage `json:"permissions"`
 		OAuth       *OAuth          `json:"oauth"`
+		Sandbox     json.RawMessage `json:"sandbox"`
+		EnvAllow    []string        `json:"envAllow"`
 	}
 	var r raw
 	if err := json.Unmarshal(data, &r); err != nil {
@@ -191,7 +339,9 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 		}
 	}
 	s.Env = stringMap(r.Env, &s.ConfigError, "env")
+	s.EnvAllow = r.EnvAllow
 	s.Headers = stringMap(r.Headers, &s.ConfigError, "headers")
+	s.decodeSandbox(r.Sandbox)
 	s.decodePermissions(r.Permissions)
 	if msg := r.OAuth.validate("oauth"); msg != "" {
 		if s.ConfigError == "" {
@@ -222,6 +372,21 @@ func (s *Server) decodePermissions(data json.RawMessage) {
 		return
 	}
 	s.Permissions = &p
+}
+
+// decodeSandbox soft-fails: a typo in the block must not brick the whole file.
+func (s *Server) decodeSandbox(data json.RawMessage) {
+	if len(data) == 0 || string(data) == "null" {
+		return
+	}
+	var sb Sandbox
+	if err := json.Unmarshal(data, &sb); err != nil {
+		if s.ConfigError == "" {
+			s.ConfigError = "sandbox: " + err.Error()
+		}
+		return
+	}
+	s.Sandbox = &sb
 }
 
 func stringMap(in map[string]any, configErr *string, field string) map[string]string {
@@ -350,6 +515,21 @@ func (s *Server) validate() bool {
 	}
 	if s.Cwd != "" && s.Transport != TransportStdio {
 		s.ConfigError = "cwd допустим только для stdio"
+		return false
+	}
+	if s.Sandbox != nil {
+		if s.Transport != TransportStdio {
+			s.ConfigError = "sandbox допустим только для stdio"
+			return false
+		}
+		s.Sandbox.setDefaults()
+		if msg := s.Sandbox.validate(); msg != "" {
+			s.ConfigError = msg
+			return false
+		}
+	}
+	if s.untrusted() && (s.Sandbox == nil || s.Sandbox.Mode == SandboxModeNone) {
+		s.ConfigError = "тег untrusted требует sandbox: сервер без изоляции не стартует"
 		return false
 	}
 	return true

@@ -207,12 +207,17 @@ func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, 
 			return []doctorLine{{false, fmt.Sprintf("конфиг %s: %v", path, loadErr)}}, raw
 		}
 		enabled := 0
+		lines := []doctorLine{}
 		for _, srv := range cfg.Servers {
 			if srv.Enabled {
 				enabled++
 			}
+			for _, w := range srv.Warnings() {
+				lines = append(lines, doctorLine{true, fmt.Sprintf("предупреждение: %s: %s", srv.Name, w)})
+			}
 		}
-		return []doctorLine{{true, fmt.Sprintf("конфиг %s: %d серверов, %d включено", path, len(cfg.Servers), enabled)}}, raw
+		lines = append([]doctorLine{{true, fmt.Sprintf("конфиг %s: %d серверов, %d включено", path, len(cfg.Servers), enabled)}}, lines...)
+		return lines, raw
 	case errors.Is(err, fs.ErrNotExist):
 		if reg != nil {
 			enabled := 0

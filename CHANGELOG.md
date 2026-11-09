@@ -5,6 +5,28 @@ Notable changes to mcprig, newest first. Format follows
 [SemVer](https://semver.org/). Releases are cut from tags: Gitea is the source
 of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
+## [Unreleased]
+
+### Added
+
+- Sandbox for untrusted stdio servers: `sandbox` block on a server
+  (`mode: bwrap`, `onUnavailable: deny` by default), running the child under
+  bubblewrap — own mount tree, read-only root, no `/home`, no network, no
+  `/proc/1/root` — with `prlimit` limits inside the namespace for address space
+  and process count. Fail-closed: if bubblewrap cannot start, the server does
+  not start either. `scripts/sandbox-e2e.sh` checks all of it against the host.
+- Servers tagged `untrusted` require a sandbox; without one the config is
+  rejected and the server never runs.
+- `envAllow` per server, and a warning in `mcprig doctor` for `npx -y` / `uvx`
+  without a pinned version.
+
+### Fixed
+
+- A stdio server started by `mcprig serve` or `mcprig stdio` received the whole
+  environment of the host process, including every API key in it. Now it gets a
+  fixed base (`PATH`, `HOME`, `LANG`, `TMPDIR`, `LC_*`, `XDG_*`, `SSL_*`,
+  `NODE_EXTRA_CA_CERTS`) plus what `env` and `envAllow` name explicitly.
+
 ## [0.3.3] - 2026-11-10
 
 ### Added
