@@ -99,4 +99,5 @@ jobs:
           # Встроенный токен задачи с permissions.contents=write. Если инстанс его
           # не выдаёт — заведите секрет RELEASE_TOKEN (PAT со scope write:repository).
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-        run: ./goreleaser release --clean
+        run: |
+          "$GORELEASER_BIN" release --clean
