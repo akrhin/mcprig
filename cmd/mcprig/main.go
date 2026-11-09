@@ -52,6 +52,10 @@ func main() {
 		if errors.Is(err, flag.ErrHelp) {
 			return
 		}
+		// doctor напечатал отчёт сам; лишняя строка об ошибке только шумит.
+		if errors.Is(err, errDoctorProblems) {
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stderr, "mcprig:", err)
 		os.Exit(exitCode(err))
 	}
@@ -136,13 +140,19 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 			return "init", args[1:], nil
 		}
 		return "init", nil, nil
+	case "doctor":
+		fs, _, _ := newDoctorFlags()
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
+		}
+		return "doctor", args[1:], nil
 	case "panel":
 		if len(args) > 1 {
 			return "", nil, &usageError{fmt.Sprintf("panel не принимает аргументов: %q", args[1:])}
 		}
 		return "panel", nil, nil
 	}
-	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel", args[0])}
+	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel, init, doctor", args[0])}
 }
 
 func run() error {
@@ -157,6 +167,8 @@ func run() error {
 		return manager.Run(manager.FromEnv(version))
 	case "init":
 		return runInit(rest)
+	case "doctor":
+		return runDoctor(rest)
 	}
 	args := rest
 
@@ -185,11 +197,13 @@ func run() error {
 	defer mgr.Close()
 
 	rec := stats.NewRecorder(os.Getenv("MCPRIG_SET"), 0)
+	// Recorder до прогрева: прогрев наполняет кэш инструментов и публикует
+	// вес схем, иначе панель видит ноль до первого list_commands.
+	mgr.Stats = rec
 
 	// Прогрев в фоне: иначе первый list_commands ждёт, пока поднимутся все
 	// npx/uvx-серверы (на одиннадцати это ~11 с).
 	go mgr.Warm(context.Background())
-	mgr.Stats = rec
 	handler, err := httplisten.New(cfg, mgr.Server(), log, rec)
 	if err != nil {
 		return err

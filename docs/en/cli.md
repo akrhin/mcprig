@@ -2,7 +2,7 @@ This file lists every subcommand and flag with real examples and their output.
 
 # CLI
 
-`mcprig` has four subcommands. Running it with no subcommand is the same as
+`mcprig` has five subcommands. Running it with no subcommand is the same as
 `mcprig serve`; running it with flags only (`mcprig -config …`) is also
 `serve`.
 
@@ -12,10 +12,12 @@ This file lists every subcommand and flag with real examples and their output.
 | `stdio` | one set over stdin/stdout, spawned by the client |
 | `panel` | manager and web panel (registry, sets, keys, call tail) |
 | `init` | print a client configuration fragment; writes nothing |
+| `doctor` | one-pass health report: config, sets, keys, secrets, services |
 
 Exit codes: `0` after help, `2` for a command-line error (unknown subcommand,
 extra positional argument, unknown client), `1` for a runtime error (config
-missing, port busy, refused to start without auth).
+missing, port busy, refused to start without auth) and for a `doctor` report
+with at least one problem.
 
 ## serve
 
@@ -109,6 +111,57 @@ loopback unless `MCPRIG_HOST` says otherwise.
 
 A second panel on the same data directory refuses to start because of
 `manager.pid`.
+
+## doctor
+
+```bash
+MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9088 mcprig doctor
+```
+
+One pass over what otherwise means reading panel logs. No running panel is
+required: file checks work on their own, and a dead listener is reported as a
+problem rather than a crash.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-config` | `os.UserConfigDir()/mcprig/servers.json` | client configuration; when absent, servers are counted from the registry |
+| `-json` | | machine-readable report with the same sections |
+
+Sections: version and binary path; configuration (path, server count, enabled);
+sets (id, port, autostart, listener, `/healthz` status); keys (count and the
+active key's 8-character `keyPrefix`); `${VAR}` secrets (names only, with the
+source — OpenBao, `env.json` or the environment — never values); services
+(foreign listeners in `9100–9199`, `sets/*/oauth.json` size, `tool-out/` size,
+panel `/healthz`).
+
+Exit code: `0` when every line is `ok`, `1` otherwise; the last line is
+`итог: N проблем`. Set listeners are dialled through `MCPRIG_BIND_IP` (a
+wildcard resolves to loopback); the panel address comes from `MCPRIG_HOST` and
+`MCPRIG_PORT`.
+
+```text
+mcprig doctor, версия dev (/usr/local/bin/mcprig)
+
+[конфиг]
+ok: конфиг /home/user/.config/mcprig/servers.json: 11 серверов, 11 включено
+
+[наборы]
+ok: main: порт 9101, слушает, autostart, /healthz 200
+
+[ключи]
+ok: main: 3 ключа, активный eef8bf86
+
+[секреты]
+ok: CONTEXT7_API_KEY: окружение
+
+[служебные]
+проблема: чужие порты в диапазоне 9100–9199: 9119
+ok: sets/*/oauth.json нет
+ok: tool-out нет
+ok: панель 127.0.0.1:9088: /healthz 200
+
+итог: 1 проблема
+```
 
 ## init
 
