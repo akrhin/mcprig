@@ -16,9 +16,9 @@ web panel.
 
 mcprig is three things in one binary:
 
-- a **proxy** that exposes four meta-tools (`list_servers`, `list_commands`,
-  `describe_commands`, `invoke_command`) instead of loading every downstream
-  tool into the client's context;
+- a **proxy** that exposes five meta-tools (`list_servers`, `list_commands`,
+  `describe_commands`, `invoke_command`, `invoke_many`) instead of loading every
+  downstream tool into the client's context;
 - a **manager** that keeps the registry of servers and sets, supervises one
   process per set, and issues access keys;
 - a **web panel** for the same registry and the live call tail.
@@ -39,7 +39,7 @@ lazy-mcp is the project mcprig grew out of, and mcprig speaks its configuration.
 The numbers below are measured on one host against the **same** eleven
 downstream servers (`serena`, `socraticode`, `xerj`, `open-design`, `context7`,
 `tavily-mcp`, `playwright`, `raven`, `designer-skill`, `gitea`,
-`portainer-mcp`, 421 tools), through the same four meta-tools.
+`portainer-mcp`, 421 tools), through the same meta-tools.
 
 | | mcprig 0.1.0 | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
 | --- | --- | --- |
@@ -193,8 +193,9 @@ field reference: [docs/en/configuration.md](docs/en/configuration.md).
 | `list_commands` | commands of one server (`server`) as an array, or of several (`servers`) as an object keyed by name |
 | `describe_commands` | input schemas for the named commands; unknown names land in `missing` |
 | `invoke_command` | runs `command_name` on `server`; downstream inputs go inside `parameters` |
+| `invoke_many` | up to 8 independent calls in one request, answered in input order; one failing call does not sink the rest |
 
-All four are thin wrappers over the downstream MCP servers. Response forms:
+All five are thin wrappers over the downstream MCP servers. Response forms:
 [docs/en/meta-tools.md](docs/en/meta-tools.md).
 
 ## Security defaults
