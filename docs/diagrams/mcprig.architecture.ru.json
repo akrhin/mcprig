@@ -7,39 +7,262 @@
     "quality_profile": "showcase"
   },
   "components": [
-    { "id": "prompt", "type": "external", "label": "промпт агента", "sublabel": "5 мета-тулов вместо 421", "pos": [40, 20], "size": [170, 64] },
-    { "id": "opencode", "type": "external", "label": "opencode", "sublabel": "плагин mcprig-route", "pos": [40, 120], "size": [170, 68] },
-    { "id": "claude", "type": "external", "label": "Claude Code · Codex", "sublabel": "mcprig init --client", "pos": [40, 240], "size": [170, 68] },
-    { "id": "hermes", "type": "external", "label": "Hermes", "sublabel": "свой клиент, набор ha", "pos": [40, 430], "size": [170, 68] },
-
-    { "id": "main", "type": "backend", "label": "mcprig serve :9101", "sublabel": "набор main · 11 серверов", "tag": "5 мета-тулов", "pos": [300, 110], "size": [200, 96] },
-    { "id": "core", "type": "backend", "label": "ядро прокси", "sublabel": "каталог · tool-out · /stats", "pos": [300, 250], "size": [200, 96] },
-    { "id": "ha", "type": "backend", "label": "mcprig serve :9102", "sublabel": "набор ha · 8 серверов", "pos": [300, 410], "size": [200, 96] },
-
-    { "id": "stdio", "type": "backend", "label": "stdio-серверы", "sublabel": "дочерний процесс", "tag": "initialize", "pos": [620, 70], "size": [200, 96] },
-    { "id": "http", "type": "cloud", "label": "HTTP-серверы", "sublabel": "serena · gitea · raven", "tag": "server/discover", "pos": [620, 230], "size": [200, 96] },
-
-    { "id": "panel", "type": "backend", "label": "панель :9088", "sublabel": "старт · ключи · логи", "pos": [300, 570], "size": [200, 76] },
-    { "id": "disk", "type": "database", "label": "конфиг и данные", "sublabel": "keys · secrets · tool-out", "pos": [620, 570], "size": [200, 76] }
+    {
+      "id": "prompt",
+      "type": "external",
+      "label": "промпт агента",
+      "sublabel": "5 мета-тулов вместо 421",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        170,
+        64
+      ]
+    },
+    {
+      "id": "opencode",
+      "type": "external",
+      "label": "opencode",
+      "sublabel": "плагин mcprig-route",
+      "pos": [
+        40,
+        120
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Claude Code · Codex",
+      "sublabel": "mcprig init --client",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "hermes",
+      "type": "external",
+      "label": "Hermes",
+      "sublabel": "свой клиент, набор ha",
+      "pos": [
+        40,
+        430
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "main",
+      "type": "backend",
+      "label": "mcprig serve :9101",
+      "sublabel": "набор main · 11 серверов",
+      "tag": "5 мета-тулов",
+      "pos": [
+        300,
+        110
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "ядро прокси",
+      "sublabel": "каталог · tool-out · /stats",
+      "pos": [
+        300,
+        250
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "ha",
+      "type": "backend",
+      "label": "mcprig serve :9102",
+      "sublabel": "набор ha · 8 серверов",
+      "pos": [
+        300,
+        410
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "stdio",
+      "type": "backend",
+      "label": "stdio-серверы",
+      "sublabel": "дочерний процесс",
+      "tag": "initialize",
+      "pos": [
+        850,
+        70
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "http",
+      "type": "cloud",
+      "label": "HTTP-серверы",
+      "sublabel": "serena · gitea · raven",
+      "tag": "server/discover",
+      "pos": [
+        620,
+        230
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "panel",
+      "type": "backend",
+      "label": "панель :9088",
+      "sublabel": "старт · ключи · логи",
+      "pos": [
+        300,
+        570
+      ],
+      "size": [
+        200,
+        76
+      ]
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "конфиг и данные",
+      "sublabel": "keys · secrets · tool-out",
+      "pos": [
+        620,
+        570
+      ],
+      "size": [
+        200,
+        76
+      ]
+    },
+    {
+      "id": "sandbox",
+      "type": "security",
+      "label": "bwrap · userns",
+      "sublabel": "ro / rw · tmpfs · prlimit",
+      "pos": [
+        620,
+        70
+      ],
+      "size": [
+        200,
+        96
+      ]
+    }
   ],
   "boundaries": [
-    { "kind": "security-group", "label": "набор = один MCP-сервер · Bearer-токен", "wraps": ["main", "core", "ha"] }
+    {
+      "kind": "security-group",
+      "label": "набор = один MCP-сервер · Bearer-токен",
+      "wraps": [
+        "main",
+        "core",
+        "ha"
+      ]
+    }
   ],
   "connections": [
-    { "id": "prompt-to-opencode", "from": "prompt", "to": "opencode", "variant": "dashed" },
-    { "id": "opencode-to-main", "from": "opencode", "to": "main", "label": "tools/call", "variant": "emphasis" },
-    { "id": "claude-to-main", "from": "claude", "to": "main" },
-    { "id": "hermes-to-ha", "from": "hermes", "to": "ha" },
-
-    { "id": "main-to-core", "from": "main", "to": "core" },
-    { "id": "ha-to-core", "from": "ha", "to": "core" },
-
-    { "id": "main-to-stdio", "from": "main", "to": "stdio", "label": "spawn + env" },
-    { "id": "main-to-http", "from": "main", "to": "http", "label": "url + headers" },
-    { "id": "ha-to-http", "from": "ha", "to": "http" },
-
-    { "id": "panel-to-ha", "from": "panel", "to": "ha", "label": "старт/стоп", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
-    { "id": "panel-to-disk", "from": "panel", "to": "disk", "label": "config · env", "variant": "dashed" }
+    {
+      "id": "prompt-to-opencode",
+      "from": "prompt",
+      "to": "opencode",
+      "variant": "dashed"
+    },
+    {
+      "id": "opencode-to-main",
+      "from": "opencode",
+      "to": "main",
+      "label": "tools/call",
+      "variant": "emphasis"
+    },
+    {
+      "id": "claude-to-main",
+      "from": "claude",
+      "to": "main"
+    },
+    {
+      "id": "hermes-to-ha",
+      "from": "hermes",
+      "to": "ha"
+    },
+    {
+      "id": "main-to-core",
+      "from": "main",
+      "to": "core"
+    },
+    {
+      "id": "ha-to-core",
+      "from": "ha",
+      "to": "core"
+    },
+    {
+      "id": "main-to-http",
+      "from": "main",
+      "to": "http",
+      "label": "url + headers"
+    },
+    {
+      "id": "ha-to-http",
+      "from": "ha",
+      "to": "http"
+    },
+    {
+      "id": "panel-to-ha",
+      "from": "panel",
+      "to": "ha",
+      "label": "старт/стоп",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "panel-to-disk",
+      "from": "panel",
+      "to": "disk",
+      "label": "config · env",
+      "variant": "dashed"
+    },
+    {
+      "id": "main-to-sandbox",
+      "from": "main",
+      "to": "sandbox",
+      "label": "spawn + env"
+    },
+    {
+      "id": "sandbox-to-stdio",
+      "from": "sandbox",
+      "to": "stdio",
+      "label": "exec"
+    }
   ],
   "cards": [
     {
@@ -71,6 +294,18 @@
         "HTTP: server/discover (2026-07-28), OAuth по 401",
         "Один Bearer-токен на набор: main.key / ha.key",
         "Наборы — дочерние процессы панели или юниты mcprig-set@"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Песочница",
+      "items": [
+        "`untrusted` без `sandbox` не стартует: fail-closed, а не «повезёт»",
+        "`ro` заменяет умолчания целиком — нужные пути перечисляй сам",
+        "`prlimit` и его загрузчик монтируются сами, `/usr` не обязателен",
+        "Лимиты AS / NPROC / FSIZE; CPU и RSS поддерева не ограничены",
+        "node: `memoryMb` ≥ 2048 и `ro` на префикс узла",
+        "Изоляция: `/home`, сеть, `/proc/1`, запись в `/`"
       ]
     }
   ]

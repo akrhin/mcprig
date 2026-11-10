@@ -7,39 +7,262 @@
     "quality_profile": "showcase"
   },
   "components": [
-    { "id": "prompt", "type": "external", "label": "agent prompt", "sublabel": "5 meta-tools, not 421", "pos": [40, 20], "size": [170, 64] },
-    { "id": "opencode", "type": "external", "label": "opencode", "sublabel": "mcprig-route plugin", "pos": [40, 120], "size": [170, 68] },
-    { "id": "claude", "type": "external", "label": "Claude Code · Codex", "sublabel": "mcprig init --client", "pos": [40, 240], "size": [170, 68] },
-    { "id": "hermes", "type": "external", "label": "Hermes", "sublabel": "own client, set ha", "pos": [40, 430], "size": [170, 68] },
-
-    { "id": "main", "type": "backend", "label": "mcprig serve :9101", "sublabel": "set main · 11 servers", "tag": "5 meta-tools", "pos": [300, 110], "size": [200, 96] },
-    { "id": "core", "type": "backend", "label": "proxy core", "sublabel": "catalog · tool-out · /stats", "pos": [300, 250], "size": [200, 96] },
-    { "id": "ha", "type": "backend", "label": "mcprig serve :9102", "sublabel": "set ha · 8 servers", "pos": [300, 410], "size": [200, 96] },
-
-    { "id": "stdio", "type": "backend", "label": "stdio servers", "sublabel": "child process", "tag": "initialize", "pos": [620, 70], "size": [200, 96] },
-    { "id": "http", "type": "cloud", "label": "HTTP servers", "sublabel": "serena · gitea · raven", "tag": "server/discover", "pos": [620, 230], "size": [200, 96] },
-
-    { "id": "panel", "type": "backend", "label": "panel :9088", "sublabel": "start · keys · logs", "pos": [300, 570], "size": [200, 76] },
-    { "id": "disk", "type": "database", "label": "config and data", "sublabel": "keys · secrets · tool-out", "pos": [620, 570], "size": [200, 76] }
+    {
+      "id": "prompt",
+      "type": "external",
+      "label": "agent prompt",
+      "sublabel": "5 meta-tools, not 421",
+      "pos": [
+        40,
+        20
+      ],
+      "size": [
+        170,
+        64
+      ]
+    },
+    {
+      "id": "opencode",
+      "type": "external",
+      "label": "opencode",
+      "sublabel": "mcprig-route plugin",
+      "pos": [
+        40,
+        120
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Claude Code · Codex",
+      "sublabel": "mcprig init --client",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "hermes",
+      "type": "external",
+      "label": "Hermes",
+      "sublabel": "own client, set ha",
+      "pos": [
+        40,
+        430
+      ],
+      "size": [
+        170,
+        68
+      ]
+    },
+    {
+      "id": "main",
+      "type": "backend",
+      "label": "mcprig serve :9101",
+      "sublabel": "set main · 11 servers",
+      "tag": "5 meta-tools",
+      "pos": [
+        300,
+        110
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "proxy core",
+      "sublabel": "catalog · tool-out · /stats",
+      "pos": [
+        300,
+        250
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "ha",
+      "type": "backend",
+      "label": "mcprig serve :9102",
+      "sublabel": "set ha · 8 servers",
+      "pos": [
+        300,
+        410
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "stdio",
+      "type": "backend",
+      "label": "stdio servers",
+      "sublabel": "child process",
+      "tag": "initialize",
+      "pos": [
+        850,
+        70
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "http",
+      "type": "cloud",
+      "label": "HTTP servers",
+      "sublabel": "serena · gitea · raven",
+      "tag": "server/discover",
+      "pos": [
+        620,
+        230
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
+      "id": "panel",
+      "type": "backend",
+      "label": "panel :9088",
+      "sublabel": "start · keys · logs",
+      "pos": [
+        300,
+        570
+      ],
+      "size": [
+        200,
+        76
+      ]
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "config and data",
+      "sublabel": "keys · secrets · tool-out",
+      "pos": [
+        620,
+        570
+      ],
+      "size": [
+        200,
+        76
+      ]
+    },
+    {
+      "id": "sandbox",
+      "type": "security",
+      "label": "bwrap · userns",
+      "sublabel": "ro / rw · tmpfs · prlimit",
+      "pos": [
+        620,
+        70
+      ],
+      "size": [
+        200,
+        96
+      ]
+    }
   ],
   "boundaries": [
-    { "kind": "security-group", "label": "a set = one MCP server · bearer token", "wraps": ["main", "core", "ha"] }
+    {
+      "kind": "security-group",
+      "label": "a set = one MCP server · bearer token",
+      "wraps": [
+        "main",
+        "core",
+        "ha"
+      ]
+    }
   ],
   "connections": [
-    { "id": "prompt-to-opencode", "from": "prompt", "to": "opencode", "variant": "dashed" },
-    { "id": "opencode-to-main", "from": "opencode", "to": "main", "label": "tools/call", "variant": "emphasis" },
-    { "id": "claude-to-main", "from": "claude", "to": "main" },
-    { "id": "hermes-to-ha", "from": "hermes", "to": "ha" },
-
-    { "id": "main-to-core", "from": "main", "to": "core" },
-    { "id": "ha-to-core", "from": "ha", "to": "core" },
-
-    { "id": "main-to-stdio", "from": "main", "to": "stdio", "label": "spawn + env" },
-    { "id": "main-to-http", "from": "main", "to": "http", "label": "url + headers" },
-    { "id": "ha-to-http", "from": "ha", "to": "http" },
-
-    { "id": "panel-to-ha", "from": "panel", "to": "ha", "label": "start/stop", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
-    { "id": "panel-to-disk", "from": "panel", "to": "disk", "label": "config · env", "variant": "dashed" }
+    {
+      "id": "prompt-to-opencode",
+      "from": "prompt",
+      "to": "opencode",
+      "variant": "dashed"
+    },
+    {
+      "id": "opencode-to-main",
+      "from": "opencode",
+      "to": "main",
+      "label": "tools/call",
+      "variant": "emphasis"
+    },
+    {
+      "id": "claude-to-main",
+      "from": "claude",
+      "to": "main"
+    },
+    {
+      "id": "hermes-to-ha",
+      "from": "hermes",
+      "to": "ha"
+    },
+    {
+      "id": "main-to-core",
+      "from": "main",
+      "to": "core"
+    },
+    {
+      "id": "ha-to-core",
+      "from": "ha",
+      "to": "core"
+    },
+    {
+      "id": "main-to-http",
+      "from": "main",
+      "to": "http",
+      "label": "url + headers"
+    },
+    {
+      "id": "ha-to-http",
+      "from": "ha",
+      "to": "http"
+    },
+    {
+      "id": "panel-to-ha",
+      "from": "panel",
+      "to": "ha",
+      "label": "start/stop",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "panel-to-disk",
+      "from": "panel",
+      "to": "disk",
+      "label": "config · env",
+      "variant": "dashed"
+    },
+    {
+      "id": "main-to-sandbox",
+      "from": "main",
+      "to": "sandbox",
+      "label": "spawn + env"
+    },
+    {
+      "id": "sandbox-to-stdio",
+      "from": "sandbox",
+      "to": "stdio",
+      "label": "exec"
+    }
   ],
   "cards": [
     {
@@ -71,6 +294,18 @@
         "HTTP: server/discover (2026-07-28), OAuth on 401",
         "One bearer token per set: main.key / ha.key",
         "Sets are panel children or mcprig-set@ units"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Sandbox",
+      "items": [
+        "`untrusted` without `sandbox` never starts: fail-closed",
+        "`ro` replaces the defaults wholesale — list the paths you need",
+        "`prlimit` and its loader are mounted for you; `/usr` is not required",
+        "Limits: AS / NPROC / FSIZE; CPU and subtree RSS are not limited",
+        "node: `memoryMb` ≥ 2048 and `ro` for the runtime prefix",
+        "Isolation: `/home`, network, `/proc/1`, writes to `/`"
       ]
     }
   ]
