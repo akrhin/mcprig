@@ -77,6 +77,52 @@ func TestInvokeCommandTruncatesOversizeAnswer(t *testing.T) {
 	}
 }
 
+// Усечение structuredContent обязано называть файл: клиент со structured-смыслом
+// (ticktick и подобные) иначе получает пустоту и не знает, где искать данные.
+func TestTruncatedStructuredAnswerNamesFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MCPRIG_DATA_DIR", dir)
+	m := New(&config.Config{Servers: []*config.Server{stdio("big")}}, "test", nil)
+	m.dial = func(context.Context, *config.Server) (*mcp.ClientSession, error) {
+		s := mcp.NewServer(&mcp.Implementation{Name: "big", Version: "test"}, nil)
+		s.AddTool(&mcp.Tool{Name: "big", InputSchema: objectSchema(map[string]any{})},
+			func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return &mcp.CallToolResult{
+					Content:           []mcp.Content{&mcp.TextContent{Text: "ticktick"}},
+					StructuredContent: map[string]any{"items": strings.Repeat("z", 40000)},
+				}, nil
+			})
+		st, ct := mcp.NewInMemoryTransports()
+		if _, err := s.Connect(context.Background(), st, nil); err != nil {
+			return nil, err
+		}
+		return mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil).
+			Connect(context.Background(), ct, nil)
+	}
+	t.Cleanup(func() { _ = m.Close() })
+	cs := clientFor(t, m.Server())
+
+	text := resultText(t, call(t, cs, "invoke_command", map[string]any{"server": "big", "command_name": "big"}))
+	const phrase = "[structuredContent не влезает в maxBytes: полный ответ в файле]"
+	if !strings.Contains(text, phrase) {
+		t.Fatalf("нет пометки про structuredContent: %q", text)
+	}
+	const marker = "полный ответ — "
+	i := strings.Index(text, marker)
+	if i < 0 {
+		t.Fatalf("нет маркера усечения: %q", text)
+	}
+	rest := text[i+len(marker):]
+	path := rest[:strings.Index(rest, "]")]
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("полный ответ не выгружен: %v", err)
+	}
+	if !strings.Contains(string(data), strings.Repeat("z", 40000)) {
+		t.Fatalf("в файле нет structuredContent: %d байт", len(data))
+	}
+}
+
 // An answer that fits is returned untouched: no marker, no file.
 func TestInvokeCommandSmallAnswerUntouched(t *testing.T) {
 	dir := t.TempDir()

@@ -46,7 +46,7 @@ connection: a filtered-out server is never dialed.
 | `description` | present when the config has one |
 | `type` | `stdio` or `remote` |
 | `enabled` | from the config; a disabled server is not probed and is reported `healthy: true` |
-| `healthy` | result of a probe; `false` for a broken config or a failed connect |
+| `healthy` | result of a probe; `false` for a broken config or a failed connect. A probe that could not get a free slot is reported `true` and is not cached — the outcome is unknown |
 | `error` | probe error text, present with `healthy: false` |
 | `isolation` | `bwrap` when the sandbox is applied; `без изоляции: <причина>` when it was requested but bubblewrap could not start (`onUnavailable: warn`/`allow`); `нет: конфиг отвергнут` when the record has a `_configError`; absent only for a valid server without a `sandbox` block |
 | `tags` | from the config, when present |
@@ -141,7 +141,7 @@ Input:
 | --- | --- |
 | `server` | required |
 | `command_name` | one of `command_name` or its alias `command` (see below) |
-| `command` | alias for `command_name`; `list_commands` returns the name in the `command` field, so either key works. Sending both with different values is an error |
+| `command` | alias for `command_name`; `list_commands` returns the name in the `command` field, so either key works. Sending both with different values is an error. The client sees the schema at session start, so after the update it must re-read `tools/list` (or start a new session) — otherwise the old `required: command_name` wins over `anyOf` |
 | `parameters` | optional object; `null` and an empty string mean `{}` |
 | `maxBytes` | optional cap on the returned answer in bytes; default 32768, at most 1048576; `0` means the default |
 
@@ -175,8 +175,11 @@ answer:
 
 The full answer is written `0600` to
 `${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/<random>.txt`; the directory is created
-on first use. An answer within the cap is returned untouched — no file, no
-marker. A non-numeric or negative `maxBytes`, or one above 1048576, is an
+on first use. When the answer carried `structuredContent`, one more line follows
+the marker — `[structuredContent не влезает в maxBytes: полный ответ в файле]`:
+the structure does not survive the text cut, and a client whose meaning lives in
+structured data has nothing to read otherwise. An answer within the cap is
+returned untouched — no file, no marker. A non-numeric or negative `maxBytes`, or one above 1048576, is an
 error like any other bad argument.
 
 ## invoke_many
@@ -206,7 +209,10 @@ in completion order:
 or the whole result object otherwise, truncated at `maxBytes`. A call that
 failed — unknown or disabled server, denied by permissions, transport error,
 timeout, or a downstream result with `isError: true` — keeps its slot with
-`ok: false` and `error`; the other calls are unaffected.
+`ok: false` and `error`; the other calls are unaffected. For a permissions
+refusal `result` carries the same answer `invoke_command` gives: the
+`🚫 Blocked by mcprig policy: …` marker in `content` and
+`_meta.lazyMcpPolicy: "blocked"`.
 
 Bad input fails the whole request with `isError: true` and nothing is run: no
 calls, more than 8, an unknown key inside a call, a missing `server` or

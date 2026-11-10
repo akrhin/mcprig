@@ -51,6 +51,9 @@ const (
 var (
 	errClosed    = errors.New("менеджер закрыт")
 	errNoTargets = errors.New("нужен параметр server или servers")
+	// errProbeSkipped — проба вообще не началась (не дождалась слота): исход
+	// неизвестен, это не отказ сервера.
+	errProbeSkipped = errors.New("проба не началась: не дождалась свободного слота")
 )
 
 // probeSlots bounds how many servers one list_servers probes at once.
@@ -415,7 +418,12 @@ func (m *Manager) status(ctx context.Context, e *entry) (bool, string) {
 
 	var ok bool
 	var errText string
-	if err := m.probe(ctx, e); err != nil {
+	err := m.probe(ctx, e)
+	if errors.Is(err, errProbeSkipped) {
+		// Исход неизвестен (проба не началась) — не кэшируем и не считаем больным.
+		return true, ""
+	}
+	if err != nil {
 		errText = err.Error()
 	} else {
 		ok = true
@@ -434,7 +442,7 @@ func (m *Manager) probe(ctx context.Context, e *entry) error {
 	case probeSlots <- struct{}{}:
 		defer func() { <-probeSlots }()
 	case <-probeCtx.Done():
-		return probeCtx.Err()
+		return fmt.Errorf("%w: %w", errProbeSkipped, probeCtx.Err())
 	}
 	_, err := e.conn.session(probeCtx, m.dialFor(e.srv))
 	return err
@@ -650,7 +658,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		return errResult(errors.New("server обязателен"))
 	}
 	if in.CommandName == "" {
-		return errResult(errors.New("command_name обязателен"))
+		return errResult(errors.New("укажите command_name или command"))
 	}
 	maxBytes, err := resolveMaxBytes(in.MaxBytes)
 	if err != nil {

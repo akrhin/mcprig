@@ -20,6 +20,7 @@ go test ./... -race -count=1 -p 1  # тесты; -p 1 обязателен: па
                                   # поднимают наборы в общем диапазоне 9100–9199
 go test ./e2e -run TestLifecycle -v   # панель + набор + stdio-даунстрим, без подготовки
 bash scripts/contract-e2e.sh      # контракт против BASE (по умолчанию 127.0.0.1:9091)
+bash scripts/sandbox-e2e.sh       # bwrap-песочница на живом хосте: 14/14 PASS
 bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
 ```
 
