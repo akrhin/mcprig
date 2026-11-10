@@ -81,18 +81,18 @@ systemctl --user enable --now mcprig.service
 ```bash
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.7-slim    # закреплённый релиз
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.7-full
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-slim    # закреплённый релиз
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-full
 ```
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
-(`0.3.7-slim`, `0.3.7-full` — текущая).
+(`0.3.8-slim`, `0.3.8-full` — текущая).
 
 Либо собрать самому:
 
 ```bash
-docker build --build-arg VERSION=v0.3.7 -t mcprig:slim .
-docker build --build-arg VERSION=v0.3.7 --target full -t mcprig:full .
+docker build --build-arg VERSION=0.3.8 -t mcprig:slim .
+docker build --build-arg VERSION=0.3.8 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
@@ -100,12 +100,19 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 ```
 
 Точка входа образа — `mcprig`; команда по умолчанию —
-`serve --config /config/servers.json`; адрес берётся из `transport.host` и `transport.port` — в конфиге должно стоять `0.0.0.0` и тот порт, который публикуешь. Рабочий каталог —
+`serve --config /config/servers.json`; адрес берётся из `transport.host` и `transport.port` — в конфиге должно стоять `0.0.0.0` и тот порт, который публикуешь. `VERSION` — версия **без** ведущего `v`: `0.3.8`, а не `v0.3.8`; значение с `v` отвергается, и сборка падает. Рабочий каталог —
 `/data`, владелец — uid 10001; смонтируйте туда том и задайте
 `MCPRIG_DATA_DIR=/data`, чтобы токены OAuth и прочее состояние переживали
-перезапуск. `slim` везёт healthcheck на `http://127.0.0.1:9100/healthz`; он рассчитан на порт
-по умолчанию, при другом `transport.port` задай `--health-cmd` или healthcheck в
-compose.
+перезапуск. Оба образа задают `MCPRIG_HOST=0.0.0.0`, поэтому панель внутри
+контейнера слушает все интерфейсы: публикуйте её на `MCPRIG_PORT` (по умолчанию
+9091, `deploy/docker-compose.yml` держит набор `ops` на 9101). Вне Docker
+`MCPRIG_HOST` не задан, и панель остаётся на `127.0.0.1` — не переносите
+контейнерное значение в systemd-юнит хоста.
+
+Healthcheck образа спрашивает набор на `http://127.0.0.1:9100/healthz` и панель
+на `http://127.0.0.1:9091/healthz`, так что контейнер `healthy`, только когда
+отвечают оба; он рассчитан на порты по умолчанию, при другом `transport.port`
+или `MCPRIG_PORT` задай `--health-cmd` или healthcheck в compose.
 
 `deploy/docker-compose.yml` запускает два набора (`demo` на 9100, `ops` на 9101)
 из `frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, монтирует каждый `servers.json` только для
