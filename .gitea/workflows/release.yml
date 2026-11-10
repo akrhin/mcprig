@@ -136,6 +136,12 @@ jobs:
             echo "secrets.REGISTRY/REGISTRY_USER/REGISTRY_PASSWORD не заданы — образы не публикуются"
             exit 0
           fi
+          # job-контейнер act-runner получает docker.sock, только если он добавлен
+          # в container.options; без него шаг не краснит релиз.
+          if ! command -v docker >/dev/null 2>&1 || [ ! -S /var/run/docker.sock ]; then
+            echo "в job-контейнере нет docker или /var/run/docker.sock — образы собираются вручную (см. CONTRIBUTING)"
+            exit 0
+          fi
           # Версия без v — та же форма, что у goreleaser и в main.version.
           ver=$(printf '%s' "${{ gitea.ref_name }}" | sed 's/^v//')
           revision=$(git rev-parse --short HEAD)
