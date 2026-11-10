@@ -27,8 +27,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/oauth2"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/oauth"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/oauth"
 )
 
 // fakeAS — фальшивый authorization server и защищённый MCP-эндпоинт на одном

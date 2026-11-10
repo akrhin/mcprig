@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // baseEnvKeep — что stdio-сервер получает по умолчанию. Остальное окружение

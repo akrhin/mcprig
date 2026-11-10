@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // available проверяет, что bwrap действительно запускается: бинарь есть и

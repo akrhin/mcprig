@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/sintez/mcprig/internal/downstream"
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 const probeTimeout = 60 * time.Second

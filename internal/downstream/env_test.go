@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // Окружение — граница доверия: ключ хоста вниз не уходит, пока его не

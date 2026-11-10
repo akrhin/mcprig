@@ -13,9 +13,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/downstream"
-	"github.com/sintez/mcprig/internal/sandbox"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/sandbox"
 )
 
 // probeResult — что удалось внутри песочницы. Песочница считается рабочей,

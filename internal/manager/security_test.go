@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/downstream"
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // stdio-сервер для probe получает whitelist, а не окружение менеджера: иначе

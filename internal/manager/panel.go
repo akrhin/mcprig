@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/sintez/mcprig/web"
+	"github.com/akrhin/mcprig/web"
 )
 
 // panelCSP: панель живёт внешними app.css/app.js, inline-скриптов и стилей нет.

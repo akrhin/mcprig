@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sintez/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/stats"
 )
 
 type callsBody struct {

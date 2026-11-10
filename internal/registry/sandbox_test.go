@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/manager"
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/manager"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // setConfigOf собирает конфиг набора и читает его так же, как это сделает

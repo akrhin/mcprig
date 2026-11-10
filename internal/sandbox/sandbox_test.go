@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // stubAvailable подменяет проверку bwrap: юнит-тесты не зависят от хоста.

@@ -18,14 +18,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/downstream"
-	"github.com/sintez/mcprig/internal/httplisten"
-	"github.com/sintez/mcprig/internal/manager"
-	"github.com/sintez/mcprig/internal/mcpserver"
-	"github.com/sintez/mcprig/internal/oauth"
-	"github.com/sintez/mcprig/internal/stats"
-	"github.com/sintez/mcprig/internal/toolout"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/httplisten"
+	"github.com/akrhin/mcprig/internal/manager"
+	"github.com/akrhin/mcprig/internal/mcpserver"
+	"github.com/akrhin/mcprig/internal/oauth"
+	"github.com/akrhin/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/toolout"
 )
 
 // version is set by the release build.
