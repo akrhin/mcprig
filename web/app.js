@@ -2171,37 +2171,79 @@
     var set = current();
     if (!set) { return; }
     renderKeys(set);
+    show($('new-key-box'), false);
+    show($('keys-warn'), false);
+    $('key-label').value = '';
     var dlg = $('keys-dlg');
     if (typeof dlg.showModal === 'function') { dlg.showModal(); }
   }
 
   function renderKeys(set) {
+    set = set || {};
     var keys = set.keys || [];
-    sync($('keys-body'), keys, function (k) { return k.id; },
+    show($('keys-empty'), keys.length === 0);
+    sync($('key-list'), keys, function (k) { return k.id; },
       function () {
-        var tr = el('tr');
-        tr.appendChild(el('td', 'n'));
-        tr.appendChild(el('td', 'n'));
-        tr.appendChild(el('td'));
-        tr.appendChild(el('td', 'hide-sm'));
-        var td = tr.appendChild(el('td', 'num'));
-        var b = td.appendChild(el('button', 'mini'));
-        b.type = 'button';
-        return tr;
+        var li = el('li', 'keyitem');
+        var head = li.appendChild(el('div'));
+        head.appendChild(el('span', 'key-name'));
+        head.appendChild(el('span', 'key-sub'));
+        var note = li.appendChild(el('div', 'key-note'));
+        var input = note.appendChild(el('input', 'input'));
+        input.type = 'text';
+        input.maxLength = 64;
+        input.autocomplete = 'off';
+        var save = note.appendChild(el('button', 'btn btn-sm'));
+        save.type = 'button';
+        save.dataset.noteSave = '';
+        var acts = li.appendChild(el('div', 'key-acts'));
+        var rev = acts.appendChild(el('button', 'btn btn-xs btn-danger'));
+        rev.type = 'button';
+        return li;
       },
-      function (tr, k) {
+      function (li, k) {
         var revoked = !!k.revokedAt;
-        tr.children[0].textContent = (set.keyPrefix || '—') + '…';
-        tr.children[1].textContent = day(k.createdAt);
-        tr.children[2].textContent = revoked ? t('keys.revoked', { date: day(k.revokedAt) }) : t('keys.active');
-        tr.children[2].className = revoked ? 'st' : '';
-        tr.children[3].textContent = k.note || '—';
-        var btn = tr.children[4].querySelector('button');
-        btn.textContent = t('keys.revoke');
-        btn.dataset.key = k.id;
-        btn.hidden = revoked;
-        tr.classList.toggle('row-warn', revoked);
+        li.dataset.revoked = String(revoked);
+        // имя строки — id ключа: префикс у всех ключей набора один и тот же
+        li.querySelector('.key-name').textContent = k.id;
+        li.querySelector('.key-sub').textContent = revoked
+          ? day(k.createdAt) + ' · ' + t('keys.revoked', { date: day(k.revokedAt) })
+          : day(k.createdAt) + ' · ' + t('keys.active');
+        var input = li.querySelector('.key-note .input');
+        input.value = k.note || '';
+        input.placeholder = t('keys.notePh');
+        input.disabled = revoked;
+        input.dataset.note = k.id;
+        input.setAttribute('aria-label', t('keys.noteFor', { id: k.id }));
+        var save = li.querySelector('[data-note-save]');
+        save.textContent = t('common.save');
+        save.dataset.note = k.id;
+        save.hidden = revoked || input.value.trim() === (k.note || '');
+        var rev = li.querySelector('.key-acts .btn');
+        rev.textContent = t('keys.revoke');
+        rev.dataset.revoke = k.id;
+        rev.hidden = revoked;
       });
+  }
+
+  // Подпись ключа — это метка клиента в статистике, поэтому демон перезапускает
+  // работающий набор. Неудачу рестарта он отдаёт полем restartError: подпись
+  // уже сохранена, и молчать об этом нельзя.
+  function saveNote(keyID, input, btn) {
+    var set = current();
+    if (!set || st.busy) { return; }
+    st.busy = true;
+    btn.disabled = true;
+    show($('keys-warn'), false);
+    send('PATCH', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' + encodeURIComponent(keyID),
+      { note: input.value.trim() }).then(function (r) {
+        if (r && r.restartError) {
+          $('keys-warn').textContent = t('keys.restartWarn', { err: r.restartError });
+          show($('keys-warn'), true);
+        }
+        return loadState().then(function () { renderKeys(current() || set); });
+      }).catch(function (e) { fail(e.message, e); })
+      .then(function () { st.busy = false; btn.disabled = false; });
   }
 
   /* ---------- язык ----------
@@ -2210,34 +2252,41 @@
   var relang = function () {
     applyStatic();
     setTitle();
-    renderTop();
+    renderChrome();
     renderRail();
-    renderSetsTable();
-    renderSetServers();
     renderHead();
+    renderKpis(st.kpi);
+    renderSetServers();
     renderServers(st.health);
-    renderTail(st.calls);
     renderCalls(st.calls);
     renderEnv();
     renderKeys(current() || {});
     fillFilters();
     renderStats(st.st.data);
     applyRail();
+    applyThemeMenu();
   };
 
   /* ---------- привязки ---------- */
 
   $('rail-sets').addEventListener('click', function (e) {
-    var row = e.target.closest('.setrow');
+    var row = e.target.closest('.set-item');
     if (!row) { return; }
-    e.preventDefault();
     select(row.dataset.id);
+    closeRail();
   });
 
-  $('sets-body').addEventListener('click', function (e) {
-    var tr = e.target.closest('tr');
-    if (tr && tr.dataset.id && tr.dataset.id !== st.sel) { select(tr.dataset.id); }
+  $('rail-open').addEventListener('click', function () {
+    if (document.body.classList.contains('rail-open')) { closeRail(); } else { openRail(); }
   });
+
+  $('rail-toggle').addEventListener('click', function () {
+    st.railPref = document.documentElement.classList.contains('rail-compact') ? 'full' : 'compact';
+    try { localStorage.setItem('mcprig.rail', st.railPref); } catch (err) { /* приватный режим */ }
+    applyRail();
+  });
+
+  $('scrim').addEventListener('click', function () { closeSide(); closeRail(); });
 
   $('tabs').addEventListener('click', function (e) {
     var btn = e.target.closest('.tab');
@@ -2503,24 +2552,85 @@
     });
   });
 
+  /* ---------- ключи ---------- */
+
   $('keys').addEventListener('click', openKeys);
   $('keys-close').addEventListener('click', function () { $('keys-dlg').close(); });
   $('keys-done').addEventListener('click', function () { $('keys-dlg').close(); });
-  $('keys-issue').addEventListener('click', function () {
+
+  $('new-key-copy').addEventListener('click', function () {
+    copyText($('new-key').textContent, this);
+  });
+
+  // Выдача ключа подписью не принимает — подпись ставим отдельным PATCH,
+  // а ошибку второго рестарта показываем тем же предупреждением.
+  $('key-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var set = current();
+    if (!set || st.busy) { return; }
+    var label = $('key-label').value.trim();
+    var btn = this.querySelector('button[type="submit"]');
+    st.busy = true;
+    btn.disabled = true;
+    show($('keys-warn'), false);
+    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', {})
+      .then(function (r) {
+        $('key-label').value = '';
+        $('new-key').textContent = (r && r.token) || '';
+        show($('new-key-box'), !!(r && r.token));
+        if (r && r.restartError) { fail(t('keys.restartWarn', { err: r.restartError })); }
+        var key = r && r.key && r.key.id;
+        var note = label && key
+          ? send('PATCH', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' + encodeURIComponent(key), { note: label })
+          : Promise.resolve(null);
+        return note.then(function (signed) {
+          if (signed && signed.restartError) {
+            $('keys-warn').textContent = t('keys.restartWarn', { err: signed.restartError });
+            show($('keys-warn'), true);
+          }
+          return loadState().then(function () { renderKeys(current() || set); });
+        });
+      })
+      .catch(function (err) { fail(err.message, err); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  });
+
+  $('key-list').addEventListener('click', function (e) {
     var set = current();
     if (!set) { return; }
-    act(this, '/api/sets/' + set.id + '/keys', function () {
+    var save = e.target.closest('[data-note-save]');
+    if (save) {
+      var input = save.closest('.keyitem').querySelector('.input');
+      saveNote(save.dataset.note, input, save);
+      return;
+    }
+    var revoke = e.target.closest('[data-revoke]');
+    if (!revoke) { return; }
+    revoke.disabled = true;
+    send('DELETE', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' +
+      encodeURIComponent(revoke.dataset.revoke)).then(function () {
       return loadState().then(function () { renderKeys(current() || set); });
-    });
+    }).catch(function () { revoke.disabled = false; });
   });
-  $('keys-body').addEventListener('click', function (e) {
-    var btn = e.target.closest('button[data-key]');
-    var set = current();
-    if (!btn || !set) { return; }
-    btn.disabled = true;
-    send('DELETE', '/api/sets/' + set.id + '/keys/' + encodeURIComponent(btn.dataset.key)).then(function () {
-      return loadState().then(function () { renderKeys(current() || set); });
-    }).catch(function () { btn.disabled = false; });
+
+  $('key-list').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !e.target.classList.contains('input')) { return; }
+    e.preventDefault();
+    var item = e.target.closest('.keyitem');
+    var save = item && item.querySelector('[data-note-save]');
+    if (save) { saveNote(save.dataset.note, e.target, save); }
+  });
+
+  // кнопка сохранения появляется только когда подпись отличалась от сохранённой
+  $('key-list').addEventListener('input', function (e) {
+    if (!e.target.classList.contains('input')) { return; }
+    var item = e.target.closest('.keyitem');
+    var save = item && item.querySelector('[data-note-save]');
+    if (!save) { return; }
+    var stored = (current() || { keys: [] }).keys.filter(function (k) {
+      return k.id === save.dataset.note;
+    })[0];
+    save.hidden = e.target.value.trim() === ((stored && stored.note) || '');
   });
 
   /* ---------- цикл обновления ---------- */
