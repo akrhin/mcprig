@@ -108,6 +108,40 @@ Rules:
 - `CHANGELOG.md` is the only release-notes source: Added / Changed / Fixed /
   Removed / Security, highest impact first.
 
+## Images
+
+Two images, `slim` and `full` (see [docs/en/install.md](docs/en/install.md)), live
+in the project's Gitea registry as `sintez/mcprig`.
+
+By hand:
+
+```bash
+reg=frosty-ad-gt.cloudpub.ru/sintez/mcprig
+ver=$(git describe --tags --abbrev=0 | sed 's/^v//')
+for target in slim full; do
+  docker build --target "$target" --build-arg VERSION="$ver" \
+    --build-arg REVISION="$(git rev-parse --short HEAD)" -t "$reg:$ver-$target" .
+  docker push "$reg:$ver-$target"
+done
+```
+
+The `v*` tag job does the same and also tags `latest` (slim) and `latest-full`. It
+needs the `REGISTRY`, `REGISTRY_USER` and `REGISTRY_PASSWORD` secrets and prints
+that it skipped when they are missing. The job runs before the release draft is
+published, so `latest` moves at tag time; a draft that is scrapped leaves `latest`
+on an unpublished version — re-point the two tags by hand:
+
+```bash
+for pair in "slim latest" "full latest-full"; do
+  set -- $pair
+  docker build --target "$1" --build-arg VERSION="$ver" -t "$reg:$2" .
+  docker push "$reg:$2"
+done
+```
+
+`VERSION` is always the version without the leading `v`; the Dockerfile rejects
+`vX.Y.Z` before compiling.
+
 ## Release
 
 A `v*` tag runs gofmt, vet, the race suite and govulncheck, then goreleaser
