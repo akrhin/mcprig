@@ -408,6 +408,27 @@ func TestInvokeCommandCommandAlias(t *testing.T) {
 	}
 }
 
+// Два имени одного поля с разными значениями — отказ, а не тихий выбор.
+func TestInvokeCommandAliasConflict(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{
+		"server": "alpha", "command_name": "echo", "command": "other",
+	})
+	if !res.IsError {
+		t.Fatal("расходящиеся имена должны отвергаться")
+	}
+	if text := resultText(t, res); !strings.Contains(text, "укажите одно: command_name или command") {
+		t.Fatalf("нет подсказки выбрать одно имя: %q", text)
+	}
+	if n := atomic.LoadInt32(&dials); n != 0 {
+		t.Fatalf("отвергнутый вызов не должен ходить в апстрим: %d", n)
+	}
+}
+
 // A wrong JSON type names the key and the expected kind, not a Go struct field.
 func TestInvokeCommandTypeError(t *testing.T) {
 	var dials int32
@@ -419,7 +440,7 @@ func TestInvokeCommandTypeError(t *testing.T) {
 	if !res.IsError {
 		t.Fatal("a number for server must be an error")
 	}
-	if text := resultText(t, res); !strings.Contains(text, "ключ server: тип строка, получено число") {
+	if text := resultText(t, res); !strings.Contains(text, "ключ server: ожидался тип «строка», получен тип «число»") {
 		t.Fatalf("want a readable type error, got %q", text)
 	}
 	if n := atomic.LoadInt32(&dials); n != 0 {

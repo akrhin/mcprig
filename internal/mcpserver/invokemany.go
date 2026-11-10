@@ -29,7 +29,7 @@ type invokeManyInput struct {
 type manyCall struct {
 	Server      string          `json:"server"`
 	CommandName string          `json:"command_name"`
-	Command     string          `json:"command,omitempty"` // alias for command_name: list_commands называет это поле command
+	Command     string          `json:"command"` // синоним command_name: list_commands называет это поле command
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
 }
 
@@ -119,6 +119,8 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 		}
 		if calls[i].CommandName == "" {
 			calls[i].CommandName = calls[i].Command
+		} else if calls[i].Command != "" && calls[i].Command != calls[i].CommandName {
+			return nil, fmt.Errorf("calls[%d]: укажите одно: command_name или command", i)
 		}
 		if calls[i].CommandName == "" {
 			return nil, fmt.Errorf("calls[%d]: command_name обязателен", i)

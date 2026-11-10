@@ -631,7 +631,7 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 type invokeCommandInput struct {
 	Server      string          `json:"server"`
 	CommandName string          `json:"command_name"`
-	Command     string          `json:"command,omitempty"` // alias for command_name: list_commands называет это поле command
+	Command     string          `json:"command"` // синоним command_name: list_commands называет это поле command
 	Parameters  json.RawMessage `json:"parameters"`
 	MaxBytes    int             `json:"maxBytes,omitempty"`
 }
@@ -643,6 +643,8 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 	if in.CommandName == "" {
 		in.CommandName = in.Command
+	} else if in.Command != "" && in.Command != in.CommandName {
+		return errResult(errors.New("укажите одно: command_name или command"))
 	}
 	if in.Server == "" {
 		return errResult(errors.New("server обязателен"))
@@ -1004,7 +1006,11 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 	if err := json.Unmarshal(req.Params.Arguments, v); err != nil {
 		var ute *json.UnmarshalTypeError
 		if errors.As(err, &ute) {
-			return fmt.Errorf("аргументы: ключ %s: тип %s, получено %s", ute.Field, typeKind(ute.Type), valueKind(ute.Value))
+			name := "аргументы"
+			if ute.Field != "" {
+				name += ": ключ " + ute.Field
+			}
+			return fmt.Errorf("%s: ожидался тип «%s», получен тип «%s»", name, typeKind(ute.Type), valueKind(ute.Value))
 		}
 		return fmt.Errorf("аргументы: %w", err)
 	}
@@ -1013,35 +1019,36 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 
 // typeKind/valueKind translate json.UnmarshalTypeError into the words a caller
 // can act on instead of leaking Go struct and type names.
+var kindWords = map[reflect.Kind]string{
+	reflect.String: "строка",
+	reflect.Bool:   "логическое",
+	reflect.Slice:  "массив",
+	reflect.Map:    "объект",
+	reflect.Struct: "объект",
+}
+
+var valueWords = map[string]string{
+	"string": "строка",
+	"bool":   "логическое",
+	"array":  "массив",
+	"object": "объект",
+	"number": "число",
+}
+
 func typeKind(t reflect.Type) string {
-	switch t.Kind() {
-	case reflect.String:
-		return "строка"
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	k := t.Kind()
+	if k >= reflect.Int && k <= reflect.Uintptr {
 		return "целое число"
-	case reflect.Bool:
-		return "логическое"
-	case reflect.Slice:
-		return "массив"
-	case reflect.Map, reflect.Struct:
-		return "объект"
+	}
+	if word, ok := kindWords[k]; ok {
+		return word
 	}
 	return t.String()
 }
 
 func valueKind(v string) string {
-	switch v {
-	case "number":
-		return "число"
-	case "string":
-		return "строка"
-	case "bool":
-		return "логическое"
-	case "object":
-		return "объект"
-	case "array":
-		return "массив"
+	if word, ok := valueWords[v]; ok {
+		return word
 	}
 	return v
 }

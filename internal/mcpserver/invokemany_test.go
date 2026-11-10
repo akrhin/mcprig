@@ -317,6 +317,9 @@ func TestInvokeManyRejectsBadInput(t *testing.T) {
 		{"no command", map[string]any{"calls": []any{map[string]any{
 			"server": "a",
 		}}}, "command_name обязателен"},
+		{"command conflicts with command_name", map[string]any{"calls": []any{map[string]any{
+			"server": "a", "command_name": "echo", "command": "boom",
+		}}}, "укажите одно: command_name или command"},
 		{"bad parameters", map[string]any{"calls": []any{map[string]any{
 			"server": "a", "command_name": "echo", "parameters": "abc",
 		}}}, "parameters: ожидался объект"},
@@ -335,5 +338,27 @@ func TestInvokeManyRejectsBadInput(t *testing.T) {
 	}
 	if peak := f.peak("a"); peak != 0 {
 		t.Fatalf("невалидный вход что-то выполнил: %d вызовов", peak)
+	}
+}
+
+// list_commands называет поле command; invoke_many принимает его синонимом.
+func TestInvokeManyCommandAlias(t *testing.T) {
+	f := newFanTracker()
+	m := fanManager(t, f, nil, "a")
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_many", map[string]any{"calls": []any{
+		map[string]any{"server": "a", "command": "echo", "parameters": map[string]any{"text": "one"}},
+		map[string]any{"server": "a", "command": "echo", "parameters": map[string]any{"text": "two"}},
+	}})
+	if res.IsError {
+		t.Fatalf("command должен приниматься как синоним command_name: %s", resultText(t, res))
+	}
+	text := resultText(t, res)
+	if !strings.Contains(text, "a:one") || !strings.Contains(text, "a:two") {
+		t.Fatalf("ответ не тот: %q", text)
+	}
+	if peak := f.peak("a"); peak == 0 {
+		t.Fatal("принятый вызов не дошёл до сервера")
 	}
 }

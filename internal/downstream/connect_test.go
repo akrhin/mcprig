@@ -213,4 +213,7 @@ func TestSandboxDenyReported(t *testing.T) {
 	if seen == "" {
 		t.Fatal("deny-отказ не дошёл до маркера изоляции")
 	}
+	if strings.Contains(seen, "sandbox unavailable") {
+		t.Fatalf("менеджер сам ставит «без изоляции:», префикс дублируется: %q", seen)
+	}
 }

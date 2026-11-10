@@ -116,7 +116,8 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		if err != nil {
 			// deny-отказ тоже должен попадать в маркер изоляции: иначе list_servers обещает bwrap неработающему серверу.
 			if c.OnSandboxFallback != nil {
-				c.OnSandboxFallback(srv, err.Error())
+				// Префикс «sandbox unavailable» уже ставит менеджер («без изоляции: …»).
+				c.OnSandboxFallback(srv, strings.TrimPrefix(err.Error(), "sandbox unavailable: "))
 			}
 			return nil, nil, err
 		}
