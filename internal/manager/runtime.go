@@ -229,6 +229,9 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		return RuntimeStatus{}, fmt.Errorf("набор %s не поднялся: порт %d не слушает", set.ID, set.Port)
 	}
 	_ = ctx
+	// Одна строка в stdout: журнал панели читается под логином, а падения и
+	// перезапуски набора должны быть видны в journald.
+	rt.log.Info("набор " + set.ID + ": запущен")
 	return rt.status(set), nil
 }
 
@@ -312,6 +315,7 @@ func (rt *Runtime) Stop(set *registry.Set) RuntimeStatus {
 		rt.mu.Lock()
 		delete(rt.procs, set.ID)
 		rt.mu.Unlock()
+		rt.log.Info("набор " + set.ID + ": остановлен")
 	}
 	return rt.status(set)
 }

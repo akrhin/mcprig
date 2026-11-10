@@ -154,6 +154,11 @@ does not multiply probes across browser tabs.
 Both panel health endpoints are public so a container or systemd check can use
 them without credentials. The panel's `/healthz` contains no set names.
 
+A set starting or stopping, and a server turning unhealthy, each write one line
+to the panel's stdout (`набор <id>: запущен|остановлен`, `набор <id>: сервер
+<name> unhealthy`), which systemd collects. An unhealthy transition is logged
+only when the state changes, not on every health poll.
+
 ## Access
 
 Modes come from `MCPRIG_PASSWORD`, `MCPRIG_PROXY_SECRET` and `MCPRIG_AUTH=off`;

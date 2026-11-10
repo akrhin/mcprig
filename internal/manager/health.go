@@ -49,15 +49,19 @@ type healthEntry struct {
 type healthCache struct {
 	mu      sync.Mutex
 	entries map[string]*healthEntry
+	// last — последнее известное состояние серверов набора: журнал пишет
+	// только смену healthy → unhealthy, а не каждый цикл опроса.
+	last map[string]map[string]bool
 }
 
 func newHealthCache() *healthCache {
-	return &healthCache{entries: map[string]*healthEntry{}}
+	return &healthCache{entries: map[string]*healthEntry{}, last: map[string]map[string]bool{}}
 }
 
 func (c *healthCache) clear(id string) {
 	c.mu.Lock()
 	delete(c.entries, id)
+	delete(c.last, id)
 	c.mu.Unlock()
 }
 
@@ -203,6 +207,38 @@ func healthError(out setHealth, err error) setHealth {
 		out.Servers[i].Error = truncate(err.Error(), 500)
 	}
 	return out
+}
+
+// noteHealth пишет в stdout (его забирает systemd) только смену состояния:
+// сервер снова здоров — молчим, стал нездоровым — одна строка. Иначе журнал
+// забивается одной и той же строкой каждый цикл опроса.
+func (m *Manager) noteHealth(id string, view setHealth) {
+	c := m.health
+	c.mu.Lock()
+	prev := c.last[id]
+	if prev == nil {
+		prev = map[string]bool{}
+		c.last[id] = prev
+	}
+	type bad struct{ name, reason string }
+	var became []bad
+	for _, s := range view.Servers {
+		if s.Healthy == nil {
+			continue
+		}
+		if *s.Healthy {
+			prev[s.Name] = true
+			continue
+		}
+		if was, known := prev[s.Name]; !known || was {
+			became = append(became, bad{s.Name, s.Error})
+		}
+		prev[s.Name] = false
+	}
+	c.mu.Unlock()
+	for _, b := range became {
+		m.log.Warn("набор "+id+": сервер "+b.name+" unhealthy", "reason", b.reason)
+	}
 }
 
 func firstText(res *mcp.CallToolResult) string {

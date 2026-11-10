@@ -1309,6 +1309,7 @@ func (m *Manager) apiSetServers(req *request) error {
 		return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, names, m.version)
 	})
 	view.Running = status.Running
+	m.noteHealth(id, view)
 	writeJSON(req.w, http.StatusOK, view)
 	return nil
 }
