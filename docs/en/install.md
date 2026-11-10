@@ -77,9 +77,12 @@ The `Dockerfile` has two targets:
 | `slim` (default) | binary, CA roots, non-root user `10001`, `bwrap` and `prlimit` | stdio servers with a single static binary, or HTTP |
 | `full` | `slim` plus node/npm, python/pip and uv | stdio servers launched with `npx` / `uvx` |
 
-Both are published to the project's Gitea registry, so you can skip the build:
+Both are published to the project's own Gitea registry, which needs a login:
+that instance is private, so an outside user cannot pull them and should build
+from the `Dockerfile` instead (below).
 
 ```bash
+docker login frosty-ad-gt.cloudpub.ru                # project maintainers only
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-slim    # pinned release

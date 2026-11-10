@@ -76,9 +76,11 @@ systemctl --user enable --now mcprig.service
 | `slim` (по умолчанию) | бинарник, корневые CA, пользователь без root `10001`, `bwrap` и `prlimit` | stdio-серверы из одного статического бинаря, либо HTTP |
 | `full` | `slim` плюс node/npm, python/pip и uv | stdio-серверы, запускаемые через `npx` / `uvx` |
 
-Оба образа опубликованы в реестре Gitea проекта, так что сборку можно пропустить:
+Оба образа опубликованы в реестре Gitea проекта, а он закрыт и требует входа:
+внешнему пользователю они недоступны — собирайте из `Dockerfile` (ниже).
 
 ```bash
+docker login frosty-ad-gt.cloudpub.ru                # только своим
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-slim    # закреплённый релиз
