@@ -194,6 +194,6 @@ check` (`b2ce4cb`) — шаг в джобе `release` перед `release --clea
 Каналы — только архивы goreleaser (обёртки npm/PyPI/crates не заводим);
 образы Docker публикуются в реестр Gitea — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`
 (`latest` = slim 32 МБ, `latest-full` = с node и python, 334 МБ, плюс теги
-`0.3.6-slim`/`0.3.6-full`);
+`0.3.7-slim`/`0.3.7-full`);
 путь модуля остаётся `github.com/sintez/mcprig`, публичный репозиторий на GitHub —
 зеркало `akrhin/mcprig` (п. 6 выше).

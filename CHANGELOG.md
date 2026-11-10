@@ -9,6 +9,8 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 Nothing yet.
 
+## [0.3.7] - 2026-11-10
+
 ### Added
 - Panel shows each server's isolation: a muted `bwrap` badge when the sandbox
   applied, a warning `без изоляции` badge when bubblewrap did not start, and
