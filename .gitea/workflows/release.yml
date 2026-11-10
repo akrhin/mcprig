@@ -18,7 +18,6 @@ concurrency:
 env:
   GO_VERSION: '1.27.3'
   GORELEASER_VERSION: v2.20.0
-  GITEA_URL: https://frosty-ad-gt.cloudpub.ru
 
 jobs:
   verify:
@@ -122,8 +121,4 @@ jobs:
         run: |
           notes="${RUNNER_TEMP:-/tmp}/release-notes.md"
           bash scripts/release-notes.sh "${{ gitea.ref_name }}" > "$notes"
-          if [ -s "$notes" ]; then
-            "$GORELEASER_BIN" release --clean --release-notes "$notes"
-          else
-            "$GORELEASER_BIN" release --clean
-          fi
+          "$GORELEASER_BIN" release --clean --release-notes "$notes"
