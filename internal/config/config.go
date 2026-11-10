@@ -659,6 +659,10 @@ type HTTPTransport struct {
 	// checked. Set only for an open set.
 	AllowAnonymous bool     `json:"allowAnonymous,omitempty"`
 	AllowedHosts   []string `json:"allowedHosts,omitempty"`
+	// ClientNames — имя клиента из подписи ключа: отпечаток ключа (6 hex от
+	// sha256 токена) → подпись. Отпечаток, а не токен: ключ набора в конфиг
+	// набора не попадает, а метка в статистике становится человеческой.
+	ClientNames map[string]string `json:"clientNames,omitempty"`
 }
 
 type HealthMonitor struct {

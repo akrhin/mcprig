@@ -328,14 +328,14 @@ func TestClientLabel(t *testing.T) {
 	req.Header.Set("User-Agent", "opencode/2.2.6 (linux)")
 	req.Header.Set("Authorization", "Bearer secret-token")
 
-	got := clientLabel(req)
+	got := clientLabel(req, nil)
 	if !strings.HasPrefix(got, "key:") || !strings.HasSuffix(got, "/opencode/2.2.6") {
 		t.Fatalf("label = %q", got)
 	}
 	if strings.Contains(got, "secret-token") {
 		t.Fatalf("label leaks the key: %q", got)
 	}
-	if open := clientLabel(httptest.NewRequest("POST", "/mcp", nil)); open != "" {
+	if open := clientLabel(httptest.NewRequest("POST", "/mcp", nil), nil); open != "" {
 		t.Fatalf("anonymous label = %q, want empty", open)
 	}
 }
@@ -346,7 +346,7 @@ func TestClientLabelFingerprintShape(t *testing.T) {
 	req := httptest.NewRequest("POST", "/mcp", nil)
 	req.Header.Set("User-Agent", "harness/1")
 	req.Header.Set("Authorization", "Bearer "+testToken)
-	got := clientLabel(req)
+	got := clientLabel(req, nil)
 	head, _, ok := strings.Cut(got, "/")
 	if !ok {
 		t.Fatalf("label = %q", got)
@@ -365,9 +365,33 @@ func TestClientLabelFingerprintShape(t *testing.T) {
 		if header != "" {
 			r.Header.Set("Authorization", header)
 		}
-		if got := clientLabel(r); strings.Contains(got, "key:") {
+		if got := clientLabel(r, nil); strings.Contains(got, "key:") {
 			t.Fatalf("заголовок %q дал отпечаток: %q", header, got)
 		}
+	}
+}
+
+// Подпись ключа важнее отпечатка и User-Agent: владелец уже назвал клиента,
+// и в счётчике видно имя, а не «key:ce80c4/python-httpx2/2.15.1». Без имени
+// остаётся прежняя метка.
+func TestClientLabelUsesKeyNote(t *testing.T) {
+	names := map[string]string{stats.Fingerprint(testToken): "hermes"}
+	req := httptest.NewRequest("POST", "/mcp", nil)
+	req.Header.Set("User-Agent", "python-httpx/0.28.1")
+	req.Header.Set("Authorization", "Bearer "+testToken)
+
+	if got := clientLabel(req, names); got != "hermes" {
+		t.Fatalf("label = %q, want hermes", got)
+	}
+
+	// Имя другого ключа не подходит: метка остаётся отпечатком с User-Agent.
+	other := map[string]string{stats.Fingerprint("чужой-ключ"): "hermes"}
+	got := clientLabel(req, other)
+	if !strings.HasPrefix(got, "key:") || !strings.HasSuffix(got, "/python-httpx/0.28.1") {
+		t.Fatalf("label = %q, want key:<fp>/python-httpx/0.28.1", got)
+	}
+	if strings.Contains(got, "hermes") {
+		t.Fatalf("чужое имя попало в метку: %q", got)
 	}
 }
 

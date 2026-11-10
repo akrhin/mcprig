@@ -547,6 +547,36 @@ func (s *Store) RevokeKey(setID, keyID string) (wasActive bool, err error) {
 	return wasActive, nil
 }
 
+// SetKeyNote пишет подпись ключа. Пустая строка снимает её. Подпись видит
+// клиент в /api/sets, а набор — в метке клиента статистики, поэтому его
+// перезапускает вызывающий.
+func (s *Store) SetKeyNote(setID, keyID, note string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	set := s.setLocked(setID)
+	if set == nil {
+		return fmt.Errorf("нет набора %s", setID)
+	}
+	idx := -1
+	for i, key := range set.Keys {
+		if key.ID == keyID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return fmt.Errorf("нет ключа %s у набора %s", keyID, setID)
+	}
+	keys := make([]Key, len(set.Keys))
+	copy(keys, set.Keys)
+	keys[idx].Note = note
+	cp := *set
+	cp.Keys = keys
+	next := s.data.clone()
+	next.Sets[s.setIndexLocked(setID)] = &cp
+	return s.commitLocked(next)
+}
+
 // AllocatePort reserves the next free port in 9100–9199.
 func (s *Store) AllocatePort() (int, error) {
 	s.mu.Lock()

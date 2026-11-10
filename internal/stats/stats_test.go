@@ -240,10 +240,10 @@ func TestLabelIsBoundedAndClean(t *testing.T) {
 	if len(s.Tail[0].Client) > MaxLabelBytes {
 		t.Fatalf("метка в хвосте длиной %d", len(s.Tail[0].Client))
 	}
-	if got := cleanLabel("  "); got != "  " {
-		t.Fatalf("cleanLabel не должен трогать короткие метки: %q", got)
+	if got := CleanLabel("  "); got != "  " {
+		t.Fatalf("CleanLabel не должен трогать короткие метки: %q", got)
 	}
-	if got := cleanLabel(strings.Repeat("ж", 100)); len(got) > MaxLabelBytes || !utf8.ValidString(got) {
+	if got := CleanLabel(strings.Repeat("ж", 100)); len(got) > MaxLabelBytes || !utf8.ValidString(got) {
 		t.Fatalf("обрезка по байтам разрезала руну: %q (%d байт)", got, len(got))
 	}
 }
