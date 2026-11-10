@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -663,5 +665,30 @@ func TestIsolationNote(t *testing.T) {
 	}
 	if got := (&entry{srv: &config.Server{}}).isolationNote(); got != "" {
 		t.Fatalf("сервер без песочницы помечен: %q", got)
+	}
+}
+
+// Отвергнутый конфиг не стартует: isolation не должен обещать ему bwrap.
+func TestIsolationNoteRejectedConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "servers.json")
+	body := `{"servers": [
+		{"name": "naked", "command": ["node", "srv.js"], "tags": ["untrusted"]},
+		{"name": "warned", "command": ["node", "srv.js"], "tags": ["untrusted"],
+		 "sandbox": {"mode": "bwrap", "onUnavailable": "warn"}}
+	]}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	for _, srv := range cfg.Servers {
+		if srv.ConfigError == "" {
+			t.Fatalf("%s: конфиг не отвергнут", srv.Name)
+		}
+		if got := (&entry{srv: srv}).isolationNote(); got != "нет: конфиг отвергнут" {
+			t.Fatalf("%s: isolation %q обещает изоляцию отвергнутому серверу", srv.Name, got)
+		}
 	}
 }

@@ -177,6 +177,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	}
 
 	logPath := LogPath(rt.dataDir, set.ID)
+	migrateLog(rt.dataDir, set.ID)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return RuntimeStatus{}, fmt.Errorf("лог набора %s: %w", set.ID, err)

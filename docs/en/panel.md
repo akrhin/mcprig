@@ -78,6 +78,10 @@ in the system, otherwise the manager allocates one; a port held by a process
 gives `409` "port N is taken by a process". `id` and `token` in a create body
 are ignored.
 
+The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at
+5 MiB. A `lazy-mcp.log` inherited from the old proxy is renamed on the set's
+first start, so the old tail stays visible in the panel.
+
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
 registry key. A set that does not answer is listed in `unreachable` by id; its
 error text is not forwarded.

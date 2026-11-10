@@ -1133,6 +1133,10 @@ func (c *conn) close() error {
 // isolationNote описывает состояние изоляции: применённая песочница или
 // причина, по которой сервер работает без неё.
 func (e *entry) isolationNote() string {
+	if e.srv.ConfigError != "" {
+		// Отвергнутый конфиг не запускается: обещать ему песочницу нельзя.
+		return "нет: конфиг отвергнут"
+	}
 	e.sandboxMu.Lock()
 	note := e.sandboxNote
 	e.sandboxMu.Unlock()

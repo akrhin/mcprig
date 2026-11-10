@@ -42,10 +42,39 @@ func TestSetLogsTailFromFile(t *testing.T) {
 	}
 }
 
+// Унаследованный от lazy-mcp файл лога переезжает в mcprig.log при старте
+// набора: хвост не пропадает из панели.
+func TestSetLogMigratesInheritedFile(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "mig", "fake")
+	dir := filepath.Join(e.dir, "sets", id)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	old := filepath.Join(dir, "lazy-mcp.log")
+	if err := os.WriteFile(old, []byte("хвост из lazy-mcp\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	set := e.m.store.Set(id)
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("старт: %v", err)
+	}
+	defer e.m.rt.Stop(set)
+
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatalf("lazy-mcp.log остался: %v", err)
+	}
+	if logs := e.m.rt.Logs(id, 500); !strings.Contains(strings.Join(logs, "\n"), "хвост из lazy-mcp") {
+		t.Fatalf("унаследованный хвост потерян: %v", logs)
+	}
+}
+
 // TestLogWriterRotatesBySize: долгоживущий набор не растёт без предела —
 // .log переезжает в .log.1 при 5 МиБ.
 func TestLogWriterRotatesBySize(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "lazy-mcp.log")
+	path := filepath.Join(t.TempDir(), "mcprig.log")
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		t.Fatal(err)
