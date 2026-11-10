@@ -1,6 +1,10 @@
 package stats
 
-import "context"
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+)
 
 type clientKey struct{}
 
@@ -24,6 +28,13 @@ func ClientFrom(ctx context.Context, fallback string) string {
 		return "unknown"
 	}
 	return fallback
+}
+
+// Fingerprint — 6 hex от sha256 токена. По нему ключ узнаётся в метке клиента,
+// а сам токен в статистику и в конфиг набора не попадает.
+func Fingerprint(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])[:6]
 }
 
 // Label builds the HTTP client label: "key:<id>" plus the User-Agent product

@@ -4,9 +4,7 @@
 package httplisten
 
 import (
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -82,7 +80,7 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed))
+	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed, cfg.Transport.ClientNames))
 	if rec != nil {
 		// The panel polls this endpoint; it carries the same bearer as /mcp.
 		// У открытого набора bearer нет ни у кого, поэтому анонимный снимок
@@ -99,14 +97,14 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			_ = json.NewEncoder(w).Encode(snap)
-		}), token, allowAnonymous, allowed))
+		}), token, allowAnonymous, allowed, cfg.Transport.ClientNames))
 	}
 	return logRequests(mux, log), nil
 }
 
 // guard is the per-request policy in front of the MCP handler: method, Host,
 // Origin, bearer token, body cap.
-func guard(next http.Handler, token string, allowAnonymous bool, allowed []string) http.Handler {
+func guard(next http.Handler, token string, allowAnonymous bool, allowed []string, names map[string]string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet, http.MethodPost, http.MethodDelete:
@@ -147,7 +145,7 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 			return
 		}
 
-		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r)))
+		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r, names)))
 
 		if r.Body != nil {
 			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
@@ -156,10 +154,11 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 	})
 }
 
-// clientLabel names the caller for the counters: the User-Agent product token
-// plus a short fingerprint of the presented key, so two harnesses on one key
-// stay apart without the key itself ever reaching the stats.
-func clientLabel(r *http.Request) string {
+// clientLabel names the caller for the counters: the key's note when the owner
+// has named the key, otherwise the User-Agent product token plus a short
+// fingerprint of the presented key, so two harnesses on one key stay apart
+// without the key itself ever reaching the stats.
+func clientLabel(r *http.Request, names map[string]string) string {
 	ua := ""
 	if fields := strings.Fields(r.UserAgent()); len(fields) > 0 {
 		ua = fields[0]
@@ -171,9 +170,13 @@ func clientLabel(r *http.Request) string {
 	// превращать в «валидный» отпечаток пустой строки.
 	if h := r.Header.Get("Authorization"); len(h) > len(scheme) && strings.EqualFold(h[:len(scheme)], scheme) {
 		if presented := strings.TrimSpace(h[len(scheme):]); presented != "" {
-			sum := sha256.Sum256([]byte(presented))
-			key = hex.EncodeToString(sum[:])[:6]
+			key = stats.Fingerprint(presented)
 		}
+	}
+	// Подпись ключа важнее отпечатка: владелец уже назвал клиента, и метка
+	// с User-Agent в этом случае только мешает.
+	if name := names[key]; name != "" {
+		return name
 	}
 	// Длину и управляющие символы метки режет stats.Record: это единственная
 	// точка, где сходятся HTTP-метка и clientInfo из initialize.

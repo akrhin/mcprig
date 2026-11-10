@@ -53,9 +53,10 @@ func cleanMessage(s string) string {
 // OtherLabel — метка счётчика, вбирающего пары сверх MaxCounters.
 const OtherLabel = "(прочее)"
 
-// cleanLabel обрезает внешнюю метку до MaxLabelBytes, выбрасывает управляющие
-// символы и чинит разрезанную на границе руну.
-func cleanLabel(s string) string {
+// CleanLabel обрезает внешнюю метку до MaxLabelBytes, выбрасывает управляющие
+// символы и чинит разрезанную на границе руну. Тот же вид получает подпись
+// ключа в API: счётчик и /api/sets показывают одно и то же.
+func CleanLabel(s string) string {
 	s = strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
 			return -1
@@ -147,8 +148,8 @@ func (r *Recorder) SetClientLabel(label string) {
 // Record accounts one finished invocation. Метки приходят от клиента, поэтому
 // сначала чистятся, а пары сверх потолка складываются в OtherLabel.
 func (r *Recorder) Record(client, server, tool string, d time.Duration, err error) {
-	client = cleanLabel(client)
-	tool = cleanLabel(tool)
+	client = CleanLabel(client)
+	tool = CleanLabel(tool)
 	if client == "" {
 		client = "unknown"
 	}
