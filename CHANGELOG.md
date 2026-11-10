@@ -12,6 +12,14 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - `invoke_command` и `invoke_many` принимают `command` синонимом
   `command_name` — так поле называет `list_commands`; оба ключа с разными
   значениями отвергаются.
+- `CONTRIBUTING.md` and `CONTRIBUTING.ru.md`: where an issue and a pull request
+  go, the commit form, the gate before pushing, and the rule that a behaviour
+  change updates both doc trees and the changelog.
+- `.gitea` issue forms for a bug and a proposal, plus a pull-request template
+  that asks what changed, the gate result and the docs touched.
+- Versioning rules in both contributing files: SemVer pre-1.0, the tag is the
+  only version source, what a `PATCH` and a `MINOR` may carry, and how a
+  release commit and a published tag are treated.
 
 ### Fixed
 

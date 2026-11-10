@@ -263,6 +263,7 @@ bash scripts/dev-real-set.sh
 против настоящих экземпляров serena, socraticode и xerj;
 `bash scripts/dev-real-set.sh stop` гасит его. Больше:
 [docs/ru/development.md](docs/ru/development.md).
+Issue и pull request оформляются по [CONTRIBUTING.ru.md](CONTRIBUTING.ru.md).
 
 ## Статус
 

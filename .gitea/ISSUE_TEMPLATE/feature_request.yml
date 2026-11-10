@@ -1,0 +1,23 @@
+name: Предложение
+about: Возможности, которой нет, или поведение, которое стоит изменить
+title: "[feat] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую задачу это решает
+      description: Что сейчас приходится делать вручную или обходить.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Предлагаемое поведение
+      description: Что должно происходить и как это увидеть — команда, поле конфига, строка панели.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Что уже пробовали
+      description: Обходные пути и почему они не подходят.
