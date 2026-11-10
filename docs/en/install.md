@@ -101,10 +101,17 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 ```
 
 The image entrypoint is `mcprig`; the default command is
-`serve --config /config/servers.json`; the listen address comes from `transport.host` and `transport.port`, so mount a config whose transport says `0.0.0.0` and the port you publish. The working
-directory is `/data`, owned by uid 10001; mount a volume there and set
+`serve --config /config/servers.json`; the set listen address comes from
+`transport.host` and `transport.port`, so mount a config whose transport says
+`0.0.0.0` and publish the port you chose. The working directory is `/data`,
+owned by uid 10001; mount a volume there and set
 `MCPRIG_DATA_DIR=/data` so OAuth tokens and other state survive a restart.
-`slim` ships a healthcheck against `http://127.0.0.1:9100/healthz`; it assumes the
+Both images set `MCPRIG_HOST=0.0.0.0`, so the panel listens on every interface
+inside the container; publish it on `MCPRIG_PORT` (the panel default is 9091,
+`deploy/docker-compose.yml` runs the `ops` set on 9101). Outside Docker
+`MCPRIG_HOST` stays unset and the panel keeps the `127.0.0.1` default — do not
+copy the container value to a host unit.
+The image healthcheck checks `http://127.0.0.1:9100/healthz`; it assumes the
 default port, so with another `transport.port` pass `--health-cmd` or set the
 healthcheck in compose.
 
@@ -112,15 +119,22 @@ healthcheck in compose.
 `frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, mounts each `servers.json` read-only and keeps
 state in named volumes.
 
-Measured on this host: the bare `docker build .` gives `slim` (32 MB, binary
-plus CA roots); `--target full` adds node and python and weighs 334 MB. Both
-were run: `slim` served a remote `serena` over the host network and answered
-`find_symbol` through `invoke_command`, and its healthcheck reports `ok`.
+Measured on this host (rootless Docker 29.9.3): the bare `docker build .` gives
+`slim` (44 MB, binary plus CA roots, `bwrap` and `prlimit`); `--target full`
+adds node/npm, python/pip and uv/uvx and weighs 446 MB. Both were run: `slim`
+served a remote
+`serena` over the host network and answered `find_symbol` through
+`invoke_command`, and its healthcheck reports `ok`.
 
-Neither image ships `bubblewrap`. A server tagged `untrusted` needs the
-`sandbox` block and, with the default fail-closed `onUnavailable: deny`, refuses
-to start without it — install the package in your own image and make sure the
-container may create user namespaces. Servers without the tag are unaffected.
+`"sandbox": {}` works in both images: they carry `bubblewrap` for `bwrap` and
+`util-linux` for `prlimit` (the binary is run by name, so it must exist in
+`PATH`). The runtime still has to allow unprivileged user namespaces; on hosts
+whose default Docker seccomp profile denies them, start the container with
+`--security-opt seccomp=unconfined` (last resort `--privileged`). `slim` has no
+node/npm and no uv: an `npx` or `uvx` stdio server needs the `full` image. A
+server tagged `untrusted` with the default fail-closed `onUnavailable: deny`
+still refuses to start when `bwrap` cannot run at all; servers without the tag
+are unaffected.
 
 ## State on disk
 

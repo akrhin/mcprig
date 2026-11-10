@@ -107,8 +107,10 @@ is `sandbox допустим только для stdio`.
 ```
 
 An explicit `ro` replaces the defaults, but `/lib`, `/lib64`, `/usr/lib` and
-`/usr/lib64` are still mounted for the loader whenever limits are on, and
-`prlimit` is mounted with them — so a missing library is not what breaks. What
+`/usr/lib64` are still mounted for the loader whenever limits are on.
+`prlimit` is mounted by the absolute path found in `PATH`, so the binary must
+exist on the host — on alpine from the `util-linux` package (both images ship
+it); when it is missing the server fails with `prlimit не найден в PATH`. What
 actually disappears is `/usr` itself (the binary), and `/etc/ssl` and
 `/etc/resolv.conf` (TLS and DNS). A runtime outside `/usr`, node from a user
 prefix for instance, must be listed in `ro` together with the defaults it needs;

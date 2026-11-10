@@ -7,7 +7,16 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- Образы везут `bubblewrap` и `prlimit` (`util-linux`): `"sandbox": {}` не
+  падает на `bwrap не найден в PATH`, а песочница больше не отвергает
+  `prlimit` как относительный путь.
+- Образ `full` везёт uv/uvx в `/usr/bin`: stdio-серверы через `uvx` стартуют.
+- Оба образа задают `MCPRIG_HOST=0.0.0.0`: панель в контейнере отвечает на
+  опубликованном порту, а не только на loopback внутри.
+- Ошибка сервера больше не обещает `bwrap` тому, кому песочница не досталась:
+  `list_servers` показывает реальную изоляцию.
 
 ## [0.3.7] - 2026-11-10
 

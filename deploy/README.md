@@ -7,7 +7,7 @@
 | `mcprig-set@.service` | шаблонный юнит: один набор на порту из `servers.json` |
 | `mcprig.service` | панель: реестр, супервизия наборов (дашборд — этап 5) |
 | `mcprig-warm.service`, `mcprig-warm.timer` | шаблонный прогрев набора раз в 10 минут: первый вызов клиента не платит за холодный кэш |
-| `Dockerfile` | два таргета: `slim` (только бинарник) и `full` (плюс node и python) |
+| `Dockerfile` | два таргета: `slim` (бинарник, `bwrap`, `prlimit`) и `full` (плюс node/npm, python, uv) |
 | `docker-compose.yml` | два набора, конфиги смонтированы read-only, состояние в томах |
 
 Песочница (`"sandbox"` у stdio-сервера) требует `bubblewrap` на хосте или в
@@ -74,8 +74,8 @@ docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest
 docker compose up -d
 
 # либо собрать локально и указать свои теги
-docker build -t mcprig:slim .                    # 32 МБ, только бинарник
-docker build --target full -t mcprig:full .      # 334 МБ, плюс node и python
+docker build -t mcprig:slim .                    # 44 МБ, бинарник + bwrap/prlimit
+docker build --target full -t mcprig:full .      # 446 МБ, плюс node/npm, python, uv
 MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
 ```
 
@@ -93,6 +93,14 @@ MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
 - `read_only: true` требует `tmpfs: /tmp:rw,exec` и `HOME=/tmp` с
   `npm_config_cache=/tmp/npm`: `npx` скачивает и запускает бинарь из `/tmp`, а
   без `exec` падает с `mcp-server-everything: Permission denied`.
+- Песочнице нужны три вещи: `bwrap` и `prlimit` в образе (несут и `slim`, и
+  `full`) и разрешённые unprivileged user namespaces от runtime. На хосте с
+  дефолтным seccomp Docker — `--security-opt seccomp=unconfined`, крайний
+  случай — `--privileged`; `slim` без node/npm и uv, для `npx`/`uvx`-серверов
+  нужен `full`.
+- Панель: образы задают `MCPRIG_HOST=0.0.0.0`, публикуйте её на `MCPRIG_PORT`
+  (дефолт 9091, поэтому `EXPOSE` — `9091`); на хосте вне Docker `MCPRIG_HOST`
+  не задан и панель остаётся на `127.0.0.1`.
 
 Юниты проверены `systemd-analyze verify`: ошибок нет, кроме отсутствующего по
 пути `/home/<user>/.local/bin/mcprig` — он появится после установки бинарника.
