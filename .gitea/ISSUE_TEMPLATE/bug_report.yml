@@ -1,0 +1,51 @@
+name: Ошибка
+about: Что-то работает не так, как описано в документации
+title: "[bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Одна проблема — один issue. Секреты (токены, пароли, ключи провайдеров)
+        заменяйте на `<token>`.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Что случилось и что ожидалось
+      description: |
+        Строку ошибки копируйте как есть: тексты русские и ищутся по коду,
+        перепечатанная строка не находится.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Как воспроизвести
+      description: Команды, конфиг без секретов, имя набора и сервера.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Версия mcprig
+      description: Вывод `mcprig --version` или тег образа.
+      placeholder: 0.3.7 / 0.3.7-full
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Как запущен
+      options:
+        - бинарник или systemd
+        - Docker slim
+        - Docker full
+        - из исходников
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи вокруг ошибки
+      description: Строки панели ($DATA/panel.log) или набора ($DATA/sets/<имя>/mcprig.log).
+      render: shell

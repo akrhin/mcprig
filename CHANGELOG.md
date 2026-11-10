@@ -7,7 +7,12 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+- `CONTRIBUTING.md` and `CONTRIBUTING.ru.md`: where an issue and a pull request
+  go, the commit form, the gate before pushing, and the rule that a behaviour
+  change updates both doc trees and the changelog.
+- `.gitea` issue forms for a bug and a proposal, plus a pull-request template
+  that asks what changed, the gate result and the docs touched.
 
 ## [0.3.7] - 2026-11-10
 

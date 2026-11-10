@@ -265,6 +265,7 @@ bash scripts/dev-real-set.sh
 `dev-real-set.sh` builds the binary and starts a panel plus one open set against
 real serena, socraticode and xerj instances; `bash scripts/dev-real-set.sh stop`
 shuts it down. More: [docs/en/development.md](docs/en/development.md).
+Issues and pull requests follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Status
 

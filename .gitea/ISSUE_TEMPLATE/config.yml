@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Документация
+    url: https://frosty-ad-gt.cloudpub.ru/sintez/mcprig/src/branch/master/docs/ru
+    about: Установка, конфигурация, CLI, панель и мета-инструменты — сначала сюда.
+  - name: Правила участия
+    url: https://frosty-ad-gt.cloudpub.ru/sintez/mcprig/src/branch/master/CONTRIBUTING.ru.md
+    about: Что попадает в issue, из какой ветки делается правка и какие ворота гоняются перед PR.
