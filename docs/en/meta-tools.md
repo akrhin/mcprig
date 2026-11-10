@@ -65,6 +65,7 @@ Input is one of two forms:
 | `{"server": "alpha"}` | array of commands |
 | `{"servers": ["alpha", "beta"]}` | object keyed by server name, each value an array; a failed server's value is `{"error": "…"}` |
 | `{"prefix": "se"}` | with either form above: keep only command names starting with the prefix (case-insensitive); no match gives `[]` |
+| `{"namesOnly": true}` | with either form above: names only — an array of strings, or arrays keyed by server. `arr-status` returns 443 tools and 89 KB of catalog; names cost about a sixth of that, and `describe_commands` gives one schema when needed |
 | both | `Error: укажи server или servers, не оба` |
 | neither | `Error: нужен параметр server или servers` |
 

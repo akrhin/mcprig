@@ -23,6 +23,12 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - `sandbox.tmpMb` (default 128): the `/tmp` tmpfs is size-limited and carries
   `RLIMIT_FSIZE`, so a child cannot fill the host disk. `mcprig doctor` probes
   bubblewrap itself.
+- `list_commands` takes `namesOnly`: an array of tool names instead of the full
+  catalog (arr-status: 89 KB and 443 tools), plus the document-everywhere
+  `refresh` in its schema. A multi-part text answer is now joined with newlines
+  instead of being wrapped in JSON, so the cut marker points at readable text.
+- tool-out is swept every 10 minutes instead of hourly: a chatty server writes
+  about 2 MiB an hour, and the old cadence let the 256 MiB cap overshoot.
 - `list_servers` and the panel health answer carry `isolation`: `bwrap` when
   the sandbox is applied, `без изоляции: <reason>` when it was requested but
   unavailable. The note clears once the sandbox works again.

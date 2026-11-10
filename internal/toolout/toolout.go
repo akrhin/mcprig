@@ -20,8 +20,10 @@ const (
 	DefaultTTL = 24 * time.Hour
 	// DefaultMax is the size cap of one tool-out directory.
 	DefaultMax = int64(256 << 20)
-	// Interval is how often a running process sweeps.
-	Interval = time.Hour
+	// Interval is how often a running process sweeps. Измеренный поток — около
+	// 2 МиБ в час на один болтливый сервер, поэтому час давал перелёт потолка в
+	// разы между чистками.
+	Interval = 10 * time.Minute
 	// minAge protects a file a client may still be about to read: eviction by
 	// size never touches it. A TTL shorter than this is honoured as asked.
 	minAge = 5 * time.Minute

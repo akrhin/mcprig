@@ -70,9 +70,20 @@ func truncateValue(res *mcp.CallToolResult, maxBytes int) (any, error) {
 // payload is the text the caller would see: a single text item as-is, anything
 // else as its serialized form so nothing (images, structured content) is lost.
 func payload(res *mcp.CallToolResult) ([]byte, error) {
-	if len(res.Content) == 1 && res.StructuredContent == nil {
-		if t, ok := res.Content[0].(*mcp.TextContent); ok {
-			return []byte(t.Text), nil
+	// Склеиваем текстовые части: ответ из 123 кусков иначе сериализовался
+	// конвертом {"content":[…]}, и срез 32 КБ начинался с JSON внутри JSON.
+	if res.StructuredContent == nil && len(res.Content) > 0 {
+		parts := make([]string, 0, len(res.Content))
+		for _, item := range res.Content {
+			t, ok := item.(*mcp.TextContent)
+			if !ok {
+				parts = nil
+				break
+			}
+			parts = append(parts, t.Text)
+		}
+		if len(parts) > 0 {
+			return []byte(strings.Join(parts, "\n")), nil
 		}
 	}
 	return json.Marshal(res)
@@ -96,16 +107,21 @@ func writeToolOut(data []byte) (string, error) {
 
 // filterCommands keeps names carrying prefix; filtering happens on the way out
 // so the tool cache and the traversal stay untouched. Empty prefix keeps all.
-func filterCommands(cmds []commandInfo, prefix string) []commandInfo {
-	if prefix == "" {
-		return cmds
-	}
-	prefix = strings.ToLower(prefix)
+func filterCommands(cmds []commandInfo, prefix string, namesOnly bool) any {
 	out := make([]commandInfo, 0, len(cmds))
+	names := make([]string, 0, len(cmds))
+	prefix = strings.ToLower(prefix)
 	for _, cmd := range cmds {
-		if strings.HasPrefix(strings.ToLower(cmd.Name), prefix) {
-			out = append(out, cmd)
+		if prefix != "" && !strings.HasPrefix(strings.ToLower(cmd.Name), prefix) {
+			continue
 		}
+		out = append(out, cmd)
+		names = append(names, cmd.Name)
+	}
+	// namesOnly — каталог из 440 тулов занимает ~90 КБ; список имён в шесть раз
+	// короче, а описание всё равно берётся через describe_commands.
+	if namesOnly {
+		return names
 	}
 	return out
 }

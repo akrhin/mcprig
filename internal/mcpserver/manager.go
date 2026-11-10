@@ -241,6 +241,14 @@ func (m *Manager) Server() *mcp.Server {
 				"type":        "string",
 				"description": "Optional: keep only commands whose name starts with this prefix (case-insensitive)",
 			},
+			"namesOnly": map[string]any{
+				"type":        "boolean",
+				"description": "Optional: return only tool names: an array of strings for server, arrays keyed by name for servers. Cheaper than full catalog; use describe_commands for one schema",
+			},
+			"refresh": map[string]any{
+				"type":        "boolean",
+				"description": "Optional: drop the cached catalog and re-read tools/list from every server",
+			},
 		}),
 	}, m.listCommands)
 	s.AddTool(&mcp.Tool{
@@ -252,6 +260,10 @@ func (m *Manager) Server() *mcp.Server {
 				"type":        "array",
 				"items":       map[string]any{"type": "string"},
 				"description": "Array of command names to describe",
+			},
+			"refresh": map[string]any{
+				"type":        "boolean",
+				"description": "Optional: drop the cached catalog and re-read tools/list first",
 			},
 		}, "server", "command_names"),
 	}, m.describeCommands)
@@ -418,10 +430,11 @@ func (m *Manager) probe(ctx context.Context, e *entry) error {
 // ─── list_commands ────────────────────────────────────────────────────────────
 
 type listCommandsInput struct {
-	Server  string   `json:"server,omitempty"`
-	Servers []string `json:"servers,omitempty"`
-	Prefix  string   `json:"prefix,omitempty"`
-	Refresh bool     `json:"refresh,omitempty"`
+	Server    string   `json:"server,omitempty"`
+	Servers   []string `json:"servers,omitempty"`
+	Prefix    string   `json:"prefix,omitempty"`
+	Refresh   bool     `json:"refresh,omitempty"`
+	NamesOnly bool     `json:"namesOnly,omitempty"`
 }
 
 type commandInfo struct {
@@ -433,7 +446,7 @@ type commandInfo struct {
 
 func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in listCommandsInput
-	if err := strictArgs(req, &in, "", "server", "servers", "prefix", "refresh"); err != nil {
+	if err := strictArgs(req, &in, "", "server", "servers", "prefix", "refresh", "namesOnly"); err != nil {
 		return errResult(err)
 	}
 	if in.Refresh {
@@ -449,7 +462,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if err != nil {
 			return errResult(err)
 		}
-		return jsonResult(filterCommands(cmds, in.Prefix))
+		return jsonResult(filterCommands(cmds, in.Prefix, in.NamesOnly))
 	case len(in.Servers) > 0:
 		// Ответ остальных не теряется из-за одного упавшего: у него в карте
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
@@ -483,7 +496,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 					}
 					return
 				}
-				out[name] = filterCommands(cmds, in.Prefix)
+				out[name] = filterCommands(cmds, in.Prefix, in.NamesOnly)
 			}(name)
 		}
 		wg.Wait()
