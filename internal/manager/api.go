@@ -584,7 +584,7 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 	origin := r.Header.Get("Origin")
 	if origin != "" && origin != "null" {
 		u, err := url.Parse(origin)
-		if err != nil || !m.originOK(u.Host, r) || !sameScheme(u, r) {
+		if err != nil || !m.originMatches(u, r) {
 			// Значения в лог: без них отказ не отладить с чужой машины.
 			m.log.Warn("csrf: origin не совпал", "origin", origin, "host", r.Host,
 				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
@@ -602,40 +602,69 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 	return nil
 }
 
-// sameScheme сверяет схему Origin со схемой запроса. За прокси до Go доходит
-// http, а Origin остаётся https — тогда веру даёт X-Forwarded-Host.
-func sameScheme(u *url.URL, r *http.Request) bool {
-	want := "http"
-	if secureRequest(r) {
-		want = "https"
-	}
-	return u.Scheme == want || u.Scheme == "https" && r.Header.Get("X-Forwarded-Host") != ""
+// originAuthority — источник так, как его видит браузер: схема, хост, порт.
+// Порт схемы по умолчанию, чтобы https://example.com и https://example.com:443
+// были одним источником.
+type originAuthority struct{ scheme, host, port string }
+
+func authorityOf(u *url.URL) originAuthority {
+	host, port := splitAuthority(u.Host, u.Scheme)
+	return originAuthority{scheme: strings.ToLower(u.Scheme), host: host, port: port}
 }
 
-// originOK пускает Origin, равный Host, либо Host, под который прокси
-// переписал заголовок, либо имя из MCPRIG_ALLOWED_HOSTS: за обратным прокси
-// Origin остаётся публичным, а Host приходит уже внутренним.
-func (m *Manager) originOK(originHost string, r *http.Request) bool {
-	if sameHost(originHost, r.Host) {
-		return true
+func splitAuthority(hostport, scheme string) (host, port string) {
+	if h, p, err := net.SplitHostPort(hostport); err == nil {
+		return strings.ToLower(strings.Trim(h, "[]")), p
 	}
-	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" && sameHost(originHost, fwd) {
-		return true
+	port = "80"
+	if strings.EqualFold(scheme, "https") {
+		port = "443"
 	}
-	return m.auth.hostOK(originHost)
+	return strings.ToLower(strings.Trim(hostport, "[]")), port
 }
 
-// sameHost сравнивает без учёта порта и регистра: за прокси Origin может
-// прийти без порта, а Host — с ним.
-func sameHost(a, b string) bool {
-	return strings.EqualFold(hostOnly(a), hostOnly(b))
+// originMatches сверяет Origin целиком — схему, хост и порт. Сравнение без
+// порта пропускало подделку с http://localhost:3000 на http://localhost:9091:
+// это один сайт, браузер шлёт cookie, и панель считала источник своим.
+// MCPRIG_ALLOWED_HOSTS здесь не участвует: это имена самой панели, не источники.
+func (m *Manager) originMatches(u *url.URL, r *http.Request) bool {
+	want := authorityOf(u)
+	if want.scheme != "http" && want.scheme != "https" {
+		return false
+	}
+	for _, got := range m.requestAuthorities(r) {
+		if got == want {
+			return true
+		}
+	}
+	return false
 }
 
-func hostOnly(host string) string {
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
+// requestAuthorities — origin'ы, которыми клиент видит запрос: сам Host и
+// публичное имя прокси. За TLS-прокси до Go доходит http, поэтому https-схема
+// считается своей при X-Forwarded-Proto (secureRequest), X-Forwarded-Host или
+// настроенном секрете прокси; иначе https-Origin на http-запросе — отказ.
+// Как только https признан своим, http-Origin отбрасывается целиком.
+func (m *Manager) requestAuthorities(r *http.Request) []originAuthority {
+	scheme := "http"
+	if secureRequest(r) || m.auth.proxySecret != "" || r.Header.Get("X-Forwarded-Host") != "" {
+		scheme = "https"
 	}
-	return strings.ToLower(strings.Trim(host, "[]"))
+	host, port := splitAuthority(r.Host, scheme)
+	out := []originAuthority{{scheme: scheme, host: host, port: port}}
+	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {
+		fwdHost, fwdPort := splitAuthority(fwd, "https")
+		if p := r.Header.Get("X-Forwarded-Port"); p != "" && !hasPort(fwd) {
+			fwdPort = p
+		}
+		out = append(out, originAuthority{scheme: "https", host: fwdHost, port: fwdPort})
+	}
+	return out
+}
+
+func hasPort(hostport string) bool {
+	_, _, err := net.SplitHostPort(hostport)
+	return err == nil
 }
 
 // hostAllowed — то же послабление для самого Host: прокси переписывает его на

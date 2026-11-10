@@ -189,5 +189,13 @@ Writes (`POST`/`PUT`/`DELETE`) are rejected when `Sec-Fetch-Site` is
 JSON. A cookie-authenticated write must also carry `Origin`: without it the
 request gets `403` "нужен заголовок Origin" — a browser sends it on every such
 request, a forged one from another site does not. Header-based proxy auth and
-login (`POST /api/login`, no cookie yet) are exempt. `Host` must be in
-`MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.
+login (`POST /api/login`, no cookie yet) are exempt.
+
+`Origin` is compared in full — scheme, host and port; `MCPRIG_ALLOWED_HOSTS` is
+not a list of sources (it names the panel itself). Behind a TLS proxy send
+`X-Forwarded-Proto: https` or `X-Forwarded-Host` (plus `X-Forwarded-Port` when
+the public port differs): otherwise the request looks like plain http and the
+panel rejects an `https` Origin on writes. A configured `MCPRIG_PROXY_SECRET`
+(trusted proxy) has the same effect; an `http` Origin is still rejected then.
+
+`Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.

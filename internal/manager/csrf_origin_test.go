@@ -9,7 +9,8 @@ import (
 )
 
 // checkCSRF за обратным прокси: Origin остаётся публичным, Host приходит
-// внутренним, публичное имя — в X-Forwarded-Host или в MCPRIG_ALLOWED_HOSTS.
+// внутренним, публичное имя — в X-Forwarded-Host. MCPRIG_ALLOWED_HOSTS —
+// список имён самой панели, источником он не является.
 // Код 200 здесь значит «дошло до обработчика»; 403 проверяется по тексту отказа,
 // чтобы не спутать CSRF с проверкой Host.
 func TestCSRFOriginBehindProxy(t *testing.T) {
@@ -25,9 +26,11 @@ func TestCSRFOriginBehindProxy(t *testing.T) {
 		want    string
 	}{
 		{"origin = host", "http://192.168.1.92:9088", "192.168.1.92:9088", "", http.StatusOK, ""},
-		{"origin из allowedHosts", "http://mcprig.lan:9088", "127.0.0.1:9088", "", http.StatusOK, ""},
+		{"origin из allowedHosts не источник", "http://mcprig.lan:9088", "127.0.0.1:9088", "", http.StatusForbidden, "origin не совпадает с хостом"},
+		{"тот же хост, другой порт", "http://192.168.1.92:3000", "192.168.1.92:9088", "", http.StatusForbidden, "origin не совпадает с хостом"},
+		{"другой хост", "http://evil.example", "192.168.1.92:9088", "", http.StatusForbidden, "origin не совпадает с хостом"},
 		{"за прокси", "https://mcprig.example", "127.0.0.1:9088", "mcprig.example", http.StatusOK, ""},
-		{"чужой origin", "http://evil.example", "192.168.1.92:9088", "", http.StatusForbidden, "origin не совпадает с хостом"},
+		{"за прокси, чужой порт", "https://mcprig.example:3000", "127.0.0.1:9088", "mcprig.example", http.StatusForbidden, "origin не совпадает с хостом"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -67,6 +70,7 @@ func TestCSRFScheme(t *testing.T) {
 		{"прокси https, origin https", "https://example.com", "https", false, http.StatusOK, ""},
 		{"tls, origin https", "https://example.com", "", true, http.StatusOK, ""},
 		{"прокси https, origin http", "http://example.com", "https", false, http.StatusForbidden, "origin не совпадает с хостом"},
+		{"http запрос, origin https", "https://example.com", "", false, http.StatusForbidden, "origin не совпадает с хостом"},
 		{"origin null с cookie", "null", "", false, http.StatusForbidden, "нужен заголовок Origin"},
 		{"без origin с cookie", "", "", false, http.StatusForbidden, "нужен заголовок Origin"},
 	}
@@ -94,5 +98,35 @@ func TestCSRFScheme(t *testing.T) {
 				t.Fatalf("%s: тело отказа %q не содержит %q", c.name, w.Body.String(), c.want)
 			}
 		})
+	}
+}
+
+// TLS-прокси без X-Forwarded-Proto: доверенный прокси (MCPRIG_PROXY_SECRET)
+// даёт право считать https-Origin своим — иначе вход за nginx с одним лишь
+// proxy_set_header Host давал 403 ещё до пароля. http-Origin при том же
+// доверии остаётся чужим.
+func TestCSRFTrustedProxyNoXFP(t *testing.T) {
+	secret := strings.Repeat("s", 32)
+	e := newEnv(t, AuthOptions{ProxySecret: secret})
+
+	post := func(origin string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/import", strings.NewReader(`{"mcpServers":{}}`))
+		req.Host = "example.com"
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Remote-User", "alice")
+		req.Header.Set("X-MCP-Proxy-Secret", secret)
+		w := httptest.NewRecorder()
+		e.m.ServeHTTP(w, req)
+		return w
+	}
+	if w := post("https://example.com"); w.Code != http.StatusOK {
+		t.Fatalf("доверенный прокси без XFP: https-Origin отвергнут: %d (%s)", w.Code, w.Body.String())
+	}
+	if w := post("http://example.com"); w.Code != http.StatusForbidden {
+		t.Fatalf("http-Origin на доверенном прокси прошёл: %d (%s)", w.Code, w.Body.String())
+	}
+	if w := post("https://example.com:3000"); w.Code != http.StatusForbidden {
+		t.Fatalf("чужой порт прошёл: %d (%s)", w.Code, w.Body.String())
 	}
 }
