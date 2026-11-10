@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 env:
   GO_VERSION: '1.27.3'
@@ -73,6 +74,24 @@ jobs:
           notes="${RUNNER_TEMP:-/tmp}/release-notes.md"
           bash scripts/release-notes.sh "$tag" > "$notes"
           "$GORELEASER_BIN" release --clean --skip=publish --release-notes "$notes"
+      # Реестр Gitea закрыт, поэтому публичные образы живут в GHCR: с GitHub
+      # их забирают без логина. Версия — без ведущего v, как у goreleaser.
+      - name: Образы в GHCR
+        env:
+          IMAGE: ghcr.io/akrhin/mcprig
+        run: |
+          set -euo pipefail
+          ver=$(printf '%s' "${{ inputs.tag || github.ref_name }}" | sed 's/^v//')
+          revision=$(git rev-parse --short HEAD)
+          printf '%s' "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for target in slim full; do
+            case "$target" in full) latest=latest-full ;; *) latest=latest ;; esac
+            docker build --target "$target" \
+              --build-arg VERSION="$ver" --build-arg REVISION="$revision" \
+              -t "$IMAGE:$ver-$target" -t "$IMAGE:$latest" .
+            docker push "$IMAGE:$ver-$target"
+            docker push "$IMAGE:$latest"
+          done
       - name: Опубликовать релиз
         env:
           GH_TOKEN: ${{ github.token }}

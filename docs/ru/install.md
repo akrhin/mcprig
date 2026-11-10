@@ -76,16 +76,18 @@ systemctl --user enable --now mcprig.service
 | `slim` (по умолчанию) | бинарник, корневые CA, пользователь без root `10001`, `bwrap` и `prlimit` | stdio-серверы из одного статического бинаря, либо HTTP |
 | `full` | `slim` плюс node/npm, python/pip и uv | stdio-серверы, запускаемые через `npx` / `uvx` |
 
-Оба образа опубликованы в реестре Gitea проекта, а он закрыт и требует входа:
-внешнему пользователю они недоступны — собирайте из `Dockerfile` (ниже).
+Оба образа опубликованы в GitHub Container Registry — вход не нужен:
 
 ```bash
-docker login frosty-ad-gt.cloudpub.ru                # только своим
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-slim    # закреплённый релиз
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-full
+docker pull ghcr.io/akrhin/mcprig:latest        # slim
+docker pull ghcr.io/akrhin/mcprig:latest-full   # full
+docker pull ghcr.io/akrhin/mcprig:0.3.8-slim    # закреплённый релиз
+docker pull ghcr.io/akrhin/mcprig:0.3.8-full
 ```
+
+`latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
+(`0.3.8-slim`, `0.3.8-full` — текущая). Собственный реестр Gitea закрыт и
+каналом раздачи не является.
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
 (`0.3.8-slim`, `0.3.8-full` — текущая).
@@ -117,7 +119,7 @@ Healthcheck образа спрашивает набор на `http://127.0.0.1:
 или `MCPRIG_PORT` задай `--health-cmd` или healthcheck в compose.
 
 `deploy/docker-compose.yml` запускает два набора (`demo` на 9100, `ops` на 9101)
-из `frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, монтирует каждый `servers.json` только для
+из `ghcr.io/akrhin/mcprig:latest`, монтирует каждый `servers.json` только для
 чтения и держит состояние в именованных томах.
 
 Замерено на этом хосте: `docker build .` без `--target` даёт `slim` — 44 МБ,

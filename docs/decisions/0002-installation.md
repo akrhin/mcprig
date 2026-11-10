@@ -67,8 +67,11 @@ docker run -d --name mcprig-demo \
   -v ~/.config/mcprig/sets/demo/servers.json:/config/servers.json:ro \
   -v mcprig-state:/state \
   --env-file ~/.config/mcprig/sets/demo/env \
-  frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest serve --config /config/servers.json --addr 0.0.0.0:9100
+  ghcr.io/akrhin/mcprig:latest serve --config /config/servers.json --addr 0.0.0.0:9100
 ```
+
+Публичная раздача образов — `ghcr.io/akrhin/mcprig` (реестр Gitea закрыт; в решении
+этот путь был его адресом, заменено 2026-11-11).
 
 `docker-compose.yml` для нескольких наборов отличается только именем сервиса,
 портом и путём к конфигу.

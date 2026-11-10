@@ -73,7 +73,7 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 
 ```bash
 # образы уже в реестре Gitea: latest (slim), latest-full и теги релиза 0.3.8-slim/0.3.8-full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest
+docker pull ghcr.io/akrhin/mcprig:latest
 docker compose up -d
 
 # либо собрать локально и указать свои теги; без VERSION образ отвечает «dev»

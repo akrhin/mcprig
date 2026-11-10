@@ -110,13 +110,15 @@ Rules:
 
 ## Images
 
-Two images, `slim` and `full` (see [docs/en/install.md](docs/en/install.md)), live
-in the project's Gitea registry as `sintez/mcprig`.
+Two images, `slim` and `full` (see [docs/en/install.md](docs/en/install.md)), are
+distributed from GitHub Container Registry as `ghcr.io/akrhin/mcprig`; the Gitea
+registry is private and is not a distribution channel, it only keeps the same
+tags for our own hosts.
 
-By hand:
+The tag job on GitHub builds and pushes both (see below). By hand:
 
 ```bash
-reg=frosty-ad-gt.cloudpub.ru/sintez/mcprig
+reg=ghcr.io/akrhin/mcprig
 ver=$(git describe --tags --abbrev=0 | sed 's/^v//')
 for target in slim full; do
   docker build --target "$target" --build-arg VERSION="$ver" \

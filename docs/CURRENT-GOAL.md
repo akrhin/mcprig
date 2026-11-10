@@ -22,7 +22,7 @@
 
 **Образы:** `0.3.4-slim` (`sha256:ba239c609995…`, 32.6 МБ) и `0.3.4-full`
 (`sha256:81db9b97e0d3…`, 334 МБ), плюс `latest`/`latest-full`; запушены в
-`frosty-ad-gt.cloudpub.ru/sintez/mcprig`.
+`ghcr.io/akrhin/mcprig` (публичная раздача образов); реестр Gitea закрыт.
 
 **Хост:** бинарь `0.3.4` из GitHub-релиза (sha256 сверен), наборы `main`
 (11/11) и `ha` (8/8) отвечают `version 0.3.4` без ошибок,

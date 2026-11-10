@@ -110,13 +110,14 @@ E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 
 ## Образы
 
-Два образа, `slim` и `full` (см. [docs/ru/install.md](docs/ru/install.md)), лежат
-в реестре Gitea проекта как `sintez/mcprig`.
+Два образа, `slim` и `full` (см. [docs/ru/install.md](docs/ru/install.md)), раздаются
+из GitHub Container Registry как `ghcr.io/akrhin/mcprig`; реестр Gitea закрыт и
+каналом раздачи не служит — в нём те же теги лежат только для своих хостов.
 
-Руками:
+Задача на тег в GitHub собирает и пушит оба (см. ниже). Руками:
 
 ```bash
-reg=frosty-ad-gt.cloudpub.ru/sintez/mcprig
+reg=ghcr.io/akrhin/mcprig
 ver=$(git describe --tags --abbrev=0 | sed 's/^v//')
 for target in slim full; do
   docker build --target "$target" --build-arg VERSION="$ver" \

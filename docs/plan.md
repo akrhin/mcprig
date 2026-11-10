@@ -193,7 +193,7 @@ check` (`b2ce4cb`) — шаг в джобе `release` перед `release --clea
   CSRF-проверкой Origin. Решение не принято.
 
 Каналы — только архивы goreleaser (обёртки npm/PyPI/crates не заводим);
-образы Docker публикуются в реестр Gitea — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`
+образы Docker публикуются в GHCR — `ghcr.io/akrhin/mcprig` (реестр Gitea закрыт и раздачей не служит)
 (`latest` = slim 32 МБ, `latest-full` = с node и python, 334 МБ, плюс теги
 `0.3.7-slim`/`0.3.7-full`);
 путь модуля остаётся `github.com/akrhin/mcprig`, публичный репозиторий на GitHub —

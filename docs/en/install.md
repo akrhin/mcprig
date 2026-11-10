@@ -77,20 +77,18 @@ The `Dockerfile` has two targets:
 | `slim` (default) | binary, CA roots, non-root user `10001`, `bwrap` and `prlimit` | stdio servers with a single static binary, or HTTP |
 | `full` | `slim` plus node/npm, python/pip and uv | stdio servers launched with `npx` / `uvx` |
 
-Both are published to the project's own Gitea registry, which needs a login:
-that instance is private, so an outside user cannot pull them and should build
-from the `Dockerfile` instead (below).
+Both are published to GitHub Container Registry, so no login is needed:
 
 ```bash
-docker login frosty-ad-gt.cloudpub.ru                # project maintainers only
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-slim    # pinned release
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-full
+docker pull ghcr.io/akrhin/mcprig:latest        # slim
+docker pull ghcr.io/akrhin/mcprig:latest-full   # full
+docker pull ghcr.io/akrhin/mcprig:0.3.8-slim    # pinned release
+docker pull ghcr.io/akrhin/mcprig:0.3.8-full
 ```
 
 `latest` and `latest-full` follow the newest release; the version tags pin one
-pair (`0.3.8-slim`, `0.3.8-full` are the current pair).
+pair (`0.3.8-slim`, `0.3.8-full` are the current pair). The project's own Gitea
+registry is private and is not a distribution channel.
 
 Or build them yourself:
 
@@ -123,7 +121,7 @@ only when both answer; it assumes the default ports, so with another
 compose.
 
 `deploy/docker-compose.yml` runs two sets (`demo` on 9100, `ops` on 9101) from
-`frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, mounts each `servers.json` read-only and keeps
+`ghcr.io/akrhin/mcprig:latest`, mounts each `servers.json` read-only and keeps
 state in named volumes.
 
 Measured on this host (rootless Docker 29.9.3): the bare `docker build .` gives
