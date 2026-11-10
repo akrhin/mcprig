@@ -303,4 +303,7 @@ admin-сессией, тонкий CLI, медленный первый стар
   `scripts/sandbox-e2e.sh` 14/14; образы 0.3.6 slim/full и `latest` в реестре;
   хост обновлён, `main` 11/11 и `ha` 8/8 отвечают `version 0.3.6`,
   `mcprig doctor` — «итог: 0 проблем», песочница на хосте проходит пробу.
+- CI Gitea run 1649 success (19 м 42 с), Gitea-релиз выпущен из черновика
+  (`gt release edit v0.3.6 --draft=false`), GitHub-релиз `v0.3.6` публичный,
+  5 ассетов.
 
