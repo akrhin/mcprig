@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -264,6 +265,37 @@ func TestInvokeManyTimeoutBoundsWholeBatch(t *testing.T) {
 		if !strings.Contains(ans.Error, "таймаут вызова 40 мс") {
 			t.Fatalf("calls[%d]: ошибка не называет таймаут: %q", i, ans.Error)
 		}
+	}
+}
+
+// Неизвестное имя в пачке отвергается по кэшу, как в invoke_command: в апстрим
+// уходит только известный вызов, тексты обоих вызовов свои.
+func TestInvokeManyChecksCache(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	m.storeTools(m.find("alpha"), []*mcp.Tool{{Name: "echo"}})
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_many", map[string]any{"calls": []any{
+		echoCall("alpha", "ok", 0),
+		map[string]any{"server": "alpha", "command_name": "nope", "parameters": map[string]any{}},
+	}})
+	if res.IsError {
+		t.Fatalf("веер упал: %s", resultText(t, res))
+	}
+	out := manyAnswers(t, res)
+	if !out[0].OK {
+		t.Fatalf("известный вызов не ok: %+v", out[0])
+	}
+	if got, _ := out[0].Result.(string); !strings.Contains(got, "echo:") || !strings.Contains(got, `"ok"`) {
+		t.Fatalf("ответ не от апстрима: %q", got)
+	}
+	if out[1].OK || out[1].Error != `неизвестный инструмент "nope" у сервера "alpha"` {
+		t.Fatalf("calls[1] = %+v", out[1])
+	}
+	if got := atomic.LoadInt32(&dials); got != 1 {
+		t.Fatalf("соединений %d, ожидалось 1", got)
 	}
 }
 
