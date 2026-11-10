@@ -42,9 +42,12 @@ does not validate them itself — it shows what the backend answers, including
 `sandbox: неизвестные поля: …`, `sandbox допустим только для stdio` and
 `тег untrusted требует sandbox: сервер без изоляции не стартует`.
 
-The panel does not display the `isolation` field that MCP clients see in
-`list_servers`; a server running without isolation is visible in the set log
-(`сервер стартует без изоляции`) and through `list_servers`.
+The server list also shows isolation: a muted shield and `bwrap` when the
+sandbox is applied, a warning badge `без изоляции` when the block was requested
+but bubblewrap did not start (the full reason is in the tooltip), and an error
+badge `конфиг отвергнут` for a record with `_configError`. A valid server without
+a `sandbox` block carries no marker. The value comes from the same `isolation`
+field MCP clients see in `list_servers`.
 
 The **Keys** dialog lists key ids, creation and revocation dates and notes. It
 shows only the 8-character prefix. A newly issued token is displayed once, and

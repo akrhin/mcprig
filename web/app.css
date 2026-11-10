@@ -365,12 +365,21 @@ table.t td.tb-name{max-width:0;width:100%}
 .pane-h{display:flex;align-items:center;gap:8px;flex:none;padding:2px 0 6px}
 .pane-h .hint{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
 .pane .push{margin-left:auto}
-ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
+ul.list{list-style:none;margin:0;padding:0 2px 0 0;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 .srv,.var{display:grid;gap:2px;padding:6px 0;border-bottom:1px solid var(--hair);min-width:0}
 .srv:last-child,.var:last-child{border-bottom:0}
 .srv-top,.var-top{display:flex;align-items:center;gap:7px;min-width:0}
 .snm{font-size:12.5px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badge{flex:none;font:10px/1 var(--font-mono);letter-spacing:.04em;border:1px solid var(--border);border-radius:2px;padding:2px 4px;color:var(--text-dim);text-transform:uppercase}
+/* маркер изоляции: щит + подпись; приглушённый bwrap — норма, цветная плашка — отклонение.
+   Подпись ужимается многоточием, поэтому строка сервера не переносится и на 390 px. */
+.iso{display:inline-flex;align-items:center;gap:4px;flex:none;min-width:0;max-width:48%;font:10px/1 var(--font-mono);letter-spacing:.02em;color:var(--text-dim)}
+.iso[hidden]{display:none}
+.iso svg{width:12px;height:12px;flex:none}
+.iso-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iso-warn,.iso-err{padding:2px 5px;border:1px solid var(--border);border-radius:2px}
+.iso-warn{color:var(--warn)}
+.iso-err{color:var(--error)}
 .srv-foot{display:flex;align-items:center;gap:8px;min-width:0}
 /* кнопка проверки нужна редко — показываем по наведению и в фокусе,
    чтобы список серверов читался как список, а не как панель кнопок */
