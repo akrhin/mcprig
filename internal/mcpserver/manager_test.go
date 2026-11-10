@@ -94,6 +94,7 @@ type serversOut struct {
 		Type    string   `json:"type"`
 		Enabled bool     `json:"enabled"`
 		Healthy bool     `json:"healthy"`
+		Unknown bool     `json:"unknown"`
 		Error   string   `json:"error"`
 		Tags    []string `json:"tags"`
 	} `json:"servers"`
@@ -307,6 +308,44 @@ func TestHealthCacheKeepsFailures(t *testing.T) {
 	}
 }
 
+// The unknown flag must reach the client: the source value is tested above,
+// the delivery is what a regression silently breaks.
+func TestListServersReportsUnknown(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	t.Cleanup(func() {
+		for {
+			select {
+			case <-probeSlots:
+			default:
+				return
+			}
+		}
+	})
+	for i := 0; i < maxProbes; i++ {
+		probeSlots <- struct{}{}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	res, err := m.listServers(ctx, nil)
+	if err != nil {
+		t.Fatalf("list_servers: %v", err)
+	}
+	var out struct {
+		Servers []struct {
+			Healthy bool `json:"healthy"`
+			Unknown bool `json:"unknown"`
+		} `json:"servers"`
+	}
+	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
+		t.Fatalf("list_servers output: %v", err)
+	}
+	if len(out.Servers) != 1 || !out.Servers[0].Healthy || !out.Servers[0].Unknown {
+		t.Fatalf("проба без слота: ждём healthy:true, unknown:true, got %+v", out.Servers)
+	}
+}
+
 // A probe that never got a slot is not a sick server: the outcome is unknown,
 // so it must not land in the cache as unhealthy for the whole TTL.
 func TestStatusSkippedProbeNotCached(t *testing.T) {
@@ -330,8 +369,8 @@ func TestStatusSkippedProbeNotCached(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	if ok, errText := m.status(ctx, e); !ok || errText != "" {
-		t.Fatalf("проба без слота: исход неизвестен, надо healthy=true, got %v %q", ok, errText)
+	if ok, errText, unknown := m.status(ctx, e); !ok || errText != "" || !unknown {
+		t.Fatalf("проба без слота: надо healthy=true, unknown=true, got %v %q unknown=%v", ok, errText, unknown)
 	}
 	e.healthMu.Lock()
 	h := e.health
@@ -344,8 +383,8 @@ func TestStatusSkippedProbeNotCached(t *testing.T) {
 	}
 
 	drain()
-	if ok, errText := m.status(context.Background(), e); !ok || errText != "" {
-		t.Fatalf("слот свободен: проба должна пройти, got %v %q", ok, errText)
+	if ok, errText, unknown := m.status(context.Background(), e); !ok || errText != "" || unknown {
+		t.Fatalf("слот свободен: проба должна пройти, got %v %q unknown=%v", ok, errText, unknown)
 	}
 	if n := atomic.LoadInt32(&dials); n != 1 {
 		t.Fatalf("после освобождения слота проба обязана пройти, got %d dial(s)", n)

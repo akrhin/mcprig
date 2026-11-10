@@ -339,13 +339,16 @@ type listServersInput struct {
 }
 
 type serverInfo struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Type        string   `json:"type"`
-	Enabled     bool     `json:"enabled"`
-	Healthy     bool     `json:"healthy"`
-	Error       string   `json:"error,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type"`
+	Enabled     bool   `json:"enabled"`
+	Healthy     bool   `json:"healthy"`
+	// Unknown — проба не началась (не дождалась слота): исход неизвестен,
+	// и healthy:true здесь значит «не больной», а не «проверен».
+	Unknown bool     `json:"unknown,omitempty"`
+	Error   string   `json:"error,omitempty"`
+	Tags    []string `json:"tags,omitempty"`
 	// Isolation — "bwrap", когда песочница применена, и "без изоляции: …",
 	// когда она запрошена, но недоступна. Пусто — сервер без песочницы.
 	Isolation string `json:"isolation,omitempty"`
@@ -377,13 +380,14 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			healthy, errText := m.status(ctx, e)
+			healthy, errText, unknown := m.status(ctx, e)
 			out.Servers[i] = serverInfo{
 				Name:        e.srv.Name,
 				Description: e.srv.Description,
 				Type:        transportType(e.srv),
 				Enabled:     e.srv.Enabled,
 				Healthy:     healthy,
+				Unknown:     unknown,
 				Error:       errText,
 				Tags:        e.srv.Tags,
 				Isolation:   e.isolationNote(),
@@ -401,19 +405,20 @@ func matches(srv *config.Server, lowerFilter string) bool {
 }
 
 // status reports health from the TTL cache or one bounded probe. A server
-// switched off on purpose is not unhealthy: nothing is dialed for it.
-func (m *Manager) status(ctx context.Context, e *entry) (bool, string) {
+// switched off on purpose is not unhealthy: nothing is dialed for it. Третий
+// результат — unknown: проба не началась, исхода нет ни в кэше, ни из сокета.
+func (m *Manager) status(ctx context.Context, e *entry) (bool, string, bool) {
 	if e.srv.ConfigError != "" {
-		return false, e.srv.ConfigError
+		return false, e.srv.ConfigError, false
 	}
 	if !e.srv.Enabled {
-		return true, ""
+		return true, "", false
 	}
 	e.healthMu.Lock()
 	h := e.health
 	e.healthMu.Unlock()
 	if !h.at.IsZero() && time.Since(h.at) < healthTTL {
-		return h.ok, h.errText
+		return h.ok, h.errText, false
 	}
 
 	var ok bool
@@ -421,7 +426,7 @@ func (m *Manager) status(ctx context.Context, e *entry) (bool, string) {
 	err := m.probe(ctx, e)
 	if errors.Is(err, errProbeSkipped) {
 		// Исход неизвестен (проба не началась) — не кэшируем и не считаем больным.
-		return true, ""
+		return true, "", true
 	}
 	if err != nil {
 		errText = err.Error()
@@ -431,7 +436,7 @@ func (m *Manager) status(ctx context.Context, e *entry) (bool, string) {
 	e.healthMu.Lock()
 	e.health = healthState{at: time.Now(), ok: ok, errText: errText}
 	e.healthMu.Unlock()
-	return ok, errText
+	return ok, errText, false
 }
 
 // probe connects within healthTimeout so one hung server cannot stall a list.
