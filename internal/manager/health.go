@@ -32,6 +32,9 @@ type serverHealth struct {
 	// Isolation повторяет пометку list_servers: «без изоляции: …» видно и в
 	// health, а не только в логе набора.
 	Isolation string `json:"isolation,omitempty"`
+	// Unknown — проба набора не началась: healthy тут значит «не больной»,
+	// и панель обязана показать «не проверено», а не «health ok».
+	Unknown bool `json:"unknown,omitempty"`
 }
 
 type setHealth struct {
@@ -164,6 +167,7 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 		Servers []struct {
 			Name      string `json:"name"`
 			Healthy   bool   `json:"healthy"`
+			Unknown   bool   `json:"unknown"`
 			Error     string `json:"error"`
 			Isolation string `json:"isolation"`
 		} `json:"servers"`
@@ -175,20 +179,23 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 	}
 	known := map[string]struct {
 		healthy   bool
+		unknown   bool
 		err       string
 		isolation string
 	}{}
 	for _, s := range payload.Servers {
 		known[s.Name] = struct {
 			healthy   bool
+			unknown   bool
 			err       string
 			isolation string
-		}{s.Healthy, truncate(s.Error, 500), s.Isolation}
+		}{s.Healthy, s.Unknown, truncate(s.Error, 500), s.Isolation}
 	}
 	for i := range out.Servers {
 		if s, ok := known[out.Servers[i].Name]; ok {
 			healthy := s.healthy
 			out.Servers[i].Healthy = &healthy
+			out.Servers[i].Unknown = s.unknown
 			out.Servers[i].Error = s.err
 			out.Servers[i].Isolation = s.isolation
 			continue

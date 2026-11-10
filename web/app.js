@@ -776,7 +776,8 @@
         var cls = 'warn';
         var note = row.mine ? 'не проверялся' : 'не в наборе';
         if (row.mine && health && !health.running) { note = 'набор не запущен'; }
-        if (row.mine && h && h.healthy === true) { cls = 'ok'; note = 'health ok'; }
+        if (row.mine && h && h.healthy === true && h.unknown) { cls = 'warn'; note = 'не проверено'; }
+        if (row.mine && h && h.healthy === true && !h.unknown) { cls = 'ok'; note = 'health ok'; }
         if (row.mine && h && h.healthy === false) { cls = 'err'; note = h.error || 'нет ответа'; }
         li.querySelector('.dot').className = 'dot ' + cls;
         li.querySelector('.snm').textContent = row.name;

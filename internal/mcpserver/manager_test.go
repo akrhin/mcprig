@@ -94,6 +94,7 @@ type serversOut struct {
 		Type    string   `json:"type"`
 		Enabled bool     `json:"enabled"`
 		Healthy bool     `json:"healthy"`
+		Unknown bool     `json:"unknown"`
 		Error   string   `json:"error"`
 		Tags    []string `json:"tags"`
 	} `json:"servers"`
@@ -304,6 +305,44 @@ func TestHealthCacheKeepsFailures(t *testing.T) {
 	}
 	if n := atomic.LoadInt32(&dials); n != 1 {
 		t.Fatalf("the cached failure must not re-dial, got %d dial(s)", n)
+	}
+}
+
+// The unknown flag must reach the client: the source value is tested above,
+// the delivery is what a regression silently breaks.
+func TestListServersReportsUnknown(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	t.Cleanup(func() {
+		for {
+			select {
+			case <-probeSlots:
+			default:
+				return
+			}
+		}
+	})
+	for i := 0; i < maxProbes; i++ {
+		probeSlots <- struct{}{}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	res, err := m.listServers(ctx, nil)
+	if err != nil {
+		t.Fatalf("list_servers: %v", err)
+	}
+	var out struct {
+		Servers []struct {
+			Healthy bool `json:"healthy"`
+			Unknown bool `json:"unknown"`
+		} `json:"servers"`
+	}
+	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
+		t.Fatalf("list_servers output: %v", err)
+	}
+	if len(out.Servers) != 1 || !out.Servers[0].Healthy || !out.Servers[0].Unknown {
+		t.Fatalf("проба без слота: ждём healthy:true, unknown:true, got %+v", out.Servers)
 	}
 }
 
