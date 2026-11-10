@@ -73,9 +73,9 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest
 docker compose up -d
 
-# либо собрать локально и указать свои теги
-docker build -t mcprig:slim .                    # 44 МБ, бинарник + bwrap/prlimit
-docker build --target full -t mcprig:full .      # 446 МБ, плюс node/npm, python, uv
+# либо собрать локально и указать свои теги; без VERSION образ отвечает «dev»
+docker build --build-arg VERSION=$(git describe --tags --abbrev=0) -t mcprig:slim .   # 44 МБ, бинарник + bwrap/prlimit
+docker build --build-arg VERSION=$(git describe --tags --abbrev=0) --target full -t mcprig:full .  # 446 МБ, плюс node/npm, python, uv
 MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
 ```
 

@@ -121,8 +121,10 @@ state in named volumes.
 
 Measured on this host (rootless Docker 29.9.3): the bare `docker build .` gives
 `slim` (44 MB, binary plus CA roots, `bwrap` and `prlimit`); `--target full`
-adds node/npm, python/pip and uv/uvx and weighs 446 MB. Both were run: `slim`
-served a remote
+adds node/npm, python/pip and uv/uvx and weighs 446 MB. Pass the release into
+the build, or the binary inside the image answers `dev`:
+`docker build --build-arg VERSION=$(git describe --tags --abbrev=0) -t mcprig:slim .`
+Both were run: `slim` served a remote
 `serena` over the host network and answered `find_symbol` through
 `invoke_command`, and its healthcheck reports `ok`.
 

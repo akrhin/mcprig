@@ -113,7 +113,10 @@ compose.
 
 Замерено на этом хосте: `docker build .` без `--target` даёт `slim` — 44 МБ,
 бинарь, корневые сертификаты, `bwrap` и `prlimit`; `--target full` добавляет
-node/npm, python/pip и uv/uvx и весит 446 МБ. Оба образа запускались: `slim` отдал удалённую `serena` через сеть
+node/npm, python/pip и uv/uvx и весит 446 МБ. Передавайте релиз в сборку, иначе
+бинарь внутри образа отвечает `dev`:
+`docker build --build-arg VERSION=$(git describe --tags --abbrev=0) -t mcprig:slim .`
+Оба образа запускались: `slim` отдал удалённую `serena` через сеть
 хоста и ответил `find_symbol` через `invoke_command`, healthcheck — `ok`.
 
 `"sandbox": {}` работает в обоих образах: они несут `bubblewrap` для `bwrap` и

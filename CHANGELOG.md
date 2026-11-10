@@ -7,8 +7,23 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
+### Added
+
+- `invoke_command` и `invoke_many` принимают `command` синонимом
+  `command_name` — так поле называет `list_commands`; оба ключа с разными
+  значениями отвергаются.
+
 ### Fixed
 
+- Ошибка лишних ключей перечисляет допустимые, а ошибка типа называет ключ и
+  вид значения (`ключ server: ожидался тип «строка», получен тип «число»`)
+  вместо имени Go-структуры.
+- Причина изоляции не дублирует префикс: `без изоляции: bwrap не найден в
+  PATH`, а не `без изоляции: sandbox unavailable: …`.
+- `doctor` проверяет `prlimit` и печатает предупреждения как `внимание:`, не
+  `ok:`.
+- Документация: `command` в таблице `invoke_command` (en/ru), сборка образа с
+  `--build-arg VERSION=` (иначе бинарь отвечает `dev`).
 - Образы везут `bubblewrap` и `prlimit` (`util-linux`): `"sandbox": {}` не
   падает на `bwrap не найден в PATH`, а песочница больше не отвергает
   `prlimit` как относительный путь.
