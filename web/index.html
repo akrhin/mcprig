@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en" data-theme="mcprig">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mcprig — panel</title>
+<meta name="color-scheme" content="dark light">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="themes.css">
@@ -12,496 +13,567 @@
 <script src="app.js" defer></script>
 </head>
 <body>
-<div class="shell">
+<a class="skip" href="#content" data-i18n="a11y.skip">Skip to content</a>
 
-  <header class="top">
-    <div class="brand">
-      <span class="mark" aria-hidden="true">
-        <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8.5 13.5V5.8a1.4 1.4 0 0 1 2.8 0v4.4"/>
-          <path d="M11.3 10.6V4.6a1.4 1.4 0 0 1 2.8 0v6"/>
-          <path d="M14.1 10.8V6.4a1.4 1.4 0 0 1 2.8 0v6"/>
-          <path d="M16.9 12.4v-2a1.4 1.4 0 0 1 2.8 0V15a6 6 0 0 1-6 6h-1.6a4.6 4.6 0 0 1-3.6-1.8l-3-3.9a1.5 1.5 0 0 1 2.3-1.9l1.7 1.8"/>
-        </svg>
-      </span>
-      <span class="wordmark">mcprig</span>
-    </div>
-    <div class="sep" aria-hidden="true"></div>
-    <div class="counters">
-      <span><b class="n" id="c-sets">—</b> <span id="c-sets-w">sets</span></span>
-      <span><b class="n" id="c-servers">—</b> <span id="c-servers-w">servers</span></span>
-      <span class="opt"><b class="n" id="c-running">—</b> <span id="c-running-w">running</span></span>
-    </div>
-    <div class="top-right">
-      <button class="btn side-open" type="button" id="side-open" aria-controls="side" aria-expanded="false">
-        <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-          <path d="M4 6h16M4 12h16M4 18h16"/>
-        </svg>
-        <span data-i18n="top.details">Details</span>
+<div class="app" id="app">
+  <aside class="rail" id="rail" aria-label="Sets" data-i18n-aria="rail.title">
+    <div class="rail-head">
+      <span class="rail-title" data-i18n="rail.title">Sets</span>
+      <span class="rail-count mono" id="rail-count">0</span>
+      <button class="ghost-icon rail-collapse" type="button" id="rail-toggle" aria-pressed="false" aria-label="Collapse the set list" data-i18n-aria="rail.collapse">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <label class="themesel langsel">
-        <span class="sr" data-i18n="top.lang">Language</span>
-        <select id="lang">
-          <option value="en">EN</option>
-          <option value="ru">RU</option>
-        </select>
-      </label>
-      <label class="themesel">
-        <span class="sr" data-i18n="top.theme">Color scheme</span>
-        <select id="theme">
-          <option value="mcprig">mcprig</option>
-          <option value="light" data-i18n="theme.light">Light</option>
-          <option value="nord">Nord</option>
-          <option value="gruvbox">Gruvbox</option>
-          <option value="solarized">Solarized</option>
-          <option value="tokyo">Tokyo Night</option>
-        </select>
-      </label>
-      <button class="iconbtn" type="button" id="dim" aria-pressed="false" aria-label="Dim the panel" data-i18n-aria="top.dim">
-        <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-          <circle cx="12" cy="12" r="8"/><path d="M12 4v16"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none" opacity=".55"/>
-        </svg>
-      </button>
-      <span class="avatar" title="Vladimir" data-i18n-title="top.who">V</span>
     </div>
-  </header>
+    <nav class="rail-sets" id="rail-sets" aria-label="Set list" data-i18n-aria="rail.title"></nav>
+    <p class="rail-empty" id="rail-empty" hidden data-i18n="rail.empty">no sets</p>
+    <div class="rail-foot">
+      <button class="rail-add" type="button" id="add-toggle">
+        <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="rail-add-txt" data-i18n="rail.add">New set</span>
+      </button>
+      <form class="rail-form" id="addform" novalidate hidden>
+        <label class="field-label" for="add-name" data-i18n="rail.name">name</label>
+        <input class="input" id="add-name" name="name" autocomplete="off" spellcheck="false" placeholder="staging">
+        <label class="field-label" for="add-port" data-i18n="rail.port">port</label>
+        <input class="input mono" id="add-port" name="port" inputmode="numeric" autocomplete="off" placeholder="9100">
+        <p class="field-error" id="add-err" role="alert" hidden></p>
+        <div class="rail-form-actions">
+          <button class="btn btn-primary btn-xs" type="submit" data-i18n="rail.create">create</button>
+          <button class="btn btn-ghost btn-xs" type="button" id="add-cancel" data-i18n="common.cancel">cancel</button>
+        </div>
+      </form>
+    </div>
+  </aside>
 
-  <div class="body">
+  <div class="main">
+    <header class="topbar">
+      <button class="ghost-icon only-mobile" type="button" id="rail-open" aria-controls="rail" aria-expanded="false" aria-label="Open set list" data-i18n-aria="rail.open">
+        <svg class="od-icon ico-17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
 
-    <nav class="rail" id="rail" aria-label="Sets" data-i18n-aria="rail.title">
-      <div class="rail-h">
-        <span class="rail-title" data-i18n="rail.title">Sets</span>
-        <span class="n rail-count" id="rail-count">0</span>
-        <button class="iconbtn rail-toggle" type="button" id="rail-toggle" aria-label="Collapse the set list" data-i18n-aria="rail.collapse" aria-pressed="false">
-          <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14 6l-6 6 6 6"/>
-          </svg>
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <span class="crumb-root">mcprig</span>
+        <span class="crumb-sep" aria-hidden="true">/</span>
+        <span class="crumb-set mono" id="crumb-set">—</span>
+      </nav>
+
+      <div class="topbar-end">
+        <button class="endpoint" type="button" id="copy" title="Copy MCP endpoint" data-i18n-title="head.copyTip">
+          <span class="endpoint-label" data-i18n="head.endpoint">Endpoint</span>
+          <span class="endpoint-url mono od-truncate" id="endpoint">—</span>
+          <span class="endpoint-ico" aria-hidden="true">
+            <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </span>
+          <span class="sr" data-i18n="head.copy">copy</span>
+        </button>
+
+        <button class="ghost-icon" type="button" id="side-open" aria-controls="side" aria-expanded="false" aria-label="Details" data-i18n-title="top.details" data-i18n-aria="top.details">
+          <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        </button>
+
+        <div class="tmenu" id="tmenu">
+          <button class="ghost-icon" type="button" id="theme-btn" aria-haspopup="true" aria-expanded="false" aria-controls="theme-menu" aria-label="Theme" data-i18n-aria="top.theme">
+            <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 1.6 1.6 0 0 0 0-3.2 1.9 1.9 0 0 1 0-3.8h2.4A6.6 6.6 0 0 0 21 7.4C21 4.9 16.9 3 12 3Z"/><circle cx="8" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="6.8" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.6" cy="9.2" r="1.1" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <div class="menu" id="theme-menu" role="menu" aria-label="Theme" data-i18n-aria="top.theme" hidden>
+            <button class="menu-item" role="menuitemradio" data-theme-opt="dark" aria-checked="true" type="button">
+              <span class="sw" aria-hidden="true"><i></i><i></i></span>
+              Dark
+              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+            </button>
+            <button class="menu-item" role="menuitemradio" data-theme-opt="light" aria-checked="false" type="button">
+              <span class="sw" aria-hidden="true"><i></i><i></i></span>
+              Light
+              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+            </button>
+            <button class="menu-item" role="menuitemradio" data-theme-opt="nord" aria-checked="false" type="button">
+              <span class="sw" aria-hidden="true"><i></i><i></i></span>
+              Nord
+              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+            </button>
+            <button class="menu-item" role="menuitemradio" data-theme-opt="gruvbox" aria-checked="false" type="button">
+              <span class="sw" aria-hidden="true"><i></i><i></i></span>
+              Gruvbox
+              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+            </button>
+          </div>
+        </div>
+
+        <label class="langsel">
+          <span class="sr" data-i18n="top.lang">Language</span>
+          <select id="lang" class="input">
+            <option value="en">EN</option>
+            <option value="ru">RU</option>
+          </select>
+        </label>
+
+        <span class="who" title="admin"><span class="who-initial" aria-hidden="true">A</span><span class="who-name">admin</span></span>
+      </div>
+    </header>
+
+    <main class="content" id="content" tabindex="-1">
+      <div class="alertbar" id="errbar" hidden role="status">
+        <span id="errbar-msg"></span>
+        <button class="ghost-icon" type="button" id="errbar-close" aria-label="Close" data-i18n-aria="common.close">
+          <svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <div class="sets" id="rail-sets"></div>
-      <div class="rail-empty" id="rail-empty" hidden data-i18n="rail.empty">no sets</div>
-      <div class="rail-foot">
-        <button class="rail-add" type="button" id="add-toggle"><span class="plus" aria-hidden="true">+</span><span class="lbl" data-i18n="rail.add">set</span></button>
-        <form class="addform" id="addform" hidden>
-          <label class="f"><span data-i18n="rail.name">name</span><input name="name" autocomplete="off" placeholder="staging"></label>
-          <label class="f"><span data-i18n="rail.port">port</span><input name="port" class="n" inputmode="numeric" placeholder="9100"></label>
-          <p class="adderr" id="add-err" hidden></p>
-          <div class="addbtns">
-            <button class="btn" type="submit" data-i18n="rail.create">create</button>
-            <button class="mini" type="button" id="add-cancel" data-i18n="common.cancel">cancel</button>
+
+      <section class="empty-state" id="empty-state" hidden>
+        <p class="empty-title" data-i18n="empty.title">No sets yet</p>
+        <p class="empty-text" data-i18n="empty.p">A set is one MCP endpoint with its own port, servers and keys.</p>
+        <button class="btn btn-primary" type="button" id="empty-add" data-i18n="empty.add">Create the first set</button>
+      </section>
+
+      <div class="set-head" id="phead" hidden>
+        <div class="set-head-row">
+          <h1 class="set-title" id="set-name">—</h1>
+          <span class="chip chip-port mono" id="set-port">:0</span>
+          <span class="badge badge-unknown" id="set-state"><span class="dot"></span><span id="set-state-t">—</span></span>
+          <div class="set-actions">
+            <button class="btn" type="button" id="keys"><span data-i18n="head.keys">Keys</span> <span class="count mono" id="keys-count">0</span></button>
+            <button class="btn" type="button" id="restart" hidden data-i18n="head.restart">Restart</button>
+            <button class="btn btn-primary" type="button" id="run">—</button>
           </div>
-        </form>
+        </div>
+        <div class="set-meta">
+          <span class="meta-label" data-i18n="head.key">Key</span>
+          <code class="mono key-val" id="key">—</code>
+          <button class="ghost-icon" type="button" id="key-open" aria-pressed="false" aria-label="Reveal key" data-i18n-title="head.keyTip" data-i18n-aria="head.keyOpen">
+            <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.8 12S5.5 5.8 12 5.8 22.2 12 22.2 12 18.5 18.2 12 18.2 1.8 12 1.8 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="ghost-icon" type="button" id="key-copy" aria-label="Copy key" data-i18n-title="head.copyKey" data-i18n-aria="head.copyKey">
+            <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span class="meta-sep" aria-hidden="true"></span>
+          <span class="meta-label" data-i18n="head.servers">Servers</span><span class="mono" id="meta-servers">0</span>
+          <span class="meta-label" data-i18n="head.tools">Tools</span><span class="mono" id="meta-tools">—</span>
+          <span class="meta-sep" aria-hidden="true"></span>
+          <span class="meta-label" title="tools/list schema of this set" data-i18n-title="head.schemaTip">LIST_COMMANDS</span><code class="mono meta-schema" id="schema" data-i18n-title="head.schemaTip">—</code>
+        </div>
       </div>
-    </nav>
 
-    <main class="main">
-
-      <div class="errbar" id="errbar" hidden role="status">
-        <span class="msg" id="errbar-msg"></span>
-        <button class="mini" type="button" id="errbar-close" data-i18n="common.hide">hide</button>
+      <div class="alertbar alertbar-err" id="set-error" hidden>
+        <strong id="set-error-h"></strong><span id="set-error-d" class="mono"></span>
       </div>
 
-      <section class="block emptywrap" id="empty-state" hidden>
-        <div class="block-h"><h2 data-i18n="empty.title">No sets</h2></div>
-        <div class="empty">
-          <h3 data-i18n="empty.h">Build your first endpoint</h3>
-          <p data-i18n="empty.p">A set gets a port from 9100–9199, a key, and one MCP address for all of its servers.</p>
-          <ul class="steps">
-            <li><span class="k">1</span><span data-i18n="empty.s1">Add a server: a stdio command or a streamable-http URL.</span></li>
-            <li><span class="k">2</span><span data-i18n="empty.s2">Create a set and assign servers to it.</span></li>
-            <li><span class="k">3</span><span data-i18n="empty.s3">Copy the endpoint and the key into your client.</span></li>
-          </ul>
-          <div><button class="btn primary" type="button" id="empty-add" data-i18n="empty.add">Create a set</button></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Set views">
+        <button class="tab" role="tab" type="button" id="tabbtn-overview" data-tab="overview" aria-controls="tab-overview" aria-selected="true" tabindex="0" data-i18n="tabs.overview">Overview</button>
+        <button class="tab" role="tab" type="button" id="tabbtn-calls" data-tab="calls" aria-controls="tab-calls" aria-selected="false" tabindex="-1" data-i18n="tabs.calls">Calls</button>
+        <button class="tab" role="tab" type="button" id="tabbtn-stats" data-tab="stats" aria-controls="tab-stats" aria-selected="false" tabindex="-1" data-i18n="tabs.stats">Statistics</button>
+      </div>
+
+      <section id="tab-overview" role="tabpanel" aria-labelledby="tabbtn-overview" tabindex="0">
+        <div class="kpis" id="kpis">
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-calls">—</span>
+            <span class="kpi-label" data-i18n="kpi.calls">calls</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-err">—</span>
+            <span class="kpi-label" data-i18n="kpi.errRate">error rate</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-p50">—</span>
+            <span class="kpi-label" data-i18n="kpi.p50">p50 latency</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-p95">—</span>
+            <span class="kpi-label" data-i18n="kpi.p95">p95 latency</span>
+          </div>
+        </div>
+
+        <section class="block" id="set-srv-block" aria-labelledby="set-srv-h">
+          <div class="block-head">
+            <h2 id="set-srv-h" data-i18n="setSrv.title">Servers</h2>
+            <p class="block-meta" id="set-srv-note" role="status"></p>
+            <button class="btn btn-sm" type="button" id="srv-add" data-i18n="setSrv.add">Add server</button>
+          </div>
+          <table class="table rtable" id="set-srv-table" aria-labelledby="set-srv-h">
+            <thead>
+              <tr>
+                <th scope="col" data-i18n="setSrv.thServer">Server</th>
+                <th scope="col" data-i18n="setSrv.thType">Type</th>
+                <th scope="col" data-i18n="setSrv.thState">State</th>
+                <th scope="col" class="num" data-i18n="setSrv.thTools">Tools</th>
+                <th scope="col" class="hide-sm" data-i18n="setSrv.thLast">Last request</th>
+                <th scope="col" class="num"><span class="sr" data-i18n="setSrv.thAct">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="set-srv-body"></tbody>
+          </table>
+          <div class="empty" id="set-srv-empty" hidden>
+            <p class="empty-title" data-i18n="setSrv.emptyTitle">This set has no servers</p>
+            <p class="empty-text" data-i18n="setSrv.emptyText">Servers live in the host registry; attach one to give this set tools to serve.</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="tab-calls" role="tabpanel" aria-labelledby="tabbtn-calls" tabindex="0" hidden>
+        <div class="filters">
+          <label class="searchfield">
+            <span class="sr" data-i18n="calls.search">search</span>
+            <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+            <input class="input" id="q" type="search" autocomplete="off" placeholder="tool or client" data-i18n-ph="calls.ph">
+          </label>
+          <label class="check"><input type="checkbox" id="only-err"> <span data-i18n="calls.onlyErr">errors only</span></label>
+          <span class="block-meta mono" id="calls-count"></span>
+        </div>
+        <table class="table rtable" id="calls-table">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="tail.thTime">time</th>
+              <th scope="col" data-i18n="tail.thServer">server</th>
+              <th scope="col" data-i18n="tail.thTool">tool</th>
+              <th scope="col" data-i18n="calls.thClient">client</th>
+              <th scope="col" class="num" data-i18n="tail.thMs">ms</th>
+              <th scope="col" data-i18n="tail.thStatus">status</th>
+            </tr>
+          </thead>
+          <tbody id="calls-body"></tbody>
+        </table>
+        <div class="empty" id="calls-note" hidden>
+          <p class="empty-title" data-i18n="tail.empty">no calls yet</p>
+          <p class="empty-text" data-i18n="calls.emptyText">Requests appear here as soon as the set serves.</p>
         </div>
       </section>
 
-      <div class="phead" id="phead" hidden>
-        <div class="phead-id">
-          <div class="title-row">
-            <h1 id="set-name">—</h1>
-            <span class="port n" id="set-port"></span>
-            <span class="state" id="set-state"></span>
+      <section id="tab-stats" role="tabpanel" aria-labelledby="tabbtn-stats" tabindex="0" hidden>
+        <div class="filters">
+          <div class="segmented" role="group" aria-label="Period" id="s-period">
+            <button class="segbtn" type="button" data-period="today" aria-pressed="true" data-i18n="stats.today">Today</button>
+            <button class="segbtn" type="button" data-period="7d" aria-pressed="false" tabindex="-1" data-i18n="stats.7d">7 days</button>
+            <button class="segbtn" type="button" data-period="30d" aria-pressed="false" tabindex="-1" data-i18n="stats.30d">30 days</button>
+            <button class="segbtn" type="button" data-period="archive" aria-pressed="false" tabindex="-1" data-i18n="stats.archive">Archive</button>
           </div>
-          <div class="ident">
-            <div class="iditem">
-              <span class="lab">endpoint</span>
-              <code id="endpoint">—</code>
-              <button class="mini" type="button" id="copy" data-i18n="head.copy">copy</button>
-            </div>
-            <div class="iditem">
-              <span class="lab" data-i18n="head.key">key</span>
-              <code id="key" title="only the prefix is shown" data-i18n-title="head.keyTip">—</code>
-            </div>
-            <div class="iditem">
-              <span class="lab">list_commands</span>
-              <code id="schema" title="how much context the set's tool list costs" data-i18n-title="head.schemaTip">—</code>
-            </div>
-          </div>
+          <label class="fsel"><span data-i18n="stats.set">set</span><select id="s-set" class="input"></select></label>
+          <label class="fsel"><span data-i18n="stats.server">server</span><select id="s-server" class="input"></select></label>
+          <label class="fsel"><span data-i18n="stats.tool">tool</span><select id="s-tool" class="input"></select></label>
+          <label class="fsel"><span data-i18n="stats.client">client</span><select id="s-client" class="input"></select></label>
+          <button class="link-btn" type="button" id="s-reset" data-i18n="stats.reset">reset</button>
         </div>
-        <div class="phead-actions">
-          <button class="btn" type="button" id="keys" data-i18n="head.keys">Keys</button>
-          <button class="btn primary" type="button" id="run" data-i18n="head.start">Start</button>
-        </div>
-      </div>
 
-      <div class="errstrip" id="set-error" hidden>
-        <div class="eh"><span class="dot err"></span><span id="set-error-h" data-i18n="head.stopped">set stopped</span></div>
-        <div class="ed" id="set-error-d"></div>
-      </div>
-
-      <nav class="tabs" id="tabs" role="tablist" aria-label="Section" data-i18n-aria="tabs.label" hidden>
-        <button class="tab" type="button" role="tab" id="tabbtn-overview" aria-controls="tab-overview" aria-selected="true" data-tab="overview" data-i18n="tabs.overview">Overview</button>
-        <button class="tab" type="button" role="tab" id="tabbtn-calls" aria-controls="tab-calls" aria-selected="false" tabindex="-1" data-tab="calls" data-i18n="tabs.calls">Calls</button>
-        <button class="tab" type="button" role="tab" id="tabbtn-stats" aria-controls="tab-stats" aria-selected="false" tabindex="-1" data-tab="stats" data-i18n="tabs.stats">Statistics</button>
-      </nav>
-
-      <div class="region" id="region">
-
-        <section class="tabpane scroll" id="tab-overview" role="tabpanel" aria-labelledby="tabbtn-overview">
-
-          <div class="kpis" id="kpis" hidden>
-            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-calls">—</span><span class="kl" id="k-calls-w" data-i18n="kpi.calls">calls</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-err">—</span><span class="kl" data-i18n="kpi.errors">errors</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-p50">—</span><span class="kl">p50</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-p95">—</span><span class="kl">p95</span></span></div>
+        <section class="block" id="s-chart-block" aria-labelledby="s-activity-title">
+          <div class="block-head">
+            <h2 id="s-activity-title" data-i18n="stats.requests">Requests</h2>
+            <p class="block-meta mono" id="s-meta"></p>
+            <div class="legend">
+              <span><i class="lg-ok"></i><span data-i18n="stats.ok">ok</span></span>
+              <span><i class="lg-err"></i><span data-i18n="stats.errors">errors</span></span>
+            </div>
           </div>
-
-          <section class="block" id="set-srv-block" hidden>
-            <div class="block-h">
-              <h2 data-i18n="setSrv.title">Servers of this set</h2>
-              <span class="hint" data-i18n="setSrv.hint">state comes from the running set</span>
-              <span class="hint n" id="set-srv-count">0</span>
-            </div>
-            <div class="tw">
-              <table class="t">
-                <caption class="sr" data-i18n="setSrv.caption">Servers of the selected set: type, state, isolation and tags</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" data-i18n="setSrv.thServer">Server</th>
-                    <th scope="col" class="hide-sm" data-i18n="setSrv.thType">Type</th>
-                    <th scope="col" data-i18n="setSrv.thState">State</th>
-                    <th scope="col" class="hide-md" data-i18n="setSrv.thIso">Isolation</th>
-                    <th scope="col" class="hide-sm" data-i18n="setSrv.thTags">Tags</th>
-                  </tr>
-                </thead>
-                <tbody id="set-srv-body"></tbody>
-              </table>
-            </div>
-            <p class="emptymsg sm" id="set-srv-empty" hidden data-i18n="setSrv.empty">the set has no servers</p>
-          </section>
-
-          <section class="block" id="sets-block" hidden>
-            <div class="block-h">
-              <h2 data-i18n="sets.title">Sets</h2>
-              <span class="hint" data-i18n="sets.hint">one entry point per set · ports come from the manager</span>
-              <span class="hint n" id="sets-count">0</span>
-            </div>
-            <div class="tw">
-              <table class="t">
-                <caption class="sr" data-i18n="sets.caption">Sets with their ports, state and servers</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" data-i18n="sets.thSet">Set</th>
-                    <th scope="col" class="hide-sm" data-i18n="sets.thPort">Port</th>
-                    <th scope="col" data-i18n="sets.thState">State</th>
-                    <th scope="col" class="num hide-sm" data-i18n="sets.thServers">Servers</th>
-                    <th scope="col" class="hide-md" data-i18n="sets.thUptime">Uptime</th>
-                    <th scope="col" class="num" title="for the period chosen on the statistics tab" data-i18n="sets.thCalls" data-i18n-title="sets.callsTip">Calls</th>
-                    <th scope="col" class="num" title="for the period chosen on the statistics tab" data-i18n="sets.thErrors" data-i18n-title="sets.callsTip">Errors</th>
-                  </tr>
-                </thead>
-                <tbody id="sets-body"></tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="block" id="tail-block" hidden>
-            <div class="block-h">
-              <h2 data-i18n="tail.title">Recent calls</h2>
-              <span class="hint" id="tail-span">—</span>
-              <button class="mini push" type="button" id="tail-all" data-i18n="tail.all">all calls</button>
-            </div>
-            <div class="tw">
-              <table class="t mini tail">
-                <caption class="sr" data-i18n="tail.caption">The last eight calls of the selected set</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" data-i18n="tail.thTime">Time</th>
-                    <th scope="col" class="hide-xs" data-i18n="tail.thServer">Server</th>
-                    <th scope="col" data-i18n="tail.thTool">Tool</th>
-                    <th scope="col" class="num hide-sm" data-i18n="tail.thMs">ms</th>
-                    <th scope="col" class="num" data-i18n="tail.thStatus">Status</th>
-                  </tr>
-                </thead>
-                <tbody id="tail-body"></tbody>
-              </table>
-            </div>
-            <p class="emptymsg sm" id="tail-empty" hidden data-i18n="tail.empty">no calls yet — the set has not received requests</p>
-          </section>
+          <div class="chart-wrap" id="chart-wrap"><svg id="chart" role="img" aria-labelledby="s-activity-title"></svg></div>
+          <div class="empty" id="activity-empty" hidden>
+            <p class="empty-title" data-i18n="stats.emptyStrong">No requests in this period</p>
+            <p class="empty-text" id="activity-empty-text" data-i18n="stats.emptyPeriod2">This set recorded no requests in the selected period.</p>
+            <button class="btn btn-sm" type="button" id="activity-reset" data-i18n="stats.resetFilters">Reset filters</button>
+          </div>
+          <p class="chart-foot mono" id="s-range"></p>
         </section>
 
-        <section class="tabpane" id="tab-calls" role="tabpanel" aria-labelledby="tabbtn-calls" hidden>
-          <div class="toolbar">
-            <label class="search">
-              <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>
-              </svg>
-              <span class="sr" data-i18n="calls.search">Search calls</span>
-              <input type="search" id="q" placeholder="search calls" data-i18n-ph="calls.ph" autocomplete="off">
-              <kbd>/</kbd>
-            </label>
-            <label class="check"><input type="checkbox" id="only-err"> <span data-i18n="calls.onlyErr">errors only</span></label>
-            <span class="hint n push" id="calls-count">0</span>
-          </div>
-          <div class="tw fill">
-            <table class="t stick">
-              <caption class="sr" data-i18n="calls.caption">Recent calls of the selected set</caption>
+        <div class="stats-grid" id="s-grid">
+          <section class="block" aria-labelledby="s-tools-h">
+            <div class="block-head">
+              <h2 id="s-tools-h" data-i18n="stats.topTools">Top tools</h2>
+              <p class="block-meta" id="s-tools-count"></p>
+            </div>
+            <table class="table rtable" aria-labelledby="s-tools-h">
               <thead>
                 <tr>
-                  <th scope="col" data-i18n="tail.thTime">Time</th>
-                  <th scope="col" data-i18n="tail.thServer">Server</th>
-                  <th scope="col" data-i18n="tail.thTool">Tool</th>
-                  <th scope="col" class="hide-md" data-i18n="calls.thClient">Client</th>
-                  <th scope="col" class="num" data-i18n="tail.thMs">ms</th>
-                  <th scope="col" class="num" data-i18n="tail.thStatus">Status</th>
+                  <th scope="col" data-i18n="stats.thTool">Tool</th>
+                  <th scope="col" class="num" data-i18n="stats.thCalls">Calls</th>
+                  <th scope="col" class="num" data-i18n="stats.thErr">Err</th>
+                  <th scope="col" class="num" data-i18n="stats.thP50">p50</th>
+                  <th scope="col" class="num" data-i18n="stats.thP95">p95</th>
                 </tr>
               </thead>
-              <tbody id="calls-body"></tbody>
+              <tbody id="tools-body"></tbody>
             </table>
-          </div>
-          <p class="emptymsg" id="calls-note" hidden></p>
-        </section>
-
-        <section class="tabpane scroll" id="tab-stats" role="tabpanel" aria-labelledby="tabbtn-stats" hidden>
-
-          <div class="toolbar">
-            <div class="periods" id="s-period" role="group" aria-label="Period" data-i18n-aria="stats.period">
-              <button class="segbtn" type="button" data-period="today" aria-pressed="true" data-i18n="stats.today">Today</button>
-              <button class="segbtn" type="button" data-period="7d" aria-pressed="false" tabindex="-1" data-i18n="stats.7d">7 days</button>
-              <button class="segbtn" type="button" data-period="30d" aria-pressed="false" tabindex="-1" data-i18n="stats.30d">30 days</button>
-              <button class="segbtn" type="button" data-period="archive" aria-pressed="false" tabindex="-1" data-i18n="stats.archive">Archive</button>
+            <div class="empty" id="tools-empty" hidden>
+              <p class="empty-title" data-i18n="stats.noData">No per-tool data</p>
             </div>
-            <label class="field">
-              <span data-i18n="stats.set">set</span>
-              <select id="s-set"><option value="" data-i18n="stats.allSets">all sets</option></select>
-            </label>
-            <label class="field">
-              <span data-i18n="stats.server">server</span>
-              <select id="s-server"><option value="" data-i18n="stats.all">all</option></select>
-            </label>
-            <label class="field">
-              <span data-i18n="stats.tool">tool</span>
-              <select id="s-tool"><option value="" data-i18n="stats.all">all</option></select>
-            </label>
-            <label class="field">
-              <span data-i18n="stats.client">client</span>
-              <select id="s-client"><option value="" data-i18n="stats.all">all</option></select>
-            </label>
-            <button class="mini push" type="button" id="s-reset" data-i18n="stats.reset">reset</button>
-          </div>
+          </section>
 
-          <div class="kpis" id="s-kpis">
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-calls">—</span></span><span class="kl" id="s-calls-w" data-i18n="kpi.calls">calls</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-fail">—</span></span><span class="kl" data-i18n="kpi.errors">errors</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p50">—</span><span class="approx" id="s-p50-a" hidden title="from the histogram" data-i18n-title="stats.approxTip">≈</span></span><span class="kl">p50</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p95">—</span><span class="approx" id="s-p95-a" hidden title="from the histogram" data-i18n-title="stats.approxTip">≈</span></span><span class="kl">p95</span></span></div>
-          </div>
+          <section class="block" aria-labelledby="s-servers-h">
+            <div class="block-head">
+              <h2 id="s-servers-h" data-i18n="stats.byServer">Top servers</h2>
+              <p class="block-meta" id="s-servers-count"></p>
+            </div>
+            <table class="table rtable" aria-labelledby="s-servers-h">
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="setSrv.thServer">Server</th>
+                  <th scope="col" class="num" data-i18n="stats.thCalls">Calls</th>
+                  <th scope="col" class="num" data-i18n="stats.thErr">Err</th>
+                  <th scope="col" class="num" data-i18n="stats.thP50">p50</th>
+                  <th scope="col" class="num" data-i18n="stats.thP95">p95</th>
+                </tr>
+              </thead>
+              <tbody id="byserver-body"></tbody>
+            </table>
+            <div class="empty" id="byserver-empty" hidden>
+              <p class="empty-title" data-i18n="stats.noData">No per-tool data</p>
+            </div>
+          </section>
 
-          <div class="sgrid" id="s-charts">
-            <section class="card" id="s-activity">
-              <div class="card-h">
-                <h2 id="s-activity-title" data-i18n="stats.byHour">Calls by hour</h2>
-                <span class="hint" id="s-span">—</span>
-              </div>
-              <div class="bars" id="activity-bars" role="img" aria-label="Calls per bucket of the period" data-i18n-aria="stats.bars"></div>
-              <div class="bars-x"><span id="s-from">—</span><span id="s-to">—</span></div>
-              <p class="emptymsg sm" id="activity-empty" hidden data-i18n="stats.noCalls">no calls in this period</p>
-            </section>
+          <section class="block" id="s-byset-block" aria-labelledby="s-byset-h">
+            <div class="block-head">
+              <h2 id="s-byset-h" data-i18n="stats.bySet">By set</h2>
+              <p class="block-meta" id="s-byset-count"></p>
+            </div>
+            <table class="table rtable" aria-labelledby="s-byset-h">
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="stats.thSet">Set</th>
+                  <th scope="col" class="num" data-i18n="stats.thCalls">Calls</th>
+                  <th scope="col" data-i18n="stats.thShare">Share</th>
+                  <th scope="col" class="num" data-i18n="stats.thErr">Err</th>
+                  <th scope="col" class="num" data-i18n="stats.thP50">p50</th>
+                </tr>
+              </thead>
+              <tbody id="byset-body"></tbody>
+            </table>
+            <div class="empty" id="byset-empty" hidden>
+              <p class="empty-title" data-i18n="stats.noPerSet">No per-set data</p>
+              <p class="empty-text" data-i18n="stats.noSets">Per-set traffic appears when every set is selected</p>
+            </div>
+          </section>
 
-            <section class="card" id="s-tools">
-              <div class="card-h"><h2 data-i18n="stats.topTools">Top tools</h2><span class="hint n" id="s-tools-count">0</span></div>
-              <div class="tw">
-                <table class="t mini">
-                  <thead><tr><th scope="col" data-i18n="tail.thTool">Tool</th><th scope="col" class="num" data-i18n="sets.thCalls">Calls</th><th scope="col" class="num" data-i18n="sets.thErrors">Errors</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
-                  <tbody id="tools-body"></tbody>
-                </table>
-              </div>
-              <p class="emptymsg sm" id="tools-empty" hidden data-i18n="stats.noData">no data</p>
-            </section>
-          </div>
+          <section class="block" aria-labelledby="s-clients-h">
+            <div class="block-head">
+              <h2 id="s-clients-h" data-i18n="stats.byClient">Top clients</h2>
+              <p class="block-meta" id="s-clients-count"></p>
+            </div>
+            <table class="table rtable" aria-labelledby="s-clients-h">
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="stats.thClient">Client</th>
+                  <th scope="col" class="num" data-i18n="stats.thCalls">Calls</th>
+                  <th scope="col" class="num" data-i18n="stats.thErr">Err</th>
+                  <th scope="col" class="num" data-i18n="stats.thP50">p50</th>
+                  <th scope="col" class="num" data-i18n="stats.thP95">p95</th>
+                </tr>
+              </thead>
+              <tbody id="byclient-body"></tbody>
+            </table>
+            <div class="empty" id="byclient-empty" hidden>
+              <p class="empty-title" data-i18n="stats.noClients">No client data</p>
+            </div>
+          </section>
+        </div>
 
-          <div class="sgrid two" id="s-breakdowns">
-            <section class="card" id="s-byserver">
-              <div class="card-h"><h2 data-i18n="stats.byServer">By server</h2></div>
-              <div class="tw">
-                <table class="t mini">
-                  <thead><tr><th scope="col" data-i18n="tail.thServer">Server</th><th scope="col" class="num" data-i18n="sets.thCalls">Calls</th><th scope="col" class="num" data-i18n="sets.thErrors">Errors</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
-                  <tbody id="byserver-body"></tbody>
-                </table>
-              </div>
-              <p class="emptymsg sm" id="byserver-empty" hidden data-i18n="stats.noData">no data</p>
-            </section>
-
-            <section class="card" id="s-byclient">
-              <div class="card-h"><h2 data-i18n="stats.byClient">By client</h2></div>
-              <div class="tw">
-                <table class="t mini">
-                  <thead><tr><th scope="col" data-i18n="calls.thClient">Client</th><th scope="col" class="num" data-i18n="sets.thCalls">Calls</th><th scope="col" class="num" data-i18n="sets.thErrors">Errors</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
-                  <tbody id="byclient-body"></tbody>
-                </table>
-              </div>
-              <p class="emptymsg sm" id="byclient-empty" hidden data-i18n="stats.noData">no data</p>
-            </section>
-          </div>
-
-          <p class="emptymsg" id="stats-empty" hidden>
-            <span class="strong" data-i18n="stats.emptyStrong">Nothing to show</span>
-            <span id="stats-empty-why" data-i18n="stats.noCalls">no calls in this period</span>
-          </p>
-          <p class="stats-note" id="stats-unreach" hidden></p>
-        </section>
-
-      </div>
+        <div class="empty" id="stats-empty" hidden>
+          <p class="empty-title" id="stats-empty-h" data-i18n="stats.emptyStrong">No requests in this period</p>
+          <p class="empty-text" id="stats-empty-why"></p>
+        </div>
+        <p class="form-alert" id="stats-unreach" role="status" hidden></p>
+      </section>
     </main>
 
-    <aside class="side" id="side" aria-label="Set details" data-i18n-aria="side.label">
-      <div class="side-h">
-        <div class="seg" role="tablist" aria-label="Set details" data-i18n-aria="side.label">
-          <button class="segbtn" type="button" role="tab" data-side="servers" id="sidebtn-servers" aria-controls="pane-servers" aria-selected="true"><span data-i18n="side.servers">Servers</span> <span class="cnt n" id="srv-count">0</span></button>
-          <button class="segbtn" type="button" role="tab" data-side="env" id="sidebtn-env" aria-controls="pane-env" aria-selected="false" tabindex="-1"><span data-i18n="side.env">Variables</span> <span class="cnt n" id="env-count">0</span></button>
-          <button class="segbtn" type="button" role="tab" data-side="log" id="sidebtn-log" aria-controls="pane-log" aria-selected="false" tabindex="-1"><span data-i18n="side.log">Log</span> <span class="cnt n" id="log-count">0</span></button>
-        </div>
-        <button class="iconbtn side-close" type="button" id="side-close" aria-label="Close the panel" data-i18n-aria="side.close">
-          <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-            <path d="M7 7l10 10M17 7L7 17"/>
-          </svg>
-        </button>
-      </div>
-      <div class="side-body">
-        <section class="pane" data-pane="servers" id="pane-servers" role="tabpanel" aria-labelledby="sidebtn-servers">
-          <div class="srv-tools">
-            <span class="hint" data-i18n="side.registry">host-wide registry</span>
-            <button class="mini push" type="button" id="srv-add" data-i18n="side.addServer">add server</button>
-          </div>
-          <ul class="list" id="servers"></ul>
-          <p class="srv-note pad" id="servers-empty" hidden data-i18n="side.registryEmpty">registry is empty</p>
-
-          <form class="srvform" id="srvform" role="dialog" aria-modal="true" aria-labelledby="srvform-h" hidden novalidate>
-            <div class="pane-h">
-              <span class="hint" id="srvform-h" data-i18n="side.server">server</span>
-              <button class="mini push" type="button" id="srvform-close" data-i18n="common.cancel">cancel</button>
-            </div>
-            <div class="sf-body">
-              <label class="sf"><span data-i18n="rail.name">name</span><input name="name" autocomplete="off" spellcheck="false" placeholder="figma"></label>
-              <label class="sf"><span data-i18n="form.description">description</span><input name="description" autocomplete="off"></label>
-              <label class="sf"><span data-i18n="form.transport">transport</span>
-                <select name="transport">
-                  <option value="stdio" data-i18n="form.stdio">stdio — local process</option>
-                  <option value="http" data-i18n="form.http">http — remote endpoint</option>
-                </select>
-              </label>
-
-              <label class="sf" data-when="stdio"><span data-i18n="form.command">command · one argument per line</span><textarea name="command" rows="3" spellcheck="false" placeholder="npx&#10;-y&#10;@playwright/mcp@latest"></textarea></label>
-              <label class="sf" data-when="stdio"><span data-i18n="form.cwd">working directory</span><input name="cwd" autocomplete="off" spellcheck="false" placeholder="/home/user/project"></label>
-              <label class="sf" data-when="http"><span>url</span><input name="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:9200/mcp"></label>
-              <label class="sf" data-when="http"><span data-i18n="form.headers">headers · K: V</span><textarea name="headers" rows="2" spellcheck="false" placeholder="Authorization: Bearer ${GITEA_TOKEN}"></textarea></label>
-
-              <label class="sf"><span data-i18n="form.env">env · KEY=value</span><textarea name="env" rows="2" spellcheck="false" placeholder="TOKEN=${GITEA_TOKEN}"></textarea></label>
-              <label class="sf"><span data-i18n="form.envAllow">envAllow · one per line</span><textarea name="envAllow" rows="2" spellcheck="false" placeholder="PATH"></textarea></label>
-              <label class="sf"><span data-i18n="form.tags">tags · comma separated</span><input name="tags" autocomplete="off" placeholder="untrusted, fs"></label>
-              <label class="check"><input type="checkbox" name="enabled"> <span data-i18n="form.enabled">enabled</span></label>
-
-              <fieldset class="sf-group" data-when="stdio">
-                <legend data-i18n="form.sandbox">sandbox</legend>
-                <p class="sf-hint" data-i18n="form.sandboxHint">mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · empty means the default</p>
-                <label class="sf"><span>mode</span>
-                  <select name="sbMode">
-                    <option value="" data-i18n="form.unset">not set</option>
-                    <option value="bwrap">bwrap</option>
-                    <option value="none">none</option>
-                  </select>
-                </label>
-                <label class="sf"><span>onUnavailable</span>
-                  <select name="sbOnUnavailable">
-                    <option value="" data-i18n="form.unset">not set</option>
-                    <option value="deny">deny</option>
-                    <option value="warn">warn</option>
-                    <option value="allow">allow</option>
-                  </select>
-                </label>
-                <label class="sf"><span>network</span>
-                  <select name="sbNetwork">
-                    <option value="" data-i18n="form.unset">not set</option>
-                    <option value="none">none</option>
-                    <option value="allow">allow</option>
-                  </select>
-                </label>
-                <label class="sf"><span data-i18n="form.ro">ro · one per line</span><textarea name="sbRo" rows="2" spellcheck="false" placeholder="/usr"></textarea></label>
-                <label class="sf"><span data-i18n="form.rw">rw · one per line</span><textarea name="sbRw" rows="2" spellcheck="false" placeholder="/home/user/project"></textarea></label>
-                <div class="sf-nums">
-                  <label class="sf"><span>memoryMb</span><input name="sbMemoryMb" type="number" min="0" inputmode="numeric" placeholder="2048"></label>
-                  <label class="sf"><span>pids</span><input name="sbPids" type="number" min="0" inputmode="numeric" placeholder="256"></label>
-                  <label class="sf"><span>tmpMb</span><input name="sbTmpMb" type="number" min="0" inputmode="numeric" placeholder="128"></label>
-                  <label class="sf"><span>timeoutSec</span><input name="sbTimeoutSec" type="number" min="0" inputmode="numeric" placeholder="30"></label>
-                </div>
-              </fieldset>
-
-              <p class="sf-err" id="srv-err" role="alert" hidden></p>
-            </div>
-            <div class="sf-foot">
-              <button class="btn primary" type="submit" id="srv-save" data-i18n="common.save">save</button>
-              <button class="mini push danger" type="button" id="srv-del" data-i18n="form.delete">delete server</button>
-            </div>
-          </form>
-        </section>
-        <section class="pane" data-pane="env" id="pane-env" role="tabpanel" aria-labelledby="sidebtn-env" hidden>
-          <ul class="list" id="env"></ul>
-          <p class="srv-note pad" id="env-empty" hidden data-i18n="env.empty">no variables</p>
-          <p class="srv-note pad" data-i18n="env.note">values are supplied by the set process — the panel neither stores nor shows them</p>
-        </section>
-        <section class="pane logpane" data-pane="log" id="pane-log" role="tabpanel" aria-labelledby="sidebtn-log" hidden>
-          <div class="pane-h">
-            <span class="hint" data-i18n="log.tail">log tail of the set</span>
-            <button class="mini push" type="button" id="log-wide" aria-pressed="false" title="expand the log panel" data-i18n-title="log.wideTip" data-i18n="log.wide">wider</button>
-            <button class="mini" type="button" id="log-refresh" data-i18n="log.refresh">refresh</button>
-          </div>
-          <div class="log" id="log" aria-live="polite" tabindex="0"></div>
-          <p class="srv-note pad" id="log-empty" hidden data-i18n="log.empty">log is empty</p>
-        </section>
-      </div>
-    </aside>
-    <div class="scrim" id="scrim" hidden></div>
+    <footer class="statusbar">
+      <span class="mono" id="status-counts">—</span>
+      <span class="right">
+        <span data-i18n="top.updatedLabel">updated</span>
+        <span class="mono" id="f-updated">—</span>
+      </span>
+    </footer>
   </div>
-
-  <footer class="status">
-    <span class="item"><span id="f-sets-w">sets</span> <b class="n" id="f-sets">—</b></span>
-    <span class="dotsep" aria-hidden="true">·</span>
-    <span class="item"><span id="f-servers-w">servers</span> <b class="n" id="f-servers">—</b></span>
-    <span class="dotsep opt" aria-hidden="true">·</span>
-    <span class="item opt"><span id="f-running-w">running</span> <b class="n" id="f-running">—</b></span>
-    <span class="push item"><span class="muted" id="f-updated">—</span></span>
-  </footer>
 </div>
 
-<dialog id="keys-dlg" aria-labelledby="keys-title">
-  <div class="dlg-h">
-    <h3 id="keys-title"><span data-i18n="keys.title">Set keys</span> <span class="n" id="dlg-set">—</span></h3>
-    <button class="mini" type="button" id="keys-close" data-i18n="common.close">close</button>
-  </div>
-  <div class="dlg-body">
-    <div class="tw">
-      <table class="t">
-        <thead>
-          <tr><th scope="col" data-i18n="keys.thKey">Key</th><th scope="col" data-i18n="keys.thCreated">Created</th><th scope="col" data-i18n="sets.thState">State</th><th scope="col" class="hide-sm" data-i18n="keys.thNote">Note</th><th scope="col"><span class="sr" data-i18n="keys.thAction">Action</span></th></tr>
-        </thead>
-        <tbody id="keys-body"></tbody>
-      </table>
+<div class="scrim" id="scrim" hidden></div>
+
+<aside class="drawer" id="side" aria-hidden="true" aria-labelledby="side-h">
+  <div class="drawer-inner">
+    <div class="drawer-head">
+      <h2 id="side-h" data-i18n="side.label">Details</h2>
+      <button class="ghost-icon" type="button" id="side-close" aria-label="Close details" data-i18n-aria="side.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
     </div>
-    <p class="dlg-note" data-i18n="keys.note">Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.</p>
+    <div class="segmented drawer-seg" role="tablist" aria-label="Details">
+      <button class="segbtn" type="button" role="tab" id="sidebtn-servers" data-side="servers" aria-selected="true" aria-controls="pane-servers"><span data-i18n="side.servers">servers</span> <span class="count mono" id="srv-count">0</span></button>
+      <button class="segbtn" type="button" role="tab" id="sidebtn-env" data-side="env" aria-selected="false" aria-controls="pane-env"><span data-i18n="side.env">env</span> <span class="count mono" id="env-count">0</span></button>
+      <button class="segbtn" type="button" role="tab" id="sidebtn-log" data-side="log" aria-selected="false" aria-controls="pane-log"><span data-i18n="side.log">log</span> <span class="count mono" id="log-count">0</span></button>
+    </div>
+
+    <div class="drawer-body">
+      <section class="pane" data-pane="servers" id="pane-servers" role="tabpanel" aria-labelledby="sidebtn-servers">
+        <p class="block-meta" data-i18n="side.registry">host-wide registry</p>
+        <table class="table rtable" id="registry-table">
+          <tbody id="servers"></tbody>
+        </table>
+        <p class="empty" id="servers-empty" hidden data-i18n="side.registryEmpty">registry is empty</p>
+      </section>
+
+      <section class="pane" data-pane="env" id="pane-env" role="tabpanel" aria-labelledby="sidebtn-env" hidden>
+        <p class="block-meta" data-i18n="env.note">values are supplied by the set process — the panel neither stores nor shows them</p>
+        <ul class="varlist" id="env"></ul>
+        <p class="empty" id="env-empty" hidden data-i18n="env.empty">no variables</p>
+      </section>
+
+      <section class="pane" data-pane="log" id="pane-log" role="tabpanel" aria-labelledby="sidebtn-log" hidden>
+        <div class="od-row">
+          <p class="block-meta" data-i18n="log.tail">log tail of the set</p>
+          <button class="btn btn-xs" type="button" id="log-wide" aria-pressed="false" title="expand the log panel" data-i18n-title="log.wideTip" data-i18n="log.wide">wider</button>
+          <button class="btn btn-xs" type="button" id="log-refresh" data-i18n="log.refresh">refresh</button>
+        </div>
+        <div class="log" id="log" aria-live="polite" tabindex="0"></div>
+        <p class="empty" id="log-empty" hidden data-i18n="log.empty">log is empty</p>
+      </section>
+    </div>
   </div>
-  <div class="dlg-f">
-    <button class="btn" type="button" id="keys-issue" data-i18n="keys.issue">issue a key</button>
-    <button class="btn" type="button" id="keys-done" data-i18n="common.done">done</button>
+</aside>
+
+<dialog class="dialog drawer" id="srv-dlg" aria-labelledby="srvform-h">
+  <form class="dialog-inner" id="srvform" novalidate>
+    <div class="dialog-head">
+      <div>
+        <h2 id="srvform-h" data-i18n="side.server">server</h2>
+        <p class="dialog-sub" data-i18n="form.sub">Changes apply to the host registry and take effect on the next set restart.</p>
+      </div>
+      <button class="ghost-icon" type="button" id="srvform-close" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <div class="field">
+        <label for="sf-name" data-i18n="rail.name">name</label>
+        <input class="input mono" id="sf-name" name="name" autocomplete="off" spellcheck="false" placeholder="figma">
+      </div>
+      <div class="field">
+        <label for="sf-desc" data-i18n="form.description">description</label>
+        <input class="input" id="sf-desc" name="description" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="sf-transport" data-i18n="form.transport">transport</label>
+        <select class="input" name="transport" id="sf-transport">
+          <option value="stdio" data-i18n="form.stdio">stdio — local process</option>
+          <option value="http" data-i18n="form.http">http — remote endpoint</option>
+        </select>
+      </div>
+
+      <div class="field" data-when="stdio">
+        <label for="sf-command" data-i18n="form.command">command · one argument per line</label>
+        <textarea class="input mono" id="sf-command" name="command" rows="3" spellcheck="false" placeholder="npx&#10;-y&#10;@playwright/mcp@latest"></textarea>
+      </div>
+      <div class="field" data-when="stdio">
+        <label for="sf-cwd" data-i18n="form.cwd">working directory</label>
+        <input class="input mono" id="sf-cwd" name="cwd" autocomplete="off" spellcheck="false" placeholder="/home/user/project">
+      </div>
+      <div class="field" data-when="http">
+        <label for="sf-url">url</label>
+        <input class="input mono" id="sf-url" name="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:9200/mcp">
+      </div>
+      <div class="field" data-when="http">
+        <label for="sf-headers" data-i18n="form.headers">headers · K: V</label>
+        <textarea class="input mono" id="sf-headers" name="headers" rows="2" spellcheck="false" placeholder="Authorization: Bearer ${GITEA_TOKEN}"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="sf-env" data-i18n="form.env">env · KEY=value</label>
+        <textarea class="input mono" id="sf-env" name="env" rows="2" spellcheck="false" placeholder="TOKEN=${GITEA_TOKEN}"></textarea>
+      </div>
+      <div class="field">
+        <label for="sf-envallow" data-i18n="form.envAllow">envAllow · one per line</label>
+        <textarea class="input mono" id="sf-envallow" name="envAllow" rows="2" spellcheck="false" placeholder="PATH"></textarea>
+      </div>
+      <div class="field">
+        <label for="sf-tags" data-i18n="form.tags">tags · comma separated</label>
+        <input class="input" id="sf-tags" name="tags" autocomplete="off" placeholder="untrusted, fs">
+      </div>
+      <label class="check"><input type="checkbox" name="enabled"> <span data-i18n="form.enabled">enabled</span></label>
+
+      <fieldset class="field-group" data-when="stdio">
+        <legend data-i18n="form.sandbox">sandbox</legend>
+        <p class="field-help" data-i18n="form.sandboxHint">mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · empty means the default</p>
+        <div class="field-row">
+          <div class="field">
+            <label for="sf-sbmode">mode</label>
+            <select class="input" id="sf-sbmode" name="sbMode">
+              <option value="" data-i18n="form.unset">not set</option>
+              <option value="bwrap">bwrap</option>
+              <option value="none">none</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sf-sbunav">onUnavailable</label>
+            <select class="input" id="sf-sbunav" name="sbOnUnavailable">
+              <option value="" data-i18n="form.unset">not set</option>
+              <option value="deny">deny</option>
+              <option value="warn">warn</option>
+              <option value="allow">allow</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sf-sbnet">network</label>
+            <select class="input" id="sf-sbnet" name="sbNetwork">
+              <option value="" data-i18n="form.unset">not set</option>
+              <option value="none">none</option>
+              <option value="allow">allow</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="sf-sbro" data-i18n="form.ro">ro · one per line</label>
+          <textarea class="input mono" id="sf-sbro" name="sbRo" rows="2" spellcheck="false" placeholder="/usr"></textarea>
+        </div>
+        <div class="field">
+          <label for="sf-sbrw" data-i18n="form.rw">rw · one per line</label>
+          <textarea class="input mono" id="sf-sbrw" name="sbRw" rows="2" spellcheck="false" placeholder="/home/user/project"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="sf-sbmem">memoryMb</label><input class="input mono" id="sf-sbmem" name="sbMemoryMb" type="number" min="0" inputmode="numeric" placeholder="2048"></div>
+          <div class="field"><label for="sf-sbpids">pids</label><input class="input mono" id="sf-sbpids" name="sbPids" type="number" min="0" inputmode="numeric" placeholder="256"></div>
+          <div class="field"><label for="sf-sbtmp">tmpMb</label><input class="input mono" id="sf-sbtmp" name="sbTmpMb" type="number" min="0" inputmode="numeric" placeholder="128"></div>
+          <div class="field"><label for="sf-sbto">timeoutSec</label><input class="input mono" id="sf-sbto" name="sbTimeoutSec" type="number" min="0" inputmode="numeric" placeholder="30"></div>
+        </div>
+      </fieldset>
+
+      <p class="field-error" id="srv-err" role="alert" hidden></p>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn-danger" type="button" id="srv-del" data-i18n="form.delete">delete server</button>
+      <button class="btn" type="button" id="srv-cancel" data-i18n="common.cancel">cancel</button>
+      <button class="btn btn-primary" type="submit" id="srv-save" data-i18n="common.save">save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dialog modal" id="keys-dlg" aria-labelledby="keys-title">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <div>
+        <h2 id="keys-title"><span data-i18n="keys.title">Set keys</span> <span class="mono" id="dlg-set">—</span></h2>
+        <p class="dialog-sub" data-i18n="keys.sub">A key authenticates one client. It is shown once, right after it is created.</p>
+      </div>
+      <button class="ghost-icon" type="button" id="keys-close" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <form class="inline-form" id="key-form" novalidate>
+        <label class="field-label" for="key-label" data-i18n="keys.newLabel">New key label</label>
+        <div class="od-row">
+          <input class="input od-fill" id="key-label" name="label" autocomplete="off" spellcheck="false" placeholder="ci-runner" data-i18n-ph="keys.notePh">
+          <button class="btn btn-primary" type="submit" data-i18n="keys.issue">issue a key</button>
+        </div>
+      </form>
+
+      <div class="newkey" id="new-key-box" hidden>
+        <span class="field-label label-ok" data-i18n="keys.once">Copy this key now — it is not shown again</span>
+        <code id="new-key"></code>
+        <div class="od-row"><button class="btn btn-sm" type="button" id="new-key-copy" data-i18n="keys.copy">Copy key</button></div>
+      </div>
+
+      <p class="form-alert" id="keys-warn" role="alert" hidden></p>
+
+      <ul class="keylist" id="key-list" aria-label="Keys for this set"></ul>
+      <p class="empty" id="keys-empty" hidden data-i18n="head.noKey">no keys</p>
+      <p class="field-help" data-i18n="keys.note">Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.</p>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn" type="button" id="keys-done" data-i18n="common.done">done</button>
+    </div>
   </div>
 </dialog>
 </body>

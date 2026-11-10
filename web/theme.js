@@ -1,17 +1,20 @@
-/*
-  mcprig — панель. Тема до первой отрисовки: файл подключён в <head> без defer,
-  поэтому скрипт выполняется раньше, чем браузер покажет body (в CSP inline нельзя).
-  Значение ключа совпадает с <select id="theme"> в index.html.
-*/
+/* Тема и язык ставятся до первой отрисовки: скрипт подключён без defer, выше app.js. */
 (function () {
+  'use strict';
   var KEY = 'mcprig.theme';
-  var saved = null;
-  try { saved = localStorage.getItem(KEY); } catch (e) { /* приватный режим */ }
-  var theme = saved || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'mcprig');
-  document.documentElement.setAttribute('data-theme', theme);
+  var LANG_KEY = 'mcprig.lang';
+  var ALIAS = { mcprig: 'dark', tokyo: 'dark', solarized: 'light' };
+  var KNOWN = { dark: 1, light: 1, nord: 1, gruvbox: 1 };
+  var html = document.documentElement;
+  var theme = 'dark';
+  try {
+    var saved = localStorage.getItem(KEY) || '';
+    theme = KNOWN[saved] ? saved : (ALIAS[saved] || 'dark');
+    if (saved && saved !== theme) { localStorage.setItem(KEY, theme); }
+  } catch (e) { /* приватный режим */ }
+  html.setAttribute('data-theme', theme);
 
-  // язык нужен в <html lang> до app.js: разметка по умолчанию английская
-  var lang = null;
-  try { lang = localStorage.getItem('mcprig.lang'); } catch (e) { /* приватный режим */ }
-  document.documentElement.setAttribute('lang', lang === 'ru' ? 'ru' : 'en');
-}());
+  var lang = 'en';
+  try { lang = localStorage.getItem(LANG_KEY) === 'ru' ? 'ru' : 'en'; } catch (e) { /* приватный режим */ }
+  html.setAttribute('lang', lang);
+})();

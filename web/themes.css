@@ -1,107 +1,123 @@
 /*
-  mcprig — панель. Цветовые схемы на выбор: data-theme на <html>.
-  Базовые значения (:root в app.css) — mcprig dark, он же дефолт; здесь — остальные.
-  Правило: правило темы задаёт только цвета, ни одного селектора компонента.
-  Контраст text/--background, text/--surface, text/--surface-2 и --text-dim по ним же
-  ≥ 4.5:1, статусы — ≥ 4.5:1 на --surface.
+  mcprig — палитры. Один набор имён на все схемы; переключается атрибутом
+  data-theme на <html> (theme.js ставит его до первой отрисовки).
+  Имена старых схем (mcprig, tokyo, solarized) переводятся в новые в theme.js,
+  поэтому панель с прежним значением в localStorage открывается без перезагрузки.
 */
+
+/* Dark — схема по умолчанию: значения на :root, любой незнакомый data-theme читается как она. */
+:root {
+  color-scheme: dark;
+
+  --bg: #0c0f13;            /* корпус окна */
+  --bg-rail: #10141a;       /* рейл и статусбар */
+  --surface: #151a21;       /* карточки, поля, меню */
+  --surface-2: #1c232c;     /* второй слой внутри карточки */
+  --line: #232b35;
+  --line-soft: #1a212a;
+  --line-strong: #35404e;
+
+  --text: #e7edf4;
+  --text-dim: #9aa8b6;
+  --text-mute: #7b8896;
+
+  --accent: #6ea8fe;
+  --accent-hi: #8bbdff;
+  --accent-ink: #08111f;
+  --accent-soft: #17283e;
+
+  --ok: #43c48b;
+  --warn: #e0b155;
+  --err: #f2776e;
+
+  --chart-ok: #3f8fd6;
+  --chart-err: #f2776e;
+  --chart-grid: #232b35;
+}
 
 html[data-theme="light"] {
   color-scheme: light;
-  --background: #f4f6f7;
+
+  --bg: #f7f8fa;
+  --bg-rail: #eef1f5;
   --surface: #ffffff;
-  --surface-2: #eceff1;
-  --border: #c9d1d6;
-  --text: #1b2126;
-  --text-dim: #59646d;
-  --accent: #0b6b5f;
-  --accent-dim: #d3e8e3;
-  --success: #156c33;
-  --warn: #8a5900;
-  --error: #b3122e;
-  --chart-1: #0b6b9b;
-  --chart-2: #156c33;
-  --chart-3: #6b3fa0;
-  --chart-4: #8a5900;
-  --scrim: rgb(20 30 35 / 0.34);
+  --surface-2: #f1f4f8;
+  --line: #dde2ea;
+  --line-soft: #e9edf3;
+  --line-strong: #c3ccd8;
+
+  --text: #0f151d;
+  --text-dim: #4a5563;
+  --text-mute: #68737f;
+
+  --accent: #1d5fd0;
+  --accent-hi: #164ea8;
+  --accent-ink: #ffffff;
+  --accent-soft: #e7effc;
+
+  --ok: #197a4c;
+  --warn: #8a5b00;
+  --err: #b62d22;
+
+  --chart-ok: #2f6fd0;
+  --chart-err: #c8382c;
+  --chart-grid: #e2e7ee;
 }
 
 html[data-theme="nord"] {
   color-scheme: dark;
-  --background: #2e3440;
-  --surface: #3b4252;
+
+  --bg: #2e3440;
+  --bg-rail: #282e39;
+  --surface: #39404e;
   --surface-2: #434c5e;
-  --border: #4c566a;
+  --line: #3f4756;
+  --line-soft: #353c48;
+  --line-strong: #4c566a;
+
   --text: #eceff4;
-  --text-dim: #bcc8d9;
+  --text-dim: #c6cdd8;
+  --text-mute: #9aa5b5;
+
   --accent: #88c0d0;
-  --accent-dim: #46707d;
-  --success: #a9c294;
+  --accent-hi: #8fbcbb;
+  --accent-ink: #1b2029;
+  --accent-soft: #33424d;
+
+  --ok: #a3be8c;
   --warn: #ebcb8b;
-  --error: #f0aab0;
-  --chart-1: #81a1c1;
-  --chart-2: #a9c294;
-  --chart-3: #b48ead;
-  --chart-4: #ebcb8b;
-  --scrim: rgb(20 24 31 / 0.72);
+  --err: #bf616a;
+
+  --chart-ok: #81a1c1;
+  --chart-err: #bf616a;
+  --chart-grid: #3f4756;
 }
 
 html[data-theme="gruvbox"] {
   color-scheme: dark;
-  --background: #1d2021;
+
+  --bg: #1d2021;
+  --bg-rail: #191b1c;
   --surface: #282828;
   --surface-2: #32302f;
-  --border: #504945;
+  --line: #3c3836;
+  --line-soft: #32302f;
+  --line-strong: #504945;
+
   --text: #ebdbb2;
-  --text-dim: #b3a48c;
+  --text-dim: #d5c4a1;
+  --text-mute: #a89984;
+
   --accent: #83a598;
-  --accent-dim: #3f5b57;
-  --success: #b8bb26;
+  --accent-hi: #8ec07c;
+  --accent-ink: #1d2021;
+  --accent-soft: #323c34;
+
+  --ok: #b8bb26;
   --warn: #fabd2f;
-  --error: #fb6b5b;
-  --chart-1: #83a598;
-  --chart-2: #b8bb26;
-  --chart-3: #d3869b;
-  --chart-4: #fabd2f;
-  --scrim: rgb(20 20 20 / 0.72);
-}
+  --err: #fb4934;
 
-html[data-theme="solarized"] {
-  color-scheme: light;
-  --background: #fdf6e3;
-  --surface: #f3edda;
-  --surface-2: #e9e2c9;
-  --border: #cdc4a6;
-  --text: #073642;
-  --text-dim: #4f656c;
-  --accent: #0f6f68;
-  --accent-dim: #cfe3dd;
-  --success: #556b00;
-  --warn: #8a6000;
-  --error: #b3261e;
-  --chart-1: #1f6f9e;
-  --chart-2: #556b00;
-  --chart-3: #7a3f8f;
-  --chart-4: #8a6000;
-  --scrim: rgb(38 32 20 / 0.32);
-}
-
-html[data-theme="tokyo"] {
-  color-scheme: dark;
-  --background: #1a1b26;
-  --surface: #1f2335;
-  --surface-2: #292e42;
-  --border: #3b4261;
-  --text: #c8d3f5;
-  --text-dim: #8f9ac9;
-  --accent: #7aa2f7;
-  --accent-dim: #2f4374;
-  --success: #9ece6a;
-  --warn: #e0af68;
-  --error: #f7768e;
-  --chart-1: #7aa2f7;
-  --chart-2: #9ece6a;
-  --chart-3: #bb9af7;
-  --chart-4: #e0af68;
-  --scrim: rgb(13 14 21 / 0.72);
+  --chart-ok: #458588;
+  --chart-err: #fb4934;
+  --chart-grid: #3c3836;
 }
