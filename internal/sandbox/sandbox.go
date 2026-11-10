@@ -47,11 +47,18 @@ func probeRun() error {
 	if err != nil {
 		return errors.New("нечем проверить песочницу: true не найден в PATH")
 	}
+	// /bin/true — обычно симлинк в /usr/bin: внутрь привязан только /usr, и
+	// непереход по ссылке давал «exec внутри песочницы не удался» на живом
+	// userns (проверено с PATH=/home/sintez/.local/bin:/bin).
+	if real, err := filepath.EvalSymlinks(trueBin); err == nil {
+		trueBin = real
+	}
 	// Пробный запуск несёт минимум привязок: без них корень — пустой tmpfs,
 	// и "execvp: No such file or directory" означало бы не отказ userns, а
 	// пустую песочницу.
 	cmd := exec.Command(bwrap, "--unshare-all", "--die-with-parent",
 		"--ro-bind-try", "/usr", "/usr",
+		"--ro-bind-try", "/bin", "/bin",
 		"--ro-bind-try", "/lib", "/lib",
 		"--ro-bind-try", "/lib64", "/lib64",
 		"--", trueBin)
@@ -193,7 +200,14 @@ func bwrapArgv(srv *config.Server, sb *config.Sandbox, argv []string) ([]string,
 	// пространстве имён, и снаружи лимит упирается в уже живые процессы
 	// владельца (bwrap не может создать namespace).
 	if limits := limitArgs(sb); len(limits) > 0 {
-		args = append(args, "--", "prlimit")
+		// Абсолютный путь: bwrap делает execvp по PATH ребёнка, и без
+		// /usr в ro падало «bwrap: execvp prlimit: No such file or directory»
+		// без подсказки, что чинить.
+		prlimit := "prlimit"
+		if p, err := exec.LookPath("prlimit"); err == nil {
+			prlimit = p
+		}
+		args = append(args, "--", prlimit)
 		args = append(args, limits...)
 		args = append(args, "--")
 	} else {

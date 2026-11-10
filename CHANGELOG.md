@@ -7,7 +7,15 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- Проба песочницы шла через `/bin/true` (симлинк): при `PATH` с `/bin` впереди
+  пробный запуск падал «exec внутри песочницы не удался», и с
+  `onUnavailable: deny` ни один изолированный сервер не стартовал. Теперь путь
+  разворачивается по симлинку, а `/bin` привязан в пробе.
+- `prlimit` запускался по имени из PATH ребёнка: без `/usr` в `ro` падало
+  `bwrap: execvp prlimit: No such file or directory` без подсказки. Теперь
+  абсолютный путь, а `doctor` предупреждает о `sandbox.ro` без `/usr`.
 
 ## [0.3.4] - 2026-11-10
 

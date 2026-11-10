@@ -165,6 +165,13 @@ func (s *Server) Warnings() []string {
 			out = append(out, fmt.Sprintf("sandbox.memoryMb=%d: node/npx не поднимется, нужно ≥2048", sb.MemoryMb))
 		}
 	}
+	if sb := s.Sandbox; sb != nil && sb.Mode == SandboxModeBwrap && len(sb.RO) > 0 {
+		// Явный ro заменяет умолчания целиком: без /usr внутри песочницы не
+		// запустится даже prlimit, и ошибка выйдет невнятная.
+		if !hasAnyPath(sb.RO, "/", "/usr") {
+			out = append(out, "sandbox.ro не содержит /usr: внутри песочницы не запустится prlimit — перечисли умолчания явно")
+		}
+	}
 	for _, name := range s.EnvAllow {
 		if _, ok := s.Env[name]; ok {
 			continue
@@ -193,6 +200,18 @@ func (s *Server) Warnings() []string {
 		}
 	}
 	return out
+}
+
+// hasAnyPath — есть ли в списке хотя бы один из путей.
+func hasAnyPath(paths []string, want ...string) bool {
+	for _, p := range paths {
+		for _, w := range want {
+			if p == w {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isNodeCommand — команда, которой нужен запас виртуальной памяти.
