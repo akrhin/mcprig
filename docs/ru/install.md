@@ -111,16 +111,20 @@ compose.
 из `frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, монтирует каждый `servers.json` только для
 чтения и держит состояние в именованных томах.
 
-Замерено на этом хосте: `docker build .` без `--target` даёт `slim` — 32 МБ,
-бинарь плюс корневые сертификаты; `--target full` добавляет node и python и
-весит 334 МБ. Оба образа запускались: `slim` отдал удалённую `serena` через сеть
+Замерено на этом хосте: `docker build .` без `--target` даёт `slim` — 44 МБ,
+бинарь, корневые сертификаты, `bwrap` и `prlimit`; `--target full` добавляет
+node/npm, python/pip и uv/uvx и весит 446 МБ. Оба образа запускались: `slim` отдал удалённую `serena` через сеть
 хоста и ответил `find_symbol` через `invoke_command`, healthcheck — `ok`.
 
-Ни один образ не содержит `bubblewrap`. Серверу с тегом `untrusted` нужен
-блок `sandbox`, а при умолчании `onUnavailable: deny` без него он не
-запустится: поставь пакет в свой образ и убедись, что контейнеру разрешено
-создавать пользовательские пространства имён. Серверов без тега это не
-касается.
+`"sandbox": {}` работает в обоих образах: они несут `bubblewrap` для `bwrap` и
+`util-linux` для `prlimit` (бинарь запускается по имени, значит должен быть в
+`PATH`). Runtime при этом обязан разрешать unprivileged user namespaces; на
+хосте с дефолтным seccomp Docker — `--security-opt seccomp=unconfined`. На
+rootless-демоне этого мало: `bwrap` падает с `Can't mount proc on /proc:
+Operation not permitted`, и замерено рабочим только `--privileged`. `slim` без
+node/npm и uv: серверу на `npx` или `uvx` нужен `full`. Сервер с тегом
+`untrusted` при умолчании `onUnavailable: deny` по-прежнему не запустится,
+если `bwrap` не работает вовсе; серверов без тега это не касается.
 
 ## Состояние на диске
 

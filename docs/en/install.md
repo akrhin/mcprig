@@ -130,11 +130,13 @@ served a remote
 `util-linux` for `prlimit` (the binary is run by name, so it must exist in
 `PATH`). The runtime still has to allow unprivileged user namespaces; on hosts
 whose default Docker seccomp profile denies them, start the container with
-`--security-opt seccomp=unconfined` (last resort `--privileged`). `slim` has no
-node/npm and no uv: an `npx` or `uvx` stdio server needs the `full` image. A
-server tagged `untrusted` with the default fail-closed `onUnavailable: deny`
-still refuses to start when `bwrap` cannot run at all; servers without the tag
-are unaffected.
+`--security-opt seccomp=unconfined`. A rootless daemon denies more than seccomp
+does — there `bwrap` fails with `Can't mount proc on /proc: Operation not
+permitted` even after that flag, and only `--privileged` was measured to work.
+`slim` has no node/npm and no uv: an `npx` or `uvx` stdio server needs the
+`full` image. A server tagged `untrusted` with the default fail-closed
+`onUnavailable: deny` still refuses to start when `bwrap` cannot run at all;
+servers without the tag are unaffected.
 
 ## State on disk
 

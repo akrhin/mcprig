@@ -95,9 +95,10 @@ MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
   без `exec` падает с `mcp-server-everything: Permission denied`.
 - Песочнице нужны три вещи: `bwrap` и `prlimit` в образе (несут и `slim`, и
   `full`) и разрешённые unprivileged user namespaces от runtime. На хосте с
-  дефолтным seccomp Docker — `--security-opt seccomp=unconfined`, крайний
-  случай — `--privileged`; `slim` без node/npm и uv, для `npx`/`uvx`-серверов
-  нужен `full`.
+  дефолтным seccomp Docker — `--security-opt seccomp=unconfined`. На rootless-
+  демоне этого мало: `bwrap` падает с `Can't mount proc on /proc: Operation not
+  permitted`, и работать замерено только с `--privileged`; `slim` без node/npm
+  и uv, для `npx`/`uvx`-серверов нужен `full`.
 - Панель: образы задают `MCPRIG_HOST=0.0.0.0`, публикуйте её на `MCPRIG_PORT`
   (дефолт 9091, поэтому `EXPOSE` — `9091`); на хосте вне Docker `MCPRIG_HOST`
   не задан и панель остаётся на `127.0.0.1`.
