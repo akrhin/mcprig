@@ -23,6 +23,21 @@ const (
 
 var errBrowseGone = errors.New("сессия просмотра не найдена или истекла")
 
+// loggingToolName — инструмент, которым сервер принимает уровень логов.
+// Наличие инструмента и есть признак: capability logging deprecated (SEP-2577).
+const loggingToolName = "logging/setLevel"
+
+// offersLogging reports whether the server still accepts a log level, judged by
+// its tool list rather than the deprecated capability.
+func offersLogging(tools []browseTool) bool {
+	for _, t := range tools {
+		if t.Name == loggingToolName {
+			return true
+		}
+	}
+	return false
+}
+
 type browseTool struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
@@ -119,15 +134,18 @@ func (b *browser) open(ctx context.Context, srv registry.Server) (*browseView, e
 			if caps.Prompts != nil {
 				view.Capabilities = append(view.Capabilities, "prompts")
 			}
-			if caps.Logging != nil {
-				view.Capabilities = append(view.Capabilities, "logging")
-			}
 		}
 	}
+	// Логирование решается по факту, а не по capability: сама capability
+	// deprecated с протокола 2026-07-28 (SEP-2577), а сервер, у которого
+	// logging/setLevel в списке инструментов, работает.
 	if tools, err := session.ListTools(ctx, nil); err == nil {
 		for _, t := range tools.Tools {
 			view.Tools = append(view.Tools, browseTool{Name: t.Name, Description: t.Description, InputSchema: t.InputSchema})
 		}
+	}
+	if offersLogging(view.Tools) {
+		view.Capabilities = append(view.Capabilities, "logging")
 	}
 	if resources, err := session.ListResources(ctx, nil); err == nil {
 		for _, r := range resources.Resources {
