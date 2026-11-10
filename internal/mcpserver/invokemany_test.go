@@ -313,13 +313,16 @@ func TestInvokeManyRejectsBadInput(t *testing.T) {
 		{"empty", map[string]any{"calls": []any{}}, "хотя бы один"},
 		{"extra key", map[string]any{"calls": []any{map[string]any{
 			"server": "a", "command_name": "echo", "bogus": 1,
-		}}}, "лишние ключи: bogus"},
+		}}}, "calls[0]: лишние ключи: bogus"},
 		{"no command", map[string]any{"calls": []any{map[string]any{
 			"server": "a",
-		}}}, "command_name обязателен"},
+		}}}, "calls[0]: command_name обязателен"},
 		{"command conflicts with command_name", map[string]any{"calls": []any{map[string]any{
 			"server": "a", "command_name": "echo", "command": "boom",
-		}}}, "укажите одно: command_name или command"},
+		}}}, "calls[0]: укажите одно: command_name или command"},
+		{"type error", map[string]any{"calls": []any{map[string]any{
+			"server": "a", "command": 5,
+		}}}, "calls[0]: ключ command: ожидался тип «строка», получен тип «число»"},
 		{"bad parameters", map[string]any{"calls": []any{map[string]any{
 			"server": "a", "command_name": "echo", "parameters": "abc",
 		}}}, "parameters: ожидался объект"},

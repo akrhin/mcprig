@@ -48,7 +48,7 @@ type manyAnswer struct {
 
 func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in invokeManyInput
-	if err := strictArgs(req, &in, "каждый вызов: server, command_name, parameters", "calls", "maxBytes"); err != nil {
+	if err := strictArgs(req, &in, "каждый вызов: server, command_name (синоним — command), parameters", "calls", "maxBytes"); err != nil {
 		return errResult(err)
 	}
 	if len(in.Calls) == 0 {
@@ -109,9 +109,12 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 			return nil, fmt.Errorf("calls[%d]: ожидался объект", i)
 		}
 		if len(extra) > 0 {
-			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s — аргументы кладутся в parameters", i, strings.Join(extra, ", "))
+			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s — допустимые: server, command_name, command, parameters; аргументы кладутся в parameters", i, strings.Join(extra, ", "))
 		}
 		if err := json.Unmarshal(item, &calls[i]); err != nil {
+			if text, ok := typeErrorText(err, fmt.Sprintf("calls[%d]: ", i)); ok {
+				return nil, errors.New(text)
+			}
 			return nil, fmt.Errorf("calls[%d]: %w", i, err)
 		}
 		if calls[i].Server == "" {

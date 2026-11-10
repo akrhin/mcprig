@@ -281,9 +281,9 @@ func (m *Manager) Server() *mcp.Server {
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_command",
 		Description: "Execute a command from a specific server (auto-discovers if needed). " +
-			"This is a wrapper tool: keep only server, command_name and maxBytes at the top level, " +
+			"This is a wrapper tool: keep only server, command_name (or command) and maxBytes at the top level, " +
 			"and put downstream tool inputs inside parameters.",
-		InputSchema: objectSchema(map[string]any{
+		InputSchema: withAnyOf(objectSchema(map[string]any{
 			"server":       map[string]any{"type": "string", "description": "Server name"},
 			"command_name": map[string]any{"type": "string", "description": "Command name to execute"},
 			"command":      map[string]any{"type": "string", "description": "Alias for command_name; list_commands returns the name in the command field"},
@@ -295,7 +295,7 @@ func (m *Manager) Server() *mcp.Server {
 				"type":        "integer",
 				"description": "Optional: cap the returned answer at this many bytes (default 32768, at most 1048576). A longer answer is cut and the full one is saved to a file named in the marker.",
 			},
-		}, "server", "command_name"),
+		}, "server"), "command_name", "command"),
 	}, m.invokeCommand)
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_many",
@@ -306,7 +306,7 @@ func (m *Manager) Server() *mcp.Server {
 			"calls": map[string]any{
 				"type":        "array",
 				"description": "Вызовы (не больше 8): server, command_name (или command) и необязательные parameters",
-				"items": map[string]any{
+				"items": withAnyOf(map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"server":       map[string]any{"type": "string", "description": "Server name"},
@@ -317,8 +317,8 @@ func (m *Manager) Server() *mcp.Server {
 							"description": "Optional downstream command input object. Put the target command inputs here.",
 						},
 					},
-					"required": []string{"server", "command_name"},
-				},
+					"required": []string{"server"},
+				}, "command_name", "command"),
 			},
 			"maxBytes": map[string]any{
 				"type":        "integer",
@@ -986,6 +986,31 @@ func objectSchema(props map[string]any, required ...string) map[string]any {
 	return s
 }
 
+// withAnyOf adds "at least one of these keys" to a schema, so a client that
+// validates arguments still accepts either spelling of the same field.
+func withAnyOf(s map[string]any, keys ...string) map[string]any {
+	alts := make([]any, 0, len(keys))
+	for _, k := range keys {
+		alts = append(alts, map[string]any{"required": []string{k}})
+	}
+	s["anyOf"] = alts
+	return s
+}
+
+// typeErrorText turns a decode type error into one line with the key and the
+// expected and actual kinds; scope prefixes the subject, like "calls[0]: ".
+func typeErrorText(err error, scope string) (string, bool) {
+	var ute *json.UnmarshalTypeError
+	if !errors.As(err, &ute) {
+		return "", false
+	}
+	name := scope + "аргументы"
+	if ute.Field != "" {
+		name = scope + "ключ " + ute.Field
+	}
+	return fmt.Sprintf("%s: ожидался тип «%s», получен тип «%s»", name, typeKind(ute.Type), valueKind(ute.Value)), true
+}
+
 // strictArgs rejects unknown top-level keys before decoding into v. The hint,
 // when set, tells the caller where those keys belong instead.
 func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string) error {
@@ -994,6 +1019,9 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 	}
 	extra, err := extraKeys(req.Params.Arguments, allowed...)
 	if err != nil {
+		if text, ok := typeErrorText(err, ""); ok {
+			return errors.New(text)
+		}
 		return fmt.Errorf("аргументы: %w", err)
 	}
 	if len(extra) > 0 {
@@ -1004,13 +1032,8 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 		return errors.New(message)
 	}
 	if err := json.Unmarshal(req.Params.Arguments, v); err != nil {
-		var ute *json.UnmarshalTypeError
-		if errors.As(err, &ute) {
-			name := "аргументы"
-			if ute.Field != "" {
-				name += ": ключ " + ute.Field
-			}
-			return fmt.Errorf("%s: ожидался тип «%s», получен тип «%s»", name, typeKind(ute.Type), valueKind(ute.Value))
+		if text, ok := typeErrorText(err, ""); ok {
+			return errors.New(text)
 		}
 		return fmt.Errorf("аргументы: %w", err)
 	}
