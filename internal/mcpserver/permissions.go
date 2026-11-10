@@ -5,6 +5,7 @@ package mcpserver
 import (
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -55,8 +56,24 @@ func lastMatch(rules []config.Rule, match func(config.Rule) bool) *config.Rule {
 // globMatch is case-insensitive; `*` is any run of characters, `?` exactly one.
 // Runs of `*` collapse first, which defuses the backtracking blow-up.
 func globMatch(pattern, value string) bool {
+	re := compiledGlob(pattern)
+	return re != nil && re.MatchString(value)
+}
+
+// globCache holds one compiled pattern per distinct rule: the gate used to
+// compile every pattern on every call. Keyed by the normalized pattern, which
+// is the same string for the same rule; the config set is bounded, so the map
+// does not grow at runtime. (Precompiling at config load would need a hook in
+// internal/config; this cache compiles once per pattern instead.)
+var globCache sync.Map // normalized pattern -> *regexp.Regexp (nil when invalid)
+
+func compiledGlob(pattern string) *regexp.Regexp {
 	for strings.Contains(pattern, "**") {
 		pattern = strings.ReplaceAll(pattern, "**", "*")
+	}
+	if cached, ok := globCache.Load(pattern); ok {
+		re, _ := cached.(*regexp.Regexp)
+		return re
 	}
 	var b strings.Builder
 	b.WriteString("(?i)^")
@@ -73,9 +90,10 @@ func globMatch(pattern, value string) bool {
 	b.WriteString("$")
 	re, err := regexp.Compile(b.String())
 	if err != nil {
-		return false
+		re = nil
 	}
-	return re.MatchString(value)
+	globCache.Store(pattern, re)
+	return re
 }
 
 // blockedResult is the lazy-mcp policy shape host hooks look for.

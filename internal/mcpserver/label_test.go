@@ -33,16 +33,30 @@ func TestLabelOf(t *testing.T) {
 		{"meta with version", context.Background(), reqWithMeta(meta("opencode", "2.2.6")), "opencode/2.2.6"},
 		{"meta without version", context.Background(), reqWithMeta(meta("mcprig", "")), "mcprig"},
 		{
-			"meta wins over transport label",
+			// The key fingerprint survives the per-request clientInfo: without
+			// it two harnesses on different keys would merge in the stats.
+			"meta keeps the key fingerprint",
 			stats.WithClient(context.Background(), "key:abc123/opencode"),
 			reqWithMeta(meta("opencode", "2.2.6")),
-			"opencode/2.2.6",
+			"key:abc123/opencode/2.2.6",
+		},
+		{
+			"key label without user-agent",
+			stats.WithClient(context.Background(), "key:abc123"),
+			reqWithMeta(meta("opencode", "")),
+			"key:abc123/opencode",
 		},
 		{
 			"no meta keeps transport label",
 			stats.WithClient(context.Background(), "key:abc123/opencode"),
 			reqWithMeta(nil),
 			"key:abc123/opencode",
+		},
+		{
+			"meta without key stands alone",
+			stats.WithClient(context.Background(), "curl/8.5"),
+			reqWithMeta(meta("opencode", "2.2.6")),
+			"opencode/2.2.6",
 		},
 		{"nothing at all", context.Background(), reqWithMeta(nil), "unknown"},
 		{"nil request", stats.WithClient(context.Background(), "key:abc123"), nil, "key:abc123"},

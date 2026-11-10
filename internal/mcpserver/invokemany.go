@@ -75,7 +75,7 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 	label := labelOf(ctx, req)
 
 	out := make([]manyAnswer, len(calls))
-	slots := newServerSlots(maxPerServer)
+	slots := m.slots
 	var wg sync.WaitGroup
 	for i, c := range calls {
 		wg.Add(1)

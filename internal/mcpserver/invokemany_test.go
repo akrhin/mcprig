@@ -243,6 +243,36 @@ func TestInvokeManyCapsCallsPerServer(t *testing.T) {
 	}
 }
 
+// The per-server cap is set-wide: two requests in flight at once share it,
+// otherwise the downstream sees twice the limit it can take.
+func TestInvokeManyCapsCallsPerServerAcrossRequests(t *testing.T) {
+	f := newFanTracker()
+	m := fanManager(t, f, nil, "same")
+	cs := clientFor(t, m.Server())
+
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			calls := make([]any, maxPerServer)
+			for i := range calls {
+				calls[i] = echoCall("same", "x", 60)
+			}
+			res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+				Name: "invoke_many", Arguments: map[string]any{"calls": calls},
+			})
+			if err != nil || res.IsError {
+				t.Errorf("invoke_many: %v %v", err, res)
+			}
+		}()
+	}
+	wg.Wait()
+	if peak := f.peak("same"); peak > maxPerServer {
+		t.Fatalf("два запроса вместе дали %d одновременных вызовов, предел %d", peak, maxPerServer)
+	}
+}
+
 // requestTimeout bounds the whole fan-out, not each call.
 func TestInvokeManyTimeoutBoundsWholeBatch(t *testing.T) {
 	f := newFanTracker()

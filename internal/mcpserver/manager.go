@@ -34,6 +34,9 @@ const (
 	// в internal/manager/health.go. Холодный stdio (npx, uvx) и первый коннект к
 	// LSP поднимаются дольше 15 с, и сервер выглядел мёртвым, хотя вызовы проходят.
 	healthTimeout = 15 * time.Second
+	// connectTimeout bounds one connect+initialize: без дедлайна зависший
+	// апстрим навсегда занимал бы c.try, и сервер считался бы живым.
+	connectTimeout = 30 * time.Second
 	// closeWait bounds how long Close waits for an in-flight connect.
 	closeWait = 5 * time.Second
 	// maxPages stops a server that keeps handing out cursors.
@@ -71,6 +74,10 @@ type Manager struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// slots bounds simultaneous calls to one downstream across every request:
+	// a per-request limiter let two parallel invoke_many send 8 at once.
+	slots *serverSlots
 
 	// Stats, when set, counts every downstream invocation per client and
 	// tool. The panel reads the recorder; the proxy works without it.
@@ -168,7 +175,9 @@ type healthState struct {
 // A connector carries the version and, when present, OAuth settings.
 func New(cfg *config.Config, version string, conn *downstream.Connector) *Manager {
 	if conn == nil {
-		conn = &downstream.Connector{Version: version}
+		// Env: без whitelist ребёнок получил бы всё окружение вызывающего,
+		// включая секреты хоста.
+		conn = &downstream.Connector{Version: version, Env: downstream.EnvFor}
 	}
 	if conn.Version == "" {
 		conn.Version = version
@@ -176,6 +185,7 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 	m := &Manager{
 		cfg:     cfg,
 		version: version,
+		slots:   newServerSlots(maxPerServer),
 		dial: func(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
 			return conn.Connect(ctx, srv)
 		},
@@ -243,7 +253,8 @@ func (m *Manager) Server() *mcp.Server {
 	s.AddTool(&mcp.Tool{
 		Name: "list_commands",
 		Description: "List commands from one server (server) or several at once (servers). " +
-			"One of server or servers is required. Use prefix to keep only tool names starting with it.",
+			"One of server or servers is required. Use prefix to keep only tool names starting with it. " +
+			"An answer over maxBytes is cut and the full one is written to a file.",
 		InputSchema: objectSchema(map[string]any{
 			"server": map[string]any{"type": "string", "description": "Server name; returns an array of commands"},
 			"servers": map[string]any{
@@ -263,11 +274,16 @@ func (m *Manager) Server() *mcp.Server {
 				"type":        "boolean",
 				"description": "Optional: drop the cached catalog and re-read tools/list from every server",
 			},
+			"maxBytes": map[string]any{
+				"type":        "integer",
+				"description": "Optional: cap on the answer in bytes (default 32768, max 1048576); a cut answer names the file with the full one",
+			},
 		}),
 	}, m.listCommands)
 	s.AddTool(&mcp.Tool{
-		Name:        "describe_commands",
-		Description: "Get detailed schemas for specific commands from a server",
+		Name: "describe_commands",
+		Description: "Get detailed schemas for specific commands from a server. " +
+			"An answer over maxBytes is cut and the full one is written to a file.",
 		InputSchema: objectSchema(map[string]any{
 			"server": map[string]any{"type": "string", "description": "Server name"},
 			"command_names": map[string]any{
@@ -278,6 +294,10 @@ func (m *Manager) Server() *mcp.Server {
 			"refresh": map[string]any{
 				"type":        "boolean",
 				"description": "Optional: drop the cached catalog and re-read tools/list first",
+			},
+			"maxBytes": map[string]any{
+				"type":        "integer",
+				"description": "Optional: cap on the answer in bytes (default 32768, max 1048576); a cut answer names the file with the full one",
 			},
 		}, "server", "command_names"),
 	}, m.describeCommands)
@@ -461,6 +481,7 @@ type listCommandsInput struct {
 	Prefix    string   `json:"prefix,omitempty"`
 	Refresh   bool     `json:"refresh,omitempty"`
 	NamesOnly bool     `json:"namesOnly,omitempty"`
+	MaxBytes  int      `json:"maxBytes,omitempty"`
 }
 
 type commandInfo struct {
@@ -472,7 +493,11 @@ type commandInfo struct {
 
 func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in listCommandsInput
-	if err := strictArgs(req, &in, "", "server", "servers", "prefix", "refresh", "namesOnly"); err != nil {
+	if err := strictArgs(req, &in, "", "server", "servers", "prefix", "refresh", "namesOnly", "maxBytes"); err != nil {
+		return errResult(err)
+	}
+	maxBytes, err := resolveMaxBytes(in.MaxBytes)
+	if err != nil {
 		return errResult(err)
 	}
 	if in.Refresh {
@@ -488,7 +513,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if err != nil {
 			return errResult(err)
 		}
-		return jsonResult(filterCommands(cmds, in.Prefix, in.NamesOnly))
+		return jsonTruncResult(filterCommands(cmds, in.Prefix, in.NamesOnly), maxBytes)
 	case len(in.Servers) > 0:
 		// Ответ остальных не теряется из-за одного упавшего: у него в карте
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
@@ -529,7 +554,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if failed == len(in.Servers) {
 			return errResult(firstErr)
 		}
-		return jsonResult(out)
+		return jsonTruncResult(out, maxBytes)
 	}
 	return errResult(errNoTargets)
 }
@@ -573,6 +598,7 @@ type describeCommandsInput struct {
 	Server       string   `json:"server"`
 	CommandNames []string `json:"command_names"`
 	Refresh      bool     `json:"refresh,omitempty"`
+	MaxBytes     int      `json:"maxBytes,omitempty"`
 }
 
 type commandSchema struct {
@@ -591,7 +617,11 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	ctx, cancel := m.callCtx(ctx)
 	defer cancel()
 	var in describeCommandsInput
-	if err := strictArgs(req, &in, "", "server", "command_names", "refresh"); err != nil {
+	if err := strictArgs(req, &in, "", "server", "command_names", "refresh", "maxBytes"); err != nil {
+		return errResult(err)
+	}
+	maxBytes, err := resolveMaxBytes(in.MaxBytes)
+	if err != nil {
 		return errResult(err)
 	}
 	if in.Server == "" {
@@ -636,7 +666,7 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 			OutputSchema: tool.OutputSchema,
 		})
 	}
-	return jsonResult(out)
+	return jsonTruncResult(out, maxBytes)
 }
 
 // ─── invoke_command ───────────────────────────────────────────────────────────
@@ -772,16 +802,27 @@ func parametersOf(raw json.RawMessage) (any, error) {
 
 // ─── shared helpers ───────────────────────────────────────────────────────────
 
-// labelOf names the harness behind a call. A per-request clientInfo
-// (_meta["io.modelcontextprotocol/clientInfo"], SEP-2575) wins: a stateless
-// HTTP caller sends it on every request and has no initialize handshake.
-// Without it the transport label stands — key fingerprint plus User-Agent on
-// HTTP — and only a caller that names itself nowhere is "unknown".
+// labelOf names the harness behind a call. The auth key fingerprint is never
+// dropped: a stateless HTTP caller sends _meta clientInfo on every request and
+// has no initialize handshake, so without this the key prefix would vanish.
+// The label is "key:<fp>/<clientInfo>", or the transport label when the caller
+// names itself nowhere, and only a caller with neither is "unknown".
 func labelOf(ctx context.Context, req *mcp.CallToolRequest) string {
-	if who := clientInfoOf(req); who != "" {
+	label := stats.ClientFrom(ctx, "")
+	who := clientInfoOf(req)
+	if fp, ok := strings.CutPrefix(label, "key:"); ok {
+		if who == "" {
+			return label
+		}
+		// transport label carries "key:<fp>" or "key:<fp>/<user-agent>".
+		fp, _, _ = strings.Cut(fp, "/")
+		return "key:" + fp + "/" + who
+	}
+	if who != "" {
 		return who
 	}
-	return stats.ClientFrom(ctx, "unknown")
+	// ClientFrom уже подставляет "unknown" вместо пустой метки.
+	return label
 }
 
 // clientInfoOf reads name/version from _meta first, then from the initialize
@@ -892,7 +933,9 @@ func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolPa
 // transport failure that produced no result qualifies: ErrConnectionClosed and
 // a clean EOF mean nothing was read back. io.ErrUnexpectedEOF means the reader
 // saw the response start, and any result — including isError — is an answer, so
-// neither is repeated. A context error is the caller's deadline, not a drop.
+// neither is repeated. A context error is the caller's deadline, not a drop; a
+// net timeout is the same family: the upstream may have run the call, so a
+// repeat would double the side effect.
 func retryableCall(res *mcp.CallToolResult, err error) bool {
 	if err == nil || res != nil {
 		return false
@@ -905,7 +948,7 @@ func retryableCall(res *mcp.CallToolResult, err error) bool {
 		return true
 	}
 	var netErr net.Error
-	return errors.As(err, &netErr)
+	return errors.As(err, &netErr) && !netErr.Timeout()
 }
 
 // Warm connects every enabled server and fills the tool cache, so the first
@@ -1113,6 +1156,16 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(data)}}}, nil
 }
 
+// jsonTruncResult is jsonResult under the same maxBytes cap as invoke_command:
+// a huge catalog is cut and the full answer lands in a file.
+func jsonTruncResult(v any, maxBytes int) (*mcp.CallToolResult, error) {
+	res, err := jsonResult(v)
+	if err != nil {
+		return res, err
+	}
+	return truncateResult(res, maxBytes)
+}
+
 // resultMessage берёт текст ошибки из ответа инструмента.
 func resultMessage(res *mcp.CallToolResult) string {
 	for _, c := range res.Content {
@@ -1173,8 +1226,25 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 
 	// The connect belongs to the manager, not to the caller: cancelling one
 	// waiting request must not abort a connect another request is waiting on.
+	// The deadline does belong to the connect: a hung initialize would otherwise
+	// hold c.try forever and make the server look alive.
 	go func() {
-		sess, err := dial(context.WithoutCancel(ctx))
+		dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), connectTimeout)
+		sess, err := dial(dctx)
+		timedOut := dctx.Err() == context.DeadlineExceeded
+		cancel()
+		if timedOut {
+			// SDK closes the connection on a failed initialize, so no child is
+			// left behind; close anyway in case dial returned a live session.
+			if sess != nil {
+				_ = sess.Close()
+				sess = nil
+			}
+			if err == nil {
+				err = context.DeadlineExceeded
+			}
+			err = fmt.Errorf("подключение не уложилось в %s: %w", connectTimeout, err)
+		}
 		c.mu.Lock()
 		if c.closed {
 			a.sess, a.err = nil, errClosed
@@ -1223,6 +1293,9 @@ func (c *conn) close() error {
 		select {
 		case <-a.done:
 		case <-time.After(closeWait):
+			// Коннект не подтвердил завершение: молча вернуть nil значит
+			// соврать вызывающему, что всё закрыто.
+			return fmt.Errorf("закрытие: подключение не завершилось за %s", closeWait)
 		}
 	}
 	c.mu.Lock()
