@@ -38,6 +38,37 @@ func writeDoctorFile(t *testing.T, path, body string) {
 	}
 }
 
+// doctor читает panel.env, а не legacy env: юнит держит пароль там, и
+// значение в кавычках сохраняет пробелы по краям.
+func TestLoadPanelEnvPanelFirst(t *testing.T) {
+	dir := t.TempDir()
+	const key, legacy = "MCPRIG_DOCTOR_TEST_QUOTED", "MCPRIG_DOCTOR_TEST_LEGACY"
+	os.Unsetenv(key)
+	os.Unsetenv(legacy)
+	t.Cleanup(func() {
+		os.Unsetenv(key)
+		os.Unsetenv(legacy)
+	})
+	writeDoctorFile(t, filepath.Join(dir, "panel.env"),
+		"# секреты панели\n"+key+"=\"p a s s\"\n")
+	writeDoctorFile(t, filepath.Join(dir, "env"),
+		key+"=from-legacy\n"+legacy+"='v'\n")
+
+	line, ok := loadPanelEnv(dir)
+	if !ok {
+		t.Fatal("loadPanelEnv: файлов не найдено")
+	}
+	if !strings.Contains(line.Text, "panel.env") {
+		t.Errorf("в строке нет panel.env: %q", line.Text)
+	}
+	if got := os.Getenv(key); got != "p a s s" {
+		t.Errorf("%s: want %q, got %q", key, "p a s s", got)
+	}
+	if got := os.Getenv(legacy); got != "v" {
+		t.Errorf("%s: want %q, got %q", legacy, "v", got)
+	}
+}
+
 // doctor зарегистрирован как подкоманда и разбирает свои флаги.
 func TestParseArgsDoctor(t *testing.T) {
 	mode, rest, err := parseArgs([]string{"doctor", "-json"})
