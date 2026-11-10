@@ -246,9 +246,9 @@ true. Полный справочник полей: [docs/ru/configuration.md](d
 - юниты systemd (пользовательские): `deploy/mcprig.service` (панель) и
   `deploy/mcprig-set@.service` (один набор на юнит).
 - Docker: `slim` (только бинарник, HTTP-нижестоящие) и `full` (добавляет node и
-  python для stdio-серверов `npx`/`uvx`). Оба опубликованы в закрытом реестре
-  Gitea проекта как `0.3.8-slim`, `0.3.8-full`, а `latest`/`latest-full` идут за
-  релизом — внешнему пользователю нужен вход, иначе собирайте из `Dockerfile`.
+  python для stdio-серверов `npx`/`uvx`). Оба опубликованы в GitHub Container
+  Registry: `ghcr.io/akrhin/mcprig:0.3.8-slim`, `:0.3.8-full`, а
+  `latest`/`latest-full` идут за релизом — вход не нужен.
 
 Подробности: [docs/ru/install.md](docs/ru/install.md).
 

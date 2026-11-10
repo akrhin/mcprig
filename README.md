@@ -248,9 +248,9 @@ ships the same archives. Release notes for a tag come from `CHANGELOG.md`.
 - systemd user units: `deploy/mcprig.service` (panel) and
   `deploy/mcprig-set@.service` (one set per unit).
 - Docker: `slim` (binary only, HTTP downstreams) and `full` (adds node and
-  python for `npx`/`uvx` stdio servers). Both are published to the project's
-  private Gitea registry as `0.3.8-slim`, `0.3.8-full`, and `latest`/`latest-full` following
-  the release.
+  python for `npx`/`uvx` stdio servers). Both are published to GitHub Container
+  Registry as `ghcr.io/akrhin/mcprig:0.3.8-slim`, `:0.3.8-full`, with
+  `latest`/`latest-full` following the release — no login needed.
 
 Details: [docs/en/install.md](docs/en/install.md).
 

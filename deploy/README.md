@@ -72,7 +72,7 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 `slim`, `ops` — stdio-сервер через `npx`, ему нужен образ с node.
 
 ```bash
-# образы уже в реестре Gitea: latest (slim), latest-full и теги релиза 0.3.8-slim/0.3.8-full
+# образы в GHCR (публично): latest (slim), latest-full и теги релиза 0.3.8-slim/0.3.8-full
 docker pull ghcr.io/akrhin/mcprig:latest
 docker compose up -d
 
