@@ -19,7 +19,8 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
   `укажите command_name или command` вместо `command_name обязателен`.
 - `list_servers`: проба, не дождавшаяся свободного слота, больше не помечает
   сервер `healthy: false` на 15 секунд — исход неизвестен, ответ
-  `healthy: true, unknown: true` без `error` и без записи в кэш.
+  `healthy: true, unknown: true` без `error` и без записи в кэш. Панель
+  показывает у такого сервера «не проверено», а не «health ok».
 - Панель получила `IdleTimeout` 60 с; `WriteTimeout` не ставится — долгие
   стримы ответов не должны обрываться.
 
