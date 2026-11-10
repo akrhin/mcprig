@@ -29,6 +29,7 @@ type invokeManyInput struct {
 type manyCall struct {
 	Server      string          `json:"server"`
 	CommandName string          `json:"command_name"`
+	Command     string          `json:"command,omitempty"` // alias for command_name: list_commands называет это поле command
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
 }
 
@@ -103,7 +104,7 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 	calls := make([]manyCall, len(raw))
 	for i, item := range raw {
-		extra, err := extraKeys(item, "server", "command_name", "parameters")
+		extra, err := extraKeys(item, "server", "command_name", "command", "parameters")
 		if err != nil {
 			return nil, fmt.Errorf("calls[%d]: ожидался объект", i)
 		}
@@ -115,6 +116,9 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 		}
 		if calls[i].Server == "" {
 			return nil, fmt.Errorf("calls[%d]: server обязателен", i)
+		}
+		if calls[i].CommandName == "" {
+			calls[i].CommandName = calls[i].Command
 		}
 		if calls[i].CommandName == "" {
 			return nil, fmt.Errorf("calls[%d]: command_name обязателен", i)

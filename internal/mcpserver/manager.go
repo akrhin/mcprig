@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -285,6 +286,7 @@ func (m *Manager) Server() *mcp.Server {
 		InputSchema: objectSchema(map[string]any{
 			"server":       map[string]any{"type": "string", "description": "Server name"},
 			"command_name": map[string]any{"type": "string", "description": "Command name to execute"},
+			"command":      map[string]any{"type": "string", "description": "Alias for command_name; list_commands returns the name in the command field"},
 			"parameters": map[string]any{
 				"type":        "object",
 				"description": "Optional downstream command input object. Put the target command inputs here, not alongside server or command_name.",
@@ -298,17 +300,18 @@ func (m *Manager) Server() *mcp.Server {
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_many",
 		Description: "Выполнить до 8 независимых вызовов одним запросом. " +
-			"Каждый вызов — как invoke_command: server, command_name и parameters. " +
+			"Каждый вызов — как invoke_command: server, command_name (синоним — command) и parameters. " +
 			"Ответ — массив в порядке calls; ошибка одного вызова не валит остальные.",
 		InputSchema: objectSchema(map[string]any{
 			"calls": map[string]any{
 				"type":        "array",
-				"description": "Вызовы (не больше 8): server, command_name и необязательные parameters",
+				"description": "Вызовы (не больше 8): server, command_name (или command) и необязательные parameters",
 				"items": map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"server":       map[string]any{"type": "string", "description": "Server name"},
 						"command_name": map[string]any{"type": "string", "description": "Command name to execute"},
+						"command":      map[string]any{"type": "string", "description": "Alias for command_name (synonym)"},
 						"parameters": map[string]any{
 							"type":        "object",
 							"description": "Optional downstream command input object. Put the target command inputs here.",
@@ -628,14 +631,18 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 type invokeCommandInput struct {
 	Server      string          `json:"server"`
 	CommandName string          `json:"command_name"`
+	Command     string          `json:"command,omitempty"` // alias for command_name: list_commands называет это поле command
 	Parameters  json.RawMessage `json:"parameters"`
 	MaxBytes    int             `json:"maxBytes,omitempty"`
 }
 
 func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in invokeCommandInput
-	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "parameters", "maxBytes"); err != nil {
+	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "command", "parameters", "maxBytes"); err != nil {
 		return errResult(err)
+	}
+	if in.CommandName == "" {
+		in.CommandName = in.Command
 	}
 	if in.Server == "" {
 		return errResult(errors.New("server обязателен"))
@@ -988,16 +995,55 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 		return fmt.Errorf("аргументы: %w", err)
 	}
 	if len(extra) > 0 {
-		message := "лишние ключи: " + strings.Join(extra, ", ")
+		message := "лишние ключи: " + strings.Join(extra, ", ") + " — допустимые: " + strings.Join(allowed, ", ")
 		if hint != "" {
-			message += " — " + hint
+			message += "; " + hint
 		}
 		return errors.New(message)
 	}
 	if err := json.Unmarshal(req.Params.Arguments, v); err != nil {
+		var ute *json.UnmarshalTypeError
+		if errors.As(err, &ute) {
+			return fmt.Errorf("аргументы: ключ %s: тип %s, получено %s", ute.Field, typeKind(ute.Type), valueKind(ute.Value))
+		}
 		return fmt.Errorf("аргументы: %w", err)
 	}
 	return nil
+}
+
+// typeKind/valueKind translate json.UnmarshalTypeError into the words a caller
+// can act on instead of leaking Go struct and type names.
+func typeKind(t reflect.Type) string {
+	switch t.Kind() {
+	case reflect.String:
+		return "строка"
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return "целое число"
+	case reflect.Bool:
+		return "логическое"
+	case reflect.Slice:
+		return "массив"
+	case reflect.Map, reflect.Struct:
+		return "объект"
+	}
+	return t.String()
+}
+
+func valueKind(v string) string {
+	switch v {
+	case "number":
+		return "число"
+	case "string":
+		return "строка"
+	case "bool":
+		return "логическое"
+	case "object":
+		return "объект"
+	case "array":
+		return "массив"
+	}
+	return v
 }
 
 // extraKeys lists sorted top-level keys of a JSON object that are not allowed.
