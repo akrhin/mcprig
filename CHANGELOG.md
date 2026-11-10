@@ -7,6 +7,10 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.8] - 2026-11-10
+
 ### Added
 
 - `invoke_command` и `invoke_many` принимают `command` синонимом
