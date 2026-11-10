@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -90,5 +91,23 @@ func TestNewHandlerRequiresRedirectURL(t *testing.T) {
 	_, err := NewHandler(context.Background(), Options{ServerName: testServer, ServerURL: testServerUL})
 	if err == nil || !strings.Contains(err.Error(), "RedirectURL") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Адрес приёмника берётся из redirect_uri: другой порт означал бы, что браузер
+// стучится мимо, и вход висел бы до пятиминутного таймаута.
+func TestCallbackAddrFollowsRedirectURL(t *testing.T) {
+	log := slog.New(slog.DiscardHandler)
+	got, err := callbackAddr("http://127.0.0.1:9107/callback", log)
+	if err != nil || got != "127.0.0.1:9107" {
+		t.Fatalf("callbackAddr = %q, %v", got, err)
+	}
+	// Без порта — эфемерный, с предупреждением в лог.
+	got, err = callbackAddr("http://127.0.0.1/callback", log)
+	if err != nil || got != "127.0.0.1:0" {
+		t.Fatalf("callbackAddr без порта = %q, %v", got, err)
+	}
+	if _, err := callbackAddr("://bad", log); err == nil {
+		t.Fatal("неверный RedirectURL принят")
 	}
 }

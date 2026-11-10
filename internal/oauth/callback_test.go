@@ -68,12 +68,18 @@ func TestCallbackSuccess(t *testing.T) {
 	}
 }
 
+// Чужой state — 400, но ожидание не снимается: иначе любой посторонний
+// редирект гасит вход, открытый в браузере владельца.
 func TestCallbackStateMismatch(t *testing.T) {
 	cb := newTestCallback(t, "st-1")
-	ch := make(chan error, 1)
+	type outcome struct {
+		res *Result
+		err error
+	}
+	ch := make(chan outcome, 1)
 	go func() {
-		_, err := cb.Wait(context.Background())
-		ch <- err
+		res, err := cb.Wait(context.Background())
+		ch <- outcome{res, err}
 	}()
 	waitUntilWaiting(t, cb)
 
@@ -82,9 +88,57 @@ func TestCallbackStateMismatch(t *testing.T) {
 		t.Fatalf("статус = %d, want 400", code)
 	}
 	select {
-	case err := <-ch:
-		if err == nil || !strings.Contains(err.Error(), "state mismatch") {
-			t.Fatalf("Wait err = %v", err)
+	case o := <-ch:
+		t.Fatalf("чужой state снял ожидание: %+v", o)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// Верный редирект после чужого по-прежнему доходит.
+	if code, _ := get(t, cb.URL()+"?code=abc&state=st-1"); code != http.StatusOK {
+		t.Fatalf("верный редирект: статус = %d, want 200", code)
+	}
+	select {
+	case o := <-ch:
+		if o.err != nil || o.res.Code != "abc" {
+			t.Fatalf("Wait: %+v", o)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait не завершился")
+	}
+}
+
+// Ошибка авторизации с чужим state — тоже чужой редирект: 400 без снятия
+// ожидания. Иначе достаточно подсунуть ?error=, чтобы сорвать вход.
+func TestCallbackForeignErrorKeepsWaiting(t *testing.T) {
+	cb := newTestCallback(t, "st-1")
+	type outcome struct {
+		res *Result
+		err error
+	}
+	ch := make(chan outcome, 1)
+	go func() {
+		res, err := cb.Wait(context.Background())
+		ch <- outcome{res, err}
+	}()
+	waitUntilWaiting(t, cb)
+
+	code, _ := get(t, cb.URL()+"?error=access_denied&state=wrong")
+	if code != http.StatusBadRequest {
+		t.Fatalf("статус = %d, want 400", code)
+	}
+	select {
+	case o := <-ch:
+		t.Fatalf("чужой error= снял ожидание: %+v", o)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if code, _ := get(t, cb.URL()+"?code=abc&state=st-1"); code != http.StatusOK {
+		t.Fatalf("верный редирект: статус = %d, want 200", code)
+	}
+	select {
+	case o := <-ch:
+		if o.err != nil || o.res.Code != "abc" {
+			t.Fatalf("Wait: %+v", o)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Wait не завершился")
@@ -93,18 +147,30 @@ func TestCallbackStateMismatch(t *testing.T) {
 
 func TestCallbackEmptyStateRejected(t *testing.T) {
 	cb := newTestCallback(t, "st-1")
-	ch := make(chan error, 1)
+	type outcome struct {
+		res *Result
+		err error
+	}
+	ch := make(chan outcome, 1)
 	go func() {
-		_, err := cb.Wait(context.Background())
-		ch <- err
+		res, err := cb.Wait(context.Background())
+		ch <- outcome{res, err}
 	}()
 	waitUntilWaiting(t, cb)
 
 	if code, _ := get(t, cb.URL()+"?code=abc"); code != http.StatusBadRequest {
 		t.Fatalf("статус = %d, want 400", code)
 	}
-	if err := <-ch; err == nil || !strings.Contains(err.Error(), "state mismatch") {
-		t.Fatalf("Wait err = %v", err)
+	select {
+	case o := <-ch:
+		t.Fatalf("редирект без state снял ожидание: %+v", o)
+	case <-time.After(100 * time.Millisecond):
+	}
+	if code, _ := get(t, cb.URL()+"?code=abc&state=st-1"); code != http.StatusOK {
+		t.Fatalf("верный редирект: статус = %d, want 200", code)
+	}
+	if o := <-ch; o.err != nil || o.res.Code != "abc" {
+		t.Fatalf("Wait: %+v", o)
 	}
 }
 

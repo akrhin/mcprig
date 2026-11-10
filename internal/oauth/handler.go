@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/url"
 	"os/exec"
 	"runtime"
@@ -20,16 +21,37 @@ type Handler = auth.AuthorizationCodeHandler
 
 // Options — параметры фабрики обработчика.
 type Options struct {
-	ServerName   string
-	ServerURL    string
-	RedirectURL  string // обязателен, обычно http://127.0.0.1:8947/callback
-	CallbackAddr string // "127.0.0.1:8947"; пустой — DefaultCallbackAddr
+	ServerName  string
+	ServerURL   string
+	RedirectURL string // обязателен, обычно http://127.0.0.1:8947/callback
+	// CallbackAddr не используется: адрес прослушивания выводится из
+	// RedirectURL — иначе редирект уходил на чужой порт и ожидание висело
+	// до таймаута. Оставлен ради совместимости.
+	CallbackAddr string
 	ClientID     string // если пуст — динамическая регистрация клиента
 	ClientSecret string
 	Scopes       []string
 	Browser      func(url string) error // nil — openBrowser
 	Store        *Store                 // nil — токены не сохраняются
 	Log          *slog.Logger
+}
+
+// callbackAddr — адрес приёмника из redirect_uri: браузер вернётся ровно на
+// указанный там порт, поэтому слушать другой — гарантированный пятиминутный
+// таймаут. Пустой порт (или "0") — эфемерный с предупреждением: предрегистри-
+// рованный redirect_uri так не совпадёт.
+func callbackAddr(redirectURL string, log *slog.Logger) (string, error) {
+	u, err := url.Parse(redirectURL)
+	if err != nil || u.Hostname() == "" {
+		return "", fmt.Errorf("oauth: неверный RedirectURL %q", redirectURL)
+	}
+	host, port := u.Hostname(), u.Port()
+	if port == "" || port == "0" {
+		log.Warn("oauth: redirectUrl не задаёт порт приёма кода — слушаю эфемерный порт, редирект может не дойти",
+			"redirectUrl", redirectURL)
+		port = "0"
+	}
+	return net.JoinHostPort(host, port), nil
 }
 
 // NewHandler собирает auth.AuthorizationCodeHandler: обнаружение метаданных,
@@ -50,9 +72,9 @@ func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, e
 	if browser == nil {
 		browser = BrowserOpen
 	}
-	addr := o.CallbackAddr
-	if addr == "" {
-		addr = DefaultCallbackAddr
+	addr, err := callbackAddr(o.RedirectURL, log)
+	if err != nil {
+		return nil, err
 	}
 	key := Key(o.ServerName, o.ServerURL)
 

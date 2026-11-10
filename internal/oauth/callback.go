@@ -127,6 +127,15 @@ func (c *Callback) Close() error {
 
 func (c *Callback) handleCallback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	// state сверяется первым: чужой редирект — в том числе с ?error= — не
+	// должен снимать ожидание этого приёмника, иначе любой прохожий гасит
+	// вход, открытый в браузере владельца.
+	state := q.Get("state")
+	if state != c.expected {
+		http.Error(w, "state mismatch", http.StatusBadRequest)
+		return
+	}
+
 	if e := q.Get("error"); e != "" {
 		msg := e
 		if d := q.Get("error_description"); d != "" {
@@ -134,13 +143,6 @@ func (c *Callback) handleCallback(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "authorization failed: "+msg, http.StatusBadRequest)
 		c.fail(fmt.Errorf("сервер авторизации вернул ошибку: %s", msg))
-		return
-	}
-
-	state := q.Get("state")
-	if state != c.expected {
-		http.Error(w, "state mismatch", http.StatusBadRequest)
-		c.fail(errors.New("state mismatch: state в редиректе не совпал с ожидаемым"))
 		return
 	}
 
