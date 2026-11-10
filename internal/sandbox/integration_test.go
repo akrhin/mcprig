@@ -102,6 +102,7 @@ func TestSandboxIsolatesStdioServer(t *testing.T) {
 			// RLIMIT_AS — виртуальная память: Go-рантайм резервирует
 			// адресное пространство заранее, 1 ГиБ ему мало.
 			MemoryMb:   4096,
+			TmpMb:      128,
 			Pids:       128,
 			TimeoutSec: 20,
 			// Тестовый бинарь живёт в /tmp/go-buildNNN — иначе его не видно.
