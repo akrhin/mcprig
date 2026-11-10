@@ -46,6 +46,11 @@ func truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult,
 		cut--
 	}
 	text := string(full[:cut]) + fmt.Sprintf("\n[обрезано: %d из %d байт, полный ответ — %s]", cut, len(full), path)
+	if res.StructuredContent != nil {
+		// Без этой строки клиент со structured-смыслом (ticktick и подобные)
+		// видит пустой ответ: структура в текстовый срез не попадает.
+		text += "\n[structuredContent не влезает в maxBytes: полный ответ в файле]"
+	}
 	return &mcp.CallToolResult{
 		IsError: res.IsError,
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},

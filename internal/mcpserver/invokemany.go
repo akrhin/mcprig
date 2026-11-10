@@ -22,8 +22,9 @@ const (
 )
 
 type invokeManyInput struct {
-	Calls    []json.RawMessage `json:"calls"`
-	MaxBytes int               `json:"maxBytes,omitempty"`
+	Calls []json.RawMessage `json:"calls"`
+	// shortcut: суммарный размер ответа не ограничен, потолок на каждый вызов; поднять при жалобе на 8×maxBytes
+	MaxBytes int `json:"maxBytes,omitempty"`
 }
 
 type manyCall struct {
@@ -36,7 +37,8 @@ type manyCall struct {
 // manyAnswer is one entry of the fan-out answer. Result carries what
 // invoke_command would return — text for a plain answer, the whole result
 // object otherwise — capped at maxBytes. A failed call keeps its slot with
-// ok:false and error, so the order always matches calls.
+// ok:false and error, so the order always matches calls; a policy refusal
+// carries in result the same shape invoke_command returns.
 type manyAnswer struct {
 	OK          bool   `json:"ok"`
 	Server      string `json:"server"`
@@ -126,7 +128,7 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 			return nil, fmt.Errorf("calls[%d]: укажите одно: command_name или command", i)
 		}
 		if calls[i].CommandName == "" {
-			return nil, fmt.Errorf("calls[%d]: command_name обязателен", i)
+			return nil, fmt.Errorf("calls[%d]: укажите command_name или command", i)
 		}
 		if _, err := parametersOf(calls[i].Parameters); err != nil {
 			return nil, fmt.Errorf("calls[%d]: %w", i, err)
@@ -146,10 +148,12 @@ func (m *Manager) runManyCall(ctx context.Context, label string, c manyCall, max
 		return serverProblem(e.srv)
 	}
 	if message, denied := denyReason(m.cfg.Permissions, e.srv.Permissions, e.srv.Name, c.CommandName); denied {
-		if message == "" {
-			message = "tool '" + e.srv.Name + ":" + c.CommandName + "' is denied"
-		}
-		return errors.New("🚫 Blocked by mcprig policy: " + message)
+		// Тот же shape, что у invoke_command: маркер в content и Meta с
+		// lazyMcpPolicy — хук-клиент ищет их там, а не в строке error.
+		blocked := blockedResult(e.srv.Name, c.CommandName, message)
+		ans.Result = blocked
+		ans.Error = resultMessage(blocked)
+		return nil
 	}
 	// Та же сверка, что у invoke_command: неизвестное имя не идёт в апстрим,
 	// иначе отказ приходит тремя разными текстами. Пустой кэш — как раньше.

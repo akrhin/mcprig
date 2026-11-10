@@ -241,6 +241,7 @@ func Run(opts Options) error {
 		Addr:              net.JoinHostPort(opts.Host, strconv.Itoa(opts.Port)),
 		Handler:           m.Handler(),
 		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       60 * time.Second, // WriteTimeout не ставим: SSE-стримы панели живут дольше любого таймаута записи
 	}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()

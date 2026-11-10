@@ -307,6 +307,57 @@ func TestHealthCacheKeepsFailures(t *testing.T) {
 	}
 }
 
+// A probe that never got a slot is not a sick server: the outcome is unknown,
+// so it must not land in the cache as unhealthy for the whole TTL.
+func TestStatusSkippedProbeNotCached(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	e := m.entries[0]
+	drain := func() {
+		for {
+			select {
+			case <-probeSlots:
+			default:
+				return
+			}
+		}
+	}
+	t.Cleanup(drain)
+
+	for i := 0; i < maxProbes; i++ {
+		probeSlots <- struct{}{}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if ok, errText := m.status(ctx, e); !ok || errText != "" {
+		t.Fatalf("проба без слота: исход неизвестен, надо healthy=true, got %v %q", ok, errText)
+	}
+	e.healthMu.Lock()
+	h := e.health
+	e.healthMu.Unlock()
+	if !h.at.IsZero() {
+		t.Fatalf("пропущенная проба не должна попадать в кэш, got %+v", h)
+	}
+	if n := atomic.LoadInt32(&dials); n != 0 {
+		t.Fatalf("проба без слота не должна подключаться, got %d dial(s)", n)
+	}
+
+	drain()
+	if ok, errText := m.status(context.Background(), e); !ok || errText != "" {
+		t.Fatalf("слот свободен: проба должна пройти, got %v %q", ok, errText)
+	}
+	if n := atomic.LoadInt32(&dials); n != 1 {
+		t.Fatalf("после освобождения слота проба обязана пройти, got %d dial(s)", n)
+	}
+	e.healthMu.Lock()
+	h = e.health
+	e.healthMu.Unlock()
+	if h.at.IsZero() || !h.ok {
+		t.Fatalf("настоящий исход должен попасть в кэш, got %+v", h)
+	}
+}
+
 // list_commands answers an array for `server`, an object for `servers`, and
 // errors when neither is given.
 func TestListCommandsForms(t *testing.T) {
@@ -459,8 +510,8 @@ func TestInvokeCommandNoName(t *testing.T) {
 	if !res.IsError {
 		t.Fatal("без command_name вызов должен отвергаться")
 	}
-	if text := resultText(t, res); !strings.Contains(text, "command_name обязателен") {
-		t.Fatalf("нет требования command_name: %q", text)
+	if text := resultText(t, res); !strings.Contains(text, "укажите command_name или command") {
+		t.Fatalf("нет требования имени: %q", text)
 	}
 	if n := atomic.LoadInt32(&dials); n != 0 {
 		t.Fatalf("отвергнутый вызов не должен ходить в апстрим: %d", n)

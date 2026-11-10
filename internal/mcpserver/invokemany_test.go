@@ -316,7 +316,7 @@ func TestInvokeManyRejectsBadInput(t *testing.T) {
 		}}}, "calls[0]: лишние ключи: bogus"},
 		{"no command", map[string]any{"calls": []any{map[string]any{
 			"server": "a",
-		}}}, "calls[0]: command_name обязателен"},
+		}}}, "calls[0]: укажите command_name или command"},
 		{"command conflicts with command_name", map[string]any{"calls": []any{map[string]any{
 			"server": "a", "command_name": "echo", "command": "boom",
 		}}}, "calls[0]: укажите одно: command_name или command"},
@@ -363,5 +363,53 @@ func TestInvokeManyCommandAlias(t *testing.T) {
 	}
 	if peak := f.peak("a"); peak == 0 {
 		t.Fatal("принятый вызов не дошёл до сервера")
+	}
+}
+
+// Отказ политики в веере несёт тот же маркер и Meta, что одиночный вызов:
+// хук-клиент ищет их в result, а не в строке error.
+func TestInvokeManyDenyKeepsPolicyShape(t *testing.T) {
+	f := newFanTracker()
+	cfg := &config.Config{Permissions: &config.Permissions{Rules: []config.Rule{
+		{Pattern: "boom", Action: config.PermissionDeny, Message: "только чтение"},
+	}}}
+	m := fanManager(t, f, cfg, "a")
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_many", map[string]any{"calls": []any{
+		map[string]any{"server": "a", "command_name": "boom", "parameters": map[string]any{}},
+		echoCall("a", "ok", 0),
+	}})
+	if res.IsError {
+		t.Fatalf("веер упал: %s", resultText(t, res))
+	}
+	out := manyAnswers(t, res)
+	if out[0].OK || !strings.Contains(out[0].Error, "🚫 Blocked by mcprig policy: только чтение") {
+		t.Fatalf("calls[0] = %+v", out[0])
+	}
+	shape, ok := out[0].Result.(map[string]any)
+	if !ok {
+		t.Fatalf("calls[0].result не объект: %#v", out[0].Result)
+	}
+	if meta, _ := shape["_meta"].(map[string]any); meta["lazyMcpPolicy"] != "blocked" {
+		t.Fatalf("result._meta.lazyMcpPolicy: %#v", shape["_meta"])
+	}
+	var texts []string
+	content, _ := shape["content"].([]any)
+	for _, item := range content {
+		if part, ok := item.(map[string]any); ok {
+			if text, ok := part["text"].(string); ok {
+				texts = append(texts, text)
+			}
+		}
+	}
+	if !strings.Contains(strings.Join(texts, "\n"), "🚫 Blocked by mcprig policy: только чтение") {
+		t.Fatalf("в result.content нет маркера: %q", texts)
+	}
+	if !out[1].OK {
+		t.Fatalf("соседний вызов не ok: %+v", out[1])
+	}
+	if peak := f.peak("a"); peak != 1 {
+		t.Fatalf("отказ дошёл до сервера: %d вызовов", peak)
 	}
 }
