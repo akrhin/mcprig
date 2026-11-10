@@ -21,96 +21,87 @@
     en: {
       'title.panel': 'mcprig — panel',
       'title.set': 'mcprig — set {name}',
+      'a11y.skip': 'Skip to content',
       'top.details': 'Details',
       'top.lang': 'Language',
       'top.theme': 'Color scheme',
-      'top.dim': 'Dim the panel',
-      'top.who': 'Vladimir',
-      'theme.light': 'Light',
+      'top.updatedLabel': 'updated',
+      'top.runningW': 'running',
       'rail.title': 'Sets',
+      'rail.open': 'Open the set list',
       'rail.collapse': 'Collapse the set list',
       'rail.expand': 'Expand the set list',
       'rail.empty': 'no sets',
-      'rail.add': 'set',
+      'rail.add': 'New set',
       'rail.name': 'name',
       'rail.port': 'port',
       'rail.create': 'create',
       'rail.item': '{name} · port {port} · {state}',
       'common.cancel': 'cancel',
-      'common.hide': 'hide',
       'common.save': 'save',
       'common.close': 'close',
       'common.done': 'done',
-      'empty.title': 'No sets',
-      'empty.h': 'Build your first endpoint',
-      'empty.p': 'A set gets a port from 9100–9199, a key, and one MCP address for all of its servers.',
-      'empty.s1': 'Add a server: a stdio command or a streamable-http URL.',
-      'empty.s2': 'Create a set and assign servers to it.',
-      'empty.s3': 'Copy the endpoint and the key into your client.',
-      'empty.add': 'Create a set',
+      'empty.title': 'No sets yet',
+      'empty.p': 'A set is one MCP endpoint with its own port, servers and keys.',
+      'empty.add': 'Create the first set',
+      'head.endpoint': 'Endpoint',
       'head.copy': 'copy',
+      'head.copyTip': 'copy the MCP endpoint of this set',
       'head.copied': 'copied',
       'head.copyFail': 'failed',
-      'head.setName': 'Set {name}',
-      'head.key': 'key',
+      'head.key': 'Key',
       'head.keyTip': 'only the prefix is shown',
       'head.keyOpen': 'set is open',
+      'head.copyKey': 'Copy key',
       'head.noKey': 'no key',
       'head.schemaTip': "how much context the set's tool list costs",
+      'head.servers': 'Servers',
+      'head.tools': 'Tools',
       'head.keys': 'Keys',
       'head.start': 'Start',
       'head.restart': 'Restart',
+      'head.stop': 'Stop',
       'head.stopped': 'set stopped',
       'head.exited': 'process exited (code {code})',
       'head.exitCode': 'exit code {code}',
       'head.restarts': 'restarts: {n}',
-      'tabs.label': 'Section',
       'tabs.overview': 'Overview',
       'tabs.calls': 'Calls',
       'tabs.stats': 'Statistics',
-      'kpi.calls': 'calls',
-      'kpi.errors': 'errors',
-      'setSrv.title': 'Servers of this set',
-      'setSrv.hint': 'state comes from the running set',
-      'setSrv.caption': 'Servers of the selected set: type, state, isolation and tags',
+      'kpi.calls': 'calls · 7 days',
+      'kpi.errRate': 'error rate',
+      'kpi.p50': 'p50 latency',
+      'kpi.p95': 'p95 latency',
+      'setSrv.title': 'Servers',
+      'setSrv.add': 'Add server',
+      'setSrv.note': '{h} healthy · {f} failed · {u} not checked',
+      'setSrv.checking': 'checking {n} {serversW}…',
       'setSrv.thServer': 'Server',
       'setSrv.thType': 'Type',
-      'setSrv.thState': 'State',
-      'setSrv.thIso': 'Isolation',
-      'setSrv.thTags': 'Tags',
-      'setSrv.empty': 'the set has no servers',
-      'sets.title': 'Sets',
-      'sets.hint': 'one entry point per set · ports come from the manager',
-      'sets.caption': 'Sets with their ports, state and servers',
-      'sets.thSet': 'Set',
-      'sets.thPort': 'Port',
-      'sets.thState': 'State',
-      'sets.thServers': 'Servers',
-      'sets.thUptime': 'Uptime',
-      'sets.thCalls': 'Calls',
-      'sets.thErrors': 'Errors',
-      'sets.callsTip': 'for the period chosen on the statistics tab',
-      'tail.title': 'Recent calls',
-      'tail.all': 'all calls',
-      'tail.caption': 'The last eight calls of the selected set',
+      'setSrv.thState': 'Health',
+      'setSrv.thTools': 'Tools',
+      'setSrv.thLast': 'Last request',
+      'setSrv.thAct': 'Actions',
+      'setSrv.toolsTip': 'tool count comes from a probe of this server',
+      'setSrv.lastTip': 'from the last 100 calls',
+      'setSrv.emptyTitle': 'This set has no servers',
+      'setSrv.emptyText': 'Servers live in the host registry; attach one to give this set tools to serve.',
       'tail.thTime': 'Time',
       'tail.thServer': 'Server',
       'tail.thTool': 'Tool',
       'tail.thMs': 'ms',
       'tail.thStatus': 'Status',
-      'tail.empty': 'no calls yet — the set has not received requests',
-      'tail.span': 'latest {n}',
+      'tail.empty': 'No calls yet',
       'calls.search': 'Search calls',
-      'calls.ph': 'search calls',
+      'calls.ph': 'tool or client',
       'calls.onlyErr': 'errors only',
-      'calls.caption': 'Recent calls of the selected set',
       'calls.thClient': 'Client',
       'calls.unavailable': 'call metrics are unavailable: the /api/calls route is not up yet',
       'calls.of': '{n} of {m}',
       'calls.noMatch': 'nothing found — loosen the filter',
       'calls.bad': 'error',
       'calls.ok': 'ok',
-      'stats.period': 'Period',
+      'calls.emptyText': 'Requests appear here as soon as the set serves.',
       'stats.today': 'Today',
       'stats.7d': '7 days',
       'stats.30d': '30 days',
@@ -123,32 +114,46 @@
       'stats.all': 'all',
       'stats.reset': 'reset',
       'stats.approxTip': 'from the histogram',
-      'stats.byHour': 'Calls by hour',
-      'stats.byDay': 'Calls by days',
-      'stats.byMonth': 'Calls by months',
-      'stats.bars': 'Calls per bucket of the period',
-      'stats.noCalls': 'no calls in this period',
+      'stats.requests': 'Requests',
+      'stats.ok': 'ok',
+      'stats.errors': 'errors',
+      'stats.meta': '{calls} {callsW} · {errors} errors · p50 {p50} · p95 {p95}',
       'stats.topTools': 'Top tools',
-      'stats.byServer': 'By server',
-      'stats.byClient': 'By client',
-      'stats.noData': 'no data',
-      'stats.emptyStrong': 'Nothing to show',
+      'stats.byServer': 'Top servers',
+      'stats.bySet': 'By set',
+      'stats.byClient': 'Top clients',
+      'stats.thTool': 'Tool',
+      'stats.thServer': 'Server',
+      'stats.thSet': 'Set',
+      'stats.thClient': 'Client',
+      'stats.thCalls': 'Calls',
+      'stats.thErr': 'Err',
+      'stats.thP50': 'p50',
+      'stats.thP95': 'p95',
+      'stats.thShare': 'Share',
+      'stats.noData': 'no data in this period',
+      'stats.noPerSet': 'No per-set data',
+      'stats.noSets': 'per-set traffic appears when every set is selected',
+      'stats.noClients': 'no client data in this period',
+      'stats.emptyStrong': 'No requests in this period',
       'stats.emptyFilters': 'the filters narrowed the sample to zero — reset them or widen the period',
       'stats.emptyPeriod': 'no calls in the period “{p}”',
+      'stats.emptyPeriod2': 'This set recorded no requests in the selected period.',
+      'stats.resetFilters': 'Reset filters',
       'stats.unreach': 'no response: {list}',
       'stats.fail': 'the stats request failed: {msg}',
       'stats.more': '{n} more — narrow the filter',
       'stats.colTip': '{label} · {n} calls',
       'stats.colTipErr': '{label} · {n} calls, {err} errors',
-      'side.label': 'Set details',
-      'side.servers': 'Servers',
-      'side.env': 'Variables',
-      'side.log': 'Log',
-      'side.close': 'Close the panel',
+      'side.label': 'Details',
+      'side.servers': 'servers',
+      'side.env': 'variables',
+      'side.log': 'log',
+      'side.close': 'Close the details panel',
       'side.registry': 'host-wide registry',
-      'side.addServer': 'add server',
       'side.registryEmpty': 'registry is empty',
       'side.server': 'server',
+      'form.sub': 'Changes apply to the host registry and take effect on the next set restart.',
       'form.description': 'description',
       'form.transport': 'transport',
       'form.stdio': 'stdio — local process',
@@ -180,15 +185,18 @@
       'log.refresh': 'refresh',
       'log.empty': 'log is empty',
       'keys.title': 'Set keys',
-      'keys.thKey': 'Key',
-      'keys.thCreated': 'Created',
-      'keys.thNote': 'Note',
-      'keys.thAction': 'Action',
+      'keys.sub': 'A key authenticates one client. It is shown once, right after it is created.',
+      'keys.newLabel': 'New key label',
+      'keys.noteFor': 'Note for key {id}',
+      'keys.notePh': 'note',
       'keys.note': 'Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.',
       'keys.issue': 'issue a key',
+      'keys.once': 'Copy this key now — it is not shown again',
+      'keys.copy': 'Copy key',
       'keys.revoke': 'revoke',
       'keys.revoked': 'revoked {date}',
       'keys.active': 'active',
+      'keys.restartWarn': 'the note is saved, but the set did not restart: {err}',
       'status.running': 'running',
       'status.failed': 'failed',
       'status.stopped': 'stopped',
@@ -202,125 +210,108 @@
       'unit.tools': 'tools',
       'unit.h': 'h',
       'unit.m': 'm',
-      'unit.hour': 'h',
-      'unit.day': 'd',
-      'unit.month': 'mo',
       'unit.ms': '{n} ms',
-      'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
+      'schema.line': '{bytes} · {tokens} {tok}',
       'srv.edit': 'edit',
+      'srv.check': 'check',
       'srv.probe': 'probe',
-      'srv.probing': 'probing…',
       'srv.notProbed': 'not probed',
       'srv.notInSet': 'not in this set',
       'srv.setOff': 'set is not running',
       'srv.unchecked': 'not checked',
-      'srv.ok': 'health ok',
       'srv.noResponse': 'no response',
-      'srv.ok2': 'ok',
-      'srv.probeOk': 'probe ok · {ms} ms · {n} tools',
+      'srv.healthy': 'Healthy',
+      'srv.failed': 'Failed',
       'srv.probeFail': 'probe failed',
       'srv.notFound': 'server {name} is not in the registry',
-      'srv.noServers': 'no servers',
-      'top.updated': 'updated {time}',
-      'top.runningW': 'running',
       'err.offline': 'no connection to the daemon',
       'err.http': 'HTTP {status} · {path}',
-      'err.network': 'network error',
       'add.nameRequired': 'a name is required'
     },
     ru: {
       'title.panel': 'mcprig — панель',
       'title.set': 'mcprig — набор {name}',
+      'a11y.skip': 'Перейти к содержимому',
       'top.details': 'Детали',
       'top.lang': 'Язык',
       'top.theme': 'Цветовая схема',
-      'top.dim': 'Понизить яркость панели',
-      'top.who': 'Владимир',
-      'theme.light': 'Светлая',
+      'top.updatedLabel': 'обновлено',
+      'top.runningW': 'запущено',
       'rail.title': 'Наборы',
+      'rail.open': 'Открыть список наборов',
       'rail.collapse': 'Свернуть список наборов',
       'rail.expand': 'Развернуть список наборов',
       'rail.empty': 'наборов нет',
-      'rail.add': 'набор',
+      'rail.add': 'Новый набор',
       'rail.name': 'имя',
       'rail.port': 'порт',
       'rail.create': 'создать',
       'rail.item': '{name} · порт {port} · {state}',
       'common.cancel': 'отмена',
-      'common.hide': 'скрыть',
       'common.save': 'сохранить',
       'common.close': 'закрыть',
       'common.done': 'готово',
-      'empty.title': 'Нет наборов',
-      'empty.h': 'Соберите первый endpoint',
-      'empty.p': 'Набор получает порт из 9100–9199, ключ и один MCP-адрес на все свои серверы.',
-      'empty.s1': 'Добавьте сервер: stdio-команда или streamable-http URL.',
-      'empty.s2': 'Создайте набор и назначьте ему серверы.',
-      'empty.s3': 'Скопируйте endpoint и ключ в клиент.',
-      'empty.add': 'Создать набор',
+      'empty.title': 'Наборов пока нет',
+      'empty.p': 'Набор — это одна точка входа MCP со своим портом, серверами и ключами.',
+      'empty.add': 'Создать первый набор',
+      'head.endpoint': 'Адрес',
       'head.copy': 'копировать',
+      'head.copyTip': 'скопировать MCP-адрес набора',
       'head.copied': 'скопировано',
       'head.copyFail': 'не удалось',
-      'head.setName': 'Набор {name}',
-      'head.key': 'ключ',
+      'head.key': 'Ключ',
       'head.keyTip': 'показывается только префикс',
       'head.keyOpen': 'набор открыт',
+      'head.copyKey': 'Скопировать ключ',
       'head.noKey': 'ключа нет',
       'head.schemaTip': 'сколько контекста стоит перечень инструментов набора',
+      'head.servers': 'Серверов',
+      'head.tools': 'Инструментов',
       'head.keys': 'Ключи',
       'head.start': 'Запустить',
       'head.restart': 'Перезапустить',
+      'head.stop': 'Остановить',
       'head.stopped': 'набор остановлен',
       'head.exited': 'процесс завершился (code {code})',
       'head.exitCode': 'код выхода {code}',
       'head.restarts': 'автоперезапусков: {n}',
-      'tabs.label': 'Раздел',
       'tabs.overview': 'Обзор',
       'tabs.calls': 'Вызовы',
       'tabs.stats': 'Статистика',
-      'kpi.calls': 'вызовов',
-      'kpi.errors': 'ошибок',
-      'setSrv.title': 'Серверы набора',
-      'setSrv.hint': 'состояние — из запущенного набора',
-      'setSrv.caption': 'Серверы выбранного набора: тип, состояние, изоляция и теги',
+      'kpi.calls': 'вызовов · 7 дней',
+      'kpi.errRate': 'доля ошибок',
+      'kpi.p50': 'задержка p50',
+      'kpi.p95': 'задержка p95',
+      'setSrv.title': 'Серверы',
+      'setSrv.add': 'Добавить сервер',
+      'setSrv.note': 'здоровых {h} · со сбоем {f} · без проверки {u}',
+      'setSrv.checking': 'проверяем серверы: {n}…',
       'setSrv.thServer': 'Сервер',
       'setSrv.thType': 'Тип',
-      'setSrv.thState': 'Состояние',
-      'setSrv.thIso': 'Изоляция',
-      'setSrv.thTags': 'Теги',
-      'setSrv.empty': 'в наборе нет серверов',
-      'sets.title': 'Наборы',
-      'sets.hint': 'одна точка входа на набор · порты выдаёт менеджер',
-      'sets.caption': 'Наборы, их порты, состояние и серверы',
-      'sets.thSet': 'Набор',
-      'sets.thPort': 'Порт',
-      'sets.thState': 'Состояние',
-      'sets.thServers': 'Серверов',
-      'sets.thUptime': 'Аптайм',
-      'sets.thCalls': 'Вызовов',
-      'sets.thErrors': 'Ошибок',
-      'sets.callsTip': 'за период, выбранный на вкладке статистики',
-      'tail.title': 'Последние вызовы',
-      'tail.all': 'все вызовы',
-      'tail.caption': 'Восемь последних вызовов выбранного набора',
+      'setSrv.thState': 'Здоровье',
+      'setSrv.thTools': 'Инструментов',
+      'setSrv.thLast': 'Последний вызов',
+      'setSrv.thAct': 'Действия',
+      'setSrv.toolsTip': 'число инструментов — из проверки этого сервера',
+      'setSrv.lastTip': 'по последним 100 вызовам',
+      'setSrv.emptyTitle': 'В наборе нет серверов',
+      'setSrv.emptyText': 'Серверы живут в реестре хоста; подключите один, чтобы у набора появились инструменты.',
       'tail.thTime': 'Время',
       'tail.thServer': 'Сервер',
       'tail.thTool': 'Инструмент',
       'tail.thMs': 'мс',
       'tail.thStatus': 'Статус',
-      'tail.empty': 'вызовов пока нет — набор ещё не получал запросов',
-      'tail.span': 'последние {n}',
-      'calls.search': 'Поиск по вызовам',
-      'calls.ph': 'поиск по вызовам',
+      'tail.empty': 'вызовов пока нет',
+      'calls.search': 'Поиск вызовов',
+      'calls.ph': 'инструмент или клиент',
       'calls.onlyErr': 'только ошибки',
-      'calls.caption': 'Последние вызовы выбранного набора',
       'calls.thClient': 'Клиент',
-      'calls.unavailable': 'метрики вызовов недоступны: роут /api/calls ещё не поднят',
+      'calls.unavailable': 'метрики вызовов недоступны: маршрут /api/calls ещё не поднят',
       'calls.of': '{n} из {m}',
-      'calls.noMatch': 'ничего не нашлось — ослабьте фильтр',
+      'calls.noMatch': 'ничего не найдено — ослабьте фильтр',
       'calls.bad': 'ошибка',
-      'calls.ok': 'ok',
-      'stats.period': 'Период',
+      'calls.ok': 'ок',
+      'calls.emptyText': 'Запросы появятся здесь, как только набор начнёт их принимать.',
       'stats.today': 'Сегодня',
       'stats.7d': '7 дней',
       'stats.30d': '30 дней',
@@ -333,53 +324,67 @@
       'stats.all': 'все',
       'stats.reset': 'сбросить',
       'stats.approxTip': 'по гистограмме',
-      'stats.byHour': 'Вызовы по часам',
-      'stats.byDay': 'Вызовы по дням',
-      'stats.byMonth': 'Вызовы по месяцам',
-      'stats.bars': 'Вызовы по корзинам периода',
-      'stats.noCalls': 'в этом периоде вызовов нет',
+      'stats.requests': 'Запросы',
+      'stats.ok': 'ок',
+      'stats.errors': 'ошибки',
+      'stats.meta': '{calls} {callsW} · ошибок {errors} · p50 {p50} · p95 {p95}',
       'stats.topTools': 'Топ инструментов',
-      'stats.byServer': 'По серверам',
-      'stats.byClient': 'По клиентам',
-      'stats.noData': 'данных нет',
-      'stats.emptyStrong': 'Статистике нечего показать',
-      'stats.emptyFilters': 'фильтры сузили выборку до нуля — сбросьте их или возьмите период пошире',
-      'stats.emptyPeriod': 'за период «{p}» вызовов нет',
+      'stats.byServer': 'Топ серверов',
+      'stats.bySet': 'По наборам',
+      'stats.byClient': 'Топ клиентов',
+      'stats.thTool': 'Инструмент',
+      'stats.thServer': 'Сервер',
+      'stats.thSet': 'Набор',
+      'stats.thClient': 'Клиент',
+      'stats.thCalls': 'Вызовов',
+      'stats.thErr': 'Ошибок',
+      'stats.thP50': 'p50',
+      'stats.thP95': 'p95',
+      'stats.thShare': 'Доля',
+      'stats.noData': 'в этом периоде данных нет',
+      'stats.noPerSet': 'Нет данных по наборам',
+      'stats.noSets': 'разбивка по наборам видна при выборе всех наборов',
+      'stats.noClients': 'в этом периоде нет данных по клиентам',
+      'stats.emptyStrong': 'В этом периоде запросов нет',
+      'stats.emptyFilters': 'фильтры сузили выборку до нуля — сбросьте их или расширьте период',
+      'stats.emptyPeriod': 'в периоде «{p}» вызовов нет',
+      'stats.emptyPeriod2': 'В выбранном периоде у набора нет запросов.',
+      'stats.resetFilters': 'Сбросить фильтры',
       'stats.unreach': 'нет ответа: {list}',
-      'stats.fail': 'запрос срезов не удался: {msg}',
+      'stats.fail': 'запрос статистики не удался: {msg}',
       'stats.more': 'ещё {n} — сузьте фильтр',
-      'stats.colTip': '{label} · {n} вызовов',
-      'stats.colTipErr': '{label} · {n} вызовов, ошибок {err}',
-      'side.label': 'Детали набора',
-      'side.servers': 'Серверы',
-      'side.env': 'Переменные',
-      'side.log': 'Лог',
-      'side.close': 'Закрыть панель',
+      'stats.colTip': '{label} · вызовов {n}',
+      'stats.colTipErr': '{label} · вызовов {n}, ошибок {err}',
+      'side.label': 'Детали',
+      'side.servers': 'серверы',
+      'side.env': 'переменные',
+      'side.log': 'лог',
+      'side.close': 'Закрыть панель деталей',
       'side.registry': 'общий реестр хоста',
-      'side.addServer': 'добавить сервер',
       'side.registryEmpty': 'реестр пуст',
       'side.server': 'сервер',
+      'form.sub': 'Изменения попадают в реестр хоста и действуют после перезапуска набора.',
       'form.description': 'описание',
       'form.transport': 'транспорт',
       'form.stdio': 'stdio — локальный процесс',
       'form.http': 'http — удалённый endpoint',
-      'form.command': 'команда · по строке на аргумент',
+      'form.command': 'команда · один аргумент на строку',
       'form.cwd': 'рабочий каталог',
       'form.headers': 'заголовки · K: V',
-      'form.env': 'env · KEY=значение',
-      'form.envAllow': 'envAllow · по строке',
+      'form.env': 'env · KEY=value',
+      'form.envAllow': 'envAllow · по одному на строку',
       'form.tags': 'теги · через запятую',
       'form.enabled': 'включён',
       'form.sandbox': 'песочница',
-      'form.sandboxHint': 'mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · пусто — умолчание',
-      'form.unset': 'не задан',
-      'form.ro': 'ro · по строке',
-      'form.rw': 'rw · по строке',
+      'form.sandboxHint': 'mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · пусто — значение по умолчанию',
+      'form.unset': 'не задано',
+      'form.ro': 'ro · по одному на строку',
+      'form.rw': 'rw · по одному на строку',
       'form.delete': 'удалить сервер',
       'form.editing': 'сервер · {name}',
       'form.new': 'новый сервер',
       'form.create': 'создать',
-      'form.deleteConfirm': 'Удалить сервер {name} из общего реестра? Он исчезнет из наборов, которые его используют.',
+      'form.deleteConfirm': 'Удалить сервер {name} из реестра хоста? Он исчезнет из наборов, где используется.',
       'env.empty': 'переменных нет',
       'env.note': 'значения подставляет процесс набора — панель их не хранит и не показывает',
       'env.set': 'задана',
@@ -390,17 +395,20 @@
       'log.refresh': 'обновить',
       'log.empty': 'лог пуст',
       'keys.title': 'Ключи набора',
-      'keys.thKey': 'Ключ',
-      'keys.thCreated': 'Создан',
-      'keys.thNote': 'Примечание',
-      'keys.thAction': 'Действие',
-      'keys.note': 'Токен знает только тот, кто его выпустил: панель показывает лишь первые 8 символов. Отзыв ключа действует без перезапуска набора.',
+      'keys.sub': 'Ключ аутентифицирует одного клиента. Он показывается один раз — сразу после создания.',
+      'keys.newLabel': 'Подпись нового ключа',
+      'keys.noteFor': 'Подпись для ключа {id}',
+      'keys.notePh': 'подпись',
+      'keys.note': 'Токен знает только тот, кто его выпустил: панель показывает первые 8 символов. Отзыв ключа действует без перезапуска набора.',
       'keys.issue': 'выпустить ключ',
+      'keys.once': 'Скопируйте ключ сейчас — он больше не покажется',
+      'keys.copy': 'Скопировать ключ',
       'keys.revoke': 'отозвать',
       'keys.revoked': 'отозван {date}',
-      'keys.active': 'действует',
+      'keys.active': 'активен',
+      'keys.restartWarn': 'подпись сохранена, но набор не перезапустился: {err}',
       'status.running': 'работает',
-      'status.failed': 'упал',
+      'status.failed': 'сбой',
       'status.stopped': 'остановлен',
       'iso.okTip': 'песочница bwrap применена',
       'iso.none': 'без изоляции',
@@ -409,33 +417,25 @@
       'unit.b': 'Б',
       'unit.kb': 'КБ',
       'unit.tokens': 'ток',
-      'unit.tools': 'инстр.',
+      'unit.tools': 'инструментов',
       'unit.h': 'ч',
       'unit.m': 'м',
-      'unit.hour': 'ч',
-      'unit.day': 'дн',
-      'unit.month': 'мес',
       'unit.ms': '{n} мс',
-      'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
+      'schema.line': '{bytes} · {tokens} {tok}',
       'srv.edit': 'изменить',
-      'srv.probe': 'проверить',
-      'srv.probing': 'проверка…',
-      'srv.notProbed': 'не проверялся',
+      'srv.check': 'проверить',
+      'srv.probe': 'проба',
+      'srv.notProbed': 'без пробы',
       'srv.notInSet': 'не в наборе',
       'srv.setOff': 'набор не запущен',
       'srv.unchecked': 'не проверено',
-      'srv.ok': 'health ok',
       'srv.noResponse': 'нет ответа',
-      'srv.ok2': 'ok',
-      'srv.probeOk': 'проверка ok · {ms} мс · инструментов {n}',
-      'srv.probeFail': 'проверка не удалась',
+      'srv.healthy': 'Здоров',
+      'srv.failed': 'Сбой',
+      'srv.probeFail': 'проба не удалась',
       'srv.notFound': 'сервер {name} не найден в реестре',
-      'srv.noServers': 'серверов нет',
-      'top.updated': 'обновлено {time}',
-      'top.runningW': 'запущено',
       'err.offline': 'нет связи с демоном',
       'err.http': 'HTTP {status} · {path}',
-      'err.network': 'ошибка сети',
       'add.nameRequired': 'имя обязательно'
     }
   };
@@ -451,10 +451,14 @@
   var PLURAL = {
     set: { en: ['set', 'sets'], ru: ['набор', 'набора', 'наборов'] },
     server: { en: ['server', 'servers'], ru: ['сервер', 'сервера', 'серверов'] },
-    call: { en: ['call', 'calls'], ru: ['вызов', 'вызова', 'вызовов'] }
+    call: { en: ['call', 'calls'], ru: ['вызов', 'вызова', 'вызовов'] },
+    tool: { en: ['tool', 'tools'], ru: ['инструмент', 'инструмента', 'инструментов'] },
+    client: { en: ['client', 'clients'], ru: ['клиент', 'клиента', 'клиентов'] }
   };
 
   function word(n, kind) {
+    // неизвестный род — не повод ронять рендер: отдаём само слово
+    if (!PLURAL[kind]) { return kind; }
     var f = PLURAL[kind][lang];
     if (lang !== 'ru') { return n === 1 ? f[0] : f[1]; }
     if (n % 10 === 1 && n % 100 !== 11) { return f[0]; }
@@ -504,7 +508,9 @@
   var linkId = (/^#\/set\/([^/]+)$/.exec(location.hash) || [])[1];
   var st = {
     sets: [], servers: [], sel: linkId ? decodeURIComponent(linkId) : null,
-    health: null, calls: null, env: [], logKey: '', errTimer: 0, busy: false, boot: !!linkId,
+    health: null, calls: null, kpi: null, env: [], logKey: '', errTimer: 0, busy: false, boot: !!linkId,
+    // probe — доказательства строки «Проверить»: они свежее кэша health (15 с)
+    probeTools: {}, probeHealth: {}, healthBusy: false,
     tab: 'overview', sideTab: 'servers', railPref: '',
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
@@ -519,22 +525,6 @@
     if (cls) { n.className = cls; }
     if (text != null) { n.textContent = String(text); }
     return n;
-  }
-
-  // Щит одинаков для всех состояний: цвет и подпись несут смысл, иконка — узнавание
-  function shield() {
-    var ns = 'http://www.w3.org/2000/svg';
-    var s = document.createElementNS(ns, 'svg');
-    s.setAttribute('viewBox', '0 0 24 24');
-    s.setAttribute('fill', 'none');
-    s.setAttribute('stroke', 'currentColor');
-    s.setAttribute('stroke-width', '1.8');
-    s.setAttribute('stroke-linejoin', 'round');
-    s.setAttribute('aria-hidden', 'true');
-    var p = document.createElementNS(ns, 'path');
-    p.setAttribute('d', 'M12 3l7 3.5V12c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6.5z');
-    s.appendChild(p);
-    return s;
   }
 
   // isolation из list_servers/health: bwrap — норма, «без изоляции: причина» —
@@ -565,9 +555,10 @@
     });
   }
 
+  // проценты — Intl: сам ставит "4.8%" в английском и "4,8 %" в русском
   function pct(fail, all) {
     if (!all) { return '—'; }
-    return numFmt({ minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(fail / all * 100) + ' %';
+    return numFmt({ style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(fail / all);
   }
 
   function mins(n) { return (n < 10 ? '0' : '') + n; }
@@ -608,15 +599,6 @@
     if (r.running) { return { cls: 'ok', text: t('status.running') }; }
     if (r.error || (r.exitCode != null && r.exitCode > 0)) { return { cls: 'err', text: t('status.failed') }; }
     return { cls: 'warn', text: t('status.stopped') };
-  }
-
-  // pctl — перцентиль по уже отсортированному массиву чисел.
-  function pctl(sorted, p) {
-    if (!sorted.length) { return null; }
-    var i = (sorted.length - 1) * p;
-    var lo = Math.floor(i), hi = Math.ceil(i);
-    if (lo === hi) { return sorted[lo]; }
-    return Math.round(sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo));
   }
 
   function ms(v) { return v == null ? '—' : t('unit.ms', { n: fmtN(v) }); }
@@ -993,219 +975,196 @@
       if (!data) { return; }
       st.sets = data.sets || [];
       st.servers = data.servers || [];
-      renderTop();
+      renderChrome();
       renderRail();
-      renderSetsTable();
+      renderServers(st.health);
       fillFilters();
       var ids = st.sets.map(function (s) { return s.id; });
       if (ids.indexOf(st.sel) === -1) { select(ids[0] || null); }
       else if (st.boot) { st.boot = false; select(st.sel, true); }
-      else { renderHead(); }
+      else { renderHead(); renderSetServers(); }
     }).catch(function (e) { fail(e.message, e); });
   }
 
-  function renderTop() {
+  // Шапка метрик не несёт: счётчики хоста живут в статусбаре, как в макете.
+  function renderChrome() {
     var running = st.sets.filter(function (s) { return s.runtime && s.runtime.running; }).length;
-    var setsW = word(st.sets.length, 'set');
-    var srvW = word(st.servers.length, 'server');
-    $('c-sets').textContent = fmtN(st.sets.length);
-    $('c-servers').textContent = fmtN(st.servers.length);
-    $('c-running').textContent = fmtN(running);
-    $('f-sets').textContent = fmtN(st.sets.length);
-    $('f-servers').textContent = fmtN(st.servers.length);
-    $('f-running').textContent = fmtN(running);
-    $('c-sets-w').textContent = setsW;
-    $('c-servers-w').textContent = srvW;
-    $('c-running-w').textContent = t('top.runningW');
-    $('f-sets-w').textContent = setsW;
-    $('f-servers-w').textContent = srvW;
-    $('f-running-w').textContent = t('top.runningW');
-    $('f-updated').textContent = t('top.updated', { time: clock() });
-    $('rail-count').textContent = fmtN(st.sets.length);
-    $('sets-count').textContent = fmtN(st.sets.length);
-
     var none = st.sets.length === 0;
+    $('status-counts').textContent = [
+      fmtN(st.sets.length) + ' ' + word(st.sets.length, 'set'),
+      fmtN(st.servers.length) + ' ' + word(st.servers.length, 'server'),
+      fmtN(running) + ' ' + t('top.runningW')
+    ].join(' · ');
+    $('f-updated').textContent = clock();
+    $('rail-count').textContent = fmtN(st.sets.length);
     show($('empty-state'), none);
     show($('rail-empty'), none);
     show($('phead'), !none);
     show($('tabs'), !none);
-    show($('region'), !none);
-    show($('kpis'), !none);
-    overviewBlocks();
-    if (none) { renderKpis(null); renderServers(null); renderLog([]); renderSetServers(); }
+    applyTab(none ? null : st.tab);
+    // адрес и крошки повторяют открытое; наборы приходят и без выбора
+    var set = current();
+    $('crumb-set').textContent = set ? (set.name || set.id) : '—';
+    $('endpoint').textContent = set
+      ? 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp' : '—';
+    if (none) { renderKpis(null); renderSetServers(); }
   }
 
-  // Наборы уже в рельсе: на странице набора второй их список ничего не добавляет.
-  // Поэтому там — серверы этого набора, а список наборов живёт только на обзоре.
-  function overviewBlocks() {
-    var none = st.sets.length === 0;
-    show($('sets-block'), !none && !st.sel);
-    show($('set-srv-block'), !none && !!st.sel);
-  }
-
+  // Рейл: личность набора и состояние. Цифр трафика здесь нет — они в наборе.
   function renderRail() {
     sync($('rail-sets'), st.sets, function (s) { return s.id; },
       function () {
-        var a = el('a', 'setrow');
-        a.appendChild(el('span', 'dot'));
-        var body = a.appendChild(el('span', 'sbody'));
-        body.appendChild(el('span', 'sname od-truncate'));
-        var meta = body.appendChild(el('span', 'smeta'));
-        meta.appendChild(el('span', 'sport n'));
-        meta.appendChild(el('span', 'srate'));
-        return a;
+        var b = el('button', 'set-item');
+        b.type = 'button';
+        var body = b.appendChild(el('span', 'set-body'));
+        body.appendChild(el('span', 'set-name'));
+        body.appendChild(el('span', 'set-sub'));
+        var state = b.appendChild(el('span', 'state'));
+        state.appendChild(el('span', 'dot'));
+        return b;
       },
-      function (a, s) {
+      function (b, s) {
         var state = setState(s);
         var name = s.name || s.id;
-        a.href = '#/set/' + s.id;
-        a.dataset.id = s.id;
-        a.classList.toggle('is-active', s.id === st.sel);
-        if (s.id === st.sel) { a.setAttribute('aria-current', 'true'); } else { a.removeAttribute('aria-current'); }
-        a.querySelector('.dot').className = 'dot ' + state.cls;
-        a.querySelector('.sname').textContent = name;
-        a.querySelector('.sport').textContent = ':' + s.port;
-        var rate = a.querySelector('.srate');
-        var names = s.servers || [];
-        if (state.cls === 'ok') {
-          var n = names.length;
-          rate.textContent = n + ' ' + word(n, 'server');
-        } else {
-          rate.textContent = state.text;
-        }
-        var label = t('rail.item', { name: name, port: s.port, state: state.text });
-        a.title = label + (names.length ? '\n' + names.join(', ') : '');
-        a.setAttribute('aria-label', label);
+        var on = s.id === st.sel;
+        b.dataset.id = s.id;
+        if (on) { b.setAttribute('aria-current', 'true'); } else { b.removeAttribute('aria-current'); }
+        b.querySelector('.set-name').textContent = name;
+        b.querySelector('.set-sub').textContent = ':' + s.port + ' · ' + state.text;
+        b.querySelector('.state').className = 'state' + (state.cls === 'ok' ? ' state-running'
+          : state.cls === 'err' ? ' state-failed' : ' state-stopped');
+        b.setAttribute('aria-label', t('rail.item', { name: name, port: s.port, state: state.text }));
       });
   }
 
-  // Вызовы и ошибки по наборам за выбранный период: их отдаёт /api/stats?set=all
-  // полем bySet. Старый демон поля не знает — тогда честный прочерк.
-  function bySetCounters() {
-    var d = st.st.data;
-    if (!d || !Array.isArray(d.bySet)) { return null; }
+  function healthy(h) { return !!(h && h.healthy === true && !h.unknown); }
+
+  // Три честных состояния и «не проверено»: пустое здоровье — не «ок».
+  function badgeState(h, running) {
+    if (!running) { return { cls: 'badge-unknown', text: t('srv.setOff'), hollow: true }; }
+    if (!h) { return { cls: 'badge-unknown', text: t('srv.notProbed'), hollow: true }; }
+    if (h.healthy === false) { return { cls: 'badge-err', text: t('srv.failed') }; }
+    if (h.unknown) { return { cls: 'badge-unknown', text: t('srv.unchecked'), hollow: true }; }
+    return { cls: 'badge-ok', text: t('srv.healthy') };
+  }
+
+  // Последний вызов по серверу — из того же хвоста, что и вкладка «Вызовы».
+  function lastByServer() {
     var map = {};
-    d.bySet.forEach(function (r) { map[r.set] = r; });
+    ((st.calls && st.calls.calls) || []).forEach(function (c) {
+      var at = new Date(c.time).getTime();
+      if (!c.server || isNaN(at)) { return; }
+      if (!map[c.server] || map[c.server] < at) { map[c.server] = at; }
+    });
     return map;
   }
 
-  // Счётчики выбранного набора для полосы KPI: они живут в его процессе.
-  function aggregated(data) {
-    var c = ((data || st.calls) && (data || st.calls).counters) || [];
-    var all = { calls: 0, failures: 0 };
-    c.forEach(function (row) {
-      all.calls += row.calls || 0;
-      all.failures += row.failures || 0;
-    });
-    return all;
-  }
+  /* ---------- серверы набора ---------- */
 
-  // Перцентили меряем по хвосту вызовов: у счётчиков они по каждому срезу отдельно
-  // и складываются в общий только взвешенно, а это уже не тот перцентиль.
-  function tailPercentiles(rows) {
-    var sorted = rows.map(function (r) { return Number(r.ms) || 0; }).sort(function (a, b) { return a - b; });
-    return { p50: pctl(sorted, 0.5), p95: pctl(sorted, 0.95) };
-  }
-
-  // Состав набора — одной строкой под именем: плашки переносились и раздували
-  // строку таблицы на узкой основной колонке.
-  function srvsLine(box, names) {
-    box.textContent = names.length ? names.join(' · ') : t('srv.noServers');
-  }
-
-  function renderSetsTable() {
-    var per = bySetCounters();
-    sync($('sets-body'), st.sets, function (s) { return s.id; },
-      function () {
-        var tr = el('tr', 'is-click');
-        var name = tr.appendChild(el('td', 'tb-name'));
-        name.appendChild(el('span', 'setlabel'));
-        name.appendChild(el('span', 'srvs'));
-        tr.appendChild(el('td', 'portcell hide-sm'));
-        var cell = tr.appendChild(el('td'));
-        var pill = cell.appendChild(el('span', 'state'));
-        pill.appendChild(el('span', 'dot'));
-        pill.appendChild(document.createTextNode(' '));
-        pill.appendChild(el('span'));
-        tr.appendChild(el('td', 'num hide-sm'));
-        tr.appendChild(el('td', 'n hide-md'));
-        tr.appendChild(el('td', 'num'));
-        tr.appendChild(el('td', 'num'));
-        return tr;
-      },
-      function (tr, s) {
-        var state = setState(s);
-        var pill = tr.children[2].querySelector('.state');
-        tr.classList.toggle('row-warn', state.cls !== 'ok');
-        var cell = tr.children[0];
-        var names = s.servers || [];
-        cell.firstChild.textContent = s.name || s.id;
-        srvsLine(cell.querySelector('.srvs'), names);
-        cell.title = names.length ? names.join(', ') : t('srv.noServers');
-        tr.children[1].textContent = s.port;
-        pill.querySelector('.dot').className = 'dot ' + state.cls;
-        pill.lastChild.textContent = state.text;
-        tr.children[3].textContent = names.length;
-        tr.children[4].textContent = uptime(s);
-        var row = per ? per[s.id] : null;
-        tr.children[5].textContent = per ? fmtN(row ? row.calls : 0) : '—';
-        tr.children[6].textContent = per ? pct(row ? row.failures : 0, row ? row.calls : 0) : '—';
-        tr.dataset.id = s.id;
-      });
-  }
-
-  /* ---------- выбранный набор ---------- */
-
-  // Состав выбранного набора с состоянием и изоляцией: данные уже в st.sets[sel]
-  // и st.health, отдельного запроса не нужно.
   function renderSetServers() {
     var set = current();
     var names = (set && set.servers) || [];
+    var running = !!(set && set.runtime && set.runtime.running);
     var health = (st.health && st.health.servers) || [];
+    var last = lastByServer();
     var rows = names.map(function (name) {
       return {
         name: name,
         srv: st.servers.filter(function (s) { return s.name === name; })[0] || null,
-        health: health.filter(function (x) { return x.name === name; })[0] || null
+        health: st.probeHealth[name] || health.filter(function (x) { return x.name === name; })[0] || null
       };
     });
-    $('set-srv-count').textContent = fmtN(rows.length);
+    var ok = rows.filter(function (r) { return healthy(r.health); }).length;
+    var bad = rows.filter(function (r) { return r.health && r.health.healthy === false; }).length;
+    var un = rows.length - ok - bad;
+    $('set-srv-note').textContent = st.healthBusy && running
+      ? t('setSrv.checking', { n: fmtN(rows.length), serversW: word(rows.length, 'server') })
+      : running ? t('setSrv.note', { h: fmtN(ok), f: fmtN(bad), u: fmtN(un) })
+        : t('srv.setOff');
     show($('set-srv-empty'), rows.length === 0);
     sync($('set-srv-body'), rows, function (r) { return r.name; },
       function () {
-        var tr = el('tr', 'is-click');
-        var nm = tr.appendChild(el('td', 'tb-name'));
-        nm.appendChild(el('span', 'setlabel'));
-        tr.appendChild(el('td', 'hide-sm'));
-        var cell = tr.appendChild(el('td'));
-        var pill = cell.appendChild(el('span', 'state'));
-        pill.appendChild(el('span', 'dot'));
-        pill.appendChild(document.createTextNode(' '));
-        pill.appendChild(el('span'));
-        tr.appendChild(el('td', 'hide-md'));
-        tr.appendChild(el('td', 'hide-sm'));
+        var tr = el('tr');
+        var nm = tr.appendChild(el('td', 'cell-name'));
+        nm.dataset.label = t('setSrv.thServer');
+        nm.appendChild(el('span', 'sv-name'));
+        nm.appendChild(el('span', 'cell-sub'));
+        var ty = tr.appendChild(el('td'));
+        ty.dataset.label = t('setSrv.thType');
+        ty.appendChild(el('span', 'chip'));
+        var stc = tr.appendChild(el('td'));
+        stc.dataset.label = t('setSrv.thState');
+        stc.appendChild(el('span', 'badge badge-unknown'));
+        var tools = tr.appendChild(el('td', 'num'));
+        tools.dataset.label = t('setSrv.thTools');
+        tools.title = t('setSrv.toolsTip');
+        var when = tr.appendChild(el('td', 'cell-time hide-sm'));
+        when.dataset.label = t('setSrv.thLast');
+        when.title = t('setSrv.lastTip');
+        var act = tr.appendChild(el('td', 'cell-actions'));
+        var check = act.appendChild(el('button', 'btn btn-xs'));
+        check.type = 'button';
+        check.dataset.check = '';
+        var edit = act.appendChild(el('button', 'btn btn-xs'));
+        edit.type = 'button';
+        edit.dataset.edit = '';
         return tr;
       },
       function (tr, row) {
         var h = row.health;
-        var cls = 'warn';
-        var note = h ? t('srv.unchecked') : t('srv.setOff');
-        if (h && h.healthy === true && !h.unknown) { cls = 'ok'; note = t('srv.ok2'); }
-        if (h && h.healthy === false) { cls = 'err'; note = t('srv.noResponse'); }
-        tr.children[0].firstChild.textContent = row.name;
-        tr.children[0].title = row.name;
-        tr.children[1].textContent = (row.srv && row.srv.transport) || '—';
-        var pill = tr.children[2].querySelector('.state');
-        pill.querySelector('.dot').className = 'dot ' + cls;
-        pill.lastChild.textContent = note;
-        pill.title = (h && h.error) || '';
-        var iso = isoOf(h && h.isolation);
-        var isoTd = tr.children[3];
-        isoTd.replaceChildren(iso ? el('span', 'badge', iso.label) : document.createTextNode('—'));
-        isoTd.title = iso ? iso.title : '';
-        tr.children[4].textContent = (row.srv && row.srv.tags && row.srv.tags.length) ? row.srv.tags.join(', ') : '—';
         tr.dataset.name = row.name;
+        tr.querySelector('.sv-name').textContent = row.name;
+        tr.children[0].title = (h && h.error) || row.name;
+        var iso = isoOf(h && h.isolation);
+        var err = (h && h.healthy === false && h.error) || '';
+        var sub = tr.querySelector('.cell-sub');
+        // вторая строка: причина отказа (текст демона, не перевод) → изоляция → описание
+        sub.textContent = err || (iso ? iso.label : '') || (row.srv && row.srv.description) || '';
+        sub.hidden = !sub.textContent;
+        sub.title = err || (iso ? iso.title : '') || '';
+        sub.className = 'cell-sub' + (err || (iso && iso.cls !== 'iso-ok') ? ' cell-iso' : '');
+        var srv = row.srv;
+        tr.querySelector('.chip').textContent =
+          (srv && srv.transport) || (srv && srv.command ? 'stdio' : srv && srv.url ? 'http' : '—');
+        var badge = tr.querySelector('.badge');
+        if (st.healthBusy && running) {
+          badge.className = 'badge badge-unknown';
+          badge.replaceChildren(el('span', 'skel'));
+        } else {
+          var st8 = badgeState(h, running);
+          badge.className = 'badge ' + st8.cls;
+          badge.replaceChildren(el('span', 'dot' + (st8.hollow ? ' dot-hollow' : '')),
+            document.createTextNode(st8.text));
+          badge.title = (h && h.error) || '';
+        }
+        tr.children[3].textContent = st.probeTools[row.name] != null ? fmtN(st.probeTools[row.name]) : '—';
+        tr.children[4].textContent = last[row.name] ? hm(last[row.name]) : '—';
+        var check = tr.querySelector('[data-check]');
+        check.textContent = t('srv.check');
+        check.dataset.check = row.name;
+        var edit = tr.querySelector('[data-edit]');
+        edit.textContent = t('srv.edit');
+        edit.dataset.edit = row.name;
       });
+  }
+
+  // Одна проба на оба списка: из неё же берётся число инструментов строки.
+  function probeServer(name, btn) {
+    if (btn) { btn.disabled = true; }
+    return send('POST', '/api/servers/' + encodeURIComponent(name) + '/probe').then(function (r) {
+      var before = ((st.health && st.health.servers) || []).filter(function (x) { return x.name === name; })[0];
+      if (r.ok) {
+        st.probeTools[name] = (r.tools || []).length;
+        st.probeHealth[name] = { name: name, healthy: true, isolation: before && before.isolation };
+      } else {
+        st.probeHealth[name] = { name: name, healthy: false, error: r.error || t('srv.noResponse') };
+      }
+      renderSetServers();
+      renderServers(st.health);
+      if (!r.ok) { fail(t('srv.probeFail') + ' · ' + (r.error || t('srv.noResponse'))); }
+    }).catch(function (e) {
+      fail(e.message, e);
+    }).then(function () { if (btn) { btn.disabled = false; } });
   }
 
   function current() {
@@ -1231,6 +1190,9 @@
     st.sel = id;
     st.health = null;
     st.calls = null;
+    st.probeTools = {};
+    st.probeHealth = {};
+    st.healthBusy = false;
     st.logKey = '';
     // статистика идёт за рельсом: свой фильтр набора начинается с текущего,
     // ручной выбор в списке фильтра живёт до следующего переключения набора
@@ -1245,7 +1207,7 @@
     }
     setTitle();
     renderRail();
-    overviewBlocks();
+    applyTab(st.tab);
     renderSetServers();
     renderHead();
     renderServers(null);
@@ -1266,18 +1228,32 @@
       show($('set-error'), false);
       $('k-calls').textContent = $('k-err').textContent = $('k-p50').textContent = $('k-p95').textContent = '—';
       $('schema').textContent = '—';
+      $('meta-tools').textContent = '—';
       return;
     }
     var state = setState(set);
-    $('set-name').textContent = t('head.setName', { name: set.name || set.id });
+    var name = set.name || set.id;
+    $('set-name').textContent = name;
+    $('crumb-set').textContent = name;
     $('set-port').textContent = ':' + set.port;
-    var pill = $('set-state');
-    pill.replaceChildren(el('span', 'dot ' + state.cls), document.createTextNode(state.text));
+    $('set-state').className = 'badge ' + (state.cls === 'ok' ? 'badge-ok'
+      : state.cls === 'err' ? 'badge-err' : 'badge-warn');
+    $('set-state-t').textContent = state.text;
     $('endpoint').textContent = 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp';
-    $('key').textContent = set.keyPrefix ? set.keyPrefix + '…' : (set.open ? t('head.keyOpen') : t('head.noKey'));
-    $('schema').textContent = schemaLine(st.calls && st.calls.schema);
-    $('run').textContent = set.runtime && set.runtime.running ? t('head.restart') : t('head.start');
-    $('dlg-set').textContent = set.name || set.id;
+    // только префикс: токена в панели нет и быть не может
+    $('key').textContent = set.keyPrefix ? set.keyPrefix + '…'
+      : (set.open ? t('head.keyOpen') : t('head.noKey'));
+    $('keys-count').textContent = fmtN((set.keys || []).length);
+    $('meta-servers').textContent = fmtN((set.servers || []).length);
+    var schema = (st.calls && st.calls.schema) || null;
+    $('meta-tools').textContent = schema ? fmtN(schema.tools) : '—';
+    $('schema').textContent = schemaLine(schema);
+    var running = !!(set.runtime && set.runtime.running);
+    // Stop — главное действие запущенного набора; перезапуск рядом и тише
+    $('run').textContent = running ? t('head.stop') : t('head.start');
+    $('run').className = running ? 'btn' : 'btn btn-primary';
+    show($('restart'), running);
+    $('dlg-set').textContent = name;
 
     var r = set.runtime || {};
     var bad = !r.running && (r.error || (r.exitCode != null && r.exitCode > 0));
@@ -1289,29 +1265,59 @@
       if (r.error) { lines.push(r.error); }
       if (r.exitCode != null) { lines.push(t('head.exitCode', { code: r.exitCode })); }
       if (r.restarts) { lines.push(t('head.restarts', { n: r.restarts })); }
-      $('set-error-d').textContent = lines.join('\n');
+      $('set-error-d').textContent = lines.join(' · ');
     }
   }
 
+  // Полоса KPI — срез самого набора за 7 дней: не счётчики процесса, которые после
+  // рестарта начинаются с нуля, и не «сегодня», которое обнуляется в полночь.
+  function loadKpi() {
+    if (!st.sel) { renderKpis(null); return; }
+    var id = st.sel;
+    return get('/api/stats?set=' + encodeURIComponent(id) + '&period=7d&bucket=day')
+      .then(function (data) {
+        if (id !== st.sel) { return; }
+        st.kpi = data || null;
+        renderKpis(st.kpi);
+      })
+      .catch(function (e) { if (id === st.sel) { renderKpis(null); } fail(e.message, e); });
+  }
+
   function renderKpis(data) {
-    var agg = data ? aggregated() : null;
-    var pctls = data ? tailPercentiles(data.calls || []) : { p50: null, p95: null };
-    $('k-calls').textContent = agg ? fmtN(agg.calls) : '—';
-    $('k-calls-w').textContent = agg ? word(agg.calls, 'call') : t('kpi.calls');
-    $('k-err').textContent = agg ? pct(agg.failures, agg.calls) : '—';
-    $('k-p50').textContent = ms(pctls.p50);
-    $('k-p95').textContent = ms(pctls.p95);
+    var tot = data && data.totals;
+    $('k-calls').textContent = tot ? fmtN(tot.calls) : '—';
+    $('k-err').textContent = tot && tot.calls ? pct(tot.failures, tot.calls) : '—';
+    $('k-p50').textContent = tot ? ms(tot.p50ms) : '—';
+    $('k-p95').textContent = tot ? ms(tot.p95ms) : '—';
+    // прочерк бледнее цифры: пустая полоса не притворяется нулём
+    [].forEach.call(document.querySelectorAll('.kpi'), function (k) {
+      var n = k.querySelector('.kpi-num');
+      n.classList.toggle('is-muted', !tot || n.textContent === '—');
+    });
   }
 
   function loadHealth() {
     if (!st.sel) { return; }
     var id = st.sel;
+    // скелетон только когда здоровья ещё нет: тикер каждые 5 с не должен мигать
+    if (!st.health) {
+      st.healthBusy = true;
+      renderSetServers();
+    }
     return get('/api/sets/' + id + '/servers').then(function (data) {
       if (id !== st.sel) { return; }
       st.health = data;
+      st.healthBusy = false;
+      renderSetServers();
       renderServers(data);
-    }).catch(function (e) { fail(e.message, e); });
+    }).catch(function (e) {
+      st.healthBusy = false;
+      renderSetServers();
+      fail(e.message, e);
+    });
   }
+
+  /* ---------- реестр хоста (дровер «Детали») ---------- */
 
   function renderServers(health) {
     var set = current();
@@ -1319,69 +1325,55 @@
     // список — общий реестр хоста, а не состав набора: новый сервер виден сразу,
     // а принадлежность к набору помечена в строке
     var rows = st.servers.map(function (s) {
-      var h = null;
-      if (health && health.servers) {
-        h = health.servers.filter(function (x) { return x.name === s.name; })[0] || null;
-      }
-      return { name: s.name, health: h, mine: inSet.indexOf(s.name) >= 0 };
+      var h = health && health.servers
+        ? health.servers.filter(function (x) { return x.name === s.name; })[0] || null : null;
+      return { name: s.name, srv: s, health: h, mine: inSet.indexOf(s.name) >= 0 };
     });
     $('srv-count').textContent = fmtN(rows.length);
     show($('servers-empty'), rows.length === 0);
     sync($('servers'), rows, function (r) { return r.name; },
       function () {
-        var li = el('li', 'srv');
-        var top = li.appendChild(el('div', 'srv-top'));
-        top.appendChild(el('span', 'dot'));
-        top.appendChild(el('span', 'snm'));
-        top.appendChild(el('span', 'badge'));
-        var iso = top.appendChild(el('span', 'iso'));
-        iso.appendChild(shield());
-        iso.appendChild(el('span', 'iso-t'));
-        var foot = li.appendChild(el('div', 'srv-foot'));
-        foot.appendChild(el('span', 'srv-note'));
-        var edit = foot.appendChild(el('button', 'mini srv-edit'));
-        edit.type = 'button';
-        edit.dataset.act = 'edit';
-        var probe = foot.appendChild(el('button', 'mini'));
+        var tr = el('tr');
+        var nm = tr.appendChild(el('td', 'cell-name'));
+        nm.dataset.label = t('setSrv.thServer');
+        nm.appendChild(el('span', 'sv-name'));
+        nm.appendChild(el('span', 'cell-sub'));
+        var ty = tr.appendChild(el('td'));
+        ty.dataset.label = t('setSrv.thType');
+        ty.appendChild(el('span', 'chip'));
+        var act = tr.appendChild(el('td', 'cell-actions'));
+        var probe = act.appendChild(el('button', 'btn btn-xs'));
         probe.type = 'button';
-        probe.dataset.act = 'probe';
-        return li;
+        probe.dataset.probe = '';
+        var edit = act.appendChild(el('button', 'btn btn-xs'));
+        edit.type = 'button';
+        edit.dataset.regedit = '';
+        return tr;
       },
-      function (li, row) {
-        var srv = st.servers.filter(function (s) { return s.name === row.name; })[0];
+      function (tr, row) {
+        var srv = row.srv;
         var h = row.health;
-        var cls = 'warn';
-        // причина ошибки приходит от демона по-русски — её не переводим
-        var note = row.mine ? t('srv.notProbed') : t('srv.notInSet');
-        if (row.mine && health && !health.running) { note = t('srv.setOff'); }
-        if (row.mine && h && h.healthy === true && h.unknown) { cls = 'warn'; note = t('srv.unchecked'); }
-        if (row.mine && h && h.healthy === true && !h.unknown) { cls = 'ok'; note = t('srv.ok'); }
-        if (row.mine && h && h.healthy === false) { cls = 'err'; note = h.error || t('srv.noResponse'); }
-        li.querySelector('.dot').className = 'dot ' + cls;
-        li.querySelector('.snm').textContent = row.name;
-        li.querySelector('.snm').title = row.name;
-        var kind = (srv && srv.transport) || (srv && srv.command ? 'stdio' : srv && srv.url ? 'http' : '—');
-        li.querySelector('.badge').textContent = kind;
-        // изоляция живёт в health: у серверов вне набора её нет, и это честно
+        tr.dataset.name = row.name;
+        tr.querySelector('.sv-name').textContent = row.name;
         var iso = isoOf(h && h.isolation);
-        var ib = li.querySelector('.iso');
-        show(ib, !!iso);
-        if (iso) {
-          ib.className = 'iso ' + iso.cls;
-          ib.title = iso.title;
-          ib.setAttribute('aria-label', iso.title);
-          // тревогу видно и с клавиатуры; норма (bwrap) не отнимает tab-стоп
-          ib.tabIndex = iso.cls === 'iso-ok' ? -1 : 0;
-          ib.querySelector('.iso-t').textContent = iso.label;
-        }
-        var n = li.querySelector('.srv-note');
-        n.textContent = note;
-        n.title = note;
-        n.classList.toggle('is-err', cls === 'err');
-        li.querySelector('[data-act=probe]').dataset.server = row.name;
-        li.querySelector('[data-act=probe]').textContent = t('srv.probe');
-        li.querySelector('[data-act=edit]').dataset.edit = row.name;
-        li.querySelector('[data-act=edit]').textContent = t('srv.edit');
+        var sub = tr.querySelector('.cell-sub');
+        // причина ошибки приходит от демона по-русски — её не переводим
+        var note = !row.mine ? t('srv.notInSet')
+          : h && h.healthy === false ? (h.error || t('srv.noResponse'))
+            : h && h.healthy === true && h.unknown ? t('srv.unchecked')
+              : iso ? iso.label : (srv.description || '');
+        sub.textContent = note || '';
+        sub.hidden = !note;
+        sub.title = (h && h.error) || '';
+        sub.className = 'cell-sub' + (h && h.healthy === false ? ' cell-iso' : '');
+        tr.querySelector('.chip').textContent =
+          srv.transport || (srv.command ? 'stdio' : srv.url ? 'http' : '—');
+        var probe = tr.querySelector('[data-probe]');
+        probe.textContent = t('srv.probe');
+        probe.dataset.probe = row.name;
+        var edit = tr.querySelector('[data-regedit]');
+        edit.textContent = t('srv.edit');
+        edit.dataset.regedit = row.name;
       });
   }
 
@@ -1399,8 +1391,9 @@
 
   // закрытие: фокус возвращается на кнопку, которая форму открыла
   function closeSrv(back) {
-    if (srvForm().hidden) { return; }
-    srvForm().hidden = true;
+    var dlg = $('srv-dlg');
+    if (!dlg.open) { return; }
+    dlg.close();
     var target = back === false ? null : st.srvReturn;
     st.srvReturn = null;
     if (target && document.contains(target) && target.offsetParent !== null) { target.focus(); }
@@ -1512,7 +1505,8 @@
     $('srv-del').hidden = !name;
     $('srvform-h').textContent = name ? t('form.editing', { name: name }) : t('form.new');
     $('srv-save').textContent = name ? t('common.save') : t('form.create');
-    show(srvForm(), true);
+    var dlg = $('srv-dlg');
+    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
     // у существующего сервера имя не редактируется — фокус на описании
     srvForm().elements[srv ? 'description' : 'name'].focus();
   }
@@ -1568,54 +1562,24 @@
         data.counters = (data.counters || []).filter(mine);
       }
       st.calls = data;
-      renderKpis(st.calls);
+      loadKpi();
       renderCalls(st.calls);
-      renderTail(st.calls);
-      renderSetsTable();
-      $('schema').textContent = schemaLine(data && data.schema);
+      renderHead();
+      renderSetServers();
     }).catch(function (e) { fail(e.message, e); });
   }
 
   /* ---------- вкладка «Вызовы» ---------- */
 
-  // Восемь последних вызовов для «Обзора»: главное, что происходит сейчас,
-  // не открывая отдельную вкладку.
-  function renderTail(data) {
-    var body = $('tail-body');
-    var block = $('tail-block');
-    show(block, !!data);
-    if (!data) { return; }
-    var rows = (data.calls || []).slice(0, 8);
-    show($('tail-empty'), rows.length === 0);
-    $('tail-span').textContent = data.calls && data.calls.length ? t('tail.span', { n: fmtN(Math.min(8, data.calls.length)) }) : '—';
-    var frag = document.createDocumentFragment();
-    rows.forEach(function (c) {
-      var tr = el('tr', 'is-click');
-      tr.appendChild(el('td', 'n', clock(c.time)));
-      tr.appendChild(el('td', 'hide-xs', c.server || '—'));
-      var tool = tr.appendChild(el('td', 'mono'));
-      tool.appendChild(el('span', 'od-truncate', c.tool || '—'));
-      tool.title = c.tool || '';
-      var dur = tr.appendChild(el('td', 'num n hide-sm' + (c.ms > 1000 ? ' slow' : ''), fmtN(c.ms)));
-      dur.title = c.client || '';
-      var stc = tr.appendChild(el('td', 'num st n' + (c.failed ? ' bad' : ''), c.failed ? t('calls.bad') : t('calls.ok')));
-      stc.title = c.error || c.client || '';
-      tr.addEventListener('click', function () { setTab('calls'); });
-      frag.appendChild(tr);
-    });
-    body.replaceChildren(frag);
-  }
-
   function renderCalls(data) {
     var box = $('calls-body');
-    var scroll = box.closest('.tw');
-    var keep = scroll ? scroll.scrollTop : 0;
+    var note = $('calls-note');
 
     if (!data) {
       box.replaceChildren();
-      $('calls-count').textContent = '0';
-      show($('calls-note'), true);
-      $('calls-note').textContent = t('calls.unavailable');
+      $('calls-count').textContent = cnt(0, 'call');
+      show(note, true);
+      note.querySelector('.empty-text').textContent = t('calls.unavailable');
       return;
     }
 
@@ -1631,24 +1595,31 @@
     var frag = document.createDocumentFragment();
     rows.forEach(function (c) {
       var tr = el('tr');
-      tr.appendChild(el('td', 'n', clock(c.time)));
-      tr.appendChild(el('td', '', c.server || '—'));
-      tr.appendChild(el('td', 'mono', c.tool || '—'));
-      tr.appendChild(el('td', 'hide-md', c.client || '—'));
-      var dur = tr.appendChild(el('td', 'num n' + (c.ms > 1000 ? ' slow' : ''), fmtN(c.ms)));
-      dur.classList.add('hide-xs');
-      var stc = tr.appendChild(el('td', 'num st n' + (c.failed ? ' bad' : ''), c.failed ? t('calls.bad') : t('calls.ok')));
-      stc.title = c.error || '';
+      var time = tr.appendChild(el('td', 'cell-time', clock(c.time)));
+      time.dataset.label = t('tail.thTime');
+      var srv = tr.appendChild(el('td', '', c.server || '—'));
+      srv.dataset.label = t('tail.thServer');
+      var tool = tr.appendChild(el('td', 'cell-name', c.tool || '—'));
+      tool.dataset.label = t('tail.thTool');
+      var cl = tr.appendChild(el('td', '', c.client || '—'));
+      cl.dataset.label = t('calls.thClient');
+      var dur = tr.appendChild(el('td', 'num' + (c.ms > 1000 ? ' slow' : ''), fmtN(c.ms)));
+      dur.dataset.label = t('tail.thMs');
+      var stc = tr.appendChild(el('td'));
+      stc.dataset.label = t('tail.thStatus');
+      var badge = stc.appendChild(el('span', 'badge ' + (c.failed ? 'badge-err' : 'badge-ok')));
+      badge.appendChild(el('span', 'dot' + (c.failed ? '' : '')));
+      badge.appendChild(document.createTextNode(c.failed ? t('calls.bad') : t('calls.ok')));
+      badge.title = c.error || '';
       frag.appendChild(tr);
     });
     box.replaceChildren(frag);
-    if (scroll) { scroll.scrollTop = keep; }
 
     $('calls-count').textContent = rows.length === all.length
-      ? fmtN(all.length) : t('calls.of', { n: fmtN(rows.length), m: fmtN(all.length) });
-    var empty = rows.length === 0;
-    show($('calls-note'), empty);
-    $('calls-note').textContent = !all.length ? t('tail.empty') : t('calls.noMatch');
+      ? cnt(all.length, 'call') : t('calls.of', { n: fmtN(rows.length), m: fmtN(all.length) });
+    show(note, rows.length === 0);
+    note.querySelector('.empty-title').textContent = all.length ? t('calls.noMatch') : t('tail.empty');
+    note.querySelector('.empty-text').textContent = t('calls.emptyText');
   }
 
   function loadEnv() {
@@ -1667,20 +1638,16 @@
     show($('env-empty'), st.env.length === 0);
     sync($('env'), st.env, function (v) { return v.name; },
       function () {
-        var li = el('li', 'var');
-        var top = li.appendChild(el('div', 'var-top'));
-        top.appendChild(el('code'));
-        top.appendChild(el('span', 'badge'));
-        li.appendChild(el('div', 'var-val n'));
+        var li = el('li');
+        li.appendChild(el('code'));
+        li.appendChild(el('span', 'v-state'));
         return li;
       },
       function (li, v) {
-        li.querySelector('code').textContent = v.name;
-        li.querySelector('code').title = v.name;
-        var badge = li.querySelector('.badge');
-        badge.textContent = v.source || '';
-        badge.hidden = !v.source;
-        li.querySelector('.var-val').textContent = (v.set ? t('env.set') : t('env.unset')) +
+        var code = li.querySelector('code');
+        code.textContent = v.name;
+        code.title = v.name;
+        li.querySelector('.v-state').textContent = (v.set ? t('env.set') : t('env.unset')) +
           (v.source ? ' · ' + v.source : '') +
           (!v.set && st.envRemoteError ? ' · ' + st.envRemoteError : '');
       });
@@ -1843,136 +1810,261 @@
     return id;
   }
 
+  function cnt(n, w) { return fmtN(n) + ' ' + word(n, w); }
+
   function renderStats(d) {
-    // колонка «вызовов» в таблице наборов считается из этого же ответа (bySet)
-    renderSetsTable();
     var tot = (d && d.totals) || { calls: 0 };
     var empty = !tot.calls;
     show($('stats-empty'), empty);
-    show($('s-kpis'), !empty);
-    show($('s-charts'), !empty);
+    show($('s-chart-block'), !empty);
+    show($('s-grid'), !empty);
 
     var unreach = (d && d.unreachable) || [];
     show($('stats-unreach'), unreach.length > 0);
     $('stats-unreach').textContent = unreach.length ? t('stats.unreach', { list: unreach.join(', ') }) : '';
 
     if (empty) {
-      $('stats-empty-why').textContent = (st.st.server || st.st.tool || st.st.client)
-        ? t('stats.emptyFilters')
-        : t('stats.emptyPeriod', { p: periodName(st.st.period) });
+      var narrowed = !!(st.st.server || st.st.tool || st.st.client);
+      $('stats-empty-why').textContent = narrowed
+        ? t('stats.emptyFilters') : t('stats.emptyPeriod', { p: periodName(st.st.period) });
+      $('s-meta').textContent = '';
+      $('s-range').textContent = '';
       return;
     }
 
-    $('s-calls').textContent = fmtN(tot.calls);
-    $('s-calls-w').textContent = word(tot.calls, 'call');
-    $('s-fail').textContent = pct(tot.failures, tot.calls);
-    $('s-p50').textContent = ms(tot.p50ms);
-    $('s-p95').textContent = ms(tot.p95ms);
-    show($('s-p50-a'), !!d.approximate);
-    show($('s-p95-a'), !!d.approximate);
-    // процентили разрезов считаются по тем же гистограммам — помечаем их так же
-    [].forEach.call(document.querySelectorAll('.ph-pct'), function (th) {
-      th.textContent = d.approximate ? th.dataset.k + ' ≈' : th.dataset.k;
-      if (d.approximate) { th.title = t('stats.approxTip'); } else { th.removeAttribute('title'); }
+    var meta = t('stats.meta', {
+      calls: fmtN(tot.calls), callsW: word(tot.calls, 'call'),
+      errors: fmtN(tot.failures), p50: ms(tot.p50ms), p95: ms(tot.p95ms)
     });
+    $('s-meta').textContent = d.approximate ? meta + ' ≈' : meta;
+    if (d.approximate) { $('s-meta').title = t('stats.approxTip'); } else { $('s-meta').removeAttribute('title'); }
 
     renderSeries(d.series || []);
-    $('s-tools-count').textContent = fmtN((d.tools || []).length);
-    renderBreakdown($('tools-body'), d.tools, 'tool', $('tools-empty'), 8, true);
-    renderBreakdown($('byserver-body'), d.servers, 'server', $('byserver-empty'), 8);
-    renderBreakdown($('byclient-body'), d.clients, 'client', $('byclient-empty'), 6);
+    $('s-tools-count').textContent = cnt((d.tools || []).length, 'tool');
+    $('s-servers-count').textContent = cnt((d.servers || []).length, 'server');
+    $('s-clients-count').textContent = cnt((d.clients || []).length, 'client');
+    $('s-byset-count').textContent = Array.isArray(d.bySet) ? cnt(d.bySet.length, 'set') : '';
+
+    renderBreakdown($('tools-body'), d.tools, 'tool', t('stats.thTool'), 'server', $('tools-empty'), 11);
+    renderBreakdown($('byserver-body'), d.servers, 'server', t('stats.thServer'), '', $('byserver-empty'), 11);
+    renderClients(d.clients || []);
+    renderSets(d.bySet);
   }
 
   // group — сортировка готовых строк бэкенда по вызовам, без собственной агрегации.
-  function renderBreakdown(tbody, rows, field, emptyNode, limit, withServer) {
+  function renderBreakdown(tbody, rows, field, label, subField, emptyNode, limit) {
     var list = (rows || []).slice().sort(function (a, b) { return (b.calls || 0) - (a.calls || 0); });
     show(emptyNode, list.length === 0);
     var frag = document.createDocumentFragment();
     list.slice(0, limit || list.length).forEach(function (g) {
       var tr = el('tr');
-      var name = tr.appendChild(el('td'));
-      name.appendChild(el('span', 'od-truncate', g[field] || '—'));
-      name.title = withServer && g.server ? g.server + ' / ' + g.tool : (g[field] || '');
-      tr.appendChild(el('td', 'num n', fmtN(g.calls)));
-      var f = tr.appendChild(el('td', 'num n', pct(g.failures, g.calls)));
+      var name = tr.appendChild(el('td', 'cell-name'));
+      name.dataset.label = label;
+      name.appendChild(el('span', 'bd-name', g[field] || '—'));
+      var sub = name.appendChild(el('span', 'cell-sub', subField ? (g[subField] || '') : ''));
+      sub.hidden = !sub.textContent;
+      addNum(tr, g.calls, t('stats.thCalls'));
+      var f = addNum(tr, pct(g.failures, g.calls), t('stats.thErr'));
       if (g.failures) { f.classList.add('bad'); }
-      tr.appendChild(el('td', 'num n col-x', ms(g.p50ms)));
-      tr.appendChild(el('td', 'num n col-x', ms(g.p95ms)));
+      addNum(tr, ms(g.p50ms), t('stats.thP50'));
+      addNum(tr, ms(g.p95ms), t('stats.thP95'));
       frag.appendChild(tr);
     });
     if (limit && list.length > limit) {
-      var rest = frag.appendChild(el('tr', 'more'));
-      var td = rest.appendChild(el('td', '', t('stats.more', { n: fmtN(list.length - limit) })));
+      var rest = frag.appendChild(el('tr'));
+      var td = rest.appendChild(el('td', 'block-meta', t('stats.more', { n: fmtN(list.length - limit) })));
       td.colSpan = 5;
     }
     tbody.replaceChildren(frag);
   }
 
-  // series — вызовы по корзинам периода (час для «сегодня», день для остальных).
-  function renderSeries(rows) {
-    var box = $('activity-bars');
-    var hour = st.st.period === 'today';
-    var monthly = st.st.period === 'archive';
-    var label = hour ? function (iso) { return hm(new Date(iso).getTime()); } : monthly ? mon : day;
-    show($('activity-empty'), rows.length === 0);
-    $('s-activity-title').textContent = hour ? t('stats.byHour') : monthly ? t('stats.byMonth') : t('stats.byDay');
-    if (!rows.length) {
-      box.replaceChildren();
-      $('s-span').textContent = '—';
-      $('s-from').textContent = '—';
-      $('s-to').textContent = '—';
+  function addNum(tr, text, label) {
+    var td = tr.appendChild(el('td', 'num', text));
+    td.dataset.label = label;
+    return td;
+  }
+
+  // By set: доля набора — полосой, как в макете.
+  function renderSets(bySet) {
+    var empty = $('byset-empty');
+    if (!Array.isArray(bySet)) {
+      show(empty, true);
+      empty.querySelector('.empty-title').textContent = t('stats.noSets');
+      $('byset-body').replaceChildren();
       return;
     }
-
-    var max = 1, calls = 0;
-    rows.forEach(function (r) {
-      calls += r.calls || 0;
-      max = Math.max(max, r.calls || 0);
-    });
-
+    var total = bySet.reduce(function (s, r) { return s + (r.calls || 0); }, 0) || 1;
+    var list = bySet.slice().sort(function (a, b) { return (b.calls || 0) - (a.calls || 0); });
+    show(empty, list.length === 0);
     var frag = document.createDocumentFragment();
-    rows.forEach(function (r) {
-      var n = r.calls || 0, err = Math.min(r.failures || 0, n);
-      var col = el('div', 'bcol');
-      if (err) {
-        var e = el('div', 'bseg err');
-        e.style.height = (err / max * 100) + '%';
-        col.appendChild(e);
+    list.forEach(function (g) {
+      var tr = el('tr');
+      var name = tr.appendChild(el('td', 'cell-name', setName(g.set)));
+      name.dataset.label = t('stats.thSet');
+      addNum(tr, fmtN(g.calls), t('stats.thCalls'));
+      var shareTd = tr.appendChild(el('td'));
+      shareTd.dataset.label = t('stats.thShare');
+      var share = Math.round((g.calls || 0) / total * 100);
+      var bar = shareTd.appendChild(el('div', 'share'));
+      var track = bar.appendChild(el('div', 'share-bar'));
+      var fill = track.appendChild(el('i'));
+      fill.style.width = Math.max(2, share) + '%';
+      bar.appendChild(el('span', 'share-n', share + ' %'));
+      var f = addNum(tr, pct(g.failures, g.calls), t('stats.thErr'));
+      if (g.failures) { f.classList.add('bad'); }
+      frag.appendChild(tr);
+    });
+    $('byset-body').replaceChildren(frag);
+  }
+
+  // Top clients: бэкенд отдаёт client первым полем, но строки бывают пустыми
+  function renderClients(rows) {
+    var list = (rows || []).filter(function (r) { return r.client; })
+      .sort(function (a, b) { return (b.calls || 0) - (a.calls || 0); });
+    show($('byclient-empty'), list.length === 0);
+    var frag = document.createDocumentFragment();
+    list.slice(0, 11).forEach(function (g) {
+      var tr = el('tr');
+      var name = tr.appendChild(el('td', 'cell-name', g.client));
+      name.dataset.label = t('stats.thClient');
+      addNum(tr, g.calls, t('stats.thCalls'));
+      var f = addNum(tr, pct(g.failures, g.calls), t('stats.thErr'));
+      if (g.failures) { f.classList.add('bad'); }
+      addNum(tr, ms(g.p50ms), t('stats.thP50'));
+      addNum(tr, ms(g.p95ms), t('stats.thP95'));
+      frag.appendChild(tr);
+    });
+    $('byclient-body').replaceChildren(frag);
+  }
+
+  /* График рисуем сами: SVG с шириной контейнера, столбики ok+err, 5 линий сетки.
+     Перерисовка на resize и на открытие вкладки — иначе во скрытой вкладке
+     контейнер нулевой ширины. */
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  function svgEl(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+
+  function niceMax(v) {
+    if (!(v > 0)) { return 1; }
+    var pow = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+    var f = v / pow;
+    var m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+    return m * pow;
+  }
+
+  function renderSeries(rows) {
+    var box = $('chart-wrap');
+    var svg = $('chart');
+    var hour = st.st.period === 'today';
+    var monthly = st.st.period === 'archive';
+    var label = hour ? function (iso) { return hm(new Date(iso).getTime()); }
+      : monthly ? mon : day;
+    var has = (rows || []).some(function (r) { return r.calls > 0; });
+    show($('activity-empty'), !has);
+    show(box, has);
+    $('activity-empty-text').textContent = (st.st.server || st.st.tool || st.st.client)
+      ? t('stats.emptyFilters') : t('stats.emptyPeriod2');
+    if (!has) { svg.replaceChildren(); $('s-range').textContent = ''; return; }
+
+    var W = Math.max(280, box.clientWidth || 640);
+    var H = W < 560 ? 190 : 236;
+    var ml = 46, mr = 6, mt = 12, mb = 26;
+    var iw = W - ml - mr, ih = H - mt - mb;
+    var max = niceMax(Math.max.apply(null, rows.map(function (r) { return r.calls || 0; })));
+    var band = iw / rows.length;
+    var barW = Math.min(38, band * 0.62);
+    var base = mt + ih;
+    var step = max / 4;
+    var frag = document.createDocumentFragment();
+
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('aria-label', t('stats.requests'));
+
+    for (var i = 0; i <= 4; i++) {
+      var y = mt + ih * i / 4;
+      frag.appendChild(svgEl('line', {
+        x1: ml, y1: y.toFixed(1), x2: W - mr, y2: y.toFixed(1),
+        stroke: 'var(--chart-grid)', 'stroke-width': 1
+      }));
+      var lab = svgEl('text', {
+        x: ml - 8, y: (y + 3.5).toFixed(1), 'text-anchor': 'end',
+        fill: 'var(--text-mute)', 'font-size': 10, 'font-family': 'var(--font-mono)'
+      });
+      var v = max - max * i / 4;
+      // шаг 0.25 → два знака: иначе подписи «0.25» и «0.3» врут
+      var d = step < 0.5 ? 2 : step < 1 ? 1 : 0;
+      lab.textContent = fmtN(d ? Number(v.toFixed(d)) : Math.round(v));
+      frag.appendChild(lab);
+    }
+
+    rows.forEach(function (r, k) {
+      var n = r.calls || 0;
+      var err = Math.min(r.failures || 0, n);
+      var hErr = err / max * ih, hOk = (n - err) / max * ih;
+      var x = ml + band * k + (band - barW) / 2;
+      var g = svgEl('g', {});
+      if (hOk > 0) {
+        g.appendChild(svgEl('rect', {
+          x: x.toFixed(1), y: (base - hOk).toFixed(1), width: barW.toFixed(1),
+          height: Math.max(1, hOk).toFixed(1), rx: 1.5, fill: 'var(--chart-ok)'
+        }));
       }
-      if (n - err > 0) {
-        var o = el('div', 'bseg');
-        o.style.height = ((n - err) / max * 100) + '%';
-        col.appendChild(o);
+      if (hErr > 0) {
+        g.appendChild(svgEl('rect', {
+          x: x.toFixed(1), y: (base - hOk - hErr).toFixed(1), width: barW.toFixed(1),
+          height: Math.max(1, hErr).toFixed(1), rx: 1.5, fill: 'var(--chart-err)'
+        }));
       }
-      col.title = err
+      var tip = svgEl('title', {});
+      tip.textContent = err
         ? t('stats.colTipErr', { label: label(r.t), n: fmtN(n), err: fmtN(err) })
         : t('stats.colTip', { label: label(r.t), n: fmtN(n) });
-      frag.appendChild(col);
+      g.appendChild(tip);
+      frag.appendChild(g);
     });
-    box.replaceChildren(frag);
 
-    $('s-span').textContent = fmtN(calls) + ' ' + word(calls, 'call') + ' · ' + rows.length + ' ' +
-      (hour ? t('unit.hour') : monthly ? t('unit.month') : t('unit.day'));
-    $('s-from').textContent = label(rows[0].t);
-    $('s-to').textContent = label(rows[rows.length - 1].t);
+    var stride = Math.max(1, Math.ceil(rows.length / Math.max(2, Math.floor(iw / 70))));
+    rows.forEach(function (r, k) {
+      if (k % stride) { return; }
+      var lab = svgEl('text', {
+        x: (ml + band * k + band / 2).toFixed(1), y: H - 8, 'text-anchor': 'middle',
+        fill: 'var(--text-mute)', 'font-size': 10, 'font-family': 'var(--font-mono)'
+      });
+      lab.textContent = label(r.t);
+      frag.appendChild(lab);
+    });
+
+    svg.replaceChildren(frag);
+    $('s-range').textContent = label(rows[0].t) + ' — ' + label(rows[rows.length - 1].t);
+  }
+
+  function applyTab(name) {
+    ['overview', 'calls', 'stats'].forEach(function (tab) {
+      var btn = $('tabbtn-' + tab);
+      var on = tab === name;
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      btn.tabIndex = on ? 0 : -1;
+      show($('tab-' + tab), on);
+    });
   }
 
   /* ---------- вкладки основной области ---------- */
 
   function setTab(name) {
     st.tab = name;
-    ['overview', 'calls', 'stats'].forEach(function (t) {
-      var btn = $('tabbtn-' + t);
-      var on = t === name;
-      btn.setAttribute('aria-selected', on ? 'true' : 'false');
-      btn.tabIndex = on ? 0 : -1;
-      show($('tab-' + t), on);
-    });
+    applyTab(name);
     // адрес повторяет то, что открыто: у статистики в нём ещё и период
     var hash = name === 'stats' ? '#/stats/' + st.st.period : (st.sel ? '#/set/' + st.sel : '');
     if (hash && location.hash !== hash) { history.replaceState(null, '', hash); }
-    // срез не перезапрашиваем на каждый клик: тикер обновляет его и так
-    if (name === 'stats' && !st.st.data) { loadStats(); }
+    if (name === 'stats') {
+      if (!st.st.data) { loadStats(); }
+      // ширина контейнера известна только после показа вкладки
+      renderSeries((st.st.data && st.st.data.series) || []);
+    }
   }
 
   /* Стрелки/Home/End внутри группы кнопок: roving tabindex сам по себе оставлял
@@ -1994,7 +2086,7 @@
   function setSideTab(name) {
     st.sideTab = name;
     ['servers', 'env', 'log'].forEach(function (p) {
-      var btn = document.querySelector('.segbtn[data-side="' + p + '"]');
+      var btn = document.querySelector('.drawer-seg .segbtn[data-side="' + p + '"]');
       var on = p === name;
       btn.setAttribute('aria-selected', on ? 'true' : 'false');
       btn.tabIndex = on ? 0 : -1;
@@ -2003,23 +2095,23 @@
   }
 
   function openSide() {
-    var drawer = window.innerWidth < 1200;
     st.sideReturn = document.activeElement;
     document.body.classList.add('side-open');
     $('side-open').setAttribute('aria-expanded', 'true');
-    show($('scrim'), drawer);
-    if (drawer) {
-      var tab = document.querySelector('.seg .segbtn[aria-selected="true"]') || $('side-close');
+    $('side').setAttribute('aria-hidden', 'false');
+    show($('scrim'), true);
+    if (window.innerWidth < 1200) {
+      var tab = document.querySelector('.drawer-seg .segbtn[aria-selected="true"]') || $('side-close');
       tab.focus();
     }
   }
 
   function closeSide() {
     var was = document.body.classList.contains('side-open');
-    closeSrv(false);
     document.body.classList.remove('side-open');
     $('side-open').setAttribute('aria-expanded', 'false');
-    show($('scrim'), false);
+    $('side').setAttribute('aria-hidden', 'true');
+    if (!document.body.classList.contains('rail-open')) { show($('scrim'), false); }
     // фокус не должен оставаться в скрытой панели: возвращаем туда, откуда открыли,
     // а если оттуда некуда (открыли программно) — на саму кнопку «Детали»
     var back = st.sideReturn && document.contains(st.sideReturn) && st.sideReturn.offsetParent !== null
@@ -2028,18 +2120,32 @@
     if (was && back) { back.focus(); }
   }
 
+  function openRail() {
+    document.body.classList.add('rail-open');
+    $('rail-open').setAttribute('aria-expanded', 'true');
+    show($('scrim'), true);
+    var first = document.querySelector('.set-item') || $('rail-toggle');
+    if (first) { first.focus(); }
+  }
+
+  function closeRail() {
+    var was = document.body.classList.contains('rail-open');
+    document.body.classList.remove('rail-open');
+    $('rail-open').setAttribute('aria-expanded', 'false');
+    if (!document.body.classList.contains('side-open')) { show($('scrim'), false); }
+    if (was) { $('rail-open').focus(); }
+  }
+
   function applyRail() {
     var w = window.innerWidth;
-    // ниже 1200 колонке деталей места нет — она в дровере, рельс отдаём иконкам;
-    // но выбор пользователя шевроном сильнее ширины окна, иначе кнопка мертва в 960–1199
-    var auto = w >= 960 && w < 1200;
+    // ниже 1180 рейл отдаём иконкам; на узком экране он живёт в off-canvas
+    var auto = w >= 960 && w < 1180;
     var compact = st.railPref ? st.railPref === 'compact' : auto;
-    $('rail').classList.toggle('compact', compact);
+    document.documentElement.classList.toggle('rail-compact', compact && w >= 860);
     var btn = $('rail-toggle');
-    btn.hidden = w < 960;
     btn.setAttribute('aria-pressed', String(compact));
     btn.setAttribute('aria-label', compact ? t('rail.expand') : t('rail.collapse'));
-    if (w >= 1200) { closeSide(); }
+    if (w >= 860) { closeRail(); } else { closeSide(); }
   }
 
   /* ---------- действия ---------- */
@@ -2147,11 +2253,11 @@
     $('tabbtn-' + order[i]).focus();
   });
 
-  document.querySelector('.seg').addEventListener('click', function (e) {
+  document.querySelector('.drawer-seg').addEventListener('click', function (e) {
     var btn = e.target.closest('.segbtn');
     if (btn) { setSideTab(btn.dataset.side); }
   });
-  document.querySelector('.seg').addEventListener('keydown', function (e) {
+  document.querySelector('.drawer-seg').addEventListener('keydown', function (e) {
     arrowNav(e, this, function (b) { setSideTab(b.dataset.side); });
   });
   $('s-period').addEventListener('keydown', function (e) {
@@ -2159,42 +2265,37 @@
   });
 
   // Tab не уходит ни в контент под дровером, ни за открытую форму сервера
-  $('side').addEventListener('keydown', function (e) {
-    var formOpen = !srvForm().hidden;
-    if (formOpen && e.key === 'Escape') {
-      // Esc сначала закрывает форму: дровер под ней человек не закрывал
-      e.stopPropagation();
-      closeSrv();
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if ($('theme-menu').hidden === false) { closeThemeMenu(true); return; }
+      if ($('srv-dlg').open) { closeSrv(); return; }
+      if (document.body.classList.contains('side-open')) { closeSide(); return; }
+      if (document.body.classList.contains('rail-open')) { closeRail(); }
       return;
     }
-    if (e.key !== 'Tab' || !(formOpen || document.body.classList.contains('side-open'))) { return; }
-    var root = formOpen ? srvForm() : this;
-    var f = [].slice.call(root.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+    if (e.key !== 'Tab') { return; }
+    var root = $('srv-dlg').open ? $('srv-dlg') : null;
+    if (!root && !document.body.classList.contains('side-open')) { return; }
+    root = root || $('side');
+    var f = [].slice.call(root.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
       .filter(function (n) { return n.offsetParent !== null; });
     if (!f.length) { return; }
     var first = f[0], last = f[f.length - 1], at = document.activeElement;
-    if (e.shiftKey && (at === first || !this.contains(at))) { e.preventDefault(); last.focus(); }
+    if (e.shiftKey && (at === first || !root.contains(at))) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
   });
 
+  /* ---------- форма сервера ---------- */
+
   $('srv-add').addEventListener('click', function () { openSrv(''); });
   $('srvform-close').addEventListener('click', function () { closeSrv(); });
+  $('srv-cancel').addEventListener('click', function () { closeSrv(); });
   $('srvform').elements.transport.addEventListener('change', srvWhen);
   $('srvform').addEventListener('submit', saveSrv);
   $('srv-del').addEventListener('click', delSrv);
 
   $('side-open').addEventListener('click', openSide);
   $('side-close').addEventListener('click', closeSide);
-  $('scrim').addEventListener('click', closeSide);
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && document.body.classList.contains('side-open')) { closeSide(); }
-  });
-
-  $('rail-toggle').addEventListener('click', function () {
-    st.railPref = $('rail').classList.contains('compact') ? 'full' : 'compact';
-    try { localStorage.setItem('mcprig.rail', st.railPref); } catch (err) { /* приватный режим */ }
-    applyRail();
-  });
 
   $('q').addEventListener('input', function () { renderCalls(st.calls); });
   $('only-err').addEventListener('change', function () { renderCalls(st.calls); });
@@ -2208,18 +2309,21 @@
       loadStats();
     });
   });
-  $('s-reset').addEventListener('click', function () {
-    st.st.set = '';
+  function resetFilters() {
+    st.st.set = st.sel || '';
     st.st.server = '';
     st.st.tool = '';
     st.st.client = '';
     fillFilters();
     loadStats();
-  });
+  }
+  $('s-reset').addEventListener('click', resetFilters);
+  $('activity-reset').addEventListener('click', resetFilters);
   [].forEach.call(document.querySelectorAll('#s-period .segbtn'), function (btn) {
     btn.addEventListener('click', function () { setPeriod(btn.dataset.period, false); });
   });
 
+  // «/» — к поиску вызовов, как в почтовых клиентах
   document.addEventListener('keydown', function (e) {
     var tag = document.activeElement && document.activeElement.tagName;
     if (e.key !== '/' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { return; }
@@ -2235,15 +2339,17 @@
     if (s) { setTab('stats'); setPeriod(s[1], true); }
   });
 
-  window.addEventListener('resize', applyRail);
-
-  $('dim').addEventListener('click', function () {
-    var on = this.getAttribute('aria-pressed') === 'true';
-    this.setAttribute('aria-pressed', String(!on));
-    document.documentElement.classList.toggle('dim', !on);
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    applyRail();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      if (st.tab === 'stats' && st.st.data) { renderSeries(st.st.data.series || []); }
+    }, 120);
   });
 
-  // язык: дефолт английский, выбор живёт в localStorage и в <html lang>
+  /* ---------- язык ---------- */
+
   var langSel = $('lang');
   langSel.value = lang;
   langSel.addEventListener('change', function () {
@@ -2252,71 +2358,127 @@
     relang();
   });
 
-  // схема выбирает select в шапке; сам атрибут ставит theme.js до первой отрисовки
-  var themeSel = $('theme');
-  themeSel.value = document.documentElement.getAttribute('data-theme');
-  themeSel.addEventListener('change', function () {
-    document.documentElement.setAttribute('data-theme', themeSel.value);
-    try { localStorage.setItem('mcprig.theme', themeSel.value); } catch (e) { /* приватный режим */ }
+  /* ---------- тема ---------- */
+
+  // сам атрибут ставит theme.js до первой отрисовки; меню только меняет его
+  function applyThemeMenu() {
+    var on = document.documentElement.getAttribute('data-theme') || 'dark';
+    [].forEach.call(document.querySelectorAll('[data-theme-opt]'), function (b) {
+      b.setAttribute('aria-checked', String(b.dataset.themeOpt === on));
+    });
+  }
+
+  function closeThemeMenu(back) {
+    $('theme-menu').hidden = true;
+    $('theme-btn').setAttribute('aria-expanded', 'false');
+    if (back) { $('theme-btn').focus(); }
+  }
+
+  $('theme-btn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = $('theme-menu').hidden;
+    $('theme-menu').hidden = !open;
+    this.setAttribute('aria-expanded', String(open));
+    if (open) {
+      var cur = document.querySelector('[data-theme-opt][aria-checked="true"]');
+      if (cur) { cur.focus(); }
+    }
   });
 
-  $('copy').addEventListener('click', function () {
-    var btn = this;
-    var text = $('endpoint').textContent;
+  $('theme-menu').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-theme-opt]');
+    if (!btn) { return; }
+    var name = btn.dataset.themeOpt;
+    document.documentElement.setAttribute('data-theme', name);
+    try { localStorage.setItem('mcprig.theme', name); } catch (err) { /* приватный режим */ }
+    applyThemeMenu();
+    closeThemeMenu(true);
+  });
+
+  document.addEventListener('click', function (e) {
+    if ($('theme-menu').hidden) { return; }
+    if (!$('tmenu').contains(e.target)) { closeThemeMenu(false); }
+  });
+
+  /* ---------- копирование ---------- */
+
+  var copyTimer = 0;
+  function copyText(text, btn, label) {
+    var back = label || btn.textContent;
     var done = function (ok) {
       btn.textContent = ok ? t('head.copied') : t('head.copyFail');
-      setTimeout(function () { btn.textContent = t('head.copy'); }, 1200);
+      clearTimeout(copyTimer);
+      copyTimer = setTimeout(function () { btn.textContent = back; }, 1200);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
     } else {
       done(false);
     }
+  }
+
+  $('copy').addEventListener('click', function () {
+    copyText($('endpoint').textContent, this);
   });
+
+  // токена в панели нет: копировать можно только префикс, и это честно подписано
+  $('key-copy').addEventListener('click', function () {
+    var text = $('key').textContent || '';
+    if (!text || text === '—') { return; }
+    copyText(text, this);
+  });
+
+  // один и тот же путь для обеих кнопок: what — start|stop|restart
+  function runAct(btn, what) {
+    var set = current();
+    if (!set) { return; }
+    act(btn, '/api/sets/' + set.id + '/' + what, function () {
+      st.health = null;
+      return loadState().then(loadHealth);
+    });
+  }
 
   $('run').addEventListener('click', function () {
     var set = current();
-    if (!set) { return; }
-    var running = set.runtime && set.runtime.running;
-    act(this, '/api/sets/' + set.id + '/' + (running ? 'restart' : 'start'), function () {
-      return loadState().then(loadHealth);
-    });
+    runAct(this, set && set.runtime && set.runtime.running ? 'stop' : 'start');
   });
 
-  $('tail-all').addEventListener('click', function () { setTab('calls'); });
+  $('restart').addEventListener('click', function () { runAct(this, 'restart'); });
+
   $('log-refresh').addEventListener('click', function () { loadLog(); });
-  // лог — единственная панель, которой тесно в 330 px: даём развернуть вручную
   $('log-wide').addEventListener('click', function () {
-    var on = document.body.classList.toggle('side-wide');
+    var on = document.body.classList.toggle('log-wide');
     this.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
   $('errbar-close').addEventListener('click', function () { show($('errbar'), false); });
 
-  $('servers').addEventListener('click', function (e) {
-    var edit = e.target.closest('button[data-edit]');
-    if (edit) { openSrv(edit.dataset.edit); return; }
-    var btn = e.target.closest('button[data-server]');
-    if (!btn) { return; }
-    var note = btn.closest('.srv').querySelector('.srv-note');
-    note.textContent = t('srv.probing');
-    note.classList.remove('is-err');
-    send('POST', '/api/servers/' + encodeURIComponent(btn.dataset.server) + '/probe').then(function (r) {
-      note.textContent = r.ok
-        ? t('srv.probeOk', { ms: fmtN(r.ms), n: fmtN((r.tools || []).length) })
-        : (r.error || t('srv.noResponse')) + ' · ' + t('unit.ms', { n: fmtN(r.ms) });
-      note.classList.toggle('is-err', !r.ok);
-    }).catch(function () { note.textContent = t('srv.probeFail'); note.classList.add('is-err'); });
+  /* ---------- список серверов набора и реестра ---------- */
+
+  $('set-srv-body').addEventListener('click', function (e) {
+    var check = e.target.closest('[data-check]');
+    if (check) { probeServer(check.dataset.check, check); return; }
+    var edit = e.target.closest('[data-edit]');
+    if (edit) { openSrv(edit.dataset.edit); }
   });
+
+  $('servers').addEventListener('click', function (e) {
+    var probe = e.target.closest('[data-probe]');
+    if (probe) { probeServer(probe.dataset.probe, probe); return; }
+    var edit = e.target.closest('[data-regedit]');
+    if (edit) { openSrv(edit.dataset.regedit); }
+  });
+
+  /* ---------- новый набор ---------- */
 
   var form = $('addform');
   $('add-toggle').addEventListener('click', function () {
     form.hidden = !form.hidden;
     $('add-err').hidden = true;
-    if (!form.hidden) { form.querySelector('input[name="name"]').focus(); }
+    if (!form.hidden) { $('add-name').focus(); }
   });
   $('empty-add').addEventListener('click', function () {
     form.hidden = false;
-    form.querySelector('input[name="name"]').focus();
+    $('add-name').focus();
   });
   $('add-cancel').addEventListener('click', function () {
     form.hidden = true;
@@ -2324,8 +2486,8 @@
   });
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    var name = form.querySelector('input[name="name"]').value.trim();
-    var portRaw = form.querySelector('input[name="port"]').value.trim();
+    var name = $('add-name').value.trim();
+    var portRaw = $('add-port').value.trim();
     var err = $('add-err');
     if (!name) { err.textContent = t('add.nameRequired'); err.hidden = false; return; }
     var body = { name: name };
@@ -2372,6 +2534,7 @@
   applyStatic();
   setTitle();
   applyRail();
+  applyThemeMenu();
   setTab(st.tab);
   setPeriod(st.st.period, true);
   setSideTab(st.sideTab);
