@@ -80,7 +80,7 @@ RegistryData  {version:1, servers, sets, nextPort}
 | `registry.json.corrupt-<ts>` | битый файл переименовывается, старт с пустого | 0600 |
 | `registry.seed.json` (`MANAGER_SEED_FILE`) | применяется только к пустому реестру | — |
 | `sets/<id>/servers.json` | конфиг lazy-mcp, `${VAR}` **не раскрыты** | 0600 |
-| `sets/<id>/lazy-mcp.log` | stdout+stderr, ротация в `.log.1` при 5 МиБ | — |
+| `sets/<id>/mcprig.log` (прежде `lazy-mcp.log`) | stdout+stderr, ротация в `.log.1` при 5 МиБ | — |
 | `env.json` | плоский `{"NAME":"value"}`, только строки | 0600 |
 | `$TRAEFIK_DIR/mcp-<id>.yml` | роут | 0644 |
 

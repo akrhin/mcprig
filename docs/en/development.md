@@ -68,7 +68,7 @@ three real servers, creates an open set and starts it:
 bash scripts/dev-real-set.sh
 # panel:  http://127.0.0.1:9177   (auth off, data /tmp/mcprig-dev-real)
 # set:    http://127.0.0.1:9101/mcp  (open, no key)
-# log:    /tmp/mcprig-dev-real/sets/real/lazy-mcp.log
+# log:    /tmp/mcprig-dev-real/sets/real/mcprig.log
 bash scripts/dev-real-set.sh stop
 ```
 
@@ -92,7 +92,7 @@ servers show as unhealthy. The printed example calls `activate_project` through
 pid file; the set exits with the panel.
 
 Logs: the panel writes `$DATA/panel.log`, the set writes
-`$DATA/sets/real/lazy-mcp.log`.
+`$DATA/sets/real/mcprig.log`.
 
 ## Release build
 

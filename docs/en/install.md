@@ -140,7 +140,7 @@ The directory is created `0700`. What lives there:
 | `env.json` | panel-managed variables (flat strings) | `0600` |
 | `manager.pid` | pid of the running panel; a second panel refuses to start | `0600` |
 | `sets/<id>/servers.json` | materialized config the set process reads | `0600` |
-| `sets/<id>/lazy-mcp.log` | set log; rotates to `.log.1` at 5 MiB | `0600` |
+| `sets/<id>/mcprig.log` | set log; rotates to `.log.1` at 5 MiB | `0600` |
 | `sets/<id>/oauth.json` | access and refresh tokens for OAuth downstreams of that set | `0600` |
 | `sets/<id>/oauth-clients.json` | dynamic client registration data of that set | `0600` |
 | `oauth.json` | access and refresh tokens for OAuth downstreams of a standalone `serve`/`stdio` process | `0600` |

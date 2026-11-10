@@ -69,7 +69,7 @@ E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 bash scripts/dev-real-set.sh
 # панель:  http://127.0.0.1:9177   (аутентификация выключена, данные /tmp/mcprig-dev-real)
 # набор:   http://127.0.0.1:9101/mcp  (открыт, без ключа)
-# лог:     /tmp/mcprig-dev-real/sets/real/lazy-mcp.log
+# лог:     /tmp/mcprig-dev-real/sets/real/mcprig.log
 bash scripts/dev-real-set.sh stop
 ```
 
@@ -93,7 +93,7 @@ bash scripts/dev-real-set.sh stop
 её pid-файлу; набор выходит вместе с панелью.
 
 Логи: панель пишет `$DATA/panel.log`, набор пишет
-`$DATA/sets/real/lazy-mcp.log`.
+`$DATA/sets/real/mcprig.log`.
 
 ## Релизная сборка
 
