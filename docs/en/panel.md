@@ -13,15 +13,22 @@ CSP: no inline scripts or styles.
 
 | area | contents |
 | --- | --- |
-| header | counters: sets, servers, calls in the tail, errors |
-| left rail | all sets, their state and port; **+ set** |
-| set card | name, port, state, endpoint, active key prefix, `list_commands` weight (bytes, tokens, tool count), **Start/Stop**, **Keys** |
-| KPIs | calls in the tail, p50, p95, errors for the selected set |
-| servers of the set | name, type, state, isolation and tags of the selected set |
-| sets table | name, port, state, server count, uptime, calls, errors; shown only while no set is selected |
-| calls table | time, server, tool, client, milliseconds, status; search box |
-| right column | servers of the set with health, variables, log tail; below 1200 px it becomes a drawer (also the **Details** button) |
-| footer | totals and last refresh time |
+| top bar | breadcrumbs `mcprig / <set>`, the endpoint with a copy button, colour scheme, language, user |
+| left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
+| set head | name, port chip, state badge, **Keys**, **Restart**, **Start/Stop**, the key prefix and — right under it — the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
+| tabs | **Overview**, **Calls**, **Statistics** |
+| KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days |
+| servers of the set | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check** and **Edit** |
+| calls table | time, server, tool, client, milliseconds, status; search box and **errors only** |
+| details drawer | host registry, variables and the set log; opens from the header and covers the panel width on a phone |
+| footer | `N sets · M servers · K running` and the last refresh time |
+
+Health is shown as it is: `Healthy`, `Failed` with the daemon's reason on the
+second line, and `Not checked` for a server the set has not probed yet. While a
+health answer is on its way the cell keeps a skeleton bar instead of guessing.
+The tool count of one server is not part of the health answer, so the **Tools**
+column shows `—` until **Check** probes that server; the head of the set shows
+the total for the whole set.
 
 Everything on the page comes from the panel API below plus `GET /stats` of the
 running sets. Nothing else is stored in the browser but the chosen colour scheme
@@ -29,8 +36,8 @@ and the interface language.
 
 ## Server editor
 
-The **Servers** tab of the right column and the **add server** button open a form
-over the panel: name, description, transport, command (one argument per line) or
+The **servers** tab of the details drawer and the **Add server** button open a
+form over the panel: name, description, transport, command (one argument per line) or
 `url` and headers, working directory, `env`, `envAllow`, tags, the `enabled`
 switch and a **sandbox** fieldset — `mode`, `onUnavailable`, `network`, `ro` and
 `rw` (one path per line), `memoryMb`, `pids`, `tmpMb`, `timeoutSec`. It writes
@@ -43,15 +50,19 @@ does not validate them itself — it shows what the backend answers, including
 `sandbox: неизвестные поля: …`, `sandbox допустим только для stdio` and
 `тег untrusted требует sandbox: сервер без изоляции не стартует`.
 
-The server list also shows isolation: a muted shield and `bwrap` when the
-sandbox is applied, a warning badge `без изоляции` when the block was requested
-but bubblewrap did not start (the full reason is in the tooltip), and an error
-badge `конфиг отвергнут` for a record with `_configError`. A valid server without
-a `sandbox` block carries no marker. The value comes from the same `isolation`
-field MCP clients see in `list_servers`.
+The registry list in the drawer also shows isolation, on the second line of a
+row: `bwrap` when the sandbox is applied, `no isolation` in warning colour when
+the block was requested but bubblewrap did not start (the daemon's full reason
+is in the tooltip), and `config rejected` in error colour for a record with
+`_configError`. A valid server without a `sandbox` block carries no marker. The
+value comes from the same `isolation` field MCP clients see in `list_servers`.
 
 The **Keys** dialog lists key ids, creation and revocation dates and notes. It
-shows only the 8-character prefix. A newly issued token is displayed once, and
+shows only the 8-character prefix. The note of an existing key is edited in
+place: the row has a label field and a **Save** button that appears once the
+value differs from the stored one; the panel sends `PATCH` with `{"note":…}`,
+redraws the list and shows a `restartError` of the set as its own warning rather
+than swallowing it. A newly issued token is displayed once, and
 so is the token of a newly created closed set: `POST /api/sets` returns it in
 the `201` body, while `GET /api/sets` never repeats it. Issuing a key later
 revokes the previous active key and restarts the set if it is running; revoking
@@ -59,12 +70,15 @@ the active key stops the set.
 
 ## Themes
 
-The panel ships six colour schemes: mcprig dark (default), light, Nord, Gruvbox,
-Solarized and Tokyo Night. The choice sits in the header, is stored in
-`localStorage['mcprig.theme']`, and the first visit follows
-`prefers-color-scheme`. A scheme is the `data-theme` attribute on `<html>` plus
-its colour rule: the default lives in `app.css`, the other five in `themes.css`;
-the CSP is unchanged (no inline styles).
+The panel ships four colour schemes — dark (default), light, Nord and Gruvbox —
+behind one set of CSS variables: colours, radii, the 4 px spacing step and the
+type scale. The theme menu sits in the header and switches the `data-theme`
+attribute on `<html>` without a reload; the choice is stored in
+`localStorage['mcprig.theme']`. The names kept from earlier versions still work
+and are rewritten to the new ones on first paint: `mcprig` and `tokyo` mean
+dark, `solarized` means light. The dark palette lives in `themes.css` on
+`:root`, so an unknown name falls back to it; the CSP is unchanged (no inline
+styles).
 
 ## Language
 
