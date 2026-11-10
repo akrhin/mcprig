@@ -189,7 +189,40 @@
         "-y",
         "@playwright/mcp@latest"
       ],
-      "enabled": true
+      "enabled": true,
+      "description": "браузер для скриншотов и проверки вёрстки",
+      "tags": [
+        "untrusted",
+        "browser"
+      ],
+      "env": {
+        "PLAYWRIGHT_BROWSERS_PATH": "/home/user/.cache/ms-playwright"
+      },
+      "envAllow": [
+        "PATH",
+        "HOME"
+      ],
+      "sandbox": {
+        "mode": "bwrap",
+        "onUnavailable": "deny",
+        "network": "none",
+        "ro": [
+          "/usr",
+          "/bin",
+          "/lib",
+          "/lib64",
+          "/etc/ssl",
+          "/etc/resolv.conf"
+        ],
+        "rw": [
+          "/home/user/.cache/ms-playwright",
+          "/tmp"
+        ],
+        "memoryMb": 2048,
+        "pids": 256,
+        "tmpMb": 128,
+        "timeoutSec": 30
+      }
     },
     {
       "name": "raven",
@@ -222,7 +255,18 @@
         "node",
         "/home/sintez/.local/node24/bin/open-design"
       ],
-      "enabled": true
+      "enabled": true,
+      "description": "дизайн-контекст проекта",
+      "tags": [
+        "design"
+      ],
+      "sandbox": {
+        "mode": "bwrap",
+        "network": "allow",
+        "rw": [
+          "/home/sintez/git"
+        ]
+      }
     },
     {
       "name": "fetch",

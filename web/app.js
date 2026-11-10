@@ -19,6 +19,9 @@
     sets: [], servers: [], sel: linkId ? decodeURIComponent(linkId) : null,
     health: null, calls: null, env: [], logKey: '', errTimer: 0, busy: false, boot: !!linkId,
     tab: 'overview', sideTab: 'servers', railPref: '',
+    // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
+    // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
+    mock: null, srvEditing: '', srvReturn: null,
     st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' }
   };
 
@@ -139,15 +142,17 @@
     if (m) { return 'set-' + m[1] + '-servers'; }
     if (/\/logs/.test(path)) { return 'logs'; }
     if (path.indexOf('/api/calls') === 0) { return 'calls'; }
-    // срез статистики мок отдаёт по периоду: набор и фильтры файл не меняют
-    if (path.indexOf('/api/stats') === 0) {
-      var p = /[?&]period=([a-z0-9]+)/.exec(path);
-      return 'stats-' + (p ? p[1] : 'today');
-    }
     return 'state';
   }
 
   function get(path) {
+    if (MOCK) {
+      // реестр в демо-режиме живёт в памяти: правка должна быть видна сразу
+      if (st.mock && path.indexOf('/api/state') === 0) { return Promise.resolve(st.mock); }
+      // срезы считаются из строк, а не читаются готовым файлом: иначе фильтры
+      // в демо не на что влиять и цифры врут
+      if (path.indexOf('/api/stats') === 0) { return Promise.resolve(mockStats(path)); }
+    }
     var url = MOCK ? 'mock/' + mockName(path) + '.json' : path;
     return fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .catch(function () { throw new Error('нет связи с демоном'); })
@@ -155,11 +160,15 @@
         if (r.status === 404) { return null; }
         if (!r.ok) { throw new Error('HTTP ' + r.status + ' · ' + path); }
         return r.json();
+      })
+      .then(function (d) {
+        if (MOCK && d && path.indexOf('/api/state') === 0 && !st.mock) { st.mock = d; }
+        return d;
       });
   }
 
   function send(method, path, body) {
-    if (MOCK) { return Promise.resolve({ ok: true, ms: 14, tools: [] }); }
+    if (MOCK) { return mockSend(method, path, body); }
     return fetch(path, {
       method: method,
       credentials: 'same-origin',
@@ -174,6 +183,284 @@
       fail(e.message || String(e));
       throw e;
     });
+  }
+
+  /* ---------- мок: запись в реестр ----------
+     Демо-режим отвечает как реестр: иначе редактор говорит «сохранено» про
+     сервер, который настоящий демон отверг бы. Правила повторяют
+     internal/registry (имя, транспорт) и internal/config (песочница, теги). */
+
+  var MOCK_SANDBOX_KEYS = ['mode', 'onUnavailable', 'ro', 'rw', 'network', 'memoryMb', 'pids', 'timeoutSec'];
+
+  function mockServerErr(inp, name, exists) {
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) { return 'name: строчные латинские буквы, цифры, - и _'; }
+    if (exists) { return 'сервер ' + name + ' уже есть'; }
+    var http = inp.transport === 'http';
+    if (http && !inp.url) { return 'http требует url'; }
+    if (http && inp.command && inp.command.length) { return 'http не может иметь command'; }
+    if (!http && !(inp.command && inp.command.length)) { return 'stdio требует command'; }
+    if (!http && inp.url) { return 'stdio не может иметь url'; }
+    if (http && inp.sandbox) { return 'sandbox допустим только для stdio'; }
+    if (inp.sandbox) {
+      var extra = Object.keys(inp.sandbox).filter(function (k) { return MOCK_SANDBOX_KEYS.indexOf(k) < 0; });
+      if (extra.length) { return 'sandbox: неизвестные поля: ' + extra.join(', '); }
+    }
+    if ((inp.tags || []).indexOf('untrusted') >= 0 && !inp.sandbox) {
+      return 'тег untrusted требует sandbox: сервер без изоляции не стартует';
+    }
+    return '';
+  }
+
+  function mockServer(name, body) {
+    var http = body.transport === 'http';
+    var srv = { name: name, transport: http ? 'http' : 'stdio', enabled: body.enabled !== false };
+    if (body.description) { srv.description = body.description; }
+    if (http) { srv.url = body.url || ''; } else { srv.command = body.command || []; }
+    if (!http && body.cwd) { srv.cwd = body.cwd; }
+    if (body.headers && Object.keys(body.headers).length) { srv.headers = body.headers; }
+    if (body.env && Object.keys(body.env).length) { srv.env = body.env; }
+    if (body.envAllow && body.envAllow.length) { srv.envAllow = body.envAllow; }
+    if (body.tags && body.tags.length) { srv.tags = body.tags; }
+    if (body.sandbox && !http) { srv.sandbox = body.sandbox; }
+    return srv;
+  }
+
+  function mockSend(method, path, body) {
+    var m = /^\/api\/servers(?:\/([^/]+))?$/.exec(path);
+    if (!m || !st.mock) { return Promise.resolve({ ok: true, ms: 14, tools: [] }); }
+    // у POST имя приходит в теле, у PUT/DELETE — в пути
+    var name = m[1] ? decodeURIComponent(m[1]) : String((body && body.name) || '');
+    var has = function (n) {
+      return st.mock.servers.some(function (s) { return s.name === n; });
+    };
+    var err = '';
+    if (method === 'DELETE') {
+      if (!has(name)) { err = 'нет сервера ' + name; }
+    } else if (method === 'PUT' && !has(name)) {
+      err = 'нет сервера ' + name;
+    } else {
+      err = mockServerErr(body || {}, name, method === 'POST' && has(name));
+    }
+    if (err) {
+      fail(err);
+      return Promise.reject(new Error(err));
+    }
+    if (method === 'DELETE') {
+      st.mock.servers = st.mock.servers.filter(function (s) { return s.name !== name; });
+      st.mock.sets.forEach(function (s) {
+        s.servers = (s.servers || []).filter(function (n) { return n !== name; });
+      });
+    } else {
+      var srv = mockServer(name, body || {});
+      if (method === 'POST') {
+        st.mock.servers.push(srv);
+      } else {
+        st.mock.servers = st.mock.servers.map(function (s) { return s.name === name ? srv : s; });
+      }
+    }
+    return Promise.resolve({ ok: true, restarted: [], stopped: [] });
+  }
+
+  /* ---------- мок: статистика ----------
+     Те же строки, что в raw-*.jsonl, и та же сводка, что в internal/stats:
+     окно периода, корзины ряда, разрезы, перцентили (точные до недели, по
+     гистограмме в 30 днях и архиве). */
+
+  var MOCK_HIST = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+  var MOCK_CLIENTS = ['opencode/2.2.6', 'openclaw/0.9.1', 'hermes/1.2'];
+  // серверы и инструменты — из состава мок-наборов: фильтр не должен предлагать
+  // имя, которого нет ни в одном срезе
+  var MOCK_TOOLS = {
+    main: [['serena', ['find_symbol', 'find_referencing_symbols']], ['socraticode', ['codebase_search']],
+      ['xerj', ['xerj_search']], ['context7', ['resolve-library-id', 'query-docs']], ['tavily', ['web_search']],
+      ['playwright', ['browser_navigate', 'browser_take_screenshot']], ['raven', ['audit_page', 'score_page']],
+      ['designer-skill', ['dispatch_intent', 'anti_slop_checklist']], ['gitea', ['list_issues']],
+      ['portainer', ['docker_ps']], ['open-design', ['get_project']]],
+    demo: [['fetch', ['fetch']], ['time', ['get_current_time']], ['memory', ['create_entities']],
+      ['context7', ['query-docs']]],
+    ops: [['fs', ['read_file', 'list_directory']], ['fetch', ['fetch']], ['gitea', ['list_pulls']]],
+    dev: [['memory', ['read_graph', 'search_nodes']], ['context7', ['query-docs']], ['fs', ['read_file']]],
+    lab: [['memory', ['search_nodes']], ['context7', ['resolve-library-id']]]
+  };
+  var MOCK_WEIGHT = [['main', 55], ['demo', 15], ['ops', 12], ['dev', 12], ['lab', 6]];
+  var mockRows = null;
+
+  // 120 дней истории: короче — архив пуст, длиннее — браузер считает впустую
+  function mockRowsOf() {
+    if (mockRows) { return mockRows; }
+    var seed = 20261108;
+    // mulberry32: демо обязано быть одинаковым при каждой перезагрузке, иначе
+    // цифры прыгают на пустом месте и это выглядит как баг. Обычный LCG на
+    // double теряет младшие биты (произведение не влезает в 53 бита)
+    var rnd = function () {
+      seed = (seed + 0x6D2B79F5) >>> 0;
+      var t = seed;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    var pick = function (a) { return a[Math.floor(rnd() * a.length) % a.length]; };
+    var now = Date.now();
+    var rows = new Array(12000);
+    for (var i = 0; i < rows.length; i++) {
+      var w = rnd() * 100, set = MOCK_WEIGHT[0][0], acc = 0;
+      for (var k = 0; k < MOCK_WEIGHT.length; k++) {
+        acc += MOCK_WEIGHT[k][1];
+        if (w < acc) { set = MOCK_WEIGHT[k][0]; break; }
+      }
+      var pair = pick(MOCK_TOOLS[set]);
+      // латентность логнормальная с редким тяжёлым хвостом: p50 и p95 видно на глаз
+      var ms = Math.round(Math.exp(4 + rnd() * 2.6) * (rnd() < 0.04 ? 5 : 1));
+      rows[i] = {
+        time: new Date(now - Math.floor(rnd() * 120 * 864e5)).toISOString(),
+        set: set,
+        server: pair[0],
+        tool: pick(pair[1]),
+        client: pick(MOCK_CLIENTS),
+        ms: ms,
+        failed: rnd() < 0.04
+      };
+    }
+    mockRows = rows;
+    return rows;
+  }
+
+  function mockHistIndex(ms) {
+    for (var i = 0; i < MOCK_HIST.length; i++) { if (ms <= MOCK_HIST[i]) { return i; } }
+    return MOCK_HIST.length;
+  }
+
+  function mockHistMid(i) {
+    if (i >= MOCK_HIST.length) {
+      var top = MOCK_HIST[MOCK_HIST.length - 1] + 1;
+      return top + Math.floor(top / 2);
+    }
+    var lo = i > 0 ? MOCK_HIST[i - 1] + 1 : 0;
+    return Math.floor((lo + MOCK_HIST[i]) / 2);
+  }
+
+  function mockAccum() { return { calls: 0, failures: 0, totalMs: 0, exact: [], hist: [] }; }
+
+  function mockAdd(acc, r, approx) {
+    acc.calls++;
+    acc.totalMs += r.ms;
+    if (r.failed) { acc.failures++; }
+    if (approx) {
+      var i = mockHistIndex(r.ms);
+      acc.hist[i] = (acc.hist[i] || 0) + 1;
+    } else {
+      acc.exact.push(r.ms);
+    }
+  }
+
+  function mockPercentile(acc, q, approx) {
+    if (!acc.calls) { return 0; }
+    if (approx) {
+      var rank = Math.floor(q * (acc.calls - 1)), cum = 0;
+      for (var i = 0; i < acc.hist.length; i++) {
+        cum += acc.hist[i] || 0;
+        if (cum > rank) { return mockHistMid(i); }
+      }
+      return mockHistMid(MOCK_HIST.length);
+    }
+    var xs = acc.exact.slice().sort(function (a, b) { return a - b; });
+    return xs[Math.floor(q * (xs.length - 1))];
+  }
+
+  function mockRow(acc, approx) {
+    return {
+      calls: acc.calls,
+      failures: acc.failures,
+      p50ms: mockPercentile(acc, 0.5, approx),
+      p95ms: mockPercentile(acc, 0.95, approx)
+    };
+  }
+
+  function mockStats(path) {
+    var q = {};
+    (path.split('?')[1] || '').split('&').forEach(function (kv) {
+      if (!kv) { return; }
+      var i = kv.indexOf('=');
+      if (i < 0) { q[kv] = ''; } else { q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); }
+    });
+    var period = q.period || 'today';
+    var approx = period === '30d' || period === 'archive';
+    var step = q.bucket === 'month' ? 'month' : q.bucket === 'day' ? 'day'
+      : period === '30d' ? 'day' : period === 'archive' ? 'month' : 'hour';
+
+    var now = new Date();
+    var day = function (shift) {
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate() - (shift || 0)).getTime();
+    };
+    // окна как в QueryHistory: неделя и месяц включительно, архив — всё до них
+    var from = period === 'today' ? day(0) : period === '7d' ? day(6) : period === '30d' ? day(29) : 0;
+    var to = period === 'archive' ? day(29) : now.getTime();
+    var start = function (t) {
+      var d = new Date(t);
+      if (step === 'hour') { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()).toISOString(); }
+      if (step === 'day') { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString(); }
+      return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+    };
+
+    var totals = mockAccum(), series = {}, tools = {}, servers = {}, clients = {}, sets = {};
+    var first = 0;
+    var at = function (map, key) { return map[key] || (map[key] = mockAccum()); };
+
+    mockRowsOf().forEach(function (r) {
+      var t = Date.parse(r.time);
+      if (t < from || t > to) { return; }
+      // bySet считается до фильтров среза: колонка в таблице наборов показывает
+      // все наборы, а не открытый
+      mockAdd(at(sets, r.set), r, false);
+      if (q.server && r.server !== q.server) { return; }
+      if (q.tool && r.tool !== q.tool) { return; }
+      if (q.client && r.client !== q.client) { return; }
+      if (q.set && q.set !== 'all' && r.set !== q.set) { return; }
+      if (!first || t < first) { first = t; }
+      mockAdd(totals, r, approx);
+      mockAdd(at(tools, r.server + '\u0000' + r.tool), r, approx);
+      mockAdd(at(servers, r.server), r, approx);
+      mockAdd(at(clients, r.client), r, approx);
+      mockAdd(at(series, start(t)), r, approx);
+    });
+
+    var list = function (map, key) {
+      return Object.keys(map).sort().map(function (k) {
+        var row = mockRow(map[k], approx);
+        row[key] = k;
+        return row;
+      });
+    };
+    var toolRows = Object.keys(tools).map(function (k) {
+      var parts = k.split('\u0000');
+      var row = mockRow(tools[k], approx);
+      row.server = parts[0];
+      row.tool = parts[1];
+      return row;
+    }).sort(function (a, b) {
+      if (a.server !== b.server) { return a.server < b.server ? -1 : 1; }
+      return a.tool < b.tool ? -1 : a.tool > b.tool ? 1 : 0;
+    });
+
+    return {
+      period: period,
+      from: new Date(first || from).toISOString(),
+      to: new Date(to).toISOString(),
+      approximate: approx,
+      totals: mockRow(totals, approx),
+      series: Object.keys(series).sort().map(function (t) {
+        var row = mockRow(series[t], approx);
+        row.t = t;
+        return row;
+      }),
+      tools: toolRows,
+      servers: list(servers, 'server'),
+      clients: list(clients, 'client'),
+      bySet: Object.keys(sets).sort().map(function (k) {
+        return { set: k, calls: sets[k].calls, failures: sets[k].failures, totalMs: sets[k].totalMs };
+      }),
+      unreachable: []
+    };
   }
 
   /* ---------- плашка ошибки ---------- */
@@ -264,8 +551,17 @@
       });
   }
 
-  // Вызовы и ошибки выбранного набора: счётчики живут в процессе набора, поэтому
-  // у чужих наборов в таблице прочерк — меряем только открытый.
+  // Вызовы и ошибки по наборам за выбранный период: их отдаёт /api/stats?set=all
+  // полем bySet. Старый демон поля не знает — тогда честный прочерк.
+  function bySetCounters() {
+    var d = st.st.data;
+    if (!d || !Array.isArray(d.bySet)) { return null; }
+    var map = {};
+    d.bySet.forEach(function (r) { map[r.set] = r; });
+    return map;
+  }
+
+  // Счётчики выбранного набора для полосы KPI: они живут в его процессе.
   function aggregated(data) {
     var c = ((data || st.calls) && (data || st.calls).counters) || [];
     var all = { calls: 0, failures: 0 };
@@ -290,7 +586,7 @@
   }
 
   function renderSetsTable() {
-    var agg = aggregated();
+    var per = bySetCounters();
     sync($('sets-body'), st.sets, function (s) { return s.id; },
       function () {
         var tr = el('tr', 'is-click');
@@ -323,10 +619,9 @@
         pill.lastChild.textContent = state.text;
         tr.children[3].textContent = names.length;
         tr.children[4].textContent = uptime(s);
-        var mine = s.id === st.sel && st.calls;
-        var g = mine ? agg : null;
-        tr.children[5].textContent = g ? fmtN(g.calls) : '—';
-        tr.children[6].textContent = g ? pct(g.failures, g.calls) : '—';
+        var row = per ? per[s.id] : null;
+        tr.children[5].textContent = per ? fmtN(row ? row.calls : 0) : '—';
+        tr.children[6].textContent = per ? pct(row ? row.failures : 0, row ? row.calls : 0) : '—';
         tr.dataset.id = s.id;
       });
   }
@@ -342,6 +637,8 @@
 
   function select(id, force) {
     if (id === st.sel && !force) { renderHead(); return; }
+    // форма сервера привязана к списку прежнего набора — закрываем без возврата фокуса
+    closeSrv(false);
     st.sel = id;
     st.health = null;
     st.calls = null;
@@ -415,13 +712,15 @@
 
   function renderServers(health) {
     var set = current();
-    var names = (set && set.servers) || [];
-    var rows = names.map(function (name) {
+    var inSet = (set && set.servers) || [];
+    // список — общий реестр хоста, а не состав набора: новый сервер виден сразу,
+    // а принадлежность к набору помечена в строке
+    var rows = st.servers.map(function (s) {
       var h = null;
       if (health && health.servers) {
-        h = health.servers.filter(function (s) { return s.name === name; })[0] || null;
+        h = health.servers.filter(function (x) { return x.name === s.name; })[0] || null;
       }
-      return { name: name, health: h };
+      return { name: s.name, health: h, mine: inSet.indexOf(s.name) >= 0 };
     });
     $('srv-count').textContent = fmtN(rows.length);
     show($('servers-empty'), rows.length === 0);
@@ -434,17 +733,22 @@
         top.appendChild(el('span', 'badge'));
         var foot = li.appendChild(el('div', 'srv-foot'));
         foot.appendChild(el('span', 'srv-note'));
+        var edit = foot.appendChild(el('button', 'mini srv-edit', 'изменить'));
+        edit.type = 'button';
+        edit.dataset.act = 'edit';
         var probe = foot.appendChild(el('button', 'mini', 'проверить'));
         probe.type = 'button';
+        probe.dataset.act = 'probe';
         return li;
       },
       function (li, row) {
         var srv = st.servers.filter(function (s) { return s.name === row.name; })[0];
         var h = row.health;
         var cls = 'warn';
-        var note = health && !health.running ? 'набор не запущен' : 'не проверялся';
-        if (h && h.healthy === true) { cls = 'ok'; note = 'health ok'; }
-        if (h && h.healthy === false) { cls = 'err'; note = h.error || 'нет ответа'; }
+        var note = row.mine ? 'не проверялся' : 'не в наборе';
+        if (row.mine && health && !health.running) { note = 'набор не запущен'; }
+        if (row.mine && h && h.healthy === true) { cls = 'ok'; note = 'health ok'; }
+        if (row.mine && h && h.healthy === false) { cls = 'err'; note = h.error || 'нет ответа'; }
         li.querySelector('.dot').className = 'dot ' + cls;
         li.querySelector('.snm').textContent = row.name;
         li.querySelector('.snm').title = row.name;
@@ -454,8 +758,180 @@
         n.textContent = note;
         n.title = note;
         n.classList.toggle('is-err', cls === 'err');
-        li.querySelector('.mini').dataset.server = row.name;
+        li.querySelector('[data-act=probe]').dataset.server = row.name;
+        li.querySelector('[data-act=edit]').dataset.edit = row.name;
       });
+  }
+
+  /* ---------- редактор сервера ----------
+     Реестр общий для хоста, сервер правится там же, где список: форма накрывает
+     панель. Отдельный экран в узком дровере потерял бы и набор, и контекст. */
+
+  function srvForm() { return $('srvform'); }
+
+  function srvErr(msg) {
+    var box = $('srv-err');
+    box.textContent = msg || '';
+    show(box, !!msg);
+  }
+
+  // закрытие: фокус возвращается на кнопку, которая форму открыла
+  function closeSrv(back) {
+    if (srvForm().hidden) { return; }
+    srvForm().hidden = true;
+    var target = back === false ? null : st.srvReturn;
+    st.srvReturn = null;
+    if (target && document.contains(target) && target.offsetParent !== null) { target.focus(); }
+    else if (back !== false) { $('srv-add').focus(); }
+  }
+
+  function srvWhen() {
+    var f = srvForm();
+    var t = f.elements.transport.value;
+    [].forEach.call(f.querySelectorAll('[data-when]'), function (node) {
+      node.hidden = node.dataset.when !== t;
+    });
+  }
+
+  function fillSrv(srv) {
+    var f = srvForm();
+    var v = function (n, val) { f.elements[n].value = val == null ? '' : String(val); };
+    v('name', srv ? srv.name : '');
+    f.elements.name.readOnly = !!srv;
+    v('description', srv && srv.description);
+    f.elements.transport.value = (srv && srv.transport === 'http') ? 'http' : 'stdio';
+    v('command', srv && srv.command ? srv.command.join('\n') : '');
+    v('cwd', srv && srv.cwd);
+    v('url', srv && srv.url);
+    v('headers', srv && srv.headers ? Object.keys(srv.headers).map(function (k) {
+      return k + ': ' + srv.headers[k];
+    }).join('\n') : '');
+    v('env', srv && srv.env ? Object.keys(srv.env).map(function (k) {
+      return k + '=' + srv.env[k];
+    }).join('\n') : '');
+    v('envAllow', srv && srv.envAllow ? srv.envAllow.join('\n') : '');
+    v('tags', srv && srv.tags ? srv.tags.join(', ') : '');
+    f.elements.enabled.checked = !srv || srv.enabled !== false;
+    var sb = (srv && srv.sandbox) || {};
+    v('sbMode', sb.mode);
+    v('sbOnUnavailable', sb.onUnavailable);
+    v('sbNetwork', sb.network);
+    v('sbRo', sb.ro ? sb.ro.join('\n') : '');
+    v('sbRw', sb.rw ? sb.rw.join('\n') : '');
+    v('sbMemoryMb', sb.memoryMb);
+    v('sbPids', sb.pids);
+    v('sbTmpMb', sb.tmpMb);
+    v('sbTimeoutSec', sb.timeoutSec);
+    srvWhen();
+  }
+
+  function linesOf(text) {
+    return (text || '').split('\n').map(function (s) { return s.trim(); })
+      .filter(function (s) { return s; });
+  }
+
+  function mapOf(text, sep) {
+    var out = {};
+    linesOf(text).forEach(function (line) {
+      var i = line.indexOf(sep);
+      if (i > 0) { out[line.slice(0, i).trim()] = line.slice(i + 1).trim(); }
+    });
+    return out;
+  }
+
+  function collectSrv() {
+    var f = srvForm();
+    var val = function (n) { return (f.elements[n].value || '').trim(); };
+    var transport = f.elements.transport.value === 'http' ? 'http' : 'stdio';
+    var out = { name: val('name'), transport: transport, enabled: f.elements.enabled.checked };
+    if (val('description')) { out.description = val('description'); }
+    if (transport === 'http') {
+      out.url = val('url');
+      var headers = mapOf(val('headers'), ':');
+      if (Object.keys(headers).length) { out.headers = headers; }
+    } else {
+      out.command = linesOf(val('command'));
+      if (val('cwd')) { out.cwd = val('cwd'); }
+    }
+    var env = mapOf(val('env'), '=');
+    if (Object.keys(env).length) { out.env = env; }
+    var allow = linesOf(val('envAllow'));
+    if (allow.length) { out.envAllow = allow; }
+    var tags = val('tags').split(',').map(function (s) { return s.trim(); })
+      .filter(function (s) { return s; });
+    if (tags.length) { out.tags = tags; }
+    // песочница живёт только у stdio: у http её нет по контракту
+    if (transport === 'stdio') {
+      var sb = {};
+      if (val('sbMode')) { sb.mode = val('sbMode'); }
+      if (val('sbOnUnavailable')) { sb.onUnavailable = val('sbOnUnavailable'); }
+      if (val('sbNetwork')) { sb.network = val('sbNetwork'); }
+      var ro = linesOf(val('sbRo'));
+      var rw = linesOf(val('sbRw'));
+      if (ro.length) { sb.ro = ro; }
+      if (rw.length) { sb.rw = rw; }
+      [['sbMemoryMb', 'memoryMb'], ['sbPids', 'pids'], ['sbTmpMb', 'tmpMb'], ['sbTimeoutSec', 'timeoutSec']]
+        .forEach(function (pair) {
+          var n = parseInt(val(pair[0]), 10);
+          if (!isNaN(n)) { sb[pair[1]] = n; }
+        });
+      if (Object.keys(sb).length) { out.sandbox = sb; }
+    }
+    return out;
+  }
+
+  function openSrv(name) {
+    var srv = name ? st.servers.filter(function (s) { return s.name === name; })[0] : null;
+    if (name && !srv) { fail('сервер ' + name + ' не найден в реестре'); return; }
+    st.srvEditing = name || '';
+    st.srvReturn = document.activeElement;
+    fillSrv(srv);
+    srvErr('');
+    $('srv-del').hidden = !name;
+    $('srvform-h').textContent = name ? 'сервер · ' + name : 'новый сервер';
+    $('srv-save').textContent = name ? 'сохранить' : 'создать';
+    show(srvForm(), true);
+    // у существующего сервера имя не редактируется — фокус на описании
+    srvForm().elements[srv ? 'description' : 'name'].focus();
+  }
+
+  function saveSrv(e) {
+    e.preventDefault();
+    if (st.busy) { return; }
+    var body = collectSrv();
+    var editing = st.srvEditing;
+    var btn = $('srv-save');
+    st.busy = true;
+    btn.disabled = true;
+    srvErr('');
+    // текст ошибки даёт бэкенд: он точнее любого предсказания в браузере
+    send(editing ? 'PUT' : 'POST', editing ? '/api/servers/' + encodeURIComponent(editing) : '/api/servers', body)
+      .then(function () { return loadState(); })
+      // loadState перерисовывает наборы и шапку, но не список правой панели
+      .then(function () { renderServers(st.health); })
+      .then(function () { closeSrv(); })
+      .catch(function (err) { srvErr(err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  function delSrv() {
+    var name = st.srvEditing;
+    if (!name || st.busy) { return; }
+    var ok = window.confirm('Удалить сервер ' + name + ' из общего реестра? Он исчезнет из наборов, которые его используют.');
+    if (!ok) { return; }
+    var btn = $('srv-del');
+    st.busy = true;
+    btn.disabled = true;
+    srvErr('');
+    send('DELETE', '/api/servers/' + encodeURIComponent(name))
+      .then(function () { return loadState(); })
+      .then(function () { renderServers(st.health); })
+      .then(function () {
+        closeSrv(false);
+        $('srv-add').focus();
+      })
+      .catch(function (err) { srvErr(err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
   }
 
   function loadCalls() {
@@ -736,6 +1212,8 @@
   }
 
   function renderStats(d) {
+    // колонка «вызовов» в таблице наборов считается из этого же ответа (bySet)
+    renderSetsTable();
     var t = (d && d.totals) || { calls: 0 };
     var empty = !t.calls;
     show($('stats-empty'), empty);
@@ -901,6 +1379,7 @@
 
   function closeSide() {
     var was = document.body.classList.contains('side-open');
+    closeSrv(false);
     document.body.classList.remove('side-open');
     $('side-open').setAttribute('aria-expanded', 'false');
     show($('scrim'), false);
@@ -1020,16 +1499,30 @@
     arrowNav(e, this, function (b) { setPeriod(b.dataset.period); });
   });
 
-  // Tab не уходит в контент под дровером
+  // Tab не уходит ни в контент под дровером, ни за открытую форму сервера
   $('side').addEventListener('keydown', function (e) {
-    if (e.key !== 'Tab' || !document.body.classList.contains('side-open')) { return; }
-    var f = [].slice.call(this.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+    var formOpen = !srvForm().hidden;
+    if (formOpen && e.key === 'Escape') {
+      // Esc сначала закрывает форму: дровер под ней человек не закрывал
+      e.stopPropagation();
+      closeSrv();
+      return;
+    }
+    if (e.key !== 'Tab' || !(formOpen || document.body.classList.contains('side-open'))) { return; }
+    var root = formOpen ? srvForm() : this;
+    var f = [].slice.call(root.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])'))
       .filter(function (n) { return n.offsetParent !== null; });
     if (!f.length) { return; }
     var first = f[0], last = f[f.length - 1], at = document.activeElement;
     if (e.shiftKey && (at === first || !this.contains(at))) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
   });
+
+  $('srv-add').addEventListener('click', function () { openSrv(''); });
+  $('srvform-close').addEventListener('click', function () { closeSrv(); });
+  $('srvform').elements.transport.addEventListener('change', srvWhen);
+  $('srvform').addEventListener('submit', saveSrv);
+  $('srv-del').addEventListener('click', delSrv);
 
   $('side-open').addEventListener('click', openSide);
   $('side-close').addEventListener('click', closeSide);
@@ -1132,6 +1625,8 @@
   $('errbar-close').addEventListener('click', function () { show($('errbar'), false); });
 
   $('servers').addEventListener('click', function (e) {
+    var edit = e.target.closest('button[data-edit]');
+    if (edit) { openSrv(edit.dataset.edit); return; }
     var btn = e.target.closest('button[data-server]');
     if (!btn) { return; }
     var note = btn.closest('.srv').querySelector('.srv-note');
