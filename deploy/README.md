@@ -10,10 +10,12 @@
 | `Dockerfile` | два таргета: `slim` (бинарник, `bwrap`, `prlimit`) и `full` (плюс node/npm, python, uv) |
 | `docker-compose.yml` | два набора, конфиги смонтированы read-only, состояние в томах |
 
-Песочница (`"sandbox"` у stdio-сервера) требует `bubblewrap` на хосте или в
-образе и разрешённых user-namespace: в образы bwrap не входит, поэтому
-`untrusted`-сервер с `onUnavailable: deny` в контейнере без него не стартует.
-Ставьте пакет `bubblewrap` и не отключайте userns; проверка — `mcprig doctor`
+Песочница (`"sandbox"` у stdio-сервера) требует `bubblewrap` и `prlimit` на
+хосте или в образе и разрешённых user-namespace: оба образа везут
+`bubblewrap` и `util-linux`, но в rootless Docker namespace-ы закрыты, поэтому
+`untrusted`-сервер с `onUnavailable: deny` там стартует только с
+`--privileged` (см. `docs/*/install.md`). На хосте поставьте пакеты
+`bubblewrap` и `util-linux` и не отключайте userns; проверка — `mcprig doctor`
 (раздел «песочница»).
 
 Раскладка на хосте:
@@ -74,8 +76,8 @@ docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest
 docker compose up -d
 
 # либо собрать локально и указать свои теги; без VERSION образ отвечает «dev»
-docker build --build-arg VERSION=$(git describe --tags --abbrev=0) -t mcprig:slim .   # 44 МБ, бинарник + bwrap/prlimit
-docker build --build-arg VERSION=$(git describe --tags --abbrev=0) --target full -t mcprig:full .  # 446 МБ, плюс node/npm, python, uv
+docker build --build-arg VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//') -t mcprig:slim .   # 44 МБ, бинарник + bwrap/prlimit
+docker build --build-arg VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//') --target full -t mcprig:full .  # 446 МБ, плюс node/npm, python, uv
 MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
 ```
 

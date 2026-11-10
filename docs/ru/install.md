@@ -73,8 +73,8 @@ systemctl --user enable --now mcprig.service
 
 | цель | содержимое | нижестоящие |
 | --- | --- | --- |
-| `slim` (по умолчанию) | бинарник, корневые CA, пользователь без root `10001` | только HTTP |
-| `full` | `slim` плюс node и python | stdio-серверы, запускаемые через `npx` / `uvx` |
+| `slim` (по умолчанию) | бинарник, корневые CA, пользователь без root `10001`, `bwrap` и `prlimit` | stdio-серверы из одного статического бинаря, либо HTTP |
+| `full` | `slim` плюс node/npm, python/pip и uv | stdio-серверы, запускаемые через `npx` / `uvx` |
 
 Оба образа опубликованы в реестре Gitea проекта, так что сборку можно пропустить:
 
@@ -115,7 +115,7 @@ compose.
 бинарь, корневые сертификаты, `bwrap` и `prlimit`; `--target full` добавляет
 node/npm, python/pip и uv/uvx и весит 446 МБ. Передавайте релиз в сборку, иначе
 бинарь внутри образа отвечает `dev`:
-`docker build --build-arg VERSION=$(git describe --tags --abbrev=0) -t mcprig:slim .`
+`docker build --build-arg VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//') -t mcprig:slim .`
 Оба образа запускались: `slim` отдал удалённую `serena` через сеть
 хоста и ответил `find_symbol` через `invoke_command`, healthcheck — `ok`.
 

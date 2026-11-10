@@ -74,8 +74,8 @@ The `Dockerfile` has two targets:
 
 | target | contents | downstreams |
 | --- | --- | --- |
-| `slim` (default) | binary, CA roots, non-root user `10001` | HTTP only |
-| `full` | `slim` plus node and python | stdio servers launched with `npx` / `uvx` |
+| `slim` (default) | binary, CA roots, non-root user `10001`, `bwrap` and `prlimit` | stdio servers with a single static binary, or HTTP |
+| `full` | `slim` plus node/npm, python/pip and uv | stdio servers launched with `npx` / `uvx` |
 
 Both are published to the project's Gitea registry, so you can skip the build:
 
@@ -123,7 +123,7 @@ Measured on this host (rootless Docker 29.9.3): the bare `docker build .` gives
 `slim` (44 MB, binary plus CA roots, `bwrap` and `prlimit`); `--target full`
 adds node/npm, python/pip and uv/uvx and weighs 446 MB. Pass the release into
 the build, or the binary inside the image answers `dev`:
-`docker build --build-arg VERSION=$(git describe --tags --abbrev=0) -t mcprig:slim .`
+`docker build --build-arg VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//') -t mcprig:slim .`
 Both were run: `slim` served a remote
 `serena` over the host network and answered `find_symbol` through
 `invoke_command`, and its healthcheck reports `ok`.

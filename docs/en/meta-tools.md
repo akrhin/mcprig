@@ -140,7 +140,7 @@ Input:
 | field | meaning |
 | --- | --- |
 | `server` | required |
-| `command_name` | required |
+| `command_name` | one of `command_name` or its alias `command` (see below) |
 | `command` | alias for `command_name`; `list_commands` returns the name in the `command` field, so either key works. Sending both with different values is an error |
 | `parameters` | optional object; `null` and an empty string mean `{}` |
 | `maxBytes` | optional cap on the returned answer in bytes; default 32768, at most 1048576; `0` means the default |
