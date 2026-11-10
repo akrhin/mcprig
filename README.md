@@ -55,9 +55,9 @@ lazy-mcp is the project mcprig grew out of, and mcprig speaks its configuration.
 The numbers below are measured on one host against the **same** eleven
 downstream servers (`serena`, `socraticode`, `xerj`, `open-design`, `context7`,
 `tavily-mcp`, `playwright`, `raven`, `designer-skill`, `gitea`,
-`portainer-mcp`, 421 tools), through the same meta-tools.
+`portainer-mcp`, 421 tools), through the same five meta-tools.
 
-| | mcprig 0.1.0 | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
+| | mcprig 0.1.0 (measured) | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
 | --- | --- | --- |
 | proxy process RSS, warmed up, 421 tools cached | **29 MiB** | 67 MiB |
 | RSS before the first call | **13 MiB** | — |
@@ -111,13 +111,15 @@ a key (**Keys** → issue). The token is shown once; save it to `demo.key`
 ```json
 {
   "mcp": {
-    "mcprig-demo": {
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer <token>"
-      },
-      "type": "remote",
-      "url": "http://127.0.0.1:9100/mcp"
+    "servers": {
+      "mcprig-demo": {
+        "enabled": true,
+        "headers": {
+          "Authorization": "Bearer <token>"
+        },
+        "type": "remote",
+        "url": "http://127.0.0.1:9100/mcp"
+      }
     }
   }
 }
@@ -227,7 +229,7 @@ All five are thin wrappers over the downstream MCP servers. Response forms:
 | area | default |
 | --- | --- |
 | set bearer | compared in constant time; an empty `authToken` refuses to start unless the set is explicitly open |
-| panel password | plain text or `scrypt$N$r$p$salt$hash`; constant-time compare; 5 failed logins per minute per IP, one scrypt at a time |
+| panel password | plain text or `scrypt$N$r$p$salt$hash`; constant-time compare; 5 failed logins per minute per IP, at most two scrypt hashes computed at once with up to 8 waiting, and a request beyond that gets `429` |
 | panel session | `mcp_session` cookie: random id signed with HMAC-SHA256, 12 h TTL, `HttpOnly`, `SameSite=Lax`, `Secure` over TLS; sessions live in memory, so a restart logs everyone out |
 | CSRF | writes reject `Sec-Fetch-Site: cross-site`, require `Origin` to match `Host`, and require a JSON body |
 | Host policy | empty `allowedHosts` / `MCPRIG_ALLOWED_HOSTS` means loopback only; `*` disables the check |
@@ -247,7 +249,7 @@ ships the same archives. Release notes for a tag come from `CHANGELOG.md`.
   `deploy/mcprig-set@.service` (one set per unit).
 - Docker: `slim` (binary only, HTTP downstreams) and `full` (adds node and
   python for `npx`/`uvx` stdio servers). Both are published to the Gitea
-  registry as `0.3.7-slim`, `0.3.7-full`, and `latest`/`latest-full` following
+  registry as `0.3.8-slim`, `0.3.8-full`, and `latest`/`latest-full` following
   the release.
 
 Details: [docs/en/install.md](docs/en/install.md).
@@ -271,7 +273,7 @@ Issues and pull requests follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Pre-1.0, single operator: one panel, one password, no per-user roles. Stages 0–6
 are accepted (config, proxy core, OAuth, HTTP transport, manager, panel,
-delivery); releases up to 0.3.7 are published. CLI help and log lines are
+delivery); releases up to 0.3.8 are published. CLI help and log lines are
 Russian in this build.
 
 License: MIT, see [LICENSE](LICENSE).

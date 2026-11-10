@@ -2,5 +2,4 @@
 /bin/
 *.test
 .tmp/
-/mcp-manager
 .serena/
