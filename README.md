@@ -242,7 +242,7 @@ ships the same archives. Release notes for a tag come from `CHANGELOG.md`.
   `deploy/mcprig-set@.service` (one set per unit).
 - Docker: `slim` (binary only, HTTP downstreams) and `full` (adds node and
   python for `npx`/`uvx` stdio servers). Both are published to the Gitea
-  registry as `0.3.4-slim`, `0.3.4-full`, and `latest`/`latest-full` following
+  registry as `0.3.5-slim`, `0.3.5-full`, and `latest`/`latest-full` following
   the release.
 
 Details: [docs/en/install.md](docs/en/install.md).
@@ -265,7 +265,7 @@ shuts it down. More: [docs/en/development.md](docs/en/development.md).
 
 Pre-1.0, single operator: one panel, one password, no per-user roles. Stages 0–6
 are accepted (config, proxy core, OAuth, HTTP transport, manager, panel,
-delivery); releases up to 0.3.4 are published. CLI help and log lines are
+delivery); releases up to 0.3.5 are published. CLI help and log lines are
 Russian in this build.
 
 License: MIT, see [LICENSE](LICENSE).

@@ -7,6 +7,10 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.5] - 2026-11-10
+
 ### Added
 
 - История вызовов на диске у каждого набора (`sets/<id>/stats`, у standalone

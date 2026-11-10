@@ -81,18 +81,18 @@ systemctl --user enable --now mcprig.service
 ```bash
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.4-slim    # закреплённый релиз
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.4-full
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.5-slim    # закреплённый релиз
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.5-full
 ```
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
-(`0.3.4-slim`, `0.3.4-full` — текущая).
+(`0.3.5-slim`, `0.3.5-full` — текущая).
 
 Либо собрать самому:
 
 ```bash
-docker build --build-arg VERSION=v0.3.4 -t mcprig:slim .
-docker build --build-arg VERSION=v0.3.4 --target full -t mcprig:full .
+docker build --build-arg VERSION=v0.3.5 -t mcprig:slim .
+docker build --build-arg VERSION=v0.3.5 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
