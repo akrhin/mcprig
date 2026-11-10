@@ -12,6 +12,7 @@ import (
 // перечислили в envAllow.
 func TestEnvWhitelist(t *testing.T) {
 	t.Setenv("MCPRIG_TEST_SECRET", "s3cr3t")
+	t.Setenv("OWN_SECRET", "own")
 	t.Setenv("LC_ALL", "C")
 	t.Setenv("XDG_DATA_HOME", "/tmp/x")
 
@@ -26,14 +27,34 @@ func TestEnvWhitelist(t *testing.T) {
 	}
 
 	// envAllow — единственный способ провести переменную владельца вниз.
-	got = strings.Join(EnvFor(&config.Server{EnvAllow: []string{"MCPRIG_TEST_SECRET"}}), "\n")
-	if !strings.Contains(got, "MCPRIG_TEST_SECRET=s3cr3t") {
+	got = strings.Join(EnvFor(&config.Server{EnvAllow: []string{"OWN_SECRET"}}), "\n")
+	if !strings.Contains(got, "OWN_SECRET=own") {
 		t.Fatalf("envAllow не сработал: %s", got)
 	}
-	if strings.Contains(strings.Join(BaseEnv(), "\n"), "MCPRIG_TEST_SECRET") {
+	if strings.Contains(strings.Join(BaseEnv(), "\n"), "OWN_SECRET") {
 		t.Error("BaseEnv не должен знать про envAllow")
 	}
 	if _, ok := os.LookupEnv("MCPRIG_TEST_SECRET"); !ok {
 		t.Fatal("t.Setenv не сработал")
+	}
+}
+
+// Резервные имена не доходят до exec.Cmd.Env, даже когда перечислены в
+// envAllow или заданы в env сервера.
+func TestReservedEnvNeverPassesDown(t *testing.T) {
+	reserved := []string{"MCPRIG_LEAKTEST", "BAO_TOKEN", "OPENBAO_TOKEN"}
+	for _, name := range reserved {
+		t.Setenv(name, "secret")
+	}
+	srv := &config.Server{EnvAllow: reserved}
+	cmdEnv := strings.Join(append(withoutReserved(EnvFor(srv)),
+		flatten(map[string]string{"OPENBAO_TOKEN": "x", "OWN": "1"})...), "\n")
+	for _, name := range reserved {
+		if strings.Contains(cmdEnv, name+"=") {
+			t.Errorf("%s ушёл вниз: %s", name, cmdEnv)
+		}
+	}
+	if !strings.Contains(cmdEnv, "OWN=1") {
+		t.Errorf("свой env сервера потерян: %s", cmdEnv)
 	}
 }

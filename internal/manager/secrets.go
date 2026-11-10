@@ -14,6 +14,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // Источники значения переменной, по порядку цепочки.
@@ -262,10 +264,9 @@ func (s *Secrets) RemoteError() string {
 
 // reservedSecret: переменные самого менеджера. Их нельзя подставлять в
 // сервер набора — иначе чужой конфиг унесёт пароль панели или токен OpenBao.
+// Список один — config.ReservedEnvPrefixes, им же отбивается загрузка набора.
 func reservedSecret(name string) bool {
-	return strings.HasPrefix(name, "MCPRIG_") ||
-		strings.HasPrefix(name, "BAO_") ||
-		strings.HasPrefix(name, "OPENBAO_")
+	return config.ReservedEnvName(name)
 }
 
 // secretValue — значение переменной и его источник.

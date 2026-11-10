@@ -18,6 +18,11 @@ var baseEnvKeep = map[string]bool{
 
 var baseEnvPrefixes = []string{"LC_", "XDG_", "SSL_"}
 
+// reservedName — переменные менеджера и хранилища секретов: вниз не уходят,
+// даже когда названы в envAllow. Список один — в config, там же отбивается
+// загрузка набора.
+func reservedName(name string) bool { return config.ReservedEnvName(name) }
+
 // BaseEnv — whitelist окружения stdio-процесса.
 func BaseEnv() []string { return envSelect(nil) }
 
@@ -39,6 +44,9 @@ func envSelect(extra []string) []string {
 	for _, kv := range os.Environ() {
 		name, _, ok := strings.Cut(kv, "=")
 		if !ok {
+			continue
+		}
+		if reservedName(name) {
 			continue
 		}
 		if baseEnvKeep[name] || want[name] || hasEnvPrefix(name) {
