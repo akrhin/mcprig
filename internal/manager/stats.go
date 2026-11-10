@@ -48,6 +48,9 @@ func (m *Manager) apiStats(req *request) error {
 		for _, set := range m.store.Sets() {
 			if dir := m.statsDir(set.ID); dirExists(dir) {
 				dirs = append(dirs, dir)
+			} else {
+				// Документ обещает назвать набор без каталога и здесь.
+				unreachable = append(unreachable, set.ID)
 			}
 		}
 	}

@@ -87,3 +87,43 @@ func TestAPIStatsReadsHistory(t *testing.T) {
 	status(t, e.do(t, http.MethodGet, "/api/stats?set=nope", nil), http.StatusNotFound)
 	status(t, e.do(t, http.MethodGet, "/api/stats?period=year", nil), http.StatusBadRequest)
 }
+
+// Фильтры из строки запроса доходят до QueryHistory, а set=all называет
+// набор без каталога истории, как обещает док.
+func TestAPIStatsFiltersAndAll(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fs")
+	one := e.addSetBody(t, map[string]any{"name": "one", "servers": []string{"fs"}, "open": true})
+	silent := e.addSetBody(t, map[string]any{"name": "silent", "servers": []string{"fs"}, "open": true})
+	now := time.Now()
+	writeHistory(t, filepath.Join(e.dir, "sets", one, "stats"), now,
+		map[string]any{"client": "opencode", "server": "fs", "tool": "echo", "ms": 10, "failed": false},
+		map[string]any{"client": "claude", "server": "other", "tool": "fetch", "ms": 50, "failed": true},
+	)
+
+	w := e.do(t, http.MethodGet, "/api/stats?set="+one+"&period=today&server=fs&tool=echo", nil)
+	status(t, w, http.StatusOK)
+	var got stats.Result
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("разбор /api/stats: %v", err)
+	}
+	if got.Totals.Calls != 1 || got.Totals.Failures != 0 {
+		t.Fatalf("фильтр не применён: %+v", got.Totals)
+	}
+	if len(got.Tools) != 1 || got.Tools[0].Tool != "echo" {
+		t.Fatalf("tools = %+v", got.Tools)
+	}
+
+	w = e.do(t, http.MethodGet, "/api/stats?set=all&period=today&server=fs&tool=echo", nil)
+	status(t, w, http.StatusOK)
+	got = stats.Result{}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Totals.Calls != 1 {
+		t.Fatalf("set=all с фильтром: %+v", got.Totals)
+	}
+	if len(got.Unreachable) != 1 || got.Unreachable[0] != silent {
+		t.Fatalf("unreachable при set=all = %v, ожидался %q", got.Unreachable, silent)
+	}
+}
