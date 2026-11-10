@@ -164,14 +164,11 @@ func clientLabel(r *http.Request, names map[string]string) string {
 		ua = fields[0]
 	}
 	key := ""
-	const scheme = "bearer "
 	// Отпечаток считается только по реально предъявленному bearer-ключу:
 	// пустой заголовок, "Bearer " без значения или чужую схему нельзя
 	// превращать в «валидный» отпечаток пустой строки.
-	if h := r.Header.Get("Authorization"); len(h) > len(scheme) && strings.EqualFold(h[:len(scheme)], scheme) {
-		if presented := strings.TrimSpace(h[len(scheme):]); presented != "" {
-			key = stats.Fingerprint(presented)
-		}
+	if presented, ok := bearerToken(r); ok {
+		key = stats.Fingerprint(presented)
 	}
 	// Подпись ключа важнее отпечатка: владелец уже назвал клиента, и метка
 	// с User-Agent в этом случае только мешает.
@@ -183,15 +180,27 @@ func clientLabel(r *http.Request, names map[string]string) string {
 	return stats.Label(key, ua)
 }
 
-func bearerOK(r *http.Request, token string) bool {
+// bearerToken — значение Bearer-заголовка: схема без учёта регистра, пробелы
+// вокруг значения срезаются. Метка клиента и проверка токена обязаны
+// понимать заголовок одинаково, иначе "Bearer  tok" даёт метку и 401.
+func bearerToken(r *http.Request) (string, bool) {
 	const scheme = "bearer "
 	h := r.Header.Get("Authorization")
 	if len(h) <= len(scheme) || !strings.EqualFold(h[:len(scheme)], scheme) {
+		return "", false
+	}
+	tok := strings.TrimSpace(h[len(scheme):])
+	return tok, tok != ""
+}
+
+func bearerOK(r *http.Request, token string) bool {
+	presented, ok := bearerToken(r)
+	if !ok {
 		return false
 	}
 	// ConstantTimeCompare returns 0 on a length mismatch, so this leaks only
 	// the token length.
-	return subtle.ConstantTimeCompare([]byte(h[len(scheme):]), []byte(token)) == 1
+	return subtle.ConstantTimeCompare([]byte(presented), []byte(token)) == 1
 }
 
 // hostOnly drops the port: AllowedHosts is a host list, not a listener list.

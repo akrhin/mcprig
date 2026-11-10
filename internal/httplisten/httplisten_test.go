@@ -395,6 +395,25 @@ func TestClientLabelUsesKeyNote(t *testing.T) {
 	}
 }
 
+// Bearer с лишними пробелами после схемы — тот же токен: метка клиента и
+// проверка доступа обязаны читать заголовок одинаково, иначе запрос получает
+// отпечаток в счётчике и 401 в ответ.
+func TestBearerTokenTrimsSpace(t *testing.T) {
+	req := httptest.NewRequest("POST", "/mcp", nil)
+	req.Header.Set("User-Agent", "harness/1")
+	req.Header.Set("Authorization", "Bearer  "+testToken)
+	tok, ok := bearerToken(req)
+	if !ok || tok != testToken {
+		t.Fatalf("bearerToken = %q, %v", tok, ok)
+	}
+	if !bearerOK(req, testToken) {
+		t.Fatal("bearerOK отбил токен с двойным пробелом")
+	}
+	if got := clientLabel(req, nil); got != "key:"+stats.Fingerprint(testToken)+"/harness/1" {
+		t.Fatalf("label = %q", got)
+	}
+}
+
 func newStatsHandler(t *testing.T, token string, allowAnonymous bool, rec *stats.Recorder) http.Handler {
 	t.Helper()
 	cfg := &config.Config{Transport: &config.HTTPTransport{
