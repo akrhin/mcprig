@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -318,4 +320,51 @@ func benchRecorder() *Recorder {
 		r.Record("opencode", "s", "echo", time.Millisecond, nil)
 	}
 	return r
+}
+
+// Recorder дублирует вызов в историю на диске: метки, ms и failed те же, а
+// Snapshot показывает, что канал не терял строк.
+func TestRecorderMirrorsToHistory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "stats")
+	h, err := OpenHistory(dir, nil)
+	if err != nil {
+		t.Fatalf("OpenHistory: %v", err)
+	}
+	day := time.Now().Format(dayLayout)
+
+	r := NewRecorder("main", 8)
+	r.SetHistory(h)
+	r.Record("opencode", "alpha", "echo", 25*time.Millisecond, errors.New("boom"))
+	if snap := r.Snapshot(); snap.Stats == nil || snap.Stats.Dropped != 0 {
+		t.Fatalf("stats снимка = %+v", snap.Stats)
+	}
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	var lines []rawLine
+	if err := scanRaw(filepath.Join(dir, "raw-"+day+".jsonl"), func(l rawLine) { lines = append(lines, l) }); err != nil {
+		t.Fatalf("scanRaw: %v", err)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("строк = %d, ожидалась 1", len(lines))
+	}
+	l := lines[0]
+	if l.Client != "opencode" || l.Server != "alpha" || l.Tool != "echo" || l.MS != 25 || !l.Failed {
+		t.Fatalf("строка = %+v", l)
+	}
+}
+
+// Недоступный каталог истории — не повод врать о состоянии: Stats пусто.
+func TestSnapshotWithoutHistory(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenHistory(filepath.Join(blocker, "stats"), nil); err == nil {
+		t.Fatal("OpenHistory под файлом не упала")
+	}
+	if snap := NewRecorder("main", 8).Snapshot(); snap.Stats != nil {
+		t.Fatalf("stats без истории = %+v", snap.Stats)
+	}
 }

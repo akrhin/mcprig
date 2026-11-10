@@ -281,6 +281,7 @@ func TestBrokenJournalLinesAreSkipped(t *testing.T) {
 // Файлы истории — 0600, каталог — 0700.
 func TestHistoryFilesArePrivate(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "stats")
+	day := time.Now().Format(dayLayout)
 	h, err := OpenHistory(dir, nil)
 	if err != nil {
 		t.Fatalf("OpenHistory: %v", err)
@@ -290,7 +291,6 @@ func TestHistoryFilesArePrivate(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	day := time.Now().Format(dayLayout)
 	raw := filepath.Join(dir, "raw-"+day+".jsonl")
 	if info, err := os.Stat(raw); err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("raw: %v, режим %v", err, info.Mode().Perm())
@@ -330,6 +330,7 @@ func TestRecordDoesNotBlockWhenQueueIsFull(t *testing.T) {
 // Записанный вызов читается обратно из сырого журнала.
 func TestRecordWritesRawLine(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "stats")
+	day := time.Now().Format(dayLayout)
 	h, err := OpenHistory(dir, nil)
 	if err != nil {
 		t.Fatalf("OpenHistory: %v", err)
@@ -340,7 +341,7 @@ func TestRecordWritesRawLine(t *testing.T) {
 	}
 
 	var lines []rawLine
-	path := filepath.Join(dir, "raw-"+time.Now().Format(dayLayout)+".jsonl")
+	path := filepath.Join(dir, "raw-"+day+".jsonl")
 	if err := scanRaw(path, func(l rawLine) { lines = append(lines, l) }); err != nil {
 		t.Fatalf("scanRaw: %v", err)
 	}
@@ -350,5 +351,82 @@ func TestRecordWritesRawLine(t *testing.T) {
 	l := lines[0]
 	if l.Client != "opencode" || l.Server != "alpha" || l.Tool != "echo" || l.MS != 12 || !l.Failed {
 		t.Fatalf("строка = %+v", l)
+	}
+}
+
+// Фильтры server/tool/client действуют и на totals, и на разрезы: чужая
+// тройка не попадает никуда.
+func TestQueryTodayFilters(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 11, 10, 15, 0, 0, 0, time.Local)
+	today := startOfDay(now)
+	writeRaw(t, dir, today, []rawLine{
+		{Time: now.Add(-time.Minute), Client: "opencode", Server: "alpha", Tool: "echo", MS: 10},
+		{Time: now.Add(-2 * time.Minute), Client: "claude", Server: "beta", Tool: "fetch", MS: 20, Failed: true},
+	})
+
+	res := QueryHistory([]string{dir}, Query{Period: PeriodToday, Server: "alpha"}, now)
+	if res.Totals.Calls != 1 || res.Totals.Failures != 0 || res.Totals.P95Ms != 10 {
+		t.Fatalf("фильтр server: %+v", res.Totals)
+	}
+	if len(res.Servers) != 1 || res.Servers[0].Server != "alpha" || res.Servers[0].Calls != 1 {
+		t.Fatalf("servers = %+v", res.Servers)
+	}
+	for _, row := range res.Tools {
+		if row.Tool == "fetch" || row.Server == "beta" {
+			t.Fatalf("в tools попал чужой сервер: %+v", row)
+		}
+	}
+	for _, row := range res.Clients {
+		if row.Client == "claude" {
+			t.Fatalf("в clients попал чужой клиент: %+v", row)
+		}
+	}
+
+	// Три фильтра вместе оставляют ровно одну тройку.
+	res = QueryHistory([]string{dir}, Query{Period: PeriodToday, Server: "alpha", Tool: "echo", Client: "opencode"}, now)
+	if res.Totals.Calls != 1 || len(res.Tools) != 1 || len(res.Clients) != 1 {
+		t.Fatalf("фильтр тройки: %+v %+v %+v", res.Totals, res.Tools, res.Clients)
+	}
+
+	// bucket=day на сегодняшних сутках — одна точка.
+	res = QueryHistory([]string{dir}, Query{Period: PeriodToday, Bucket: "day"}, now)
+	if len(res.Series) != 1 || res.Series[0].Calls != 2 || !res.Series[0].T.Equal(today) {
+		t.Fatalf("серия по дню: %+v", res.Series)
+	}
+}
+
+// Два дня одного месяца живут в одном month-файле, и повторная ротация не
+// удваивает ни один из них.
+func TestRotateMonthKeepsTwoDays(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 11, 10, 15, 0, 0, 0, time.Local)
+	today := startOfDay(now)
+	d1 := today.AddDate(0, 0, -51) // 20 сентября
+	d2 := today.AddDate(0, 0, -50) // 21 сентября
+	writeRaw(t, dir, d1, []rawLine{{Time: d1.Add(time.Hour), Client: "c", Server: "s", Tool: "t", MS: 10}})
+	writeRaw(t, dir, d2, []rawLine{{Time: d2.Add(time.Hour), Client: "c", Server: "s", Tool: "t", MS: 20}})
+
+	for i := 0; i < 2; i++ {
+		if err := Rotate(dir, now); err != nil {
+			t.Fatalf("Rotate #%d: %v", i+1, err)
+		}
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "month-"+d1.Format(monthLayout)+".json"))
+	if err != nil {
+		t.Fatalf("месячный файл: %v", err)
+	}
+	var mf monthFile
+	if err := json.Unmarshal(b, &mf); err != nil {
+		t.Fatal(err)
+	}
+	if len(mf.Days) != 2 {
+		t.Fatalf("дней в месяце = %d: %+v", len(mf.Days), mf.Days)
+	}
+	for _, day := range []time.Time{d1, d2} {
+		got := mf.Days[day.Format(dayLayout)]
+		if len(got) != 1 || got[0].Calls != 1 {
+			t.Fatalf("%s: %+v", day.Format(dayLayout), got)
+		}
 	}
 }
