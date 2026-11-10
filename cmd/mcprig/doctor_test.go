@@ -149,6 +149,31 @@ func TestBuildDoctorReportGreen(t *testing.T) {
 	}
 }
 
+// Предупреждение читается как «внимание:», а не как «ok:»; проблема важнее.
+func TestRenderDoctorPrefixes(t *testing.T) {
+	rep := doctorReport{
+		Version: []doctorLine{{OK: true, Text: "0.3.8"}},
+		Services: []doctorLine{
+			{OK: true, Text: "предупреждение: песочница: prlimit не найден в PATH"},
+			{OK: true, Text: "панель слушает 9091"},
+			{OK: false, Text: "набор ops не отвечает"},
+		},
+	}
+	out := string(renderDoctor(rep))
+	for _, want := range []string{
+		"внимание: песочница: prlimit не найден в PATH",
+		"ok: панель слушает 9091",
+		"проблема: набор ops не отвечает",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("нет строки %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "ok: предупреждение:") {
+		t.Fatalf("предупреждение выдано за успех:\n%s", out)
+	}
+}
+
 // Строка tool-out: число файлов, объём и возраст самого старого — он же
 // ближайший к истечению срока.
 func TestToolOutLine(t *testing.T) {

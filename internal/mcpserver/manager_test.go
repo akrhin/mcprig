@@ -386,6 +386,162 @@ func TestInvokeCommandStrictArguments(t *testing.T) {
 	}
 }
 
+// list_commands names the field command; invoke_command must accept that name
+// as a synonym for command_name.
+func TestInvokeCommandCommandAlias(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{
+		"server": "alpha", "command": "echo", "parameters": map[string]any{"text": "hi"},
+	})
+	if res.IsError {
+		t.Fatalf("command must be accepted as an alias for command_name: %s", resultText(t, res))
+	}
+	if text := resultText(t, res); !strings.Contains(text, `echo:{"text":"hi"}`) {
+		t.Fatalf("want the echo answer, got %q", text)
+	}
+	if n := atomic.LoadInt32(&dials); n == 0 {
+		t.Fatal("an accepted call must dial the server")
+	}
+}
+
+// Два имени одного поля с разными значениями — отказ, а не тихий выбор.
+func TestInvokeCommandAliasConflict(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{
+		"server": "alpha", "command_name": "echo", "command": "other",
+	})
+	if !res.IsError {
+		t.Fatal("расходящиеся имена должны отвергаться")
+	}
+	if text := resultText(t, res); !strings.Contains(text, "укажите одно: command_name или command") {
+		t.Fatalf("нет подсказки выбрать одно имя: %q", text)
+	}
+	if n := atomic.LoadInt32(&dials); n != 0 {
+		t.Fatalf("отвергнутый вызов не должен ходить в апстрим: %d", n)
+	}
+}
+
+// A wrong JSON type names the key and the expected kind, not a Go struct field.
+func TestInvokeCommandTypeError(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{"server": 5})
+	if !res.IsError {
+		t.Fatal("a number for server must be an error")
+	}
+	if text := resultText(t, res); !strings.Contains(text, "ключ server: ожидался тип «строка», получен тип «число»") {
+		t.Fatalf("want a readable type error, got %q", text)
+	}
+	if n := atomic.LoadInt32(&dials); n != 0 {
+		t.Fatalf("a refused call must not dial, got %d", n)
+	}
+}
+
+// Без обоих имён вызов отвергается до подключения к апстриму.
+func TestInvokeCommandNoName(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{"server": "alpha"})
+	if !res.IsError {
+		t.Fatal("без command_name вызов должен отвергаться")
+	}
+	if text := resultText(t, res); !strings.Contains(text, "command_name обязателен") {
+		t.Fatalf("нет требования command_name: %q", text)
+	}
+	if n := atomic.LoadInt32(&dials); n != 0 {
+		t.Fatalf("отвергнутый вызов не должен ходить в апстрим: %d", n)
+	}
+}
+
+// Аргументы — строка, а не объект: ошибка называет вид значения, не Go-тип map.
+func TestInvokeCommandArgumentsNotObject(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "invoke_command", Arguments: "abc",
+	})
+	if err != nil {
+		t.Fatalf("вызов: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("строка вместо аргументов должна быть ошибкой")
+	}
+	if text := resultText(t, res); !strings.Contains(text, "аргументы: ожидался тип «объект», получен тип «строка»") {
+		t.Fatalf("хочется понятную ошибку типа, получено %q", text)
+	}
+	if n := atomic.LoadInt32(&dials); n != 0 {
+		t.Fatalf("отвергнутый вызов не должен ходить в апстрим: %d", n)
+	}
+}
+
+// Схема не требует оба имени: клиент, проверяющий required, примет любое.
+func TestInvokeCommandSchemaAcceptsEitherName(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("list tools: %v", err)
+	}
+	var schema map[string]any
+	for _, tool := range res.Tools {
+		if tool.Name == "invoke_command" {
+			schema = tool.InputSchema.(map[string]any)
+		}
+	}
+	if schema == nil {
+		t.Fatal("нет схемы invoke_command")
+	}
+	if required, ok := schema["required"].([]any); ok && len(required) > 0 {
+		if required[0] != "server" {
+			t.Fatalf("обязательным должен быть только server, получено %v", required)
+		}
+	}
+	alts, ok := schema["anyOf"].([]any)
+	if !ok || len(alts) != 2 {
+		t.Fatalf("нужен anyOf из двух имён, получено %v", schema["anyOf"])
+	}
+}
+
+// The stray-key error lists what is allowed, so the alias is discoverable.
+func TestInvokeCommandExtraKeyListsAllowed(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{
+		"server": "alpha", "command_name": "echo", "bogus": 1,
+	})
+	if !res.IsError {
+		t.Fatal("an unknown key must be an error")
+	}
+	text := resultText(t, res)
+	if !strings.Contains(text, "допустимые:") ||
+		!strings.Contains(text, "command, parameters") {
+		t.Fatalf("the error must list the allowed keys, got %q", text)
+	}
+}
+
 // One absent command does not hide the schemas that do exist.
 func TestDescribeCommandsSkipsMissing(t *testing.T) {
 	var dials int32

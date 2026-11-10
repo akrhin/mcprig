@@ -114,6 +114,19 @@ func TestWrapBwrapArgv(t *testing.T) {
 	}
 }
 
+// Без prlimit песочница fail-closed по-настоящему: раньше пустое имя
+// доходило до bind и давало невнятное «путь "prlimit" должен быть абсолютным».
+func TestBwrapArgvRequiresPrlimit(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	srv := &config.Server{Name: "victim", Transport: config.TransportStdio, Command: []string{"true"}}
+	sb := &config.Sandbox{Mode: config.SandboxModeBwrap, MemoryMb: 2048}
+
+	_, err := bwrapArgv(srv, sb, srv.Command)
+	if err == nil || !strings.Contains(err.Error(), "prlimit не найден в PATH") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestWrapNetworkAllow(t *testing.T) {
 	stubAvailable(t, nil)
 	srv := sandboxed()
@@ -264,4 +277,21 @@ func prlimitPath() string {
 		return p
 	}
 	return "prlimit"
+}
+
+// Проба обязана требовать prlimit: без него bwrapArgv падает на bind, и
+// замена внятной ошибки на «путь "prlimit" должен быть абсолютным» остаётся
+// незамеченной, если эту строку кто-то уберёт.
+func TestProbeRunRequiresPrlimit(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"bwrap", "true"} {
+		if err := os.Symlink("/bin/true", filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+	err := probeRun()
+	if err == nil || !strings.Contains(err.Error(), "prlimit не найден в PATH") {
+		t.Fatalf("probeRun = %v", err)
+	}
 }

@@ -8,6 +8,10 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 ## [Unreleased]
 
 ### Added
+
+- `invoke_command` и `invoke_many` принимают `command` синонимом
+  `command_name` — так поле называет `list_commands`; оба ключа с разными
+  значениями отвергаются.
 - `CONTRIBUTING.md` and `CONTRIBUTING.ru.md`: where an issue and a pull request
   go, the commit form, the gate before pushing, and the rule that a behaviour
   change updates both doc trees and the changelog.
@@ -16,6 +20,34 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - Versioning rules in both contributing files: SemVer pre-1.0, the tag is the
   only version source, what a `PATCH` and a `MINOR` may carry, and how a
   release commit and a published tag are treated.
+
+### Fixed
+
+- Схемы инструментов больше не объявляют `command_name` обязательным: он и
+  `command` — равноправные имена (JSON Schema `anyOf`), поэтому клиент,
+  проверяющий `required`, принимает `command`.
+- `invoke_many` доведён до общего стиля ошибок: тип значения — «ключ command:
+  ожидался тип «строка», получен тип «число»» с индексом вызова, лишний ключ
+  перечисляет допустимые, подсказка упоминает синоним.
+- Топ-level аргументы не-объект переводятся в «аргументы: ожидался тип
+  «объект», получен тип «строка»», без имени Go-типа.
+- Ошибка лишних ключей перечисляет допустимые, а ошибка типа называет ключ и
+  вид значения (`ключ server: ожидался тип «строка», получен тип «число»`)
+  вместо имени Go-структуры.
+- Причина изоляции не дублирует префикс: `без изоляции: bwrap не найден в
+  PATH`, а не `без изоляции: sandbox unavailable: …`.
+- `doctor` проверяет `prlimit` и печатает предупреждения как `внимание:`, не
+  `ok:`.
+- Документация: `command` в таблице `invoke_command` (en/ru), сборка образа с
+  `--build-arg VERSION=` (иначе бинарь отвечает `dev`).
+- Образы везут `bubblewrap` и `prlimit` (`util-linux`): `"sandbox": {}` не
+  падает на `bwrap не найден в PATH`, а песочница больше не отвергает
+  `prlimit` как относительный путь.
+- Образ `full` везёт uv/uvx в `/usr/bin`: stdio-серверы через `uvx` стартуют.
+- Оба образа задают `MCPRIG_HOST=0.0.0.0`: панель в контейнере отвечает на
+  опубликованном порту, а не только на loopback внутри.
+- Ошибка сервера больше не обещает `bwrap` тому, кому песочница не досталась:
+  `list_servers` показывает реальную изоляцию.
 
 ## [0.3.7] - 2026-11-10
 

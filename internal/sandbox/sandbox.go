@@ -41,6 +41,9 @@ func probeRun() error {
 	if err != nil {
 		return errors.New("bwrap не найден в PATH")
 	}
+	if _, err := exec.LookPath("prlimit"); err != nil {
+		return errors.New("prlimit не найден в PATH: лимиты песочницы задаёт util-linux — установите пакет util-linux")
+	}
 	// Не жёсткое /usr/bin/true: на хосте без /usr пустая песочница выглядела
 	// бы как выключенный userns.
 	trueBin, err := exec.LookPath("true")
@@ -177,10 +180,11 @@ func bwrapArgv(srv *config.Server, sb *config.Sandbox, argv []string) ([]string,
 	// such file or directory» — даже когда /usr есть в ro, но /lib64 нет.
 	// Лимиты при этом остаются частью песочницы: prlimit внутри userns.
 	limits := limitArgs(sb)
-	prlimit := "prlimit"
+	var prlimit string
 	if len(limits) > 0 {
-		if p, err := exec.LookPath("prlimit"); err == nil {
-			prlimit = p
+		var err error
+		if prlimit, err = exec.LookPath("prlimit"); err != nil {
+			return nil, errors.New("sandbox: prlimit не найден в PATH (пакет util-linux)")
 		}
 		if err := bind("--ro-bind", prlimit, false); err != nil {
 			return nil, err

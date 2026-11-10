@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -280,11 +281,12 @@ func (m *Manager) Server() *mcp.Server {
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_command",
 		Description: "Execute a command from a specific server (auto-discovers if needed). " +
-			"This is a wrapper tool: keep only server, command_name and maxBytes at the top level, " +
+			"This is a wrapper tool: keep only server, command_name (or command) and maxBytes at the top level, " +
 			"and put downstream tool inputs inside parameters.",
-		InputSchema: objectSchema(map[string]any{
+		InputSchema: withAnyOf(objectSchema(map[string]any{
 			"server":       map[string]any{"type": "string", "description": "Server name"},
 			"command_name": map[string]any{"type": "string", "description": "Command name to execute"},
+			"command":      map[string]any{"type": "string", "description": "Alias for command_name; list_commands returns the name in the command field"},
 			"parameters": map[string]any{
 				"type":        "object",
 				"description": "Optional downstream command input object. Put the target command inputs here, not alongside server or command_name.",
@@ -293,29 +295,30 @@ func (m *Manager) Server() *mcp.Server {
 				"type":        "integer",
 				"description": "Optional: cap the returned answer at this many bytes (default 32768, at most 1048576). A longer answer is cut and the full one is saved to a file named in the marker.",
 			},
-		}, "server", "command_name"),
+		}, "server"), "command_name", "command"),
 	}, m.invokeCommand)
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_many",
 		Description: "Выполнить до 8 независимых вызовов одним запросом. " +
-			"Каждый вызов — как invoke_command: server, command_name и parameters. " +
+			"Каждый вызов — как invoke_command: server, command_name (синоним — command) и parameters. " +
 			"Ответ — массив в порядке calls; ошибка одного вызова не валит остальные.",
 		InputSchema: objectSchema(map[string]any{
 			"calls": map[string]any{
 				"type":        "array",
-				"description": "Вызовы (не больше 8): server, command_name и необязательные parameters",
-				"items": map[string]any{
+				"description": "Вызовы (не больше 8): server, command_name (или command) и необязательные parameters",
+				"items": withAnyOf(map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"server":       map[string]any{"type": "string", "description": "Server name"},
 						"command_name": map[string]any{"type": "string", "description": "Command name to execute"},
+						"command":      map[string]any{"type": "string", "description": "Alias for command_name (synonym)"},
 						"parameters": map[string]any{
 							"type":        "object",
 							"description": "Optional downstream command input object. Put the target command inputs here.",
 						},
 					},
-					"required": []string{"server", "command_name"},
-				},
+					"required": []string{"server"},
+				}, "command_name", "command"),
 			},
 			"maxBytes": map[string]any{
 				"type":        "integer",
@@ -628,14 +631,20 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 type invokeCommandInput struct {
 	Server      string          `json:"server"`
 	CommandName string          `json:"command_name"`
+	Command     string          `json:"command"` // синоним command_name: list_commands называет это поле command
 	Parameters  json.RawMessage `json:"parameters"`
 	MaxBytes    int             `json:"maxBytes,omitempty"`
 }
 
 func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in invokeCommandInput
-	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "parameters", "maxBytes"); err != nil {
+	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "command", "parameters", "maxBytes"); err != nil {
 		return errResult(err)
+	}
+	if in.CommandName == "" {
+		in.CommandName = in.Command
+	} else if in.Command != "" && in.Command != in.CommandName {
+		return errResult(errors.New("укажите одно: command_name или command"))
 	}
 	if in.Server == "" {
 		return errResult(errors.New("server обязателен"))
@@ -977,6 +986,31 @@ func objectSchema(props map[string]any, required ...string) map[string]any {
 	return s
 }
 
+// withAnyOf adds "at least one of these keys" to a schema, so a client that
+// validates arguments still accepts either spelling of the same field.
+func withAnyOf(s map[string]any, keys ...string) map[string]any {
+	alts := make([]any, 0, len(keys))
+	for _, k := range keys {
+		alts = append(alts, map[string]any{"required": []string{k}})
+	}
+	s["anyOf"] = alts
+	return s
+}
+
+// typeErrorText turns a decode type error into one line with the key and the
+// expected and actual kinds; scope prefixes the subject, like "calls[0]: ".
+func typeErrorText(err error, scope string) (string, bool) {
+	var ute *json.UnmarshalTypeError
+	if !errors.As(err, &ute) {
+		return "", false
+	}
+	name := scope + "аргументы"
+	if ute.Field != "" {
+		name = scope + "ключ " + ute.Field
+	}
+	return fmt.Sprintf("%s: ожидался тип «%s», получен тип «%s»", name, typeKind(ute.Type), valueKind(ute.Value)), true
+}
+
 // strictArgs rejects unknown top-level keys before decoding into v. The hint,
 // when set, tells the caller where those keys belong instead.
 func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string) error {
@@ -985,19 +1019,61 @@ func strictArgs(req *mcp.CallToolRequest, v any, hint string, allowed ...string)
 	}
 	extra, err := extraKeys(req.Params.Arguments, allowed...)
 	if err != nil {
+		if text, ok := typeErrorText(err, ""); ok {
+			return errors.New(text)
+		}
 		return fmt.Errorf("аргументы: %w", err)
 	}
 	if len(extra) > 0 {
-		message := "лишние ключи: " + strings.Join(extra, ", ")
+		message := "лишние ключи: " + strings.Join(extra, ", ") + " — допустимые: " + strings.Join(allowed, ", ")
 		if hint != "" {
-			message += " — " + hint
+			message += "; " + hint
 		}
 		return errors.New(message)
 	}
 	if err := json.Unmarshal(req.Params.Arguments, v); err != nil {
+		if text, ok := typeErrorText(err, ""); ok {
+			return errors.New(text)
+		}
 		return fmt.Errorf("аргументы: %w", err)
 	}
 	return nil
+}
+
+// typeKind/valueKind translate json.UnmarshalTypeError into the words a caller
+// can act on instead of leaking Go struct and type names.
+var kindWords = map[reflect.Kind]string{
+	reflect.String: "строка",
+	reflect.Bool:   "логическое",
+	reflect.Slice:  "массив",
+	reflect.Map:    "объект",
+	reflect.Struct: "объект",
+}
+
+var valueWords = map[string]string{
+	"string": "строка",
+	"bool":   "логическое",
+	"array":  "массив",
+	"object": "объект",
+	"number": "число",
+}
+
+func typeKind(t reflect.Type) string {
+	k := t.Kind()
+	if k >= reflect.Int && k <= reflect.Uintptr {
+		return "целое число"
+	}
+	if word, ok := kindWords[k]; ok {
+		return word
+	}
+	return t.String()
+}
+
+func valueKind(v string) string {
+	if word, ok := valueWords[v]; ok {
+		return word
+	}
+	return v
 }
 
 // extraKeys lists sorted top-level keys of a JSON object that are not allowed.

@@ -140,7 +140,8 @@ Input:
 | field | meaning |
 | --- | --- |
 | `server` | required |
-| `command_name` | required |
+| `command_name` | one of `command_name` or its alias `command` (see below) |
+| `command` | alias for `command_name`; `list_commands` returns the name in the `command` field, so either key works. Sending both with different values is an error |
 | `parameters` | optional object; `null` and an empty string mean `{}` |
 | `maxBytes` | optional cap on the returned answer in bytes; default 32768, at most 1048576; `0` means the default |
 
@@ -148,8 +149,11 @@ Downstream arguments go **inside** `parameters`. Any other top-level key is an
 error, so a call cannot silently run with empty arguments:
 
 ```text
-Error: лишние ключи: path — аргументы инструмента кладутся в parameters
+Error: лишние ключи: path — допустимые: server, command_name, command, parameters, maxBytes; аргументы инструмента кладутся в parameters
 ```
+
+A wrong JSON type is named by key and kind, without Go types:
+`аргументы: ключ server: ожидался тип «строка», получен тип «число»`.
 
 The downstream result is returned as-is: `content`, `structuredContent` and
 `isError` are preserved. If the connection dies before the first response byte
@@ -206,7 +210,8 @@ timeout, or a downstream result with `isError: true` — keeps its slot with
 
 Bad input fails the whole request with `isError: true` and nothing is run: no
 calls, more than 8, an unknown key inside a call, a missing `server` or
-`command_name`, `parameters` that is not an object, or a bad `maxBytes`.
+`command_name` (or its alias `command`), `parameters` that is not an object, or
+a bad `maxBytes`.
 
 ## Secret scrubbing
 

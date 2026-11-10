@@ -192,3 +192,28 @@ func TestSandboxFallbackReported(t *testing.T) {
 		t.Errorf("причина не та: %q", seen)
 	}
 }
+
+// deny-отказ — тоже деградация: маркер изоляции обязан дойти до набора,
+// иначе list_servers обещает bwrap серверу, который не стартует.
+func TestSandboxDenyReported(t *testing.T) {
+	t.Setenv("PATH", "/nonexistent")
+	srv := &config.Server{
+		Name:      "boxed",
+		Transport: config.TransportStdio,
+		Command:   []string{"/bin/sh", "-c", "exit 1"},
+		Sandbox:   &config.Sandbox{Mode: config.SandboxModeBwrap}, // deny по умолчанию
+	}
+	var seen string
+	c := &Connector{Version: "test", OnSandboxFallback: func(_ *config.Server, reason string) { seen = reason }}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := c.Connect(ctx, srv); err == nil {
+		t.Fatal("deny должен вернуть ошибку подключения")
+	}
+	if seen == "" {
+		t.Fatal("deny-отказ не дошёл до маркера изоляции")
+	}
+	if strings.Contains(seen, "sandbox unavailable") {
+		t.Fatalf("менеджер сам ставит «без изоляции:», префикс дублируется: %q", seen)
+	}
+}
