@@ -100,6 +100,16 @@ func (e *entry) cachedTools() []*mcp.Tool {
 	return e.tools
 }
 
+// hasTool reports whether the cached list names this tool.
+func hasTool(tools []*mcp.Tool, name string) bool {
+	for _, t := range tools {
+		if t.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Manager) storeTools(e *entry, tools []*mcp.Tool) {
 	e.toolsMu.Lock()
 	e.tools = tools
@@ -646,6 +656,12 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 	if message, denied := denyReason(m.cfg.Permissions, e.srv.Permissions, e.srv.Name, in.CommandName); denied {
 		return blockedResult(e.srv.Name, in.CommandName, message), nil
+	}
+	// Кэш инструментов уже есть — неизвестное имя не идёт в апстрим: иначе
+	// отказ приходит тремя разными текстами (go-sdk, transport, апстрим).
+	// Пустой кэш — первый вызов после старта, проверять не по чему.
+	if cached := e.cachedTools(); cached != nil && !hasTool(cached, in.CommandName) {
+		return errResult(fmt.Errorf("неизвестный инструмент %q у сервера %q", in.CommandName, e.srv.Name))
 	}
 
 	args, err := parametersOf(in.Parameters)
