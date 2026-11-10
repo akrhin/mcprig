@@ -17,6 +17,11 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
   структура отброшена и лежит в выгруженном файле.
 - При обоих пустых именах `invoke_command` и `invoke_many` говорят
   `укажите command_name или command` вместо `command_name обязателен`.
+- `list_servers`: проба, не дождавшаяся свободного слота, больше не помечает
+  сервер `healthy: false` на 15 секунд — исход неизвестен, ответ `true` без
+  `error` и без записи в кэш.
+- Панель получила `IdleTimeout` 60 с; `WriteTimeout` не ставится — долгие
+  стримы ответов не должны обрываться.
 
 ## [0.3.8] - 2026-11-10
 

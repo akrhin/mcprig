@@ -46,7 +46,7 @@ connection: a filtered-out server is never dialed.
 | `description` | present when the config has one |
 | `type` | `stdio` or `remote` |
 | `enabled` | from the config; a disabled server is not probed and is reported `healthy: true` |
-| `healthy` | result of a probe; `false` for a broken config or a failed connect |
+| `healthy` | result of a probe; `false` for a broken config or a failed connect. A probe that could not get a free slot is reported `true` and is not cached — the outcome is unknown |
 | `error` | probe error text, present with `healthy: false` |
 | `isolation` | `bwrap` when the sandbox is applied; `без изоляции: <причина>` when it was requested but bubblewrap could not start (`onUnavailable: warn`/`allow`); `нет: конфиг отвергнут` when the record has a `_configError`; absent only for a valid server without a `sandbox` block |
 | `tags` | from the config, when present |
