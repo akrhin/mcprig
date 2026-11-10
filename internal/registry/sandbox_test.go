@@ -157,3 +157,18 @@ func TestExportSetKeepsSandbox(t *testing.T) {
 		t.Error("экспорт потерял envAllow")
 	}
 }
+
+// Опечатка в поле sandbox отвергается панелью, а не сохраняется с 200.
+func TestAddServerUnknownSandboxKey(t *testing.T) {
+	store, err := registry.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.AddServer(json.RawMessage(`{"name":"typo","command":["/bin/true"],"sandbox":{"mode":"bwrap","memMb":1024}}`))
+	if err == nil {
+		t.Fatal("сервер с неизвестным полем sandbox принят")
+	}
+	if !strings.Contains(err.Error(), "неизвестные поля: memMb") {
+		t.Errorf("причина не та: %v", err)
+	}
+}

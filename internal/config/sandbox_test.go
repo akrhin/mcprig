@@ -209,3 +209,27 @@ func TestCheckDoesNotMutate(t *testing.T) {
 		t.Fatalf("Check записал ConfigError: %q", srv.ConfigError)
 	}
 }
+
+// Опечатка в поле sandbox не должна молча давать умолчания.
+func TestDecodeSandboxUnknownKeys(t *testing.T) {
+	data := []byte(`{"name":"c","command":["/bin/true"],"sandbox":{"mode":"bwrap","memoryMB":1024}}`)
+	var srv Server
+	if err := srv.UnmarshalJSON(data); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !strings.Contains(srv.ConfigError, "неизвестные поля: memoryMB") {
+		t.Fatalf("ConfigError = %q", srv.ConfigError)
+	}
+	if srv.Sandbox != nil {
+		t.Fatalf("блок с опечаткой принят: %+v", srv.Sandbox)
+	}
+}
+
+// mode=none с лимитами — блок ничего не делает, об этом надо сказать.
+func TestWarningsSandboxNoneWithLimits(t *testing.T) {
+	srv := &Server{Command: []string{"/bin/true"}, Sandbox: &Sandbox{Mode: SandboxModeNone, MemoryMb: 1024}}
+	got := srv.Warnings()
+	if len(got) != 1 || !strings.Contains(got[0], "mode=none") {
+		t.Fatalf("warnings = %v", got)
+	}
+}

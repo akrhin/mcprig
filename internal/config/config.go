@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -70,8 +71,9 @@ const (
 	SandboxNetworkAllow = "allow"
 
 	// DefaultSandboxMemoryMb ограничивает виртуальную память (RLIMIT_AS), а не
-	// RSS: node под 512 МиБ не поднимается, ему нужно ≥2048, python — хватает.
-	DefaultSandboxMemoryMb = 512
+	// RSS: под 512 МиБ не поднимается ни node, ни Go (проверено живьём —
+	// canary на go-sdk падал «failed to reserve page summary memory»).
+	DefaultSandboxMemoryMb = 2048
 	DefaultSandboxPids     = 256
 	DefaultSandboxTimeout  = 30
 	// DefaultSandboxTmpMb — /tmp внутри песочницы: 128 МиБ хватает node и
@@ -164,6 +166,10 @@ func (s *Server) Warnings() []string {
 		if sb.MemoryMb > 0 && sb.MemoryMb < 2048 && isNodeCommand(s.Command) {
 			out = append(out, fmt.Sprintf("sandbox.memoryMb=%d: node/npx не поднимется, нужно ≥2048", sb.MemoryMb))
 		}
+	}
+	if sb := s.Sandbox; sb != nil && sb.Mode == SandboxModeNone &&
+		(sb.MemoryMb > 0 || sb.Pids > 0 || sb.TmpMb > 0 || sb.TimeoutSec > 0 || len(sb.RO) > 0 || len(sb.RW) > 0) {
+		out = append(out, "sandbox.mode=none: лимиты и монтирования из блока не применяются")
 	}
 	if sb := s.Sandbox; sb != nil && sb.Mode == SandboxModeBwrap && len(sb.RO) > 0 {
 		// Явный ro заменяет умолчания целиком: без /usr внутри песочницы не
@@ -440,7 +446,37 @@ func (s *Server) decodeSandbox(data json.RawMessage) {
 		}
 		return
 	}
+	// Опечатка в имени поля иначе молча даёт умолчание: "memoryMB" или
+	// "networkk" выглядели бы как «настроено», а сервер шёл бы с дефолтами.
+	if unknown := UnknownSandboxKeys(data); len(unknown) > 0 {
+		if s.ConfigError == "" {
+			s.ConfigError = "sandbox: неизвестные поля: " + strings.Join(unknown, ", ")
+		}
+		return
+	}
 	s.Sandbox = &sb
+}
+
+// sandboxFields — единственные имена, которые понимает Sandbox.
+var sandboxFields = map[string]bool{
+	"mode": true, "onUnavailable": true, "ro": true, "rw": true,
+	"network": true, "memoryMb": true, "pids": true, "timeoutSec": true, "tmpMb": true,
+}
+
+// UnknownSandboxKeys возвращает имена полей sandbox, которых нет в схеме.
+func UnknownSandboxKeys(data json.RawMessage) []string {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+	var out []string
+	for k := range raw {
+		if !sandboxFields[k] {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func stringMap(in map[string]any, configErr *string, field string) map[string]string {

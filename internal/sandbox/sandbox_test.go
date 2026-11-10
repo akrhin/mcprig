@@ -106,7 +106,7 @@ func TestWrapBwrapArgv(t *testing.T) {
 		{"--chdir", "/"},
 		{"--setenv", "TMPDIR", "/tmp"},
 		{"--size", "134217728", "--tmpfs", "/tmp"},
-		{"--", prlimitPath(), "--as=536870912", "--nproc=256", "--fsize=134217728", "--", "node", "server.js", "--port", "1"},
+		{"--", prlimitPath(), "--as=2147483648", "--nproc=256", "--fsize=134217728", "--", "node", "server.js", "--port", "1"},
 	} {
 		if !hasSeq(got, want...) {
 			t.Errorf("нет %v в %v", want, got)

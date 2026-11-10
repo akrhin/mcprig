@@ -16,6 +16,12 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - `prlimit` запускался по имени из PATH ребёнка: без `/usr` в `ro` падало
   `bwrap: execvp prlimit: No such file or directory` без подсказки. Теперь
   абсолютный путь, а `doctor` предупреждает о `sandbox.ro` без `/usr`.
+- Умолчание `sandbox.memoryMb` поднято с 512 до 2048: под 512 не стартовал не
+  только node, но и любой Go-сервер (`failed to reserve page summary memory`).
+- Опечатка в имени поля `sandbox` (`memoryMB`, `cwd` внутри блока) больше не
+  молчит: `config.Load` и панель отвечают «sandbox: неизвестные поля: …».
+- `sandbox.mode=none` с лимитами в блоке теперь даёт предупреждение — раньше
+  блок выглядел настроенным, а лимиты не применялись.
 
 ## [0.3.4] - 2026-11-10
 

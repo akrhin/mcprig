@@ -83,7 +83,7 @@ read-only root, no `/home` unless `rw` or `cwd` names one, no network, no
 | `ro` | array of absolute paths | `/usr /bin /lib /lib64 /etc/ssl /etc/resolv.conf /etc/passwd /etc/group` | mounted read-only; an explicit list replaces the defaults entirely, so name every directory the binary needs; only a missing *default* path is skipped, a path you named must exist |
 | `rw` | array of absolute paths | empty | mounted read-write; wins over `ro` on the same path |
 | `network` | `none` / `allow` | `none` | `allow` keeps the host network namespace |
-| `memoryMb` | int | `512` | `RLIMIT_AS` — virtual memory, not RSS; 512 fits interpreters, node needs 2048 and more |
+| `memoryMb` | int | `2048` | `RLIMIT_AS` — virtual memory, not RSS; Go and node do not start under 512, Python fits |
 | `pids` | int | `256` | `RLIMIT_NPROC`, the fork-bomb stop |
 | `tmpMb` | int | `128` | size of the `/tmp` tmpfs inside the namespace, also `RLIMIT_FSIZE`; without it a server could fill the host disk |
 | `timeoutSec` | int | `30` | per-tool-call deadline once the sandbox is on |

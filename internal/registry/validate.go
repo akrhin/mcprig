@@ -160,6 +160,9 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 		if err := json.Unmarshal(raw, &sb); err != nil {
 			return nil, fmt.Errorf("sandbox: ожидался объект")
 		}
+		if unknown := config.UnknownSandboxKeys(raw); len(unknown) > 0 {
+			return nil, fmt.Errorf("sandbox: неизвестные поля: %s", strings.Join(unknown, ", "))
+		}
 		sandbox = &sb
 	}
 	headers, err := stringMapStrict(in, "headers")
