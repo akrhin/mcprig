@@ -17,14 +17,15 @@ CSP: no inline scripts or styles.
 | left rail | all sets, their state and port; **+ set** |
 | set card | name, port, state, endpoint, active key prefix, `list_commands` weight (bytes, tokens, tool count), **Start/Stop**, **Keys** |
 | KPIs | calls in the tail, p50, p95, errors for the selected set |
-| sets table | name, port, state, server count, uptime, calls, errors |
+| servers of the set | name, type, state, isolation and tags of the selected set |
+| sets table | name, port, state, server count, uptime, calls, errors; shown only while no set is selected |
 | calls table | time, server, tool, client, milliseconds, status; search box |
 | right column | servers of the set with health, variables, log tail; below 1200 px it becomes a drawer (also the **Details** button) |
 | footer | totals and last refresh time |
 
 Everything on the page comes from the panel API below plus `GET /stats` of the
-running sets. Nothing else is stored in the browser but the chosen colour
-scheme.
+running sets. Nothing else is stored in the browser but the chosen colour scheme
+and the interface language.
 
 ## Server editor
 
@@ -64,6 +65,16 @@ Solarized and Tokyo Night. The choice sits in the header, is stored in
 `prefers-color-scheme`. A scheme is the `data-theme` attribute on `<html>` plus
 its colour rule: the default lives in `app.css`, the other five in `themes.css`;
 the CSP is unchanged (no inline styles).
+
+## Language
+
+The interface speaks English and Russian. English is the default: the `EN`/`RU`
+switch sits in the header next to the colour scheme, the choice is stored in
+`localStorage['mcprig.lang']`, `<html lang>` follows it, and numbers and dates
+are drawn by `Intl` in the current locale (`en-US`/`ru-RU`). Every panel string
+lives in one `DICT` in `web/app.js`; `index.html` carries only the English values
+and `data-i18n` keys. Strings that come from the daemon — a server error reason,
+the `isolation` field, refusals shown in the form — are displayed as they are.
 
 ## Routes
 
@@ -159,7 +170,10 @@ monthly. An unknown `bucket` is `400`. `server`, `tool` and `client` filter ever
 `servers` and `clients` breakdowns of the same shape. `set=all` (or no `set`) adds `bySet`:
 `{set, calls, failures, totalMs}` per set with calls in the period, which the
 set table shows without opening one; a set with no calls in the period is left
-out rather than reported as zero. A single `set` answer has no `bySet`. A set whose stats
+out rather than reported as zero. A single `set` answer has no `bySet`. The set
+filter of the **Statistics** tab follows the rail: an open statistics view shows
+the selected set, switching the set switches it too, and a manual choice in the
+list lasts until the next rail switch. A set whose stats
 directory is missing is listed in `unreachable` by id, with an empty answer
 otherwise; an unknown set id is `404`.
 

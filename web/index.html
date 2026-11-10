@@ -166,6 +166,30 @@
             <div class="kpi"><span class="od-stat"><span class="kv n" id="k-p95">—</span><span class="kl">p95</span></span></div>
           </div>
 
+          <section class="block" id="set-srv-block" hidden>
+            <div class="block-h">
+              <h2 data-i18n="setSrv.title">Servers of this set</h2>
+              <span class="hint" data-i18n="setSrv.hint">state comes from the running set</span>
+              <span class="hint n" id="set-srv-count">0</span>
+            </div>
+            <div class="tw">
+              <table class="t">
+                <caption class="sr" data-i18n="setSrv.caption">Servers of the selected set: type, state, isolation and tags</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="setSrv.thServer">Server</th>
+                    <th scope="col" class="hide-sm" data-i18n="setSrv.thType">Type</th>
+                    <th scope="col" data-i18n="setSrv.thState">State</th>
+                    <th scope="col" class="hide-md" data-i18n="setSrv.thIso">Isolation</th>
+                    <th scope="col" class="hide-sm" data-i18n="setSrv.thTags">Tags</th>
+                  </tr>
+                </thead>
+                <tbody id="set-srv-body"></tbody>
+              </table>
+            </div>
+            <p class="emptymsg sm" id="set-srv-empty" hidden data-i18n="setSrv.empty">the set has no servers</p>
+          </section>
+
           <section class="block" id="sets-block" hidden>
             <div class="block-h">
               <h2 data-i18n="sets.title">Sets</h2>

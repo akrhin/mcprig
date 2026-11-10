@@ -1031,8 +1031,16 @@
     show($('tabs'), !none);
     show($('region'), !none);
     show($('kpis'), !none);
-    show($('sets-block'), !none);
-    if (none) { renderKpis(null); renderServers(null); renderLog([]); }
+    overviewBlocks();
+    if (none) { renderKpis(null); renderServers(null); renderLog([]); renderSetServers(); }
+  }
+
+  // Наборы уже в рельсе: на странице набора второй их список ничего не добавляет.
+  // Поэтому там — серверы этого набора, а список наборов живёт только на обзоре.
+  function overviewBlocks() {
+    var none = st.sets.length === 0;
+    show($('sets-block'), !none && !st.sel);
+    show($('set-srv-block'), !none && !!st.sel);
   }
 
   function renderRail() {
@@ -1148,6 +1156,58 @@
 
   /* ---------- выбранный набор ---------- */
 
+  // Состав выбранного набора с состоянием и изоляцией: данные уже в st.sets[sel]
+  // и st.health, отдельного запроса не нужно.
+  function renderSetServers() {
+    var set = current();
+    var names = (set && set.servers) || [];
+    var health = (st.health && st.health.servers) || [];
+    var rows = names.map(function (name) {
+      return {
+        name: name,
+        srv: st.servers.filter(function (s) { return s.name === name; })[0] || null,
+        health: health.filter(function (x) { return x.name === name; })[0] || null
+      };
+    });
+    $('set-srv-count').textContent = fmtN(rows.length);
+    show($('set-srv-empty'), rows.length === 0);
+    sync($('set-srv-body'), rows, function (r) { return r.name; },
+      function () {
+        var tr = el('tr', 'is-click');
+        var nm = tr.appendChild(el('td', 'tb-name'));
+        nm.appendChild(el('span', 'setlabel'));
+        tr.appendChild(el('td', 'hide-sm'));
+        var cell = tr.appendChild(el('td'));
+        var pill = cell.appendChild(el('span', 'state'));
+        pill.appendChild(el('span', 'dot'));
+        pill.appendChild(document.createTextNode(' '));
+        pill.appendChild(el('span'));
+        tr.appendChild(el('td', 'hide-md'));
+        tr.appendChild(el('td', 'hide-sm'));
+        return tr;
+      },
+      function (tr, row) {
+        var h = row.health;
+        var cls = 'warn';
+        var note = h ? t('srv.unchecked') : t('srv.setOff');
+        if (h && h.healthy === true && !h.unknown) { cls = 'ok'; note = t('srv.ok2'); }
+        if (h && h.healthy === false) { cls = 'err'; note = t('srv.noResponse'); }
+        tr.children[0].firstChild.textContent = row.name;
+        tr.children[0].title = row.name;
+        tr.children[1].textContent = (row.srv && row.srv.transport) || '—';
+        var pill = tr.children[2].querySelector('.state');
+        pill.querySelector('.dot').className = 'dot ' + cls;
+        pill.lastChild.textContent = note;
+        pill.title = (h && h.error) || '';
+        var iso = isoOf(h && h.isolation);
+        var isoTd = tr.children[3];
+        isoTd.replaceChildren(iso ? el('span', 'badge', iso.label) : document.createTextNode('—'));
+        isoTd.title = iso ? iso.title : '';
+        tr.children[4].textContent = (row.srv && row.srv.tags && row.srv.tags.length) ? row.srv.tags.join(', ') : '—';
+        tr.dataset.name = row.name;
+      });
+  }
+
   function current() {
     for (var i = 0; i < st.sets.length; i++) {
       if (st.sets[i].id === st.sel) { return st.sets[i]; }
@@ -1156,26 +1216,44 @@
   }
 
   function select(id, force) {
-    if (id === st.sel && !force) { renderHead(); return; }
+    if (id === st.sel && !force) {
+      // клик по уже выбранному набору возвращает к нему статистику, если фильтр увели руками
+      if (st.st.set !== (id || '')) {
+        st.st.set = id || '';
+        fillFilters();
+        if (st.tab === 'stats') { loadStats(); }
+      }
+      renderHead();
+      return;
+    }
     // форма сервера привязана к списку прежнего набора — закрываем без возврата фокуса
     closeSrv(false);
     st.sel = id;
     st.health = null;
     st.calls = null;
     st.logKey = '';
-    if (id) {
-      history.replaceState(null, '', '#/set/' + id);
-    } else {
-      history.replaceState(null, '', location.pathname);
+    // статистика идёт за рельсом: свой фильтр набора начинается с текущего,
+    // ручной выбор в списке фильтра живёт до следующего переключения набора
+    st.st.set = id || '';
+    // адрес повторяет открытое: на статистике его держит setTab, набор его не перебивает
+    if (st.tab !== 'stats') {
+      if (id) {
+        history.replaceState(null, '', '#/set/' + id);
+      } else {
+        history.replaceState(null, '', location.pathname);
+      }
     }
     setTitle();
     renderRail();
+    overviewBlocks();
+    renderSetServers();
     renderHead();
     renderServers(null);
     renderCalls(null);
     renderLog([]);
     fillFilters();
     if (id) { loadHealth(); loadCalls(); loadLog(); }
+    if (st.tab === 'stats') { loadStats(); }
   }
 
   function setTitle() {
@@ -1671,6 +1749,9 @@
   // исчезает из своего же списка и фильтр залипает на одном варианте.
   // Списки зависят только от периода и набора, поэтому запрос за ними — не на каждый чин.
   function loadStats() {
+    // до первой загрузки /api/state набор неизвестен: запрос «все наборы» на старте
+    // дал бы чужие числа и лишний запрос — срез приедет после select()
+    if (!st.sets.length) { return Promise.resolve(); }
     var seq = ++st.st.seq;
     var key = st.st.period + '|' + (st.st.set || 'all');
     var base;
@@ -2026,6 +2107,7 @@
     renderTop();
     renderRail();
     renderSetsTable();
+    renderSetServers();
     renderHead();
     renderServers(st.health);
     renderTail(st.calls);
@@ -2043,7 +2125,7 @@
     var row = e.target.closest('.setrow');
     if (!row) { return; }
     e.preventDefault();
-    if (row.dataset.id !== st.sel) { select(row.dataset.id); }
+    select(row.dataset.id);
   });
 
   $('sets-body').addEventListener('click', function (e) {
