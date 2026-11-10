@@ -330,8 +330,8 @@ func TestStatusSkippedProbeNotCached(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	if ok, errText := m.status(ctx, e); !ok || errText != "" {
-		t.Fatalf("проба без слота: исход неизвестен, надо healthy=true, got %v %q", ok, errText)
+	if ok, errText, unknown := m.status(ctx, e); !ok || errText != "" || !unknown {
+		t.Fatalf("проба без слота: надо healthy=true, unknown=true, got %v %q unknown=%v", ok, errText, unknown)
 	}
 	e.healthMu.Lock()
 	h := e.health
@@ -344,8 +344,8 @@ func TestStatusSkippedProbeNotCached(t *testing.T) {
 	}
 
 	drain()
-	if ok, errText := m.status(context.Background(), e); !ok || errText != "" {
-		t.Fatalf("слот свободен: проба должна пройти, got %v %q", ok, errText)
+	if ok, errText, unknown := m.status(context.Background(), e); !ok || errText != "" || unknown {
+		t.Fatalf("слот свободен: проба должна пройти, got %v %q unknown=%v", ok, errText, unknown)
 	}
 	if n := atomic.LoadInt32(&dials); n != 1 {
 		t.Fatalf("после освобождения слота проба обязана пройти, got %d dial(s)", n)
