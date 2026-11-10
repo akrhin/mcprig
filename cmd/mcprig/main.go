@@ -211,6 +211,15 @@ func run() error {
 	// вес схем, иначе панель видит ноль до первого list_commands.
 	mgr.Stats = rec
 
+	// История рядом с конфигом: у набора это sets/<id>/, у standalone serve —
+	// каталог, где лежит сам servers.json. Без неё прокси работает дальше.
+	if hist, err := stats.OpenHistory(filepath.Join(filepath.Dir(*cfgPath), "stats"), log); err != nil {
+		log.Warn("stats: история на диске недоступна", "err", err)
+	} else {
+		rec.SetHistory(hist)
+		defer hist.Close()
+	}
+
 	// Прогрев в фоне: иначе первый list_commands ждёт, пока поднимутся все
 	// npx/uvx-серверы (на одиннадцати это ~11 с).
 	go mgr.Warm(context.Background())

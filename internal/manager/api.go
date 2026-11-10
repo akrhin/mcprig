@@ -467,6 +467,7 @@ func (m *Manager) buildRoutes() []route {
 	return []route{
 		mk(`^/api/state$`, map[string]handlerFunc{http.MethodGet: m.apiState}),
 		mk(`^/api/calls$`, map[string]handlerFunc{http.MethodGet: m.apiCalls}),
+		mk(`^/api/stats$`, map[string]handlerFunc{http.MethodGet: m.apiStats}),
 		mk(`^/api/import$`, map[string]handlerFunc{http.MethodPost: m.apiImport}),
 		mk(`^/api/export/registry$`, map[string]handlerFunc{http.MethodGet: m.apiExportRegistry}),
 		mk(`^/api/export$`, map[string]handlerFunc{http.MethodGet: m.apiExportSet}),
