@@ -7,6 +7,16 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
+### Added
+
+- Клиент в статистике набора называется по подписи ключа: `PATCH
+  /api/sets/<id>/keys/<keyID>` с `{"note":"hermes"}` пишет подпись, набор
+  получает её в `transport.clientNames` под отпечатком ключа (6 hex от sha256,
+  без токена) и считает клиента как `hermes`, а не
+  `key:ce80c4/python-httpx/0.28.1`. Пустая строка снимает подпись, работающий
+  набор перезапускается; в документации набора появилось поле `clientNames`,
+  в `/api/sets` — `note` ключа, который там был и раньше.
+
 ### Fixed
 
 - Отказ правами внутри `invoke_many` несёт в `result` тот же маркер

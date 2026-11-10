@@ -258,8 +258,9 @@ request being counted — the SEP-2575 per-request client info. It is written as
 `name/version` (`opencode/2.2.6`) or as the bare `name` when the client sends no
 version (`mcprig`). This matters for stateless HTTP, where there is no
 `initialize` handshake: the label follows every request, not the session. When
-`_meta` has no client info, the label falls back to the transport: `key:<6 hex
-of a token hash>/<User-Agent product token>` for a keyed set, the `User-Agent`
-alone without a key, and `unknown` when neither is present. Reading the
-`/stats` of an open set without its token still redacts every label to
+`_meta` has no client info, the label falls back to the transport: the key's
+note when the key is signed (`PATCH /api/sets/<id>/keys/<keyID>`), otherwise
+`key:<6 hex of a token hash>/<User-Agent product token>` for a keyed set, the
+`User-Agent` alone without a key, and `unknown` when neither is present. Reading
+the `/stats` of an open set without its token still redacts every label to
 `(аноним)`.
