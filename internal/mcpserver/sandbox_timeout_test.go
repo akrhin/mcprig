@@ -44,7 +44,7 @@ func runSlowChild() {
 // timeoutSec обязан обрывать вызов, отличать свой дедлайн от родительского и
 // сбрасывать сессию: иначе первый же зависший вызов залипает навсегда.
 func TestSandboxCallTimeout(t *testing.T) {
-	if os.Getenv("MCPRIG_SLOW_CHILD") == "1" {
+	if os.Getenv("SLOW_CHILD_TEST") == "1" {
 		runSlowChild()
 	}
 	if err := sandbox.Probe(); err != nil {
@@ -58,7 +58,7 @@ func TestSandboxCallTimeout(t *testing.T) {
 		Name:      "slow",
 		Transport: config.TransportStdio,
 		Command:   []string{exe, "-test.run=TestSandboxCallTimeout$"},
-		Env:       map[string]string{"MCPRIG_SLOW_CHILD": "1"},
+		Env:       map[string]string{"SLOW_CHILD_TEST": "1"},
 		// Тестовый бинарь лежит в /tmp/go-buildNNN: без привязки его каталога
 		// bwrap не найдёт exec (это же подтверждает, что изоляция применилась).
 		Sandbox: &config.Sandbox{Mode: config.SandboxModeBwrap, MemoryMb: 4096, TimeoutSec: 1,
