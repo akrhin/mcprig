@@ -12,9 +12,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/oauth"
-	"github.com/sintez/mcprig/internal/sandbox"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/oauth"
+	"github.com/akrhin/mcprig/internal/sandbox"
 )
 
 // Connector opens sessions to downstream servers. OAuth is optional: without a

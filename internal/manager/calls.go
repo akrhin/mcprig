@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sintez/mcprig/internal/registry"
-	"github.com/sintez/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/stats"
 )
 
 const (

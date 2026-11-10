@@ -12,7 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // requestTimeout must bound invoke_command: a slow downstream is cut off with a

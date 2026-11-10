@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sintez/mcprig/internal/toolout"
+	"github.com/akrhin/mcprig/internal/toolout"
 )
 
 // startToolout — общая для serve и stdio чистка: свип идёт сразу, поэтому

@@ -12,7 +12,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/toolout"
+	"github.com/akrhin/mcprig/internal/toolout"
 )
 
 const (

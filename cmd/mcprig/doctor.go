@@ -17,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/manager"
-	"github.com/sintez/mcprig/internal/registry"
-	"github.com/sintez/mcprig/internal/sandbox"
-	"github.com/sintez/mcprig/internal/toolout"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/manager"
+	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/sandbox"
+	"github.com/akrhin/mcprig/internal/toolout"
 )
 
 // errDoctorProblems — отчёт уже напечатан; main выходит с кодом 1 без лишней

@@ -9,7 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // A connection lost before any response byte is repeated once, on a fresh

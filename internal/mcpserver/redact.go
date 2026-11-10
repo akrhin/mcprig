@@ -5,7 +5,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // serverSecrets — секреты сервера: env и заголовки с «секретным» именем.

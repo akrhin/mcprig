@@ -201,7 +201,7 @@ opencode|claude|codex --set <id> [--remote]`.
    linux/darwin × amd64/arm64, архивы, checksums) собирается в CI, `goreleaser
    check` гоняется перед релизом; образы Docker публикуются в реестр Gitea.
    Каналы публикации решены: только архивы goreleaser, без обёрток
-   npm/PyPI/crates. Путь модуля оставлен `github.com/sintez/mcprig`.
+   npm/PyPI/crates. Путь модуля оставлен `github.com/akrhin/mcprig`.
 2. Ревью: паладин (безопасность) и арбитр (готовность к мержу) запускаются по
    текущему HEAD; находки разводятся отдельными полосами.
 

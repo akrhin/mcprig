@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // Разрешённые Host попадают в конфиг набора: иначе набор, поднятый панелью

@@ -23,10 +23,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/registry"
-	"github.com/sintez/mcprig/internal/stats"
-	"github.com/sintez/mcprig/internal/toolout"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/toolout"
 )
 
 const maxBody = 1 << 20

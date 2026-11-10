@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // Один упавший сервер в списке не скрывает ответы остальных.

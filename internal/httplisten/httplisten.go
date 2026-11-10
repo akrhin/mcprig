@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/stats"
 )
 
 // maxBodyBytes is the contract limit for one proxied MCP request.
