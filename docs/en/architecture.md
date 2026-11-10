@@ -84,9 +84,10 @@ opening the dashboard does not multiply probes across browser tabs.
 
 Counters live in the set process (`internal/stats`): per client, server and
 tool, with call/failure counts, total milliseconds, p50/p95 from a 256-sample
-reservoir, and a ring of the last 512 calls. Client labels come from the MCP
-`clientInfo` in stdio mode and from the `User-Agent` product token plus a
-6-character fingerprint of the presented key in HTTP mode. Labels and tool
+reservoir, and a ring of the last 512 calls. In stdio mode the client label is
+`stdio` — the transport is the only client the process has — and in HTTP mode it
+comes from the `User-Agent` product token plus a 6-character fingerprint of the
+presented key. Labels and tool
 names are capped at 64 bytes; the number of counters is capped at 4096, the
 rest collapses into `(прочее)`; error text in the ring is capped at 512 bytes.
 
