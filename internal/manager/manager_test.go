@@ -281,6 +281,47 @@ func TestSetsHideToken(t *testing.T) {
 	}
 }
 
+// Подпись ключа ставится и снимается через PATCH: она видна в /api/sets и
+// уходит в метку клиента статистики.
+func TestKeyNotePatch(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+
+	w := e.do(t, http.MethodPost, "/api/sets/"+id+"/keys", nil)
+	status(t, w, http.StatusOK)
+	keyID := decode[struct {
+		Key struct{ ID string } `json:"key"`
+	}](t, w).Key.ID
+
+	type keyNote struct {
+		Key struct{ Note string } `json:"key"`
+	}
+	w = e.do(t, http.MethodPatch, "/api/sets/"+id+"/keys/"+keyID, map[string]any{"note": "hermes"})
+	status(t, w, http.StatusOK)
+	if got := decode[keyNote](t, w).Key.Note; got != "hermes" {
+		t.Fatalf("note = %q, want hermes", got)
+	}
+
+	w = e.do(t, http.MethodGet, "/api/sets", nil)
+	status(t, w, http.StatusOK)
+	if !strings.Contains(w.Body.String(), `"note":"hermes"`) {
+		t.Fatalf("в списке наборов нет подписи: %s", w.Body.String())
+	}
+
+	// Пустая строка снимает подпись.
+	w = e.do(t, http.MethodPatch, "/api/sets/"+id+"/keys/"+keyID, map[string]any{"note": ""})
+	status(t, w, http.StatusOK)
+	if got := decode[keyNote](t, w).Key.Note; got != "" {
+		t.Fatalf("note = %q, want empty", got)
+	}
+	status(t, e.do(t, http.MethodGet, "/api/sets", nil), http.StatusOK)
+
+	status(t, e.do(t, http.MethodPatch, "/api/sets/"+id+"/keys/nope", map[string]any{"note": "x"}), http.StatusNotFound)
+	status(t, e.do(t, http.MethodPatch, "/api/sets/nope/keys/"+keyID, map[string]any{"note": "x"}), http.StatusNotFound)
+	status(t, e.do(t, http.MethodPatch, "/api/sets/"+id+"/keys/"+keyID, "не json"), http.StatusBadRequest)
+}
+
 func TestImportExport(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 

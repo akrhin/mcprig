@@ -12,6 +12,7 @@ import (
 
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/registry"
+	"github.com/sintez/mcprig/internal/stats"
 )
 
 // Формат servers.json — вход lazy-mcp `serve`. ${VAR} остаются нераскрытыми:
@@ -25,6 +26,9 @@ type setTransport struct {
 	AllowedHosts []string `json:"allowedHosts,omitempty"`
 	// AllowAnonymous marks an open set: the proxy listens without a bearer.
 	AllowAnonymous bool `json:"allowAnonymous,omitempty"`
+	// ClientNames — подпись ключа по отпечатку: набор берёт её в метку
+	// клиента статистики. Отпечаток, а не токен.
+	ClientNames map[string]string `json:"clientNames,omitempty"`
 }
 
 type setHealthMonitor struct {
@@ -64,6 +68,7 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 			AuthToken:      set.Token,
 			AllowedHosts:   allowedHosts,
 			AllowAnonymous: set.Open && set.Token == "",
+			ClientNames:    clientNames(set.Keys),
 		},
 		Logging:        map[string]any{"level": "info"},
 		HealthMonitor:  setHealthMonitor{Interval: 60000, Timeout: 120000},
@@ -82,6 +87,23 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 		return nil, err
 	}
 	return append(body, '\n'), nil
+}
+
+// clientNames — подпись каждого ключа под его отпечатком. Ключ без токена
+// (такой остаётся только в истории отзыва) и пустая подпись имени не дают.
+func clientNames(keys []registry.Key) map[string]string {
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		note := strings.TrimSpace(key.Note)
+		if key.Token == "" || note == "" {
+			continue
+		}
+		out[stats.Fingerprint(key.Token)] = note
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // WriteSetConfig пишет <dataDir>/sets/<id>/servers.json атомарно, 0600.

@@ -96,6 +96,7 @@ Gruvbox, Solarized и Tokyo Night. Выбор — в шапке, хранитс�
 | `GET /api/sets/<id>/servers/<name>/logs` | строки лога одного нижестоящего сервера |
 | `POST /api/sets/<id>/keys` | выпустить ключ; ответ содержит единственную копию токена |
 | `DELETE /api/sets/<id>/keys/<keyID>` | отозвать ключ |
+| `PATCH /api/sets/<id>/keys/<keyID>` | подписать ключ: `{"note":"hermes"}`; подпись становится меткой клиента в статистике, пустая строка снимает её, работающий набор перезапускается |
 | `GET /api/servers`, `POST /api/servers` | список и добавление нижестоящих серверов |
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | изменение и удаление; работающие наборы перезапускаются |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, бюджет 60 с, текст ошибки в теле |

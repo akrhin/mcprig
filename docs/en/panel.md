@@ -94,6 +94,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
 | `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token |
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key |
+| `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"note":"hermes"}`; the note becomes the client's label in the statistics, an empty string clears it, a running set is restarted |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |

@@ -525,7 +525,9 @@ func (m *Manager) buildRoutes() []route {
 			http.MethodPut: m.apiServerUpdate, http.MethodDelete: m.apiServerDelete,
 		}),
 		mk(`^/api/sets/`+setPattern+`/keys$`, map[string]handlerFunc{http.MethodPost: m.apiKeyIssue}),
-		mk(`^/api/sets/`+setPattern+`/keys/([A-Za-z0-9_-]{1,32})$`, map[string]handlerFunc{http.MethodDelete: m.apiKeyRevoke}),
+		mk(`^/api/sets/`+setPattern+`/keys/([A-Za-z0-9_-]{1,32})$`, map[string]handlerFunc{
+			http.MethodPatch: m.apiKeyNote, http.MethodDelete: m.apiKeyRevoke,
+		}),
 		mk(`^/api/sets/`+setPattern+`/servers$`, map[string]handlerFunc{http.MethodGet: m.apiSetServers}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiServerLogs}),
 		mk(`^/api/sets/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiSetLogs}),
@@ -1407,6 +1409,61 @@ func (m *Manager) apiKeyIssue(req *request) error {
 		"set":   m.setView(updated),
 	}
 	// Ключ уже выдан и показан один раз: ошибку рестарта отдаём полем, а не кодом.
+	if restartErr != "" {
+		resp["restartError"] = restartErr
+	}
+	writeJSON(req.w, http.StatusOK, resp)
+	return nil
+}
+
+// apiKeyNote подписывает ключ человеческим именем: подпись уходит в метку
+// клиента статистики, поэтому работающий набор перезапускается — listener
+// читает clientNames из servers.json при старте.
+func (m *Manager) apiKeyNote(req *request) error {
+	id, keyID := req.args[0], req.args[1]
+	var body struct {
+		Note string `json:"note"`
+	}
+	if err := decodeJSON(req.r, &body); err != nil {
+		return err
+	}
+	// Подпись чистится как любая метка клиента: >64 байт и управляющие
+	// символы в счётчик всё равно не пройдут.
+	note := stats.CleanLabel(strings.TrimSpace(body.Note))
+	set := m.store.Set(id)
+	if set == nil {
+		return notFound("нет набора " + id)
+	}
+	known := false
+	for _, key := range registry.PublicSet(set).Keys {
+		if key.ID == keyID {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return notFound("нет ключа " + keyID)
+	}
+	running := m.rt.status(set).Running
+	if err := m.store.SetKeyNote(id, keyID, note); err != nil {
+		return err
+	}
+	set = m.store.Set(id)
+	var restartErr string
+	if running {
+		if _, err := m.RestartSet(context.Background(), set); err != nil {
+			m.log.Warn("перезапуск набора после подписи ключа не удался", "set", id, "err", err)
+			restartErr = err.Error()
+		}
+	}
+	var signed registry.PublicKey
+	for _, key := range registry.PublicSet(set).Keys {
+		if key.ID == keyID {
+			signed = key
+		}
+	}
+	resp := map[string]any{"key": signed}
+	// Подпись уже сохранена: ошибку рестарта отдаём полем, а не кодом.
 	if restartErr != "" {
 		resp["restartError"] = restartErr
 	}

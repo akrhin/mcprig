@@ -13,9 +13,16 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
   `EN`/`RU` в шапке, выбор в `localStorage['mcprig.lang']`, `<html lang>` следует
   за ним, числа и даты — через `Intl`. Все пользовательские строки собраны в
   одном словаре `DICT` в `web/app.js`.
+- Клиент в статистике набора называется по подписи ключа: `PATCH
+  /api/sets/<id>/keys/<keyID>` с `{"note":"hermes"}` пишет подпись, набор
+  получает её в `transport.clientNames` под отпечатком ключа (6 hex от sha256,
+  без токена) и считает клиента как `hermes`, а не
+  `key:ce80c4/python-httpx/0.28.1`. Пустая строка снимает подпись, работающий
+  набор перезапускается; в документации набора появилось поле `clientNames`,
+  в `/api/sets` — `note` ключа, который там был и раньше.
+
 
 ### Changed
-
 - Вкладка **Статистика** показывает набор, выбранный в рельсе, и следует за его
   переключением; свой список набора больше не разъезжается с рельсом.
 - На странице набора вместо таблицы всех наборов — таблица серверов этого
@@ -34,7 +41,8 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
   `укажите command_name или command` вместо `command_name обязателен`.
 - `list_servers`: проба, не дождавшаяся свободного слота, больше не помечает
   сервер `healthy: false` на 15 секунд — исход неизвестен, ответ
-  `healthy: true, unknown: true` без `error` и без записи в кэш.
+  `healthy: true, unknown: true` без `error` и без записи в кэш. Панель
+  показывает у такого сервера «не проверено», а не «health ok».
 - Панель получила `IdleTimeout` 60 с; `WriteTimeout` не ставится — долгие
   стримы ответов не должны обрываться.
 
@@ -110,6 +118,7 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
   вызовы, — таблица наборов показывает счётчики, не открывая набор. Набор без
   вызовов в разрез не попадает, нулями не отвечает; у одного набора `bySet` нет.
 
+
 ### Changed
 
 - `period=7d` держит в памяти распределение латентностей (значение мс → сколько
@@ -148,6 +157,7 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
   за 30 суток и архив — по гистограмме (`approximate:true`, середина корзины).
   `set=all` складывает все наборы; набор без каталога истории — в `unreachable`.
   Неизвестный `bucket` — `400`.
+
 
 ### Changed
 
@@ -283,6 +293,7 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - `POST /api/login` answers `400` for empty fields instead of a misleading `401`.
 
 ## [0.3.2] - 2026-11-09
+
 
 ### Changed
 

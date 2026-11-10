@@ -201,6 +201,13 @@ chain (OpenBao → `env.json` → process environment; `MCPRIG_*`, `BAO_*` and
 | `authToken` | | bearer token; empty refuses to start unless `allowAnonymous` |
 | `allowAnonymous` | `false` | open set: no `Authorization` header is allowed |
 | `allowedHosts` | loopback | `Host` and `Origin` allowlist |
+| `clientNames` | | key fingerprint (6 hex) → key note: the client's label in the statistics |
+
+`clientNames` is filled by the manager from the keys' notes
+(`PATCH /api/sets/<id>/keys/<keyID>`); a hand-written file may carry it too. A
+key with a note is counted under that note instead of
+`key:<fingerprint>/<User-Agent>`. Only the fingerprint reaches the file, never
+the token.
 
 `allowAnonymous` does not make a wrong token acceptable: a request that
 presents `Authorization` must still match `authToken`, and an open set has no
