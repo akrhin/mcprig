@@ -33,6 +33,8 @@ archives:
       - LICENSE
       - deploy/mcprig-set@.service
       - deploy/mcprig.service
+      - deploy/mcprig-warm.service
+      - deploy/mcprig-warm.timer
 
 checksum:
   name_template: checksums.txt

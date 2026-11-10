@@ -1,6 +1,7 @@
 name: release
 # Тег v* → проверки (vet, тесты с -race, govulncheck, gofmt) → goreleaser: четыре
-# платформы, checksums, черновик релиза в Gitea. Публикацию делает человек.
+# платформы, checksums, черновик релиза в Gitea → образы slim и full в реестр.
+# Публикацию черновика делает человек.
 on:
   push:
     tags:
@@ -18,7 +19,6 @@ concurrency:
 env:
   GO_VERSION: '1.27.3'
   GORELEASER_VERSION: v2.20.0
-  GITEA_URL: https://frosty-ad-gt.cloudpub.ru
 
 jobs:
   verify:
@@ -122,8 +122,30 @@ jobs:
         run: |
           notes="${RUNNER_TEMP:-/tmp}/release-notes.md"
           bash scripts/release-notes.sh "${{ gitea.ref_name }}" > "$notes"
-          if [ -s "$notes" ]; then
-            "$GORELEASER_BIN" release --clean --release-notes "$notes"
-          else
-            "$GORELEASER_BIN" release --clean
+          "$GORELEASER_BIN" release --clean --release-notes "$notes"
+      # Образы в реестр: установка обещает их на каждый релиз, а наполнялся он
+      # руками. Без трёх секретов шаг пропускается — релиз не краснеет.
+      - name: Образы
+        env:
+          REGISTRY: ${{ secrets.REGISTRY }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${REGISTRY:-}" ] || [ -z "${REGISTRY_USER:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
+            echo "secrets.REGISTRY/REGISTRY_USER/REGISTRY_PASSWORD не заданы — образы не публикуются"
+            exit 0
           fi
+          # Версия без v — та же форма, что у goreleaser и в main.version.
+          ver=$(printf '%s' "${{ gitea.ref_name }}" | sed 's/^v//')
+          revision=$(git rev-parse --short HEAD)
+          repo="$REGISTRY/sintez/mcprig"
+          printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin
+          for target in slim full; do
+            case "$target" in full) latest=latest-full ;; *) latest=latest ;; esac
+            docker build --target "$target" \
+              --build-arg VERSION="$ver" --build-arg REVISION="$revision" \
+              -t "$repo:$ver-$target" -t "$repo:$latest" .
+            docker push "$repo:$ver-$target"
+            docker push "$repo:$latest"
+          done

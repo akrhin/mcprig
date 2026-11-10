@@ -108,6 +108,40 @@ E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 - `CHANGELOG.md` — единственный источник release notes: Added / Changed /
   Fixed / Removed / Security, важное выше.
 
+## Образы
+
+Два образа, `slim` и `full` (см. [docs/ru/install.md](docs/ru/install.md)), лежат
+в реестре Gitea проекта как `sintez/mcprig`.
+
+Руками:
+
+```bash
+reg=frosty-ad-gt.cloudpub.ru/sintez/mcprig
+ver=$(git describe --tags --abbrev=0 | sed 's/^v//')
+for target in slim full; do
+  docker build --target "$target" --build-arg VERSION="$ver" \
+    --build-arg REVISION="$(git rev-parse --short HEAD)" -t "$reg:$ver-$target" .
+  docker push "$reg:$ver-$target"
+done
+```
+
+Задача на тег `v*` делает то же самое и вдобавок ставит `latest` (slim) и
+`latest-full`. Ей нужны секреты `REGISTRY`, `REGISTRY_USER` и
+`REGISTRY_PASSWORD`; без них она печатает, что пропустила шаг. Задача идёт до
+публикации черновика релиза, поэтому `latest` сдвигается на теге; если черновик
+так и не опубликовали, `latest` указывает на неопубликованную версию — переназначь
+две метки руками:
+
+```bash
+for pair in "slim latest" "full latest-full"; do
+  set -- $pair
+  docker build --target "$1" --build-arg VERSION="$ver" -t "$reg:$2" .
+  docker push "$reg:$2"
+done
+```
+
+`VERSION` всегда без ведущего `v`; Dockerfile отбивает форму `vX.Y.Z` до сборки.
+
 ## Релиз
 
 Тег `v*` прогоняет gofmt, vet, тесты с `-race` и govulncheck, затем goreleaser
