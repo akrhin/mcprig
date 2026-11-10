@@ -1,7 +1,9 @@
 package stats
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -428,5 +430,88 @@ func TestRotateMonthKeepsTwoDays(t *testing.T) {
 		if len(got) != 1 || got[0].Calls != 1 {
 			t.Fatalf("%s: %+v", day.Format(dayLayout), got)
 		}
+	}
+}
+
+// day-файл, который никто не свернул (набор остановили навсегда), архив
+// обязан увидеть; день, уже лежащий в месячном файле, не считается дважды.
+func TestArchiveSeesUnfoldedDays(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 11, 10, 15, 0, 0, 0, time.Local)
+	today := startOfDay(now)
+	day40 := today.AddDate(0, 0, -40)
+	day50 := today.AddDate(0, 0, -50)
+
+	writeDay := func(day time.Time, calls int64) {
+		t.Helper()
+		p := filepath.Join(dir, "day-"+day.Format(dayLayout)+".json")
+		if err := writeJSONFile(p, dayFile{Day: day.Format(dayLayout), Triples: []Triple{
+			{Client: "opencode", Server: "alpha", Tool: "echo", Calls: calls, TotalMs: 10 * calls},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeDay(day40, 1)
+	writeDay(day50, 3)
+	if err := foldMonth(dir, day40, []Triple{
+		{Client: "opencode", Server: "alpha", Tool: "echo", Calls: 1, TotalMs: 10},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	res := QueryHistory([]string{dir}, Query{Period: PeriodArchive}, now)
+	if res.Totals.Calls != 4 {
+		t.Fatalf("calls = %d, ожидалось 4 (1 из месяца + 3 из несвёрнутого дня)", res.Totals.Calls)
+	}
+	if !res.From.Equal(day50) {
+		t.Fatalf("from = %s, ожидался самый ранний день %s", res.From, day50)
+	}
+}
+
+type warnCounter struct{ n int }
+
+func (h *warnCounter) Enabled(context.Context, slog.Level) bool { return true }
+func (h *warnCounter) Handle(context.Context, slog.Record) error {
+	h.n++
+	return nil
+}
+func (h *warnCounter) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *warnCounter) WithGroup(string) slog.Handler      { return h }
+
+// Битый day-файл пропускается с предупреждением: остальные дни сворачиваются,
+// сырой журнал старше RawDays убирается.
+func TestRotateSkipsBrokenDay(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 11, 10, 15, 0, 0, 0, time.Local)
+	today := startOfDay(now)
+	broken := today.AddDate(0, 0, -45)
+	good := today.AddDate(0, 0, -46)
+	if err := os.WriteFile(filepath.Join(dir, "day-"+broken.Format(dayLayout)+".json"), []byte("{не json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSONFile(filepath.Join(dir, "day-"+good.Format(dayLayout)+".json"), dayFile{
+		Day:     good.Format(dayLayout),
+		Triples: []Triple{{Client: "c", Server: "s", Tool: "t", Calls: 1, TotalMs: 5}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	old := today.AddDate(0, 0, -8)
+	rawOld := writeRaw(t, dir, old, []rawLine{{Time: old.Add(time.Hour), Client: "c", Server: "s", Tool: "t", MS: 7}})
+
+	count := &warnCounter{}
+	if err := Rotate(dir, now, slog.New(count)); err != nil {
+		t.Fatalf("Rotate: %v", err)
+	}
+	if count.n != 1 {
+		t.Fatalf("предупреждений = %d, ожидалось 1", count.n)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "day-"+broken.Format(dayLayout)+".json")); err != nil {
+		t.Fatalf("битый day-файл удалён: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "month-"+good.Format(monthLayout)+".json")); err != nil {
+		t.Fatalf("соседний день не свёрнут: %v", err)
+	}
+	if _, err := os.Stat(rawOld); !os.IsNotExist(err) {
+		t.Fatalf("raw старше RawDays остался: %v", err)
 	}
 }

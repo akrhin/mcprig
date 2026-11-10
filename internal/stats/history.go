@@ -163,7 +163,7 @@ func (h *History) Close() error {
 
 func (h *History) run() {
 	defer close(h.done)
-	if err := Rotate(h.dir, time.Now()); err != nil && h.log != nil {
+	if err := Rotate(h.dir, time.Now(), h.log); err != nil && h.log != nil {
 		h.log.Warn("stats: ротация", "dir", h.dir, "err", err)
 	}
 	ticker := time.NewTicker(rotateEvery)
@@ -179,7 +179,7 @@ func (h *History) run() {
 			}
 		case <-ticker.C:
 			w.close()
-			if err := Rotate(h.dir, time.Now()); err != nil && h.log != nil {
+			if err := Rotate(h.dir, time.Now(), h.log); err != nil && h.log != nil {
 				h.log.Warn("stats: ротация", "err", err)
 			}
 		case <-h.stop:
@@ -230,8 +230,14 @@ func (w *rawWriter) close() {
 
 // Rotate применяет ретенцию на момент now и идемпотентен: законченные сутки
 // получают day-файл из сырого журнала, дни старше DayDays уходят в месяц,
-// сырой журнал старше RawDays удаляется.
-func Rotate(dir string, now time.Time) error {
+// сырой журнал старше RawDays удаляется. log необязателен: битый day-файл
+// пропускается с предупреждением, а не останавливает всю уборку.
+func Rotate(dir string, now time.Time, log ...*slog.Logger) error {
+	warn := func(msg string, args ...any) {
+		if len(log) > 0 && log[0] != nil {
+			log[0].Warn(msg, args...)
+		}
+	}
 	today := startOfDay(now)
 	raws, _ := filepath.Glob(filepath.Join(dir, "raw-*.jsonl"))
 
@@ -262,7 +268,8 @@ func Rotate(dir string, now time.Time) error {
 		}
 		df, err := readDayFile(p)
 		if err != nil {
-			return err
+			warn("stats: битый day-файл пропущен", "path", p, "err", err)
+			continue
 		}
 		if err := foldMonth(dir, day, df.Triples); err != nil {
 			return err

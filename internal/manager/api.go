@@ -25,6 +25,7 @@ import (
 
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/registry"
+	"github.com/sintez/mcprig/internal/stats"
 	"github.com/sintez/mcprig/internal/toolout"
 )
 
@@ -131,6 +132,17 @@ func New(opts Options) (*Manager, error) {
 	}
 	for _, id := range store.Dropped() {
 		log.Warn("набор выброшен: некорректный id", "id", id)
+	}
+	// Свёртка при старте панели: набор мог быть остановлен навсегда, и тогда
+	// никто не переведёт его day-файлы в месячные.
+	for _, set := range store.Sets() {
+		dir := filepath.Join(opts.DataDir, "sets", set.ID, "stats")
+		if _, err := os.Stat(dir); err != nil {
+			continue
+		}
+		if err := stats.Rotate(dir, time.Now(), log); err != nil {
+			log.Warn("stats: ротация при старте", "set", set.ID, "err", err)
+		}
 	}
 	a, err := newAuth(opts.Auth)
 	if err != nil {

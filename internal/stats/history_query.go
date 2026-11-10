@@ -297,7 +297,7 @@ func QueryHistory(dirs []string, q Query, now time.Time) Result {
 		archiveStart := today.AddDate(0, 0, -(DayDays - 1))
 		from := time.Time{}
 		for _, dir := range dirs {
-			if d := readMonths(dir, b); !d.IsZero() && (from.IsZero() || d.Before(from)) {
+			if d := readMonths(dir, archiveStart, b); !d.IsZero() && (from.IsZero() || d.Before(from)) {
 				from = d
 			}
 		}
@@ -340,10 +340,14 @@ func readLast30(dir string, today time.Time, b *bundle) {
 	}
 }
 
-// readMonths feeds month files and reports the earliest archived day.
-func readMonths(dir string, b *bundle) time.Time {
+// readMonths feeds month files and the day files nobody folded — a set stopped
+// for good keeps its days on disk, and the archive must not lose them. Days
+// already present in a month file are not counted twice. Reports the earliest
+// archived day.
+func readMonths(dir string, archiveStart time.Time, b *bundle) time.Time {
 	paths, _ := filepath.Glob(filepath.Join(dir, "month-*.json"))
 	from := time.Time{}
+	folded := map[string]bool{}
 	for _, p := range paths {
 		raw, err := os.ReadFile(p)
 		if err != nil {
@@ -358,12 +362,30 @@ func readMonths(dir string, b *bundle) time.Time {
 			if err != nil {
 				continue
 			}
+			folded[day] = true
 			if from.IsZero() || d.Before(from) {
 				from = d
 			}
 			for _, t := range triples {
 				b.addTriple(t, d)
 			}
+		}
+	}
+	days, _ := filepath.Glob(filepath.Join(dir, "day-*.json"))
+	for _, p := range days {
+		d, ok := dayOf(p, "day-", ".json")
+		if !ok || !d.Before(archiveStart) || folded[d.Format(dayLayout)] {
+			continue
+		}
+		df, err := readDayFile(p)
+		if err != nil {
+			continue
+		}
+		if from.IsZero() || d.Before(from) {
+			from = d
+		}
+		for _, t := range df.Triples {
+			b.addTriple(t, d)
 		}
 	}
 	return from
