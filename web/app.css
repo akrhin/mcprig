@@ -187,7 +187,6 @@ button{font:inherit;color:inherit}
 .setrow:hover{background:var(--surface-2)}
 .setrow.is-active{background:var(--surface-2)}
 .setrow.is-active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent)}
-.smono{display:none}
 .sbody{display:grid;gap:1px;flex:1;min-width:0}
 .sname{font-size:13px;min-width:0}
 .smeta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-dim);min-width:0}
@@ -425,10 +424,12 @@ dialog::backdrop{background:var(--scrim)}
   .rail.compact .rail-h{justify-content:center;padding:8px 0}
   .rail.compact .rail-toggle{margin:0}
   .rail.compact .rail-toggle svg{transform:rotate(180deg)}
-  .rail.compact .setrow{flex-direction:column;justify-content:center;gap:2px;padding:10px 2px 8px}
+  /* свёрнутый рельс: набор — это только маркер, подписи в иконном режиме нет
+     (имя и порт живут в title и в развёрнутом виде) */
+  .rail.compact .setrow{justify-content:center;padding:0;height:38px;margin:3px 8px;border-bottom:0;border-radius:var(--radius-xs)}
   .rail.compact .sbody{display:none}
-  .rail.compact .smono{display:block;font:11px/1 var(--font-mono);letter-spacing:.04em;color:var(--text);text-transform:uppercase}
-  .rail.compact .setrow .dot{position:absolute;top:6px;right:9px}
+  .rail.compact .setrow .dot{width:9px;height:9px}
+  .rail.compact .setrow.is-active::before{left:-8px;top:0;bottom:0}
   .rail.compact .rail-foot{padding:6px 4px}
   .rail.compact .rail-add{justify-content:center;padding:5px 0}
   .rail.compact .rail-add .lbl{display:none}

@@ -18,7 +18,7 @@
   var st = {
     sets: [], servers: [], sel: linkId ? decodeURIComponent(linkId) : null,
     health: null, calls: null, env: [], logKey: '', errTimer: 0, busy: false, boot: !!linkId,
-    tab: 'overview', sideTab: 'servers', railCollapsed: false,
+    tab: 'overview', sideTab: 'servers', railPref: '',
     st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' }
   };
 
@@ -228,7 +228,6 @@
       function () {
         var a = el('a', 'setrow');
         a.appendChild(el('span', 'dot'));
-        a.appendChild(el('span', 'smono'));
         var body = a.appendChild(el('span', 'sbody'));
         body.appendChild(el('span', 'sname od-truncate'));
         var meta = body.appendChild(el('span', 'smeta'));
@@ -244,7 +243,6 @@
         a.classList.toggle('is-active', s.id === st.sel);
         if (s.id === st.sel) { a.setAttribute('aria-current', 'true'); } else { a.removeAttribute('aria-current'); }
         a.querySelector('.dot').className = 'dot ' + state.cls;
-        a.querySelector('.smono').textContent = name.slice(0, 2);
         a.querySelector('.sname').textContent = name;
         a.querySelector('.sport').textContent = ':' + s.port;
         var rate = a.querySelector('.srate');
@@ -256,6 +254,7 @@
         }
         var names = s.servers || [];
         a.title = name + ' · порт ' + s.port + ' · ' + state.text + (names.length ? '\n' + names.join(', ') : '');
+        a.setAttribute('aria-label', name + ' · порт ' + s.port + ' · ' + state.text);
       });
   }
 
@@ -866,8 +865,10 @@
 
   function applyRail() {
     var w = window.innerWidth;
-    // ниже 1200 колонке деталей места нет — она в дровере, рельс отдаём иконкам
-    var compact = (w >= 960 && w < 1200) || st.railCollapsed;
+    // ниже 1200 колонке деталей места нет — она в дровере, рельс отдаём иконкам;
+    // но выбор пользователя шевроном сильнее ширины окна, иначе кнопка мертва в 960–1199
+    var auto = w >= 960 && w < 1200;
+    var compact = st.railPref ? st.railPref === 'compact' : auto;
     $('rail').classList.toggle('compact', compact);
     var btn = $('rail-toggle');
     btn.hidden = w < 960;
@@ -972,8 +973,8 @@
   });
 
   $('rail-toggle').addEventListener('click', function () {
-    st.railCollapsed = !st.railCollapsed;
-    try { localStorage.setItem('mcprig.rail', st.railCollapsed ? 'compact' : 'full'); } catch (err) { /* приватный режим */ }
+    st.railPref = $('rail').classList.contains('compact') ? 'full' : 'compact';
+    try { localStorage.setItem('mcprig.rail', st.railPref); } catch (err) { /* приватный режим */ }
     applyRail();
   });
 
@@ -1135,7 +1136,7 @@
 
   function every(ms, fn) { setInterval(function () { if (!document.hidden) { fn(); } }, ms); }
 
-  try { st.railCollapsed = localStorage.getItem('mcprig.rail') === 'compact'; } catch (e) { /* приватный режим */ }
+  try { var rp = localStorage.getItem('mcprig.rail'); st.railPref = rp === 'compact' || rp === 'full' ? rp : ''; } catch (e) { /* приватный режим */ }
   // ссылка на срез статистики открывает сразу её
   var statLink = /^#\/stats\/([a-z0-9]+)$/.exec(location.hash);
   if (statLink) { st.st.period = PERIODS.indexOf(statLink[1]) < 0 ? 'today' : statLink[1]; st.tab = 'stats'; }
