@@ -33,21 +33,22 @@ func (m *Manager) apiStats(req *request) error {
 	}
 
 	id := q.Get("set")
-	dirs := []string{}
+	// bySet нужен таблице наборов: он считается тем же проходом, что и итоги.
+	sources := []stats.Source{}
 	unreachable := []string{}
 	if id != "" && id != "all" {
 		if m.store.Set(id) == nil {
 			return notFound("набор не найден")
 		}
 		if dir := m.statsDir(id); dirExists(dir) {
-			dirs = append(dirs, dir)
+			sources = append(sources, stats.Source{Dir: dir})
 		} else {
 			unreachable = append(unreachable, id)
 		}
 	} else {
 		for _, set := range m.store.Sets() {
 			if dir := m.statsDir(set.ID); dirExists(dir) {
-				dirs = append(dirs, dir)
+				sources = append(sources, stats.Source{Set: set.ID, Dir: dir})
 			} else {
 				// Документ обещает назвать набор без каталога и здесь.
 				unreachable = append(unreachable, set.ID)
@@ -60,7 +61,7 @@ func (m *Manager) apiStats(req *request) error {
 		return badRequest("bucket: hour, day или month")
 	}
 
-	res := stats.QueryHistory(dirs, stats.Query{
+	res := stats.QuerySets(sources, stats.Query{
 		Period: period,
 		Bucket: bucket,
 		Server: q.Get("server"),

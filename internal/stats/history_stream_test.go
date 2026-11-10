@@ -94,7 +94,7 @@ func TestAccKeepsDistributionNotRows(t *testing.T) {
 // Приблизительный режим не платит за точность вовсе: распределение не ведётся.
 func TestApproximateBundleSkipsDistribution(t *testing.T) {
 	b := newBundle(stepDay, true, Query{})
-	b.addRaw(rawLine{Time: time.Now(), Client: "c", Server: "s", Tool: "t", MS: 5})
+	b.addRaw("", rawLine{Time: time.Now(), Client: "c", Server: "s", Tool: "t", MS: 5})
 	if b.totals.exact != nil {
 		t.Fatal("приблизительный разрез ведёт распределение латентностей")
 	}

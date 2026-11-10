@@ -133,3 +133,62 @@ func TestAPIStatsBucketValidation(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	status(t, e.do(t, http.MethodGet, "/api/stats?period=today&bucket=year", nil), http.StatusBadRequest)
 }
+
+// Таблица наборов: set=all отдаёт счётчики по каждому набору тем же проходом;
+// набор без истории не получает нулевую строку, а один набор разреза не несёт.
+func TestAPIStatsBySet(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fs")
+	one := e.addSetBody(t, map[string]any{"name": "one", "servers": []string{"fs"}, "open": true})
+	two := e.addSetBody(t, map[string]any{"name": "two", "servers": []string{"fs"}, "open": true})
+	silent := e.addSetBody(t, map[string]any{"name": "silent", "servers": []string{"fs"}, "open": true})
+
+	now := time.Now()
+	writeHistory(t, filepath.Join(e.dir, "sets", one, "stats"), now,
+		map[string]any{"client": "opencode", "server": "fs", "tool": "echo", "ms": 10, "failed": false},
+		map[string]any{"client": "opencode", "server": "fs", "tool": "echo", "ms": 30, "failed": true},
+	)
+	writeHistory(t, filepath.Join(e.dir, "sets", two, "stats"), now,
+		map[string]any{"client": "claude", "server": "fs", "tool": "fetch", "ms": 200, "failed": false},
+	)
+
+	w := e.do(t, http.MethodGet, "/api/stats?set=all&period=today", nil)
+	status(t, w, http.StatusOK)
+	var got stats.Result
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("разбор /api/stats: %v", err)
+	}
+	want := []stats.SetRow{
+		{Set: one, Calls: 2, Failures: 1, TotalMs: 40},
+		{Set: two, Calls: 1, Failures: 0, TotalMs: 200},
+	}
+	if len(got.BySet) != len(want) {
+		t.Fatalf("bySet = %+v, ожидалось %+v", got.BySet, want)
+	}
+	for i := range want {
+		if got.BySet[i] != want[i] {
+			t.Fatalf("bySet[%d] = %+v, ожидалось %+v", i, got.BySet[i], want[i])
+		}
+	}
+	if len(got.Unreachable) != 1 || got.Unreachable[0] != silent {
+		t.Fatalf("unreachable = %v, ожидался %q", got.Unreachable, silent)
+	}
+	var sum int64
+	for _, r := range got.BySet {
+		sum += r.Calls
+	}
+	if sum != got.Totals.Calls {
+		t.Fatalf("bySet складывается в %d, totals = %d", sum, got.Totals.Calls)
+	}
+
+	// Один набор: разрез не нужен, поле пустое.
+	w = e.do(t, http.MethodGet, "/api/stats?set="+one+"&period=today", nil)
+	status(t, w, http.StatusOK)
+	got = stats.Result{}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.BySet) != 0 {
+		t.Fatalf("bySet у одного набора = %+v", got.BySet)
+	}
+}
