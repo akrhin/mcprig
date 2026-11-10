@@ -48,7 +48,7 @@ Restart policy:
 | port never opens | process killed, `набор … не поднялся: порт … не слушает` |
 | stop | `SIGTERM` to the process group, then `SIGKILL` after 5 s |
 
-Logs are appended to `sets/<id>/lazy-mcp.log`, rotate to `.log.1` at 5 MiB, and
+Logs are appended to `sets/<id>/mcprig.log`, rotate to `.log.1` at 5 MiB, and
 the last 2000 lines are kept in memory for `GET /api/sets/<id>/logs`.
 
 ## Lazy connections

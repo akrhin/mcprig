@@ -3,10 +3,12 @@
   "servers": [
     {
       "name": "memory",
-      "error": "набор не запущен"
+      "healthy": false,
+      "error": "connection refused"
     },
     {
       "name": "context7",
+      "healthy": false,
       "error": "набор не запущен"
     }
   ]

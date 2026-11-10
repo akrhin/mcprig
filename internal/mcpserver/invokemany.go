@@ -142,6 +142,11 @@ func (m *Manager) runManyCall(ctx context.Context, label string, c manyCall, max
 		}
 		return errors.New("🚫 Blocked by mcprig policy: " + message)
 	}
+	// Та же сверка, что у invoke_command: неизвестное имя не идёт в апстрим,
+	// иначе отказ приходит тремя разными текстами. Пустой кэш — как раньше.
+	if cached := e.cachedTools(); cached != nil && !hasTool(cached, c.CommandName) {
+		return fmt.Errorf("неизвестный инструмент %q у сервера %q", c.CommandName, e.srv.Name)
+	}
 	args, err := parametersOf(c.Parameters)
 	if err != nil {
 		return err

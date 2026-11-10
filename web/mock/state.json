@@ -1,16 +1,65 @@
 {
   "sets": [
     {
+      "id": "main",
+      "name": "main",
+      "description": "боевой набор хоста",
+      "port": 9104,
+      "servers": [
+        "serena",
+        "socraticode",
+        "xerj",
+        "context7",
+        "tavily",
+        "playwright",
+        "raven",
+        "designer-skill",
+        "gitea",
+        "portainer",
+        "open-design"
+      ],
+      "keyPrefix": "main_9f2",
+      "autostart": true,
+      "runtime": {
+        "id": "main",
+        "running": true,
+        "pid": 25102,
+        "startedAt": "2026-11-08T06:12:41.000Z",
+        "port": 9104
+      },
+      "keys": [
+        {
+          "id": "k_main1",
+          "createdAt": "2026-10-30T09:12:00.000Z",
+          "note": "ноутбук"
+        },
+        {
+          "id": "k_main2",
+          "createdAt": "2026-11-02T18:40:00.000Z",
+          "note": "ci"
+        }
+      ]
+    },
+    {
       "id": "demo",
       "name": "demo",
       "description": "основной набор",
+      "port": 9100,
       "servers": [
         "fetch",
         "time",
         "memory",
         "context7"
       ],
-      "port": 9100,
+      "keyPrefix": "demo_7c1",
+      "autostart": true,
+      "runtime": {
+        "id": "demo",
+        "running": true,
+        "pid": 24817,
+        "startedAt": "2026-11-08T15:28:58.440Z",
+        "port": 9100
+      },
       "keys": [
         {
           "id": "k_demo1",
@@ -23,57 +72,46 @@
           "revokedAt": "2026-10-12T19:40:58.440Z",
           "note": "старый"
         }
-      ],
-      "keyPrefix": "demo_7c1",
-      "autostart": true,
-      "runtime": {
-        "id": "demo",
-        "running": true,
-        "pid": 24817,
-        "startedAt": "2026-11-08T15:28:58.440Z",
-        "port": 9100
-      }
+      ]
     },
     {
       "id": "ops",
       "name": "ops",
-      "servers": [
-        "fetch",
-        "time",
-        "memory"
-      ],
+      "description": "дежурный",
       "port": 9101,
-      "keys": [
-        {
-          "id": "k_ops1",
-          "createdAt": "2026-10-27T19:40:58.440Z"
-        }
+      "servers": [
+        "fs",
+        "fetch",
+        "gitea"
       ],
-      "keyPrefix": "ops_51ab",
+      "keyPrefix": "ops_31a",
+      "autostart": true,
       "runtime": {
         "id": "ops",
         "running": true,
-        "pid": 24902,
-        "startedAt": "2026-11-08T17:00:58.440Z",
+        "pid": 24930,
+        "startedAt": "2026-11-08T20:04:11.000Z",
         "port": 9101
-      }
+      },
+      "keys": [
+        {
+          "id": "k_ops1",
+          "createdAt": "2026-10-20T11:02:00.000Z",
+          "note": "сервер"
+        }
+      ]
     },
     {
       "id": "lab",
       "name": "lab",
-      "description": "эксперименты",
+      "description": "песочница",
+      "port": 9102,
       "servers": [
         "memory",
         "context7"
       ],
-      "port": 9102,
-      "keys": [
-        {
-          "id": "k_lab1",
-          "createdAt": "2026-11-03T19:40:58.440Z"
-        }
-      ],
-      "keyPrefix": "lab_3d77",
+      "keyPrefix": "lab_55b",
+      "autostart": false,
       "runtime": {
         "id": "lab",
         "running": false,
@@ -81,35 +119,111 @@
         "exitCode": 1,
         "restarts": 2,
         "error": "memory: connection refused после 3 попыток"
-      }
+      },
+      "keys": []
     },
     {
       "id": "dev",
       "name": "dev",
-      "servers": [
-        "fetch",
-        "fs",
-        "time"
-      ],
+      "description": "разработка",
       "port": 9103,
-      "keys": [
-        {
-          "id": "k_dev1",
-          "createdAt": "2026-11-06T19:40:58.440Z",
-          "note": "ноутбук"
-        }
+      "servers": [
+        "memory",
+        "context7",
+        "fs"
       ],
-      "keyPrefix": "dev_0e94",
+      "keyPrefix": "dev_0ae",
+      "autostart": true,
       "runtime": {
         "id": "dev",
         "running": true,
-        "pid": 25311,
-        "startedAt": "2026-11-08T18:35:58.440Z",
+        "pid": 25041,
+        "startedAt": "2026-11-08T22:48:03.000Z",
         "port": 9103
-      }
+      },
+      "keys": [
+        {
+          "id": "k_dev1",
+          "createdAt": "2026-11-05T08:30:00.000Z",
+          "note": "ноутбук"
+        }
+      ]
     }
   ],
   "servers": [
+    {
+      "name": "serena",
+      "transport": "http",
+      "url": "http://127.0.0.1:8899/mcp",
+      "enabled": true
+    },
+    {
+      "name": "socraticode",
+      "transport": "http",
+      "url": "http://127.0.0.1:9101/mcp",
+      "enabled": true
+    },
+    {
+      "name": "xerj",
+      "transport": "http",
+      "url": "http://127.0.0.1:9200/mcp",
+      "enabled": true
+    },
+    {
+      "name": "context7",
+      "transport": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    },
+    {
+      "name": "tavily",
+      "transport": "http",
+      "url": "https://mcp.tavily.com/mcp",
+      "enabled": true
+    },
+    {
+      "name": "playwright",
+      "transport": "stdio",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true
+    },
+    {
+      "name": "raven",
+      "transport": "http",
+      "url": "http://192.168.1.92:9300/mcp",
+      "enabled": true
+    },
+    {
+      "name": "designer-skill",
+      "transport": "http",
+      "url": "http://127.0.0.1:9310/mcp",
+      "enabled": true
+    },
+    {
+      "name": "gitea",
+      "transport": "http",
+      "url": "https://frosty-ad-gt.cloudpub.ru/api/mcp",
+      "enabled": true
+    },
+    {
+      "name": "portainer",
+      "transport": "http",
+      "url": "http://192.168.1.92:9000/mcp",
+      "enabled": true
+    },
+    {
+      "name": "open-design",
+      "transport": "stdio",
+      "command": [
+        "node",
+        "/home/sintez/.local/node24/bin/open-design"
+      ],
+      "enabled": true
+    },
     {
       "name": "fetch",
       "transport": "stdio",
@@ -132,12 +246,6 @@
       "name": "memory",
       "transport": "http",
       "url": "http://127.0.0.1:49374/mcp",
-      "enabled": true
-    },
-    {
-      "name": "context7",
-      "transport": "http",
-      "url": "https://mcp.context7.com/mcp",
       "enabled": true
     },
     {

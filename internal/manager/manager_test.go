@@ -43,6 +43,10 @@ type env struct {
 }
 
 func newEnv(t *testing.T, auth AuthOptions) *env {
+	return newEnvLog(t, auth, nil)
+}
+
+func newEnvLog(t *testing.T, auth AuthOptions, log *slog.Logger) *env {
 	t.Helper()
 	dir := t.TempDir()
 	// httptest.NewRequest ставит Host example.com: пустой список теперь значит
@@ -50,12 +54,15 @@ func newEnv(t *testing.T, auth AuthOptions) *env {
 	if auth.AllowedHosts == nil {
 		auth.AllowedHosts = []string{"example.com"}
 	}
+	if log == nil {
+		log = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	m, err := New(Options{
 		DataDir: dir,
 		Version: "test",
 		CLIPath: fakeBin,
 		Auth:    auth,
-		Log:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Log:     log,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -72,6 +79,13 @@ func (e *env) do(t *testing.T, method, path string, body any) *httptest.Response
 
 func (e *env) doWithCookie(t *testing.T, method, path string, body any, cookie *http.Cookie) *httptest.ResponseRecorder {
 	t.Helper()
+	return e.doWithCookieOrigin(t, method, path, body, cookie, "")
+}
+
+// doWithCookieOrigin то же, но с заголовком Origin: браузер шлёт его на каждый
+// небезопасный запрос, и checkCSRF этого требует при сессионной cookie.
+func (e *env) doWithCookieOrigin(t *testing.T, method, path string, body any, cookie *http.Cookie, origin string) *httptest.ResponseRecorder {
+	t.Helper()
 	var rd io.Reader
 	switch v := body.(type) {
 	case nil:
@@ -87,6 +101,9 @@ func (e *env) doWithCookie(t *testing.T, method, path string, body any, cookie *
 	r := httptest.NewRequest(method, path, rd)
 	if body != nil {
 		r.Header.Set("Content-Type", "application/json")
+	}
+	if origin != "" {
+		r.Header.Set("Origin", origin)
 	}
 	if cookie != nil {
 		r.AddCookie(cookie)
@@ -202,7 +219,7 @@ func TestLoginLogout(t *testing.T) {
 	w = e.doWithCookie(t, http.MethodGet, "/api/state", nil, cookie)
 	status(t, w, http.StatusOK)
 
-	w = e.doWithCookie(t, http.MethodPost, "/api/logout", nil, cookie)
+	w = e.doWithCookieOrigin(t, http.MethodPost, "/api/logout", nil, cookie, "http://example.com")
 	status(t, w, http.StatusOK)
 
 	w = e.doWithCookie(t, http.MethodGet, "/api/state", nil, cookie)

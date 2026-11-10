@@ -64,6 +64,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
 | `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500; for one set it also carries `schema` |
+| `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | export the registry or one set |
@@ -77,6 +78,10 @@ in the system, otherwise the manager allocates one; a port held by a process
 gives `409` "port N is taken by a process". `id` and `token` in a create body
 are ignored.
 
+The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at
+5 MiB. A `lazy-mcp.log` inherited from the old proxy is renamed on the set's
+first start, so the old tail stays visible in the panel.
+
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
 registry key. A set that does not answer is listed in `unreachable` by id; its
 error text is not forwarded.
@@ -89,6 +94,48 @@ i.e. its tool cache, with no calls to downstream servers. The merged answer
 without `set` has no such field: the weight is per set. It is absent until the
 set has filled its cache once. The panel prints it in the card head as
 `list_commands`: `20 КБ · 5 067 ток · 22 инстр.`
+
+## Call history
+
+Counters of `/api/calls` live in the set's memory and die with the process. The
+history below is kept on disk by the set itself, next to its config: for a set
+that is `<data-dir>/sets/<id>/stats/`, for a standalone `serve` — the directory
+of the `servers.json` it was started with. Files are `0600`, the directory
+`0700`.
+
+| file | contents | kept |
+| --- | --- | --- |
+| `raw-YYYY-MM-DD.jsonl` | one line per call: `{time, client, server, tool, ms, failed}`; no error text | today + 7 days |
+| `day-YYYY-MM-DD.json` | per `(client, server, tool)`: `{client, server, tool, calls, failures, totalMs, hist, lastMs}` | up to 30 days |
+| `month-YYYY-MM.json` | the same triples per day under `days` — a repeated fold overwrites a day instead of doubling it | always |
+
+`hist` is a fixed histogram in milliseconds: `1, 2, 5, 10, 20, 50, 100, 200,
+500, 1000, 2000, 5000, 10000, ∞`.
+
+Rotation and cleanup run when the set starts and then once a day: a finished day
+gets its day file built from the raw journal, days older than 30 move into their
+month file, and journals older than 7 days are removed. Writing never blocks a
+tool call: the line goes to a bounded channel served by one goroutine, and a
+full channel drops the line, which is reported as `stats.dropped` in the set's
+`/stats`.
+
+`GET /api/stats` answers one period:
+
+```text
+period=today    from 00:00 today       exact percentiles from raw, approximate=false
+period=7d       last 7 calendar days   exact, approximate=false
+period=30d      last 30 calendar days  from the histogram, approximate=true
+period=archive  older than 30 days     from month files, approximate=true
+```
+
+`bucket=hour|day|month` picks the series step (default follows the period): today
+and 7d answer hourly (or daily with `bucket=day`), 30d answers daily, archive
+monthly. An unknown `bucket` is `400`. `server`, `tool` and `client` filter every part of the answer. `set=all`
+(or no `set`) sums all sets. The answer is `period`, `from`, `to`, `approximate`,
+`totals` and `series` (`{t, calls, failures, p50ms, p95ms}`), plus `tools`,
+`servers` and `clients` breakdowns of the same shape. A set whose stats
+directory is missing is listed in `unreachable` by id, with an empty answer
+otherwise; an unknown set id is `404`.
 
 ## Health
 
@@ -106,6 +153,13 @@ does not multiply probes across browser tabs.
 
 Both panel health endpoints are public so a container or systemd check can use
 them without credentials. The panel's `/healthz` contains no set names.
+
+A set starting or stopping, and a server turning unhealthy, each write one line
+to the panel's stdout (`набор <id>: запущен|остановлен`, `набор <id>: сервер
+<name> unhealthy`), which systemd collects. An unhealthy transition is logged
+only when the state changes, not on every health poll. The same poll runs in the
+background every 30 s for every running set, so lines appear even with no panel
+open.
 
 ## Access
 
@@ -134,5 +188,16 @@ time. Both modes can be combined; either one is enough to pass.
 
 Writes (`POST`/`PUT`/`DELETE`) are rejected when `Sec-Fetch-Site` is
 `cross-site`, when `Origin` does not match `Host`, or when the body is not
-JSON. `Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback
-only.
+JSON. A cookie-authenticated write must also carry `Origin`: without it the
+request gets `403` "нужен заголовок Origin" — a browser sends it on every such
+request, a forged one from another site does not. Header-based proxy auth and
+login (`POST /api/login`, no cookie yet) are exempt.
+
+`Origin` is compared in full — scheme, host and port; `MCPRIG_ALLOWED_HOSTS` is
+not a list of sources (it names the panel itself). Behind a TLS proxy send
+`X-Forwarded-Proto: https` or `X-Forwarded-Host` (plus `X-Forwarded-Port` when
+the public port differs): otherwise the request looks like plain http and the
+panel rejects an `https` Origin on writes. A configured `MCPRIG_PROXY_SECRET`
+(trusted proxy) has the same effect; an `http` Origin is still rejected then.
+
+`Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.

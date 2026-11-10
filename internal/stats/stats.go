@@ -110,6 +110,8 @@ type Recorder struct {
 	tailNext int
 	tailCap  int
 	schema   *Schema
+	// hist, when set, mirrors every call to the on-disk history.
+	hist *History
 }
 
 // counterKey включает сервер: два сервера с одинаковым именем инструмента —
@@ -146,7 +148,6 @@ func (r *Recorder) Record(client, server, tool string, d time.Duration, err erro
 	}
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	k := counterKey{server: server, client: client, tool: tool}
 	ctr := r.counters[k]
@@ -180,6 +181,20 @@ func (r *Recorder) Record(client, server, tool string, d time.Duration, err erro
 		r.tail[r.tailNext] = c
 		r.tailNext = (r.tailNext + 1) % r.tailCap
 	}
+	hist := r.hist
+	r.mu.Unlock()
+
+	// Канал истории неблокирующий: строка теряется только при переполнении.
+	if hist != nil {
+		hist.Record(client, server, tool, ms, err != nil)
+	}
+}
+
+// SetHistory mirrors every recorded call to the on-disk history.
+func (r *Recorder) SetHistory(h *History) {
+	r.mu.Lock()
+	r.hist = h
+	r.mu.Unlock()
 }
 
 // Snapshot is the panel view: counters with percentiles, newest tail first.
@@ -189,6 +204,13 @@ type Snapshot struct {
 	Tail     []Call    `json:"tail"`
 	// Schema — вес list_commands набора, если прокси уже снял его с кэша.
 	Schema *Schema `json:"schema,omitempty"`
+	// Stats — состояние истории на диске: сколько строк потерял полный канал.
+	Stats *HistoryStats `json:"stats,omitempty"`
+}
+
+// HistoryStats is the disk-history health the panel shows as stats.dropped.
+type HistoryStats struct {
+	Dropped int64 `json:"dropped"`
 }
 
 // Schema is what list_commands costs the caller's context: the JSON of the
@@ -236,6 +258,9 @@ func (r *Recorder) snapshot(redacted bool) Snapshot {
 	defer r.mu.Unlock()
 
 	out := Snapshot{Set: r.set, Counters: make([]Counter, 0, len(r.counters)), Schema: r.schema}
+	if r.hist != nil {
+		out.Stats = &HistoryStats{Dropped: r.hist.Dropped()}
+	}
 	for _, c := range r.counters {
 		cp := *c
 		cp.latencies = append([]int64(nil), c.latencies...)

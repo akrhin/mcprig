@@ -19,11 +19,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/registry"
+	"github.com/sintez/mcprig/internal/stats"
 	"github.com/sintez/mcprig/internal/toolout"
 )
 
@@ -40,6 +42,11 @@ type Options struct {
 	Version  string
 	Auth     AuthOptions
 	Log      *slog.Logger
+
+	// healthEvery и probe — дырки для тестов фонового опроса здоровья:
+	// в бою период 30 с и настоящая проба набора.
+	healthEvery time.Duration
+	probe       func(context.Context, *registry.Set) setHealth
 }
 
 func FromEnv(version string) Options {
@@ -92,6 +99,12 @@ type Manager struct {
 	health  *healthCache
 	browse  *browser
 	routes  []route
+
+	healthStop  chan struct{}
+	healthDone  chan struct{}
+	healthOnce  sync.Once
+	healthEvery time.Duration
+	probe       func(context.Context, *registry.Set) setHealth
 }
 
 func New(opts Options) (*Manager, error) {
@@ -119,6 +132,17 @@ func New(opts Options) (*Manager, error) {
 	}
 	for _, id := range store.Dropped() {
 		log.Warn("набор выброшен: некорректный id", "id", id)
+	}
+	// Свёртка при старте панели: набор мог быть остановлен навсегда, и тогда
+	// никто не переведёт его day-файлы в месячные.
+	for _, set := range store.Sets() {
+		dir := filepath.Join(opts.DataDir, "sets", set.ID, "stats")
+		if _, err := os.Stat(dir); err != nil {
+			continue
+		}
+		if err := stats.Rotate(dir, time.Now(), log); err != nil {
+			log.Warn("stats: ротация при старте", "set", set.ID, "err", err)
+		}
 	}
 	a, err := newAuth(opts.Auth)
 	if err != nil {
@@ -162,12 +186,24 @@ func New(opts Options) (*Manager, error) {
 		return set, m.store.Servers()
 	}
 	m.routes = m.buildRoutes()
+	m.healthEvery = opts.healthEvery
+	if m.healthEvery <= 0 {
+		m.healthEvery = 30 * time.Second
+	}
+	m.probe = opts.probe
+	if m.probe == nil {
+		m.probe = func(ctx context.Context, set *registry.Set) setHealth {
+			return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, set.Servers, m.version)
+		}
+	}
+	m.startHealthLoop()
 	return m, nil
 }
 
 func (m *Manager) Handler() http.Handler { return m }
 
 func (m *Manager) Close() {
+	m.stopHealthLoop()
 	m.browse.closeAll()
 	m.rt.Close()
 }
@@ -467,6 +503,7 @@ func (m *Manager) buildRoutes() []route {
 	return []route{
 		mk(`^/api/state$`, map[string]handlerFunc{http.MethodGet: m.apiState}),
 		mk(`^/api/calls$`, map[string]handlerFunc{http.MethodGet: m.apiCalls}),
+		mk(`^/api/stats$`, map[string]handlerFunc{http.MethodGet: m.apiStats}),
 		mk(`^/api/import$`, map[string]handlerFunc{http.MethodPost: m.apiImport}),
 		mk(`^/api/export/registry$`, map[string]handlerFunc{http.MethodGet: m.apiExportRegistry}),
 		mk(`^/api/export$`, map[string]handlerFunc{http.MethodGet: m.apiExportSet}),
@@ -574,20 +611,26 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (m *Manager) checkCSRF(r *http.Request) error {
-	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
 		return nil
 	}
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		return &httpError{http.StatusForbidden, "запрос с чужого сайта"}
 	}
-	if origin := r.Header.Get("Origin"); origin != "" && origin != "null" {
+	origin := r.Header.Get("Origin")
+	if origin != "" && origin != "null" {
 		u, err := url.Parse(origin)
-		if err != nil || !m.originOK(u.Host, r) {
+		if err != nil || !m.originMatches(u, r) {
 			// Значения в лог: без них отказ не отладить с чужой машины.
 			m.log.Warn("csrf: origin не совпал", "origin", origin, "host", r.Host,
 				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
+	} else if _, err := r.Cookie(sessionCookie); err == nil {
+		// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
+		// сессионной cookie — подделка. Прокси-аутентификация и вход сюда не
+		// попадают: у login cookie ещё нет, у API её нет вовсе.
+		return &httpError{http.StatusForbidden, "нужен заголовок Origin"}
 	}
 	if r.ContentLength != 0 && r.URL.Path != "/api/login" && !isJSON(r.Header.Get("Content-Type")) {
 		return badRequest("ожидался JSON")
@@ -595,30 +638,69 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 	return nil
 }
 
-// originOK пускает Origin, равный Host, либо Host, под который прокси
-// переписал заголовок, либо имя из MCPRIG_ALLOWED_HOSTS: за обратным прокси
-// Origin остаётся публичным, а Host приходит уже внутренним.
-func (m *Manager) originOK(originHost string, r *http.Request) bool {
-	if sameHost(originHost, r.Host) {
-		return true
-	}
-	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" && sameHost(originHost, fwd) {
-		return true
-	}
-	return m.auth.hostOK(originHost)
+// originAuthority — источник так, как его видит браузер: схема, хост, порт.
+// Порт схемы по умолчанию, чтобы https://example.com и https://example.com:443
+// были одним источником.
+type originAuthority struct{ scheme, host, port string }
+
+func authorityOf(u *url.URL) originAuthority {
+	host, port := splitAuthority(u.Host, u.Scheme)
+	return originAuthority{scheme: strings.ToLower(u.Scheme), host: host, port: port}
 }
 
-// sameHost сравнивает без учёта порта и регистра: за прокси Origin может
-// прийти без порта, а Host — с ним.
-func sameHost(a, b string) bool {
-	return strings.EqualFold(hostOnly(a), hostOnly(b))
+func splitAuthority(hostport, scheme string) (host, port string) {
+	if h, p, err := net.SplitHostPort(hostport); err == nil {
+		return strings.ToLower(strings.Trim(h, "[]")), p
+	}
+	port = "80"
+	if strings.EqualFold(scheme, "https") {
+		port = "443"
+	}
+	return strings.ToLower(strings.Trim(hostport, "[]")), port
 }
 
-func hostOnly(host string) string {
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
+// originMatches сверяет Origin целиком — схему, хост и порт. Сравнение без
+// порта пропускало подделку с http://localhost:3000 на http://localhost:9091:
+// это один сайт, браузер шлёт cookie, и панель считала источник своим.
+// MCPRIG_ALLOWED_HOSTS здесь не участвует: это имена самой панели, не источники.
+func (m *Manager) originMatches(u *url.URL, r *http.Request) bool {
+	want := authorityOf(u)
+	if want.scheme != "http" && want.scheme != "https" {
+		return false
 	}
-	return strings.ToLower(strings.Trim(host, "[]"))
+	for _, got := range m.requestAuthorities(r) {
+		if got == want {
+			return true
+		}
+	}
+	return false
+}
+
+// requestAuthorities — origin'ы, которыми клиент видит запрос: сам Host и
+// публичное имя прокси. За TLS-прокси до Go доходит http, поэтому https-схема
+// считается своей при X-Forwarded-Proto (secureRequest), X-Forwarded-Host или
+// настроенном секрете прокси; иначе https-Origin на http-запросе — отказ.
+// Как только https признан своим, http-Origin отбрасывается целиком.
+func (m *Manager) requestAuthorities(r *http.Request) []originAuthority {
+	scheme := "http"
+	if secureRequest(r) || m.auth.proxySecret != "" || r.Header.Get("X-Forwarded-Host") != "" {
+		scheme = "https"
+	}
+	host, port := splitAuthority(r.Host, scheme)
+	out := []originAuthority{{scheme: scheme, host: host, port: port}}
+	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {
+		fwdHost, fwdPort := splitAuthority(fwd, "https")
+		if p := r.Header.Get("X-Forwarded-Port"); p != "" && !hasPort(fwd) {
+			fwdPort = p
+		}
+		out = append(out, originAuthority{scheme: "https", host: fwdHost, port: fwdPort})
+	}
+	return out
+}
+
+func hasPort(hostport string) bool {
+	_, _, err := net.SplitHostPort(hostport)
+	return err == nil
 }
 
 // hostAllowed — то же послабление для самого Host: прокси переписывает его на
@@ -1289,9 +1371,10 @@ func (m *Manager) apiSetServers(req *request) error {
 		return nil
 	}
 	view := m.health.get(req.r.Context(), id, func(ctx context.Context) setHealth {
-		return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, names, m.version)
+		return m.probe(ctx, set)
 	})
 	view.Running = status.Running
+	m.noteHealth(id, view)
 	writeJSON(req.w, http.StatusOK, view)
 	return nil
 }

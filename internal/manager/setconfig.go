@@ -3,6 +3,7 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -96,9 +97,26 @@ func WriteSetConfig(dataDir, id string, body []byte) (string, error) {
 	return path, nil
 }
 
-// LogPath — <dataDir>/sets/<id>/lazy-mcp.log.
+// LogPath — <dataDir>/sets/<id>/mcprig.log.
 func LogPath(dataDir, id string) string {
-	return filepath.Join(dataDir, "sets", id, "lazy-mcp.log")
+	return filepath.Join(dataDir, "sets", id, "mcprig.log")
+}
+
+// migrateLog переносит унаследованный lazy-mcp.log в mcprig.log один раз: без
+// этого хвост старого лога пропал бы из панели после переименования.
+func migrateLog(log *slog.Logger, dataDir, id string) {
+	dir := filepath.Join(dataDir, "sets", id)
+	old := filepath.Join(dir, "lazy-mcp.log")
+	if _, err := os.Stat(old); err != nil {
+		return
+	}
+	next := filepath.Join(dir, "mcprig.log")
+	if _, err := os.Stat(next); err == nil {
+		return
+	}
+	if err := os.Rename(old, next); err != nil && log != nil {
+		log.Warn("лог набора не переименован", "set", id, "err", err)
+	}
 }
 
 func writeAtomic(path string, body []byte, mode os.FileMode) error {

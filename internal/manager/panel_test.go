@@ -29,6 +29,17 @@ func TestPanelIsServed(t *testing.T) {
 		t.Fatalf("/app.css = %d %q", css.Code, css.Header().Get("Content-Type"))
 	}
 
+	// Остальные файлы панели лежат в том же embed: без них страница пустая.
+	for _, asset := range []string{"/app.js", "/theme.js", "/themes.css"} {
+		w := e.do(t, http.MethodGet, asset, nil)
+		if w.Code != http.StatusOK || w.Body.Len() == 0 {
+			t.Fatalf("%s = %d, тело %d байт", asset, w.Code, w.Body.Len())
+		}
+	}
+	if js := e.do(t, http.MethodGet, "/app.js", nil); !strings.Contains(js.Body.String(), "/api/stats") {
+		t.Fatalf("/app.js не знает про /api/stats")
+	}
+
 	// /ui был единственной страницей раньше: старые закладки живут.
 	ui := e.do(t, http.MethodGet, "/ui", nil)
 	if ui.Code != http.StatusFound || ui.Header().Get("Location") != "/" {

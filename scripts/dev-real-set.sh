@@ -60,7 +60,7 @@ api POST /api/sets/real/start '' >/dev/null
 cat <<EOF
 панель:  http://127.0.0.1:$PANEL_PORT   (auth off, данные $DATA)
 набор:   http://127.0.0.1:$SET_PORT/mcp  (открытый, без ключа)
-лог:     $DATA/sets/real/lazy-mcp.log
+лог:     $DATA/sets/real/mcprig.log
 
 пример:
   curl -s -XPOST http://127.0.0.1:$SET_PORT/mcp \\

@@ -2,15 +2,15 @@
   "running": true,
   "servers": [
     {
+      "name": "fs",
+      "healthy": true
+    },
+    {
       "name": "fetch",
       "healthy": true
     },
     {
-      "name": "time",
-      "healthy": true
-    },
-    {
-      "name": "memory",
+      "name": "gitea",
       "healthy": true
     }
   ]

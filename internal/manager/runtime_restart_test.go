@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/sintez/mcprig/internal/registry"
 )
@@ -62,5 +63,60 @@ func TestStartResetsRestartBudget(t *testing.T) {
 	}
 	if status.Restarts != 0 {
 		t.Fatalf("ручной start наследует бюджет: restarts=%d", status.Restarts)
+	}
+}
+
+// Рестарт идёт общим путём остановки: ровно одна строка «остановлен».
+func TestRestartLogsStopOnce(t *testing.T) {
+	h := &captureHandler{}
+	e := newEnvLog(t, AuthOptions{Off: true}, slog.New(h))
+	e.addServer(t, "fake")
+	id := e.addSet(t, "restart", "fake")
+	set := e.m.store.Set(id)
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("старт: %v", err)
+	}
+	if _, err := e.m.rt.Restart(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("рестарт: %v", err)
+	}
+	defer e.m.rt.Stop(set)
+
+	if _, n := h.find("набор " + id + ": остановлен"); n != 1 {
+		t.Fatalf("строк «остановлен»: %d, ожидалась 1", n)
+	}
+}
+
+// Упавший сам процесс остановки не переживает: Stop не должен писать
+// «остановлен» задним числом.
+func TestStopAfterCrashDoesNotClaimStopped(t *testing.T) {
+	h := &captureHandler{}
+	e := newEnvLog(t, AuthOptions{Off: true}, slog.New(h))
+	e.addServer(t, "fake")
+	id := e.addSet(t, "crash", "fake")
+	set := e.m.store.Set(id)
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("старт: %v", err)
+	}
+	p := e.m.rt.proc(id)
+	if err := syscall.Kill(-p.pid, syscall.SIGKILL); err != nil {
+		t.Fatalf("убить набор: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		e.m.rt.mu.Lock()
+		exited := p.exited
+		e.m.rt.mu.Unlock()
+		if exited {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("процесс не отмечен упавшим")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	e.m.rt.Stop(set)
+	if _, n := h.find("набор " + id + ": остановлен"); n != 0 {
+		t.Fatalf("«остановлен» после падения: %d", n)
 	}
 }
