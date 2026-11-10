@@ -7,7 +7,16 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- Отказ правами внутри `invoke_many` несёт в `result` тот же маркер
+  `🚫 Blocked by mcprig policy: …` и `_meta.lazyMcpPolicy: "blocked"`, что и
+  `invoke_command`: хук-клиент видит отказ в веере, а не только строку `error`.
+- Усечение ответа с `structuredContent` добавляет к маркеру строку
+  `[structuredContent не влезает в maxBytes: полный ответ в файле]` — видно, что
+  структура отброшена и лежит в выгруженном файле.
+- При обоих пустых именах `invoke_command` и `invoke_many` говорят
+  `укажите command_name или command` вместо `command_name обязателен`.
 
 ## [0.3.8] - 2026-11-10
 
