@@ -175,18 +175,13 @@ func TestWarningsNodeMemory(t *testing.T) {
 	}
 }
 
-// Явный ro заменяет умолчания целиком: без /usr внутри песочницы не
-// запустится даже prlimit, и это надо сказать до старта.
+// Явный ro заменяет умолчания, но prlimit песочница монтирует сама:
+// предупреждать о «нет /usr» больше не о чем.
 func TestWarningsSandboxROWithoutUsr(t *testing.T) {
 	srv := &Server{Command: []string{"/tmp/canary"}, Sandbox: &Sandbox{
 		Mode: SandboxModeBwrap, RO: []string{"/tmp"}}}
-	got := srv.Warnings()
-	if len(got) != 1 || !strings.Contains(got[0], "не содержит /usr") {
-		t.Fatalf("warnings = %v", got)
-	}
-	srv.Sandbox.RO = []string{"/tmp", "/usr"}
 	if got := srv.Warnings(); len(got) != 0 {
-		t.Fatalf("предупреждение осталось с /usr: %v", got)
+		t.Fatalf("warnings = %v, prlimit монтируется песочницей", got)
 	}
 }
 
