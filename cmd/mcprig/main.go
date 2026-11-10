@@ -162,6 +162,21 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel, init, doctor, warm", args[0])}
 }
 
+// tooloutInterval is a variable only so a test can shorten the sweep; serve and
+// stdio both use it.
+var tooloutInterval = toolout.Interval
+
+// startToolout sweeps the tool-out directory now and then periodically until ctx
+// is done. serve and stdio share one base directory — the same one the proxy
+// writes truncated answers into — so stdio's files are cleaned too.
+func startToolout(ctx context.Context, log *slog.Logger) <-chan struct{} {
+	cfg, warns := toolout.FromEnv()
+	for _, w := range warns {
+		log.Warn("tool-out: " + w)
+	}
+	return toolout.Run(ctx, toolout.Base(), cfg, tooloutInterval, log)
+}
+
 func run() error {
 	mode, rest, err := parseArgs(os.Args[1:])
 	if err != nil {
@@ -246,12 +261,8 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Выгрузки усечённых ответов чистятся при старте и дальше раз в час.
-	toolCfg, warns := toolout.FromEnv()
-	for _, w := range warns {
-		log.Warn("tool-out: " + w)
-	}
-	toolout.Run(ctx, toolout.Base(), toolCfg, toolout.Interval, log)
+	// Выгрузки усечённых ответов чистятся при старте и дальше периодически.
+	startToolout(ctx, log)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
@@ -275,6 +286,9 @@ func defaultConfigPath() string {
 	return "servers.json"
 }
 
+// stdioClient — метка клиента в истории stdio-режима: клиент у процесса один.
+const stdioClient = "stdio"
+
 // runStdio serves one set over stdin/stdout: the client spawns us and owns the
 // process. No listener, no key — the transport is the boundary.
 func runStdio(args []string) error {
@@ -297,8 +311,26 @@ func runStdio(args []string) error {
 	mgr := mcpserver.New(cfg, version, conn)
 	defer mgr.Close()
 
+	// История вызовов: у stdio нет панели над процессом, но разрез по
+	// периодам читается с диска так же, как у набора. Без неё прокси работает
+	// дальше — клиенту важнее ответ, чем учёт.
+	rec := stats.NewRecorder(os.Getenv("MCPRIG_SET"), 0)
+	rec.SetClientLabel(stdioClient)
+	if hist, err := stats.OpenHistory(filepath.Join(stateDir(), "stdio", "stats"), log); err != nil {
+		log.Warn("stats: история на диске недоступна", "err", err)
+	} else {
+		rec.SetHistory(hist)
+		defer hist.Close()
+	}
+	mgr.Stats = rec
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Выгрузки усечённых ответов копятся в том же базовом каталоге, что у
+	// serve, и чистить их должен сам процесс: stdio-набор живёт без панели.
+	startToolout(ctx, log)
+
 	return mgr.Server().Run(ctx, &mcp.StdioTransport{})
 }
 

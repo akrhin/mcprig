@@ -112,6 +112,9 @@ type Recorder struct {
 	schema   *Schema
 	// hist, when set, mirrors every call to the on-disk history.
 	hist *History
+	// client, when set, overrides the caller's own label: a stdio process has
+	// exactly one client and names it after the transport.
+	client string
 }
 
 // counterKey включает сервер: два сервера с одинаковым именем инструмента —
@@ -132,6 +135,15 @@ func NewRecorder(set string, tailCap int) *Recorder {
 	}
 }
 
+// SetClientLabel fixes the client name for a process that has exactly one
+// client: in stdio the transport is the boundary, so the history line says
+// "stdio" rather than whatever the harness calls itself.
+func (r *Recorder) SetClientLabel(label string) {
+	r.mu.Lock()
+	r.client = label
+	r.mu.Unlock()
+}
+
 // Record accounts one finished invocation. Метки приходят от клиента, поэтому
 // сначала чистятся, а пары сверх потолка складываются в OtherLabel.
 func (r *Recorder) Record(client, server, tool string, d time.Duration, err error) {
@@ -148,6 +160,10 @@ func (r *Recorder) Record(client, server, tool string, d time.Duration, err erro
 	}
 
 	r.mu.Lock()
+	if r.client != "" {
+		client = r.client
+		c.Client = client
+	}
 
 	k := counterKey{server: server, client: client, tool: tool}
 	ctr := r.counters[k]
