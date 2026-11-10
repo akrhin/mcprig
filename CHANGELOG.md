@@ -7,6 +7,10 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.4] - 2026-11-10
+
 ### Added
 
 - Sandbox for untrusted stdio servers: `sandbox` block on a server
