@@ -114,6 +114,19 @@ func TestWrapBwrapArgv(t *testing.T) {
 	}
 }
 
+// Без prlimit песочница fail-closed по-настоящему: раньше пустое имя
+// доходило до bind и давало невнятное «путь "prlimit" должен быть абсолютным».
+func TestBwrapArgvRequiresPrlimit(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	srv := &config.Server{Name: "victim", Transport: config.TransportStdio, Command: []string{"true"}}
+	sb := &config.Sandbox{Mode: config.SandboxModeBwrap, MemoryMb: 2048}
+
+	_, err := bwrapArgv(srv, sb, srv.Command)
+	if err == nil || !strings.Contains(err.Error(), "prlimit не найден в PATH") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestWrapNetworkAllow(t *testing.T) {
 	stubAvailable(t, nil)
 	srv := sandboxed()

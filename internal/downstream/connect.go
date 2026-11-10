@@ -114,6 +114,10 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		// fail-closed: сервер не стартует, а не стартует «как раньше».
 		res, err := sandbox.Wrap(srv, srv.Command)
 		if err != nil {
+			// deny-отказ тоже должен попадать в маркер изоляции: иначе list_servers обещает bwrap неработающему серверу.
+			if c.OnSandboxFallback != nil {
+				c.OnSandboxFallback(srv, err.Error())
+			}
 			return nil, nil, err
 		}
 		if res.Reason != "" {

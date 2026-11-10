@@ -150,11 +150,15 @@ func renderDoctor(rep doctorReport) []byte {
 	} {
 		fmt.Fprintf(&b, "\n[%s]\n", sec.title)
 		for _, line := range sec.lines {
-			prefix := "ok: "
+			prefix, text := "ok: ", line.Text
 			if !line.OK {
 				prefix = "проблема: "
+			} else if warn, ok := strings.CutPrefix(text, "предупреждение: "); ok {
+				// Предупреждение — не «ok»: иначе строка читается как «всё хорошо»
+				// ровно там, где хозяин должен вмешаться.
+				prefix, text = "внимание: ", warn
 			}
-			fmt.Fprintf(&b, "%s%s\n", prefix, line.Text)
+			fmt.Fprintf(&b, "%s%s\n", prefix, text)
 		}
 	}
 	fmt.Fprintf(&b, "\nитог: %d %s\n", rep.Problems, problemWord(rep.Problems))
@@ -348,8 +352,8 @@ func checkSecrets(raw []byte, dataDir string) []doctorLine {
 	return lines
 }
 
-// checkSandbox спрашивает то же, что проверит Wrap: bwrap есть и userns
-// разрешён. Провал — ошибка только когда песочницу кто-то просит.
+// checkSandbox спрашивает то же, что проверит Wrap: bwrap и prlimit есть,
+// userns разрешён. Провал — ошибка только когда песочницу кто-то просит.
 func checkSandbox(cfg *config.Config) []doctorLine {
 	wanted := false
 	if cfg != nil {
