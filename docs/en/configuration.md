@@ -72,32 +72,58 @@ governed by the 15 s cache described in
 
 ### Sandbox
 
-A `sandbox` block runs the stdio server under `bwrap`: its own mount tree,
-read-only root, no `/home` unless `rw` or `cwd` names one, no network, no
-`/proc/1/root`, and `prlimit` limits inside the namespace.
+A `sandbox` block runs a stdio server under `bwrap`: its own mount tree,
+read-only root (`--remount-ro /`), no `/home`, no host network, no
+`/proc/1/root`, and `prlimit` limits applied inside the namespace.
+
+To turn it on, add the block — `"sandbox": {}` is enough, it means
+`mode: bwrap` with every default. A server without the block has no isolation at
+all. A server tagged `untrusted` must have the block **and** keep
+`onUnavailable: deny`: `{"sandbox": {"mode": "none"}}` on an untrusted server is
+rejected with `тег untrusted требует sandbox: сервер без изоляции не стартует`.
 
 | field | type | default | meaning |
 | --- | --- | --- | --- |
-| `mode` | `bwrap` / `none` | `bwrap` | `none` turns isolation off for this server |
-| `onUnavailable` | `deny` / `warn` / `allow` | `deny` | what happens when bubblewrap cannot start: refuse the server (fail-closed), run it and log a warning, or run it silently. An `untrusted` server accepts only `deny` |
-| `ro` | array of absolute paths | `/usr /bin /lib /lib64 /etc/ssl /etc/resolv.conf /etc/passwd /etc/group` | mounted read-only; an explicit list replaces the defaults entirely, so name every directory the binary needs; only a missing *default* path is skipped, a path you named must exist |
+| `mode` | `bwrap` / `none` | `bwrap` | `none` turns isolation off for this server; the block then only costs a warning |
+| `onUnavailable` | `deny` / `warn` / `allow` | `deny` | what happens when bubblewrap cannot start: refuse the server (fail-closed), run it confined by nothing and log a warning into the set log, or run it silently. An `untrusted` server accepts only `deny` |
+| `ro` | array of absolute paths | `/usr /bin /lib /lib64 /etc/ssl /etc/resolv.conf /etc/passwd /etc/group` | mounted read-only. An explicit list replaces the defaults, and any absolute path is allowed — including one under `/home`. Only a missing *default* path is skipped; a path you named must exist, and that is checked when the server starts, not when the config loads. Mounts are ordered parent before child, so `rw` on a subdirectory of an `ro` root works and the reverse silently stays read-only |
 | `rw` | array of absolute paths | empty | mounted read-write; wins over `ro` on the same path |
-| `network` | `none` / `allow` | `none` | `allow` keeps the host network namespace |
-| `memoryMb` | int | `2048` | `RLIMIT_AS` — virtual memory, not RSS; Go and node do not start under 512, Python fits |
+| `network` | `none` / `allow` | `none` | `allow` keeps the host network namespace; there is no per-host allowlist |
+| `memoryMb` | int | `2048` | `RLIMIT_AS` — virtual memory, not RSS. Go and node need at least 2048; under 512 neither starts |
 | `pids` | int | `256` | `RLIMIT_NPROC`, the fork-bomb stop |
-| `tmpMb` | int | `128` | size of the `/tmp` tmpfs inside the namespace, also `RLIMIT_FSIZE`; without it a server could fill the host disk |
-| `timeoutSec` | int | `30` | per-tool-call deadline once the sandbox is on |
+| `tmpMb` | int | `128` | size of the `/tmp` tmpfs **and** `RLIMIT_FSIZE`: the largest file the server may write anywhere, including in an `rw` directory. A cache or sqlite database larger than this fails with `EFBIG` |
+| `timeoutSec` | int | `30` | deadline for one tool call while `mode: bwrap` and the value is positive. It applies even when isolation was *not* applied (`warn`/`allow`): the call is cut with `таймаут 30s (sandbox)` and the session is reset |
+
+A zero value means the default: `memoryMb: 0`, `pids: 0`, `tmpMb: 0` and
+`timeoutSec: 0` are replaced by 2048 / 256 / 128 / 30, so a limit cannot be
+turned off; a negative value is a config error. Unknown keys inside the block
+are rejected and the whole block is dropped — the server stays in the list with
+`sandbox: неизвестные поля: …` and never starts. `sandbox` on an `http` server
+is `sandbox допустим только для stdio`.
 
 ```json
 {"name": "unknown", "command": ["npx", "-y", "some-mcp@1.2.3"], "tags": ["untrusted"],
- "sandbox": {"network": "none", "memoryMb": 1024}}
+ "sandbox": {"network": "none", "memoryMb": 2048}}
 ```
 
-A binary outside `/usr` — node from a user prefix, for instance — must be
-listed in `ro` (together with the defaults, which are replaced), or the child
-cannot start. A path under `/home` gets in only through `rw` (read-write) or
-`cwd` (read-only). `prlimit`, the helper the limits go through, is mounted by
-the sandbox together with its loader, so an explicit `ro` does not cut it out.
+An explicit `ro` replaces the defaults, but `/lib`, `/lib64`, `/usr/lib` and
+`/usr/lib64` are still mounted for the loader whenever limits are on, and
+`prlimit` is mounted with them — so a missing library is not what breaks. What
+actually disappears is `/usr` itself (the binary), and `/etc/ssl` and
+`/etc/resolv.conf` (TLS and DNS). A runtime outside `/usr`, node from a user
+prefix for instance, must be listed in `ro` together with the defaults it needs;
+`npx` and `uv` write their caches under `$HOME`, so they need `rw` on `~/.npm`
+or `~/.cache/uv` as well.
+
+What the sandbox does **not** limit: CPU, the memory of the whole subtree
+(`RLIMIT_AS` counts one process, and node spawns children), and network egress —
+`allow` is all or nothing. The kernel is shared, so this is isolation from the
+filesystem and the host network namespace, not a virtual machine.
+
+Messages you may meet, and what they mean:
+`sandbox unavailable: <причина>` (bubblewrap is missing or userns is denied and
+`deny` is set), `sandbox: путь "…" не существует`, `sandbox: cwd "…" должен
+быть абсолютным`, `sandbox: неизвестные поля: …`.
 
 ### Both command forms
 

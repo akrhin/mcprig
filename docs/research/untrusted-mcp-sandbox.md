@@ -10,7 +10,8 @@
 описаны как замысел, фактические детали — в `docs/en/configuration.md` (Sandbox)
 и коде `internal/sandbox`. Отличия от текста: режим `docker` не реализован
 (только `none|bwrap`), `prlimit` стоит внутри bwrap, `cmd.Dir` не заменяется на
-`--chdir`, `doctor` проверяет только предупреждения конфига.
+`--chdir`, а `doctor` делает настоящую пробу: запускает bwrap с userns и падает,
+если песочницу просит конфиг (`cmd/mcprig/doctor.go:353-368`).
 
 ---
 
@@ -27,9 +28,9 @@ mcp.Client ──HTTP/stdio──▶ set process (mcprig serve) ──spawn─�
 | место | что происходит |
 | --- | --- |
 | `internal/downstream/connect.go:38` `Connect` | единственная точка входа в чужой сервер |
-| `internal/downstream/connect.go:88` `transport` | развилка stdio/HTTP |
-| `internal/downstream/connect.go:90-103` | stdio: `exec.Command(srv.Command[0], srv.Command[1:]...)` (:94), `cmd.Dir = srv.Cwd` (:95) |
-| `internal/downstream/connect.go:98-102` | `base := os.Environ()`; если `c.Env != nil` — whitelist (:100); поверх — `flatten(srv.Env)` (:102) |
+| `internal/downstream/connect.go:107-168` `transport` | развилка stdio/HTTP |
+| `internal/downstream/connect.go:132` | stdio: `exec.Command(srv.Command[0], srv.Command[1:]...)`, `cmd.Dir = srv.Cwd` |
+| `internal/downstream/connect.go:134-142` | `base := os.Environ()`; если `c.Env != nil` — whitelist; поверх — `flatten(srv.Env)` |
 | `internal/downstream/connect.go:103` | `&mcp.CommandTransport{Command: cmd}` — процесс стартует внутри `client.Connect` (:48) |
 | `internal/downstream/connect.go:104-124` | HTTP: `StreamableClientTransport`, заголовки через `withHeaders` (:111) |
 | `internal/downstream/connect.go:157` `sameHostRedirect` | защита от уноса `Authorization` на другой хост |
@@ -245,18 +246,19 @@ egress-политики `sbx policy`). Как продукты решают «м
   "ro": ["/usr", "/lib", "/lib64", "/bin", "/etc/ssl", "/etc/resolv.conf"],
   "rw": [],                   // пусто по умолчанию; рабочий каталог сервера — отдельно
   "network": "none",          // none | allow
-  "memoryMb": 512,
+  "memoryMb": 2048,
   "pids": 256,
   "timeoutSec": 30
 }
 ```
 
-Код: новый пакет `internal/sandbox`, функция `Wrap(srv *config.Server, argv []string)
-([]string, error)`; вызов в `internal/downstream/connect.go:90-103` перед
+Код: пакет `internal/sandbox`, функция `Wrap(srv *config.Server, argv []string)
+(`sandbox.Result, error)`; вызов в `internal/downstream/connect.go` перед
 `exec.Command`. Для `mode:"bwrap"` argv становится
-`prlimit --as=… --nproc=… -- bwrap --ro-bind … --unshare-all --die-with-parent --new-session -- <cmd>`.
-`cmd.Dir` заменяется на `--chdir`. Всё остальное (сессии, health, reconnect) не
-трогаем. Лимит времени — обернуть `session.CallTool` контекстом с `timeoutSec`.
+`bwrap --ro-bind … --unshare-all --die-with-parent --new-session -- prlimit --as=…
+--nproc=… -- <cmd>`: `prlimit` стоит **внутри** bwrap, иначе лимиты применились бы
+к самому bwrap, а не к потомку. `cwd` монтируется `--ro-bind` и задаётся
+`--chdir`. Дедлайн вызова живёт в `mcpserver` и сбрасывает сессию после срабатывания.
 
 Почему не `systemd-run --user`: `--scope` не принимает `ProtectHome` (проверено:
 `Unknown assignment`), а `--pipe` уводит lifecycle в systemctl. bwrap прозрачнее.

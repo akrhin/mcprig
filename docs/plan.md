@@ -117,8 +117,8 @@ health, вызовы). Экран показывает то, чего сейча
 Полный разбор — `docs/research/untrusted-mcp-sandbox.md` (модель угроз,
 варианты, источники, 381 строка). Коротко:
 
-Граница одна: `internal/downstream/connect.go:88-103` — `exec.Command` на :94,
-env на :98-102. Песочница — это префикс argv, транспорт не меняется.
+Граница одна: `internal/downstream/connect.go:107-168` — `exec.Command` на :132,
+env на :134-142. Песочница — это префикс argv, транспорт не меняется.
 
 | вариант | что даёт | цена |
 | --- | --- | --- |
@@ -148,9 +148,9 @@ env на :98-102. Песочница — это префикс argv, транс�
 Изоляция не лечит tool poisoning, confused deputy и prompt injection — для них
 отдельные механизмы (пиннинг `tools/list`, allowlist инструментов).
 
-Проверка — `scripts/sandbox-e2e.sh` (9 проверок + Go-тест на env): `~/.ssh`,
+Проверка — `scripts/sandbox-e2e.sh` (10 проверок + Go-тест на env): `~/.ssh`,
 `registry.json`, curl наружу, запись в `/` и `/etc`, запись в `rw`, `env`,
-fork-бомба (`pids`), `/proc/1/root`, `mount`, unix-сокет.
+fork-бомба (`pids`), `/proc/1/root`, `mount`, unix-сокет, лимит памяти.
 
 ## Долг, принятый сознательно (2026-11-09)
 
@@ -194,6 +194,6 @@ check` (`b2ce4cb`) — шаг в джобе `release` перед `release --clea
 Каналы — только архивы goreleaser (обёртки npm/PyPI/crates не заводим);
 образы Docker публикуются в реестр Gitea — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`
 (`latest` = slim 32 МБ, `latest-full` = с node и python, 334 МБ, плюс теги
-`0.3.5-slim`/`0.3.5-full`);
+`0.3.6-slim`/`0.3.6-full`);
 путь модуля остаётся `github.com/sintez/mcprig`, публичный репозиторий на GitHub —
 зеркало `akrhin/mcprig` (п. 6 выше).

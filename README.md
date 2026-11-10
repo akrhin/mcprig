@@ -35,6 +35,11 @@ forms, `url`, `env`, `envAllow`, `headers`, `sandbox`, `transport`,
 `healthMonitor`, `requestTimeout`. A server with a broken field stays in the list as unhealthy
 with its error; a missing name or invalid JSON fails the load.
 
+A `sandbox` block puts a stdio server under `bubblewrap`: read-only root,
+no `/home`, no network, `prlimit` limits. `"sandbox": {}` is enough to turn it on;
+a server tagged `untrusted` cannot start without it. Details and what it does not
+limit — [docs/en/configuration.md](docs/en/configuration.md#sandbox).
+
 ## Architecture
 
 [![mcprig architecture](docs/diagrams/mcprig.architecture.en.png)](docs/diagrams/mcprig.architecture.en.html)
@@ -242,7 +247,7 @@ ships the same archives. Release notes for a tag come from `CHANGELOG.md`.
   `deploy/mcprig-set@.service` (one set per unit).
 - Docker: `slim` (binary only, HTTP downstreams) and `full` (adds node and
   python for `npx`/`uvx` stdio servers). Both are published to the Gitea
-  registry as `0.3.5-slim`, `0.3.5-full`, and `latest`/`latest-full` following
+  registry as `0.3.6-slim`, `0.3.6-full`, and `latest`/`latest-full` following
   the release.
 
 Details: [docs/en/install.md](docs/en/install.md).
@@ -265,7 +270,7 @@ shuts it down. More: [docs/en/development.md](docs/en/development.md).
 
 Pre-1.0, single operator: one panel, one password, no per-user roles. Stages 0–6
 are accepted (config, proxy core, OAuth, HTTP transport, manager, panel,
-delivery); releases up to 0.3.5 are published. CLI help and log lines are
+delivery); releases up to 0.3.6 are published. CLI help and log lines are
 Russian in this build.
 
 License: MIT, see [LICENSE](LICENSE).

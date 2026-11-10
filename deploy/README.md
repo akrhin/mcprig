@@ -10,6 +10,12 @@
 | `Dockerfile` | два таргета: `slim` (только бинарник) и `full` (плюс node и python) |
 | `docker-compose.yml` | два набора, конфиги смонтированы read-only, состояние в томах |
 
+Песочница (`"sandbox"` у stdio-сервера) требует `bubblewrap` на хосте или в
+образе и разрешённых user-namespace: в образы bwrap не входит, поэтому
+`untrusted`-сервер с `onUnavailable: deny` в контейнере без него не стартует.
+Ставьте пакет `bubblewrap` и не отключайте userns; проверка — `mcprig doctor`
+(раздел «песочница»).
+
 Раскладка на хосте:
 
 ```
@@ -63,7 +69,7 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 `slim`, `ops` — stdio-сервер через `npx`, ему нужен образ с node.
 
 ```bash
-# образы уже в реестре Gitea: latest (slim), latest-full и теги релиза 0.3.5-slim/0.3.5-full
+# образы уже в реестре Gitea: latest (slim), latest-full и теги релиза 0.3.6-slim/0.3.6-full
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest
 docker compose up -d
 

@@ -12,7 +12,7 @@ This file lists every subcommand and flag with real examples and their output.
 | `stdio` | one set over stdin/stdout, spawned by the client |
 | `panel` | manager and web panel (registry, sets, keys, call tail) |
 | `init` | print a client configuration fragment; writes nothing |
-| `doctor` | one-pass health report: config, sets, keys, secrets, services |
+| `doctor` | one-pass health report: config, sets, keys, secrets, services, sandbox |
 | `warm` | load a set's tool cache so the first client call is fast |
 
 Exit codes: `0` after help, `2` for a command-line error (unknown subcommand,
@@ -156,7 +156,9 @@ sets (id, port, autostart, listener, `/healthz` status); keys (count and the
 active key's 8-character `keyPrefix`); `${VAR}` secrets (names only, with the
 source — OpenBao, `env.json` or the environment — never values); services
 (foreign listeners in `9100–9199`, `sets/*/oauth.json` size, `tool-out/` size,
-panel `/healthz`).
+panel `/healthz`); sandbox (runs `bwrap` with a user namespace and reports
+`песочница: bwrap запускается, userns разрешён`, or a problem when a config
+actually asks for isolation and bwrap or userns is missing — exit code 1).
 
 Exit code: `0` when every line is `ok`, `1` otherwise; the last line is
 `итог: N проблем`. Set listeners are dialled through `MCPRIG_BIND_IP` (a

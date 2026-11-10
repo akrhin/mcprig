@@ -7,8 +7,19 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.6] - 2026-11-10
+
 ### Added
 
+- Панель редактирует реестр серверов хоста: `GET/POST /api/servers`,
+  `PUT/DELETE /api/servers/<имя>` и форма в дровере с полями транспорта,
+  `env`/`envAllow`, тегов и блока `sandbox` (`mode`, `onUnavailable`, `ro`,
+  `rw`, `network`, `memoryMb`, `pids`, `tmpMb`, `timeoutSec`). Отказ бэкенда
+  показывается в форме, запись не меняется.
+- Мок панели считает статистику по фильтрам и заполняет счётчики всех наборов
+  из `bySet`.
 - `mcprig stdio` ведёт историю вызовов: `$MCPRIG_DATA_DIR/stdio/stats/` держит
   те же `raw-*.jsonl`, `day-*.json` и `month-*.json`, что каталог набора, и
   разрез по периодам читается с диска. Клиент в строке — `stdio`: транспорт и
@@ -32,6 +43,9 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ### Fixed
 
+- `prlimit` с динамическим загрузчиком монтируется в песочницу сам (как
+  `/lib`, `/lib64`, `/usr/lib`, `/usr/lib64` при наличии), поэтому явный `ro`
+  без `/usr` больше не ломает старт сервера с лимитами.
 - `mcprig stdio` чистит `tool-out` (`MCPRIG_TOOLOUT_TTL`/`MCPRIG_TOOLOUT_MAX`)
   тем же свипом при старте и раз в час, что `serve` и `panel`, и в том же
   базовом каталоге: выгрузки stdio-процесса больше не остаются навсегда.

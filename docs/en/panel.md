@@ -19,12 +19,32 @@ CSP: no inline scripts or styles.
 | KPIs | calls in the tail, p50, p95, errors for the selected set |
 | sets table | name, port, state, server count, uptime, calls, errors |
 | calls table | time, server, tool, client, milliseconds, status; search box |
-| right column | servers of the set with health, variables, log tail |
+| right column | servers of the set with health, variables, log tail; below 1200 px it becomes a drawer (also the **Details** button) |
 | footer | totals and last refresh time |
 
 Everything on the page comes from the panel API below plus `GET /stats` of the
 running sets. Nothing else is stored in the browser but the chosen colour
 scheme.
+
+## Server editor
+
+The **Servers** tab of the right column and the **add server** button open a form
+over the panel: name, description, transport, command (one argument per line) or
+`url` and headers, working directory, `env`, `envAllow`, tags, the `enabled`
+switch and a **sandbox** fieldset — `mode`, `onUnavailable`, `network`, `ro` and
+`rw` (one path per line), `memoryMb`, `pids`, `tmpMb`, `timeoutSec`. It writes
+through `POST /api/servers` and `PUT /api/servers/<name>`; a backend refusal is
+shown in the form as its own text and the stored record stays untouched.
+
+The same form is the only way to edit a `sandbox` block from the UI. Fields and
+their meaning are in [configuration.md](configuration.md#sandbox); the panel
+does not validate them itself — it shows what the backend answers, including
+`sandbox: неизвестные поля: …`, `sandbox допустим только для stdio` and
+`тег untrusted требует sandbox: сервер без изоляции не стартует`.
+
+The panel does not display the `isolation` field that MCP clients see in
+`list_servers`; a server running without isolation is visible in the set log
+(`сервер стартует без изоляции`) and through `list_servers`.
 
 The **Keys** dialog lists key ids, creation and revocation dates and notes. It
 shows only the 8-character prefix. A newly issued token is displayed once, and

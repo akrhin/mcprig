@@ -35,6 +35,11 @@ mcprig — это три вещи в одном бинарнике:
 `healthMonitor`, `requestTimeout`. Сервер с битым полем остаётся в списке нездоровым со своей
 ошибкой; отсутствующее имя или невалидный JSON валят загрузку.
 
+Блок `sandbox` запускает stdio-сервер под `bubblewrap`: корень только для
+чтения, нет `/home`, нет сети, лимиты `prlimit`. Включить — `"sandbox": {}`; сервер
+с тегом `untrusted` без него не стартует. Подробности и чего песочница не
+ограничивает — [docs/ru/configuration.md](docs/ru/configuration.md#песочница).
+
 ## Архитектура
 
 [![архитектура mcprig](docs/diagrams/mcprig.architecture.ru.png)](docs/diagrams/mcprig.architecture.ru.html)
@@ -240,7 +245,7 @@ true. Полный справочник полей: [docs/ru/configuration.md](d
   `deploy/mcprig-set@.service` (один набор на юнит).
 - Docker: `slim` (только бинарник, HTTP-нижестоящие) и `full` (добавляет node и
   python для stdio-серверов `npx`/`uvx`). Оба опубликованы в реестре Gitea как
-  `0.3.5-slim`, `0.3.5-full`, а `latest`/`latest-full` идут за релизом.
+  `0.3.6-slim`, `0.3.6-full`, а `latest`/`latest-full` идут за релизом.
 
 Подробности: [docs/ru/install.md](docs/ru/install.md).
 
@@ -263,7 +268,7 @@ bash scripts/dev-real-set.sh
 
 До 1.0, один оператор: одна панель, один пароль, без ролей на пользователя.
 Этапы 0–6 приняты (конфигурация, ядро прокси, OAuth, HTTP-транспорт, менеджер,
-панель, поставка); релизы до 0.3.5 опубликованы. Справка CLI и строки логов в
+панель, поставка); релизы до 0.3.6 опубликованы. Справка CLI и строки логов в
 этой сборке — на русском.
 
 Лицензия: MIT, см. [LICENSE](LICENSE).
