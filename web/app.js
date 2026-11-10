@@ -34,6 +34,32 @@
     return n;
   }
 
+  // Щит одинаков для всех состояний: цвет и подпись несут смысл, иконка — узнавание
+  function shield() {
+    var ns = 'http://www.w3.org/2000/svg';
+    var s = document.createElementNS(ns, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('fill', 'none');
+    s.setAttribute('stroke', 'currentColor');
+    s.setAttribute('stroke-width', '1.8');
+    s.setAttribute('stroke-linejoin', 'round');
+    s.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', 'M12 3l7 3.5V12c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6.5z');
+    s.appendChild(p);
+    return s;
+  }
+
+  // isolation из list_servers/health: bwrap — норма, «без изоляции: причина» —
+  // предупреждение, «нет: конфиг отвергнут» — ошибка. Поля нет — маркера нет.
+  function isoOf(v) {
+    if (!v) { return null; }
+    if (v === 'bwrap') { return { cls: 'iso-ok', label: 'bwrap', title: 'песочница bwrap применена' }; }
+    if (v.indexOf('без изоляции') === 0) { return { cls: 'iso-warn', label: 'без изоляции', title: v }; }
+    if (v.indexOf('нет:') === 0) { return { cls: 'iso-err', label: 'конфиг отвергнут', title: 'конфиг отвергнут: сервер не запустится' }; }
+    return { cls: 'iso-warn', label: v, title: v };
+  }
+
   function fmtN(v) { return v == null || v === '' ? '—' : Number(v).toLocaleString('ru-RU'); }
 
   function fmtBytes(v) {
@@ -731,6 +757,9 @@
         top.appendChild(el('span', 'dot'));
         top.appendChild(el('span', 'snm'));
         top.appendChild(el('span', 'badge'));
+        var iso = top.appendChild(el('span', 'iso'));
+        iso.appendChild(shield());
+        iso.appendChild(el('span', 'iso-t'));
         var foot = li.appendChild(el('div', 'srv-foot'));
         foot.appendChild(el('span', 'srv-note'));
         var edit = foot.appendChild(el('button', 'mini srv-edit', 'изменить'));
@@ -754,6 +783,18 @@
         li.querySelector('.snm').title = row.name;
         var kind = (srv && srv.transport) || (srv && srv.command ? 'stdio' : srv && srv.url ? 'http' : '—');
         li.querySelector('.badge').textContent = kind;
+        // изоляция живёт в health: у серверов вне набора её нет, и это честно
+        var iso = isoOf(h && h.isolation);
+        var ib = li.querySelector('.iso');
+        show(ib, !!iso);
+        if (iso) {
+          ib.className = 'iso ' + iso.cls;
+          ib.title = iso.title;
+          ib.setAttribute('aria-label', iso.title);
+          // тревогу видно и с клавиатуры; норма (bwrap) не отнимает tab-стоп
+          ib.tabIndex = iso.cls === 'iso-ok' ? -1 : 0;
+          ib.querySelector('.iso-t').textContent = iso.label;
+        }
         var n = li.querySelector('.srv-note');
         n.textContent = note;
         n.title = note;

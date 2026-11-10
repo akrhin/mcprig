@@ -20,11 +20,13 @@
     {
       "name": "tavily",
       "healthy": false,
-      "error": "503 upstream"
+      "error": "sandbox: только для stdio",
+      "isolation": "нет: конфиг отвергнут"
     },
     {
       "name": "playwright",
-      "healthy": true
+      "healthy": true,
+      "isolation": "bwrap"
     },
     {
       "name": "raven",
@@ -44,7 +46,8 @@
     },
     {
       "name": "open-design",
-      "healthy": true
+      "healthy": true,
+      "isolation": "без изоляции: bwrap не найден в PATH"
     }
   ]
 }

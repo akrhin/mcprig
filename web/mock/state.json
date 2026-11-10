@@ -179,7 +179,11 @@
       "name": "tavily",
       "transport": "http",
       "url": "https://mcp.tavily.com/mcp",
-      "enabled": true
+      "enabled": true,
+      "sandbox": {
+        "mode": "bwrap"
+      },
+      "_configError": "sandbox: только для stdio"
     },
     {
       "name": "playwright",
@@ -262,6 +266,7 @@
       ],
       "sandbox": {
         "mode": "bwrap",
+        "onUnavailable": "warn",
         "network": "allow",
         "rw": [
           "/home/sintez/git"
