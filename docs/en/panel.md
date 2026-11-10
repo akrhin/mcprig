@@ -110,7 +110,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
 least one existing server; its `port`, when given, must be 9100–9199 and free
 in the system, otherwise the manager allocates one; a port held by a process
-gives `409` "port N is taken by a process". `id` and `token` in a create body
+gives `409` "port N is taken by another process". `id` and `token` in a create body
 are ignored.
 
 The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at

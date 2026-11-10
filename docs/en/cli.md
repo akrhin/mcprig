@@ -53,8 +53,9 @@ that address for any subcommand; unset by default, so nothing is exposed.
 ### tool-out retention
 
 A truncated answer is saved under `${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/`.
-`serve`, `stdio` and `panel` sweep that one directory at startup and then
-hourly, until the process exits — stdio uses the base directory, not its own:
+`serve`, `stdio` and `panel` sweep that one directory at startup and then every
+ten minutes, until the process exits — stdio uses the base directory, not its
+own:
 
 | variable | default | meaning |
 | --- | --- | --- |
@@ -139,7 +140,7 @@ A second panel on the same data directory refuses to start because of
 ## doctor
 
 ```bash
-MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9088 mcprig doctor
+MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9091 mcprig doctor
 ```
 
 One pass over what otherwise means reading panel logs. No running panel is
@@ -151,14 +152,16 @@ problem rather than a crash.
 | `-config` | `os.UserConfigDir()/mcprig/servers.json` | client configuration; when absent, servers are counted from the registry |
 | `-json` | | machine-readable report with the same sections |
 
-Sections: version and binary path; configuration (path, server count, enabled);
-sets (id, port, autostart, listener, `/healthz` status); keys (count and the
-active key's 8-character `keyPrefix`); `${VAR}` secrets (names only, with the
-source — OpenBao, `env.json` or the environment — never values); services
-(foreign listeners in `9100–9199`, `sets/*/oauth.json` size, `tool-out/` size,
-panel `/healthz`); sandbox (runs `bwrap` with a user namespace and reports
-`песочница: bwrap запускается, userns разрешён`, or a problem when a config
-actually asks for isolation and bwrap or userns is missing — exit code 1).
+Five sections: configuration (path, server count, enabled); sets (id, port,
+autostart, listener, `/healthz` status); keys (count and the active key's
+8-character `keyPrefix`); `${VAR}` secrets (names only, with the source —
+OpenBao, `env.json` or the environment — never values); services (foreign
+listeners in `9100–9199`, `sets/*/oauth.json` size, `tool-out/` size, panel
+`/healthz`). The version and binary path line is printed above the first
+heading. The sandbox is a line inside the services section: it runs `bwrap`
+with a user namespace and reports `песочница: bwrap запускается, userns
+разрешён`, or a problem when a config actually asks for isolation and bwrap or
+userns is missing — exit code 1.
 
 Exit code: `0` when every line is `ok`, `1` otherwise; the last line is
 `итог: N проблем`. Set listeners are dialled through `MCPRIG_BIND_IP` (a
@@ -181,19 +184,19 @@ ok: main: 3 ключа, активный eef8bf86
 ok: CONTEXT7_API_KEY: окружение
 
 [служебные]
-проблема: чужие порты в диапазоне 9100–9199: 9119
+ok: чужие порты в диапазоне 9100–9199: 9119 (выдача портов их пропускает)
 ok: sets/*/oauth.json нет
 ok: tool-out нет
-ok: панель 127.0.0.1:9088: /healthz 200
+ok: панель 127.0.0.1:9091: /healthz 200
 
-итог: 1 проблема
+итог: 0 проблем
 ```
 
 ## warm
 
 ```bash
 mcprig warm --set main
-mcprig warm --all --panel http://127.0.0.1:9088 --password "$MCPRIG_PASSWORD"
+mcprig warm --all --panel http://127.0.0.1:9091 --password "$MCPRIG_PASSWORD"
 mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 ```
 
@@ -274,15 +277,17 @@ mcprig init --client opencode --set demo --config /tmp/demo/servers.json
 ```json
 {
   "mcp": {
-    "mcprig-demo": {
-      "command": [
-        "mcprig",
-        "stdio",
-        "--config",
-        "/tmp/demo/servers.json"
-      ],
-      "enabled": true,
-      "type": "local"
+    "servers": {
+      "mcprig-demo": {
+        "command": [
+          "mcprig",
+          "stdio",
+          "--config",
+          "/tmp/demo/servers.json"
+        ],
+        "enabled": true,
+        "type": "local"
+      }
     }
   }
 }
@@ -326,13 +331,15 @@ mcprig init --client opencode --set demo --remote http://127.0.0.1:9100/mcp --ke
 ```json
 {
   "mcp": {
-    "mcprig-demo": {
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer <token>"
-      },
-      "type": "remote",
-      "url": "http://127.0.0.1:9100/mcp"
+    "servers": {
+      "mcprig-demo": {
+        "enabled": true,
+        "headers": {
+          "Authorization": "Bearer <token>"
+        },
+        "type": "remote",
+        "url": "http://127.0.0.1:9100/mcp"
+      }
     }
   }
 }

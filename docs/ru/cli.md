@@ -53,8 +53,8 @@ time=2026-11-09T00:10:09.939+03:00 level=INFO msg="прокси слушает" 
 ### Срок жизни tool-out
 
 Усечённый ответ лежит в `${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/`. `serve`,
-`stdio` и `panel` чистят этот общий каталог при старте, а дальше раз в час — до
-выхода процесса; stdio берёт базовый каталог, а не свой:
+`stdio` и `panel` чистят этот общий каталог при старте, а дальше каждые десять
+минут — до выхода процесса; stdio берёт базовый каталог, а не свой:
 
 | переменная | по умолчанию | значение |
 | --- | --- | --- |
@@ -138,7 +138,7 @@ loopback, если `MCPRIG_HOST` не говорит иного.
 ## doctor
 
 ```bash
-MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9088 mcprig doctor
+MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9091 mcprig doctor
 ```
 
 Один проход по тому, ради чего иначе приходится разбирать логи панели.
@@ -150,14 +150,15 @@ MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9088 mcprig doctor
 | `-config` | `os.UserConfigDir()/mcprig/servers.json` | конфигурация клиента; если файла нет, серверы считаются из реестра |
 | `-json` | | машинный отчёт с теми же разделами |
 
-Разделы: версия и путь к бинарю; конфигурация (путь, число серверов,
-включённые); наборы (id, порт, autostart, слушатель, код `/healthz`); ключи
-(число и 8-символьный `keyPrefix` активного); секреты `${VAR}` (только имена и
-источник — OpenBao, `env.json` или окружение, никогда значения); служебное
-(чужие слушатели в `9100–9199`, размер `sets/*/oauth.json`, размер
-`tool-out/`, `/healthz` панели); песочница (запускает `bwrap` с user-namespace и
+Разделов пять: конфигурация (путь, число серверов, включённые); наборы (id,
+порт, autostart, слушатель, код `/healthz`); ключи (число и 8-символьный
+`keyPrefix` активного); секреты `${VAR}` (только имена и источник — OpenBao,
+`env.json` или окружение, никогда значения); служебные (чужие слушатели в
+`9100–9199`, размер `sets/*/oauth.json`, размер `tool-out/`, `/healthz`
+панели). Строка с версией и путём к бинарю печатается над первым заголовком.
+Песочница — строка внутри «служебных»: она запускает `bwrap` с user-namespace и
 пишет `песочница: bwrap запускается, userns разрешён`, а если изоляцию кто-то
-просит, а bwrap или userns недоступны — это проблема и код 1).
+просит, а bwrap или userns недоступны — это проблема и код 1.
 
 Код возврата: `0`, когда каждая строка `ok`, иначе `1`; последняя строка —
 `итог: N проблем`. Порты наборов проверяются через `MCPRIG_BIND_IP` (wildcard
@@ -179,19 +180,19 @@ ok: main: 3 ключа, активный eef8bf86
 ok: CONTEXT7_API_KEY: окружение
 
 [служебные]
-проблема: чужие порты в диапазоне 9100–9199: 9119
+ok: чужие порты в диапазоне 9100–9199: 9119 (выдача портов их пропускает)
 ok: sets/*/oauth.json нет
 ok: tool-out нет
-ok: панель 127.0.0.1:9088: /healthz 200
+ok: панель 127.0.0.1:9091: /healthz 200
 
-итог: 1 проблема
+итог: 0 проблем
 ```
 
 ## warm
 
 ```bash
 mcprig warm --set main
-mcprig warm --all --panel http://127.0.0.1:9088 --password "$MCPRIG_PASSWORD"
+mcprig warm --all --panel http://127.0.0.1:9091 --password "$MCPRIG_PASSWORD"
 mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 ```
 
@@ -273,15 +274,17 @@ mcprig init --client opencode --set demo --config /tmp/demo/servers.json
 ```json
 {
   "mcp": {
-    "mcprig-demo": {
-      "command": [
-        "mcprig",
-        "stdio",
-        "--config",
-        "/tmp/demo/servers.json"
-      ],
-      "enabled": true,
-      "type": "local"
+    "servers": {
+      "mcprig-demo": {
+        "command": [
+          "mcprig",
+          "stdio",
+          "--config",
+          "/tmp/demo/servers.json"
+        ],
+        "enabled": true,
+        "type": "local"
+      }
     }
   }
 }
@@ -325,13 +328,15 @@ mcprig init --client opencode --set demo --remote http://127.0.0.1:9100/mcp --ke
 ```json
 {
   "mcp": {
-    "mcprig-demo": {
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer <token>"
-      },
-      "type": "remote",
-      "url": "http://127.0.0.1:9100/mcp"
+    "servers": {
+      "mcprig-demo": {
+        "enabled": true,
+        "headers": {
+          "Authorization": "Bearer <token>"
+        },
+        "type": "remote",
+        "url": "http://127.0.0.1:9100/mcp"
+      }
     }
   }
 }

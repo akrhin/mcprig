@@ -154,7 +154,10 @@ Error: лишние ключи: path — допустимые: server, command_n
 ```
 
 A wrong JSON type is named by key and kind, without Go types:
-`аргументы: ключ server: ожидался тип «строка», получен тип «число»`.
+`Error: ключ server: ожидался тип «строка», получен тип «число»`. The
+`аргументы:` prefix appears only when the type error is not tied to a named
+key — an unknown or mis-shaped top-level field, e.g.
+`Error: аргументы: ожидался тип «объект», получен тип «строка»`.
 
 The downstream result is returned as-is: `content`, `structuredContent` and
 `isError` are preserved. If the connection dies before the first response byte
