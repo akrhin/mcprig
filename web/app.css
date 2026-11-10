@@ -170,6 +170,8 @@ button{font:inherit;color:inherit}
 .themesel{display:flex;align-items:center;flex:none}
 .themesel select{height:28px;max-width:132px;padding:0 4px;border:1px solid var(--border);border-radius:var(--radius-xs);background:transparent;color:var(--text-dim);font:12px var(--font-sans);cursor:pointer;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
 .themesel select:hover{background:var(--surface-2);color:var(--text)}
+/* выбор языка: две-три буквы, поэтому узкий */
+.langsel select{max-width:78px;min-width:58px;text-transform:uppercase;letter-spacing:.04em}
 .iconbtn{width:28px;height:28px;display:grid;place-items:center;background:transparent;border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text-dim);cursor:pointer;flex:none}
 .iconbtn:hover{background:var(--surface-2);color:var(--text)}
 .iconbtn[aria-pressed="true"]{color:var(--text);background:var(--surface-2)}
@@ -536,6 +538,7 @@ dialog::backdrop{background:var(--scrim)}
   .search input{width:96px}
   .avatar{display:none}
   .themesel select{max-width:104px}
+  .langsel select{max-width:64px;min-width:52px}
   .status .opt{display:none}
   .main{padding:10px 10px 8px}
   .tab{padding:7px 10px;font-size:12px}

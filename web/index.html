@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru" data-theme="mcprig">
+<html lang="en" data-theme="mcprig">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mcprig — панель</title>
+<title>mcprig — panel</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="themes.css">
@@ -28,60 +28,67 @@
     </div>
     <div class="sep" aria-hidden="true"></div>
     <div class="counters">
-      <span><b class="n" id="c-sets">—</b> наборов</span>
-      <span><b class="n" id="c-servers">—</b> серверов</span>
-      <span class="opt"><b class="n" id="c-running">—</b> работают</span>
+      <span><b class="n" id="c-sets">—</b> <span id="c-sets-w">sets</span></span>
+      <span><b class="n" id="c-servers">—</b> <span id="c-servers-w">servers</span></span>
+      <span class="opt"><b class="n" id="c-running">—</b> <span id="c-running-w">running</span></span>
     </div>
     <div class="top-right">
       <button class="btn side-open" type="button" id="side-open" aria-controls="side" aria-expanded="false">
         <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
           <path d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
-        Детали
+        <span data-i18n="top.details">Details</span>
       </button>
+      <label class="themesel langsel">
+        <span class="sr" data-i18n="top.lang">Language</span>
+        <select id="lang">
+          <option value="en">EN</option>
+          <option value="ru">RU</option>
+        </select>
+      </label>
       <label class="themesel">
-        <span class="sr">Цветовая схема</span>
+        <span class="sr" data-i18n="top.theme">Color scheme</span>
         <select id="theme">
           <option value="mcprig">mcprig</option>
-          <option value="light">Светлая</option>
+          <option value="light" data-i18n="theme.light">Light</option>
           <option value="nord">Nord</option>
           <option value="gruvbox">Gruvbox</option>
           <option value="solarized">Solarized</option>
           <option value="tokyo">Tokyo Night</option>
         </select>
       </label>
-      <button class="iconbtn" type="button" id="dim" aria-pressed="false" aria-label="Понизить яркость панели">
+      <button class="iconbtn" type="button" id="dim" aria-pressed="false" aria-label="Dim the panel" data-i18n-aria="top.dim">
         <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
           <circle cx="12" cy="12" r="8"/><path d="M12 4v16"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none" opacity=".55"/>
         </svg>
       </button>
-      <span class="avatar" title="Владимир">В</span>
+      <span class="avatar" title="Vladimir" data-i18n-title="top.who">V</span>
     </div>
   </header>
 
   <div class="body">
 
-    <nav class="rail" id="rail" aria-label="Наборы">
+    <nav class="rail" id="rail" aria-label="Sets" data-i18n-aria="rail.title">
       <div class="rail-h">
-        <span class="rail-title">Наборы</span>
+        <span class="rail-title" data-i18n="rail.title">Sets</span>
         <span class="n rail-count" id="rail-count">0</span>
-        <button class="iconbtn rail-toggle" type="button" id="rail-toggle" aria-label="Свернуть список наборов" aria-pressed="false">
+        <button class="iconbtn rail-toggle" type="button" id="rail-toggle" aria-label="Collapse the set list" data-i18n-aria="rail.collapse" aria-pressed="false">
           <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M14 6l-6 6 6 6"/>
           </svg>
         </button>
       </div>
       <div class="sets" id="rail-sets"></div>
-      <div class="rail-empty" id="rail-empty" hidden>наборов нет</div>
+      <div class="rail-empty" id="rail-empty" hidden data-i18n="rail.empty">no sets</div>
       <div class="rail-foot">
-        <button class="rail-add" type="button" id="add-toggle"><span class="plus" aria-hidden="true">+</span><span class="lbl">набор</span></button>
+        <button class="rail-add" type="button" id="add-toggle"><span class="plus" aria-hidden="true">+</span><span class="lbl" data-i18n="rail.add">set</span></button>
         <form class="addform" id="addform" hidden>
-          <label class="f"><span>имя</span><input name="name" autocomplete="off" placeholder="staging"></label>
-          <label class="f"><span>порт</span><input name="port" class="n" inputmode="numeric" placeholder="9100"></label>
+          <label class="f"><span data-i18n="rail.name">name</span><input name="name" autocomplete="off" placeholder="staging"></label>
+          <label class="f"><span data-i18n="rail.port">port</span><input name="port" class="n" inputmode="numeric" placeholder="9100"></label>
           <p class="adderr" id="add-err" hidden></p>
           <div class="addbtns">
-            <button class="btn" type="submit">создать</button>
-            <button class="mini" type="button" id="add-cancel">отмена</button>
+            <button class="btn" type="submit" data-i18n="rail.create">create</button>
+            <button class="mini" type="button" id="add-cancel" data-i18n="common.cancel">cancel</button>
           </div>
         </form>
       </div>
@@ -91,20 +98,20 @@
 
       <div class="errbar" id="errbar" hidden role="status">
         <span class="msg" id="errbar-msg"></span>
-        <button class="mini" type="button" id="errbar-close">скрыть</button>
+        <button class="mini" type="button" id="errbar-close" data-i18n="common.hide">hide</button>
       </div>
 
       <section class="block emptywrap" id="empty-state" hidden>
-        <div class="block-h"><h2>Нет наборов</h2></div>
+        <div class="block-h"><h2 data-i18n="empty.title">No sets</h2></div>
         <div class="empty">
-          <h3>Соберите первый endpoint</h3>
-          <p>Набор получает порт из 9100–9199, ключ и один MCP-адрес на все свои серверы.</p>
+          <h3 data-i18n="empty.h">Build your first endpoint</h3>
+          <p data-i18n="empty.p">A set gets a port from 9100–9199, a key, and one MCP address for all of its servers.</p>
           <ul class="steps">
-            <li><span class="k">1</span><span>Добавьте сервер: stdio-команда или streamable-http URL.</span></li>
-            <li><span class="k">2</span><span>Создайте набор и назначьте ему серверы.</span></li>
-            <li><span class="k">3</span><span>Скопируйте endpoint и ключ в клиент.</span></li>
+            <li><span class="k">1</span><span data-i18n="empty.s1">Add a server: a stdio command or a streamable-http URL.</span></li>
+            <li><span class="k">2</span><span data-i18n="empty.s2">Create a set and assign servers to it.</span></li>
+            <li><span class="k">3</span><span data-i18n="empty.s3">Copy the endpoint and the key into your client.</span></li>
           </ul>
-          <div><button class="btn primary" type="button" id="empty-add">Создать набор</button></div>
+          <div><button class="btn primary" type="button" id="empty-add" data-i18n="empty.add">Create a set</button></div>
         </div>
       </section>
 
@@ -119,33 +126,33 @@
             <div class="iditem">
               <span class="lab">endpoint</span>
               <code id="endpoint">—</code>
-              <button class="mini" type="button" id="copy">копировать</button>
+              <button class="mini" type="button" id="copy" data-i18n="head.copy">copy</button>
             </div>
             <div class="iditem">
-              <span class="lab">ключ</span>
-              <code id="key" title="показывается только префикс">—</code>
+              <span class="lab" data-i18n="head.key">key</span>
+              <code id="key" title="only the prefix is shown" data-i18n-title="head.keyTip">—</code>
             </div>
             <div class="iditem">
               <span class="lab">list_commands</span>
-              <code id="schema" title="сколько контекста стоит перечень инструментов набора">—</code>
+              <code id="schema" title="how much context the set's tool list costs" data-i18n-title="head.schemaTip">—</code>
             </div>
           </div>
         </div>
         <div class="phead-actions">
-          <button class="btn" type="button" id="keys">Ключи</button>
-          <button class="btn primary" type="button" id="run">Запустить</button>
+          <button class="btn" type="button" id="keys" data-i18n="head.keys">Keys</button>
+          <button class="btn primary" type="button" id="run" data-i18n="head.start">Start</button>
         </div>
       </div>
 
       <div class="errstrip" id="set-error" hidden>
-        <div class="eh"><span class="dot err"></span><span id="set-error-h">набор остановлен</span></div>
+        <div class="eh"><span class="dot err"></span><span id="set-error-h" data-i18n="head.stopped">set stopped</span></div>
         <div class="ed" id="set-error-d"></div>
       </div>
 
-      <nav class="tabs" id="tabs" role="tablist" aria-label="Раздел" hidden>
-        <button class="tab" type="button" role="tab" id="tabbtn-overview" aria-controls="tab-overview" aria-selected="true" data-tab="overview">Обзор</button>
-        <button class="tab" type="button" role="tab" id="tabbtn-calls" aria-controls="tab-calls" aria-selected="false" tabindex="-1" data-tab="calls">Вызовы</button>
-        <button class="tab" type="button" role="tab" id="tabbtn-stats" aria-controls="tab-stats" aria-selected="false" tabindex="-1" data-tab="stats">Статистика</button>
+      <nav class="tabs" id="tabs" role="tablist" aria-label="Section" data-i18n-aria="tabs.label" hidden>
+        <button class="tab" type="button" role="tab" id="tabbtn-overview" aria-controls="tab-overview" aria-selected="true" data-tab="overview" data-i18n="tabs.overview">Overview</button>
+        <button class="tab" type="button" role="tab" id="tabbtn-calls" aria-controls="tab-calls" aria-selected="false" tabindex="-1" data-tab="calls" data-i18n="tabs.calls">Calls</button>
+        <button class="tab" type="button" role="tab" id="tabbtn-stats" aria-controls="tab-stats" aria-selected="false" tabindex="-1" data-tab="stats" data-i18n="tabs.stats">Statistics</button>
       </nav>
 
       <div class="region" id="region">
@@ -153,30 +160,30 @@
         <section class="tabpane scroll" id="tab-overview" role="tabpanel" aria-labelledby="tabbtn-overview">
 
           <div class="kpis" id="kpis" hidden>
-            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-calls">—</span><span class="kl">вызовов</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-err">—</span><span class="kl">ошибок</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-calls">—</span><span class="kl" id="k-calls-w" data-i18n="kpi.calls">calls</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-err">—</span><span class="kl" data-i18n="kpi.errors">errors</span></span></div>
             <div class="kpi"><span class="od-stat"><span class="kv n" id="k-p50">—</span><span class="kl">p50</span></span></div>
             <div class="kpi"><span class="od-stat"><span class="kv n" id="k-p95">—</span><span class="kl">p95</span></span></div>
           </div>
 
           <section class="block" id="sets-block" hidden>
             <div class="block-h">
-              <h2>Наборы</h2>
-              <span class="hint">одна точка входа на набор · порты выдаёт менеджер</span>
+              <h2 data-i18n="sets.title">Sets</h2>
+              <span class="hint" data-i18n="sets.hint">one entry point per set · ports come from the manager</span>
               <span class="hint n" id="sets-count">0</span>
             </div>
             <div class="tw">
               <table class="t">
-                <caption class="sr">Наборы, их порты, состояние и серверы</caption>
+                <caption class="sr" data-i18n="sets.caption">Sets with their ports, state and servers</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Набор</th>
-                    <th scope="col" class="hide-sm">Порт</th>
-                    <th scope="col">Состояние</th>
-                    <th scope="col" class="num hide-sm">Серверов</th>
-                    <th scope="col" class="hide-md">Аптайм</th>
-                    <th scope="col" class="num" title="за период, выбранный на вкладке статистики">Вызовов</th>
-                    <th scope="col" class="num" title="за период, выбранный на вкладке статистики">Ошибок</th>
+                    <th scope="col" data-i18n="sets.thSet">Set</th>
+                    <th scope="col" class="hide-sm" data-i18n="sets.thPort">Port</th>
+                    <th scope="col" data-i18n="sets.thState">State</th>
+                    <th scope="col" class="num hide-sm" data-i18n="sets.thServers">Servers</th>
+                    <th scope="col" class="hide-md" data-i18n="sets.thUptime">Uptime</th>
+                    <th scope="col" class="num" title="for the period chosen on the statistics tab" data-i18n="sets.thCalls" data-i18n-title="sets.callsTip">Calls</th>
+                    <th scope="col" class="num" title="for the period chosen on the statistics tab" data-i18n="sets.thErrors" data-i18n-title="sets.callsTip">Errors</th>
                   </tr>
                 </thead>
                 <tbody id="sets-body"></tbody>
@@ -186,26 +193,26 @@
 
           <section class="block" id="tail-block" hidden>
             <div class="block-h">
-              <h2>Последние вызовы</h2>
+              <h2 data-i18n="tail.title">Recent calls</h2>
               <span class="hint" id="tail-span">—</span>
-              <button class="mini push" type="button" id="tail-all">все вызовы</button>
+              <button class="mini push" type="button" id="tail-all" data-i18n="tail.all">all calls</button>
             </div>
             <div class="tw">
               <table class="t mini tail">
-                <caption class="sr">Восемь последних вызовов выбранного набора</caption>
+                <caption class="sr" data-i18n="tail.caption">The last eight calls of the selected set</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Время</th>
-                    <th scope="col" class="hide-xs">Сервер</th>
-                    <th scope="col">Инструмент</th>
-                    <th scope="col" class="num hide-sm">мс</th>
-                    <th scope="col" class="num">Статус</th>
+                    <th scope="col" data-i18n="tail.thTime">Time</th>
+                    <th scope="col" class="hide-xs" data-i18n="tail.thServer">Server</th>
+                    <th scope="col" data-i18n="tail.thTool">Tool</th>
+                    <th scope="col" class="num hide-sm" data-i18n="tail.thMs">ms</th>
+                    <th scope="col" class="num" data-i18n="tail.thStatus">Status</th>
                   </tr>
                 </thead>
                 <tbody id="tail-body"></tbody>
               </table>
             </div>
-            <p class="emptymsg sm" id="tail-empty" hidden>вызовов пока нет — набор ещё не получал запросов</p>
+            <p class="emptymsg sm" id="tail-empty" hidden data-i18n="tail.empty">no calls yet — the set has not received requests</p>
           </section>
         </section>
 
@@ -215,24 +222,24 @@
               <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>
               </svg>
-              <span class="sr">Поиск по вызовам</span>
-              <input type="search" id="q" placeholder="поиск по вызовам" autocomplete="off">
+              <span class="sr" data-i18n="calls.search">Search calls</span>
+              <input type="search" id="q" placeholder="search calls" data-i18n-ph="calls.ph" autocomplete="off">
               <kbd>/</kbd>
             </label>
-            <label class="check"><input type="checkbox" id="only-err"> только ошибки</label>
+            <label class="check"><input type="checkbox" id="only-err"> <span data-i18n="calls.onlyErr">errors only</span></label>
             <span class="hint n push" id="calls-count">0</span>
           </div>
           <div class="tw fill">
             <table class="t stick">
-              <caption class="sr">Последние вызовы выбранного набора</caption>
+              <caption class="sr" data-i18n="calls.caption">Recent calls of the selected set</caption>
               <thead>
                 <tr>
-                  <th scope="col">Время</th>
-                  <th scope="col">Сервер</th>
-                  <th scope="col">Инструмент</th>
-                  <th scope="col" class="hide-md">Клиент</th>
-                  <th scope="col" class="num">мс</th>
-                  <th scope="col" class="num">Статус</th>
+                  <th scope="col" data-i18n="tail.thTime">Time</th>
+                  <th scope="col" data-i18n="tail.thServer">Server</th>
+                  <th scope="col" data-i18n="tail.thTool">Tool</th>
+                  <th scope="col" class="hide-md" data-i18n="calls.thClient">Client</th>
+                  <th scope="col" class="num" data-i18n="tail.thMs">ms</th>
+                  <th scope="col" class="num" data-i18n="tail.thStatus">Status</th>
                 </tr>
               </thead>
               <tbody id="calls-body"></tbody>
@@ -244,88 +251,88 @@
         <section class="tabpane scroll" id="tab-stats" role="tabpanel" aria-labelledby="tabbtn-stats" hidden>
 
           <div class="toolbar">
-            <div class="periods" id="s-period" role="group" aria-label="Период">
-              <button class="segbtn" type="button" data-period="today" aria-pressed="true">Сегодня</button>
-              <button class="segbtn" type="button" data-period="7d" aria-pressed="false" tabindex="-1">7 дней</button>
-              <button class="segbtn" type="button" data-period="30d" aria-pressed="false" tabindex="-1">30 дней</button>
-              <button class="segbtn" type="button" data-period="archive" aria-pressed="false" tabindex="-1">Архив</button>
+            <div class="periods" id="s-period" role="group" aria-label="Period" data-i18n-aria="stats.period">
+              <button class="segbtn" type="button" data-period="today" aria-pressed="true" data-i18n="stats.today">Today</button>
+              <button class="segbtn" type="button" data-period="7d" aria-pressed="false" tabindex="-1" data-i18n="stats.7d">7 days</button>
+              <button class="segbtn" type="button" data-period="30d" aria-pressed="false" tabindex="-1" data-i18n="stats.30d">30 days</button>
+              <button class="segbtn" type="button" data-period="archive" aria-pressed="false" tabindex="-1" data-i18n="stats.archive">Archive</button>
             </div>
             <label class="field">
-              <span>набор</span>
-              <select id="s-set"><option value="">все наборы</option></select>
+              <span data-i18n="stats.set">set</span>
+              <select id="s-set"><option value="" data-i18n="stats.allSets">all sets</option></select>
             </label>
             <label class="field">
-              <span>сервер</span>
-              <select id="s-server"><option value="">все</option></select>
+              <span data-i18n="stats.server">server</span>
+              <select id="s-server"><option value="" data-i18n="stats.all">all</option></select>
             </label>
             <label class="field">
-              <span>инструмент</span>
-              <select id="s-tool"><option value="">все</option></select>
+              <span data-i18n="stats.tool">tool</span>
+              <select id="s-tool"><option value="" data-i18n="stats.all">all</option></select>
             </label>
             <label class="field">
-              <span>клиент</span>
-              <select id="s-client"><option value="">все</option></select>
+              <span data-i18n="stats.client">client</span>
+              <select id="s-client"><option value="" data-i18n="stats.all">all</option></select>
             </label>
-            <button class="mini push" type="button" id="s-reset">сбросить</button>
+            <button class="mini push" type="button" id="s-reset" data-i18n="stats.reset">reset</button>
           </div>
 
           <div class="kpis" id="s-kpis">
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-calls">—</span></span><span class="kl">вызовов</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-fail">—</span></span><span class="kl">ошибок</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p50">—</span><span class="approx" id="s-p50-a" hidden title="по гистограмме">≈</span></span><span class="kl">p50</span></span></div>
-            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p95">—</span><span class="approx" id="s-p95-a" hidden title="по гистограмме">≈</span></span><span class="kl">p95</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-calls">—</span></span><span class="kl" id="s-calls-w" data-i18n="kpi.calls">calls</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-fail">—</span></span><span class="kl" data-i18n="kpi.errors">errors</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p50">—</span><span class="approx" id="s-p50-a" hidden title="from the histogram" data-i18n-title="stats.approxTip">≈</span></span><span class="kl">p50</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p95">—</span><span class="approx" id="s-p95-a" hidden title="from the histogram" data-i18n-title="stats.approxTip">≈</span></span><span class="kl">p95</span></span></div>
           </div>
 
           <div class="sgrid" id="s-charts">
             <section class="card" id="s-activity">
               <div class="card-h">
-                <h2 id="s-activity-title">Вызовы по часам</h2>
+                <h2 id="s-activity-title" data-i18n="stats.byHour">Calls by hour</h2>
                 <span class="hint" id="s-span">—</span>
               </div>
-              <div class="bars" id="activity-bars" role="img" aria-label="Вызовы по корзинам периода"></div>
+              <div class="bars" id="activity-bars" role="img" aria-label="Calls per bucket of the period" data-i18n-aria="stats.bars"></div>
               <div class="bars-x"><span id="s-from">—</span><span id="s-to">—</span></div>
-              <p class="emptymsg sm" id="activity-empty" hidden>в этом периоде вызовов нет</p>
+              <p class="emptymsg sm" id="activity-empty" hidden data-i18n="stats.noCalls">no calls in this period</p>
             </section>
 
             <section class="card" id="s-tools">
-              <div class="card-h"><h2>Топ инструментов</h2><span class="hint n" id="s-tools-count">0</span></div>
+              <div class="card-h"><h2 data-i18n="stats.topTools">Top tools</h2><span class="hint n" id="s-tools-count">0</span></div>
               <div class="tw">
                 <table class="t mini">
-                  <thead><tr><th scope="col">Инструмент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
+                  <thead><tr><th scope="col" data-i18n="tail.thTool">Tool</th><th scope="col" class="num" data-i18n="sets.thCalls">Calls</th><th scope="col" class="num" data-i18n="sets.thErrors">Errors</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
                   <tbody id="tools-body"></tbody>
                 </table>
               </div>
-              <p class="emptymsg sm" id="tools-empty" hidden>данных нет</p>
+              <p class="emptymsg sm" id="tools-empty" hidden data-i18n="stats.noData">no data</p>
             </section>
           </div>
 
           <div class="sgrid two" id="s-breakdowns">
             <section class="card" id="s-byserver">
-              <div class="card-h"><h2>По серверам</h2></div>
+              <div class="card-h"><h2 data-i18n="stats.byServer">By server</h2></div>
               <div class="tw">
                 <table class="t mini">
-                  <thead><tr><th scope="col">Сервер</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
+                  <thead><tr><th scope="col" data-i18n="tail.thServer">Server</th><th scope="col" class="num" data-i18n="sets.thCalls">Calls</th><th scope="col" class="num" data-i18n="sets.thErrors">Errors</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
                   <tbody id="byserver-body"></tbody>
                 </table>
               </div>
-              <p class="emptymsg sm" id="byserver-empty" hidden>данных нет</p>
+              <p class="emptymsg sm" id="byserver-empty" hidden data-i18n="stats.noData">no data</p>
             </section>
 
             <section class="card" id="s-byclient">
-              <div class="card-h"><h2>По клиентам</h2></div>
+              <div class="card-h"><h2 data-i18n="stats.byClient">By client</h2></div>
               <div class="tw">
                 <table class="t mini">
-                  <thead><tr><th scope="col">Клиент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
+                  <thead><tr><th scope="col" data-i18n="calls.thClient">Client</th><th scope="col" class="num" data-i18n="sets.thCalls">Calls</th><th scope="col" class="num" data-i18n="sets.thErrors">Errors</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
                   <tbody id="byclient-body"></tbody>
                 </table>
               </div>
-              <p class="emptymsg sm" id="byclient-empty" hidden>данных нет</p>
+              <p class="emptymsg sm" id="byclient-empty" hidden data-i18n="stats.noData">no data</p>
             </section>
           </div>
 
           <p class="emptymsg" id="stats-empty" hidden>
-            <span class="strong">Статистике нечего показать</span>
-            <span id="stats-empty-why">за период вызовов нет</span>
+            <span class="strong" data-i18n="stats.emptyStrong">Nothing to show</span>
+            <span id="stats-empty-why" data-i18n="stats.noCalls">no calls in this period</span>
           </p>
           <p class="stats-note" id="stats-unreach" hidden></p>
         </section>
@@ -333,14 +340,14 @@
       </div>
     </main>
 
-    <aside class="side" id="side" aria-label="Детали набора">
+    <aside class="side" id="side" aria-label="Set details" data-i18n-aria="side.label">
       <div class="side-h">
-        <div class="seg" role="tablist" aria-label="Детали набора">
-          <button class="segbtn" type="button" role="tab" data-side="servers" id="sidebtn-servers" aria-controls="pane-servers" aria-selected="true">Серверы <span class="cnt n" id="srv-count">0</span></button>
-          <button class="segbtn" type="button" role="tab" data-side="env" id="sidebtn-env" aria-controls="pane-env" aria-selected="false" tabindex="-1">Переменные <span class="cnt n" id="env-count">0</span></button>
-          <button class="segbtn" type="button" role="tab" data-side="log" id="sidebtn-log" aria-controls="pane-log" aria-selected="false" tabindex="-1">Лог <span class="cnt n" id="log-count">0</span></button>
+        <div class="seg" role="tablist" aria-label="Set details" data-i18n-aria="side.label">
+          <button class="segbtn" type="button" role="tab" data-side="servers" id="sidebtn-servers" aria-controls="pane-servers" aria-selected="true"><span data-i18n="side.servers">Servers</span> <span class="cnt n" id="srv-count">0</span></button>
+          <button class="segbtn" type="button" role="tab" data-side="env" id="sidebtn-env" aria-controls="pane-env" aria-selected="false" tabindex="-1"><span data-i18n="side.env">Variables</span> <span class="cnt n" id="env-count">0</span></button>
+          <button class="segbtn" type="button" role="tab" data-side="log" id="sidebtn-log" aria-controls="pane-log" aria-selected="false" tabindex="-1"><span data-i18n="side.log">Log</span> <span class="cnt n" id="log-count">0</span></button>
         </div>
-        <button class="iconbtn side-close" type="button" id="side-close" aria-label="Закрыть панель">
+        <button class="iconbtn side-close" type="button" id="side-close" aria-label="Close the panel" data-i18n-aria="side.close">
           <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
             <path d="M7 7l10 10M17 7L7 17"/>
           </svg>
@@ -349,50 +356,50 @@
       <div class="side-body">
         <section class="pane" data-pane="servers" id="pane-servers" role="tabpanel" aria-labelledby="sidebtn-servers">
           <div class="srv-tools">
-            <span class="hint">общий реестр хоста</span>
-            <button class="mini push" type="button" id="srv-add">добавить сервер</button>
+            <span class="hint" data-i18n="side.registry">host-wide registry</span>
+            <button class="mini push" type="button" id="srv-add" data-i18n="side.addServer">add server</button>
           </div>
           <ul class="list" id="servers"></ul>
-          <p class="srv-note pad" id="servers-empty" hidden>реестр пуст</p>
+          <p class="srv-note pad" id="servers-empty" hidden data-i18n="side.registryEmpty">registry is empty</p>
 
           <form class="srvform" id="srvform" role="dialog" aria-modal="true" aria-labelledby="srvform-h" hidden novalidate>
             <div class="pane-h">
-              <span class="hint" id="srvform-h">сервер</span>
-              <button class="mini push" type="button" id="srvform-close">отмена</button>
+              <span class="hint" id="srvform-h" data-i18n="side.server">server</span>
+              <button class="mini push" type="button" id="srvform-close" data-i18n="common.cancel">cancel</button>
             </div>
             <div class="sf-body">
-              <label class="sf"><span>имя</span><input name="name" autocomplete="off" spellcheck="false" placeholder="figma"></label>
-              <label class="sf"><span>описание</span><input name="description" autocomplete="off"></label>
-              <label class="sf"><span>транспорт</span>
+              <label class="sf"><span data-i18n="rail.name">name</span><input name="name" autocomplete="off" spellcheck="false" placeholder="figma"></label>
+              <label class="sf"><span data-i18n="form.description">description</span><input name="description" autocomplete="off"></label>
+              <label class="sf"><span data-i18n="form.transport">transport</span>
                 <select name="transport">
-                  <option value="stdio">stdio — локальный процесс</option>
-                  <option value="http">http — удалённый endpoint</option>
+                  <option value="stdio" data-i18n="form.stdio">stdio — local process</option>
+                  <option value="http" data-i18n="form.http">http — remote endpoint</option>
                 </select>
               </label>
 
-              <label class="sf" data-when="stdio"><span>команда · по строке на аргумент</span><textarea name="command" rows="3" spellcheck="false" placeholder="npx&#10;-y&#10;@playwright/mcp@latest"></textarea></label>
-              <label class="sf" data-when="stdio"><span>рабочий каталог</span><input name="cwd" autocomplete="off" spellcheck="false" placeholder="/home/user/project"></label>
+              <label class="sf" data-when="stdio"><span data-i18n="form.command">command · one argument per line</span><textarea name="command" rows="3" spellcheck="false" placeholder="npx&#10;-y&#10;@playwright/mcp@latest"></textarea></label>
+              <label class="sf" data-when="stdio"><span data-i18n="form.cwd">working directory</span><input name="cwd" autocomplete="off" spellcheck="false" placeholder="/home/user/project"></label>
               <label class="sf" data-when="http"><span>url</span><input name="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:9200/mcp"></label>
-              <label class="sf" data-when="http"><span>заголовки · K: V</span><textarea name="headers" rows="2" spellcheck="false" placeholder="Authorization: Bearer ${GITEA_TOKEN}"></textarea></label>
+              <label class="sf" data-when="http"><span data-i18n="form.headers">headers · K: V</span><textarea name="headers" rows="2" spellcheck="false" placeholder="Authorization: Bearer ${GITEA_TOKEN}"></textarea></label>
 
-              <label class="sf"><span>env · KEY=значение</span><textarea name="env" rows="2" spellcheck="false" placeholder="TOKEN=${GITEA_TOKEN}"></textarea></label>
-              <label class="sf"><span>envAllow · по строке</span><textarea name="envAllow" rows="2" spellcheck="false" placeholder="PATH"></textarea></label>
-              <label class="sf"><span>теги · через запятую</span><input name="tags" autocomplete="off" placeholder="untrusted, fs"></label>
-              <label class="check"><input type="checkbox" name="enabled"> включён</label>
+              <label class="sf"><span data-i18n="form.env">env · KEY=value</span><textarea name="env" rows="2" spellcheck="false" placeholder="TOKEN=${GITEA_TOKEN}"></textarea></label>
+              <label class="sf"><span data-i18n="form.envAllow">envAllow · one per line</span><textarea name="envAllow" rows="2" spellcheck="false" placeholder="PATH"></textarea></label>
+              <label class="sf"><span data-i18n="form.tags">tags · comma separated</span><input name="tags" autocomplete="off" placeholder="untrusted, fs"></label>
+              <label class="check"><input type="checkbox" name="enabled"> <span data-i18n="form.enabled">enabled</span></label>
 
               <fieldset class="sf-group" data-when="stdio">
-                <legend>песочница</legend>
-                <p class="sf-hint">mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · пусто — умолчание</p>
+                <legend data-i18n="form.sandbox">sandbox</legend>
+                <p class="sf-hint" data-i18n="form.sandboxHint">mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · empty means the default</p>
                 <label class="sf"><span>mode</span>
                   <select name="sbMode">
-                    <option value="">не задан</option>
+                    <option value="" data-i18n="form.unset">not set</option>
                     <option value="bwrap">bwrap</option>
                     <option value="none">none</option>
                   </select>
                 </label>
                 <label class="sf"><span>onUnavailable</span>
                   <select name="sbOnUnavailable">
-                    <option value="">не задан</option>
+                    <option value="" data-i18n="form.unset">not set</option>
                     <option value="deny">deny</option>
                     <option value="warn">warn</option>
                     <option value="allow">allow</option>
@@ -400,13 +407,13 @@
                 </label>
                 <label class="sf"><span>network</span>
                   <select name="sbNetwork">
-                    <option value="">не задан</option>
+                    <option value="" data-i18n="form.unset">not set</option>
                     <option value="none">none</option>
                     <option value="allow">allow</option>
                   </select>
                 </label>
-                <label class="sf"><span>ro · по строке</span><textarea name="sbRo" rows="2" spellcheck="false" placeholder="/usr"></textarea></label>
-                <label class="sf"><span>rw · по строке</span><textarea name="sbRw" rows="2" spellcheck="false" placeholder="/home/user/project"></textarea></label>
+                <label class="sf"><span data-i18n="form.ro">ro · one per line</span><textarea name="sbRo" rows="2" spellcheck="false" placeholder="/usr"></textarea></label>
+                <label class="sf"><span data-i18n="form.rw">rw · one per line</span><textarea name="sbRw" rows="2" spellcheck="false" placeholder="/home/user/project"></textarea></label>
                 <div class="sf-nums">
                   <label class="sf"><span>memoryMb</span><input name="sbMemoryMb" type="number" min="0" inputmode="numeric" placeholder="2048"></label>
                   <label class="sf"><span>pids</span><input name="sbPids" type="number" min="0" inputmode="numeric" placeholder="256"></label>
@@ -418,24 +425,24 @@
               <p class="sf-err" id="srv-err" role="alert" hidden></p>
             </div>
             <div class="sf-foot">
-              <button class="btn primary" type="submit" id="srv-save">сохранить</button>
-              <button class="mini push danger" type="button" id="srv-del">удалить сервер</button>
+              <button class="btn primary" type="submit" id="srv-save" data-i18n="common.save">save</button>
+              <button class="mini push danger" type="button" id="srv-del" data-i18n="form.delete">delete server</button>
             </div>
           </form>
         </section>
         <section class="pane" data-pane="env" id="pane-env" role="tabpanel" aria-labelledby="sidebtn-env" hidden>
           <ul class="list" id="env"></ul>
-          <p class="srv-note pad" id="env-empty" hidden>переменных нет</p>
-          <p class="srv-note pad">значения подставляет процесс набора — панель их не хранит и не показывает</p>
+          <p class="srv-note pad" id="env-empty" hidden data-i18n="env.empty">no variables</p>
+          <p class="srv-note pad" data-i18n="env.note">values are supplied by the set process — the panel neither stores nor shows them</p>
         </section>
         <section class="pane logpane" data-pane="log" id="pane-log" role="tabpanel" aria-labelledby="sidebtn-log" hidden>
           <div class="pane-h">
-            <span class="hint">хвост лога набора</span>
-            <button class="mini push" type="button" id="log-wide" aria-pressed="false" title="развернуть панель лога">шире</button>
-            <button class="mini" type="button" id="log-refresh">обновить</button>
+            <span class="hint" data-i18n="log.tail">log tail of the set</span>
+            <button class="mini push" type="button" id="log-wide" aria-pressed="false" title="expand the log panel" data-i18n-title="log.wideTip" data-i18n="log.wide">wider</button>
+            <button class="mini" type="button" id="log-refresh" data-i18n="log.refresh">refresh</button>
           </div>
           <div class="log" id="log" aria-live="polite" tabindex="0"></div>
-          <p class="srv-note pad" id="log-empty" hidden>лог пуст</p>
+          <p class="srv-note pad" id="log-empty" hidden data-i18n="log.empty">log is empty</p>
         </section>
       </div>
     </aside>
@@ -443,34 +450,34 @@
   </div>
 
   <footer class="status">
-    <span class="item">наборов <b class="n" id="f-sets">—</b></span>
+    <span class="item"><span id="f-sets-w">sets</span> <b class="n" id="f-sets">—</b></span>
     <span class="dotsep" aria-hidden="true">·</span>
-    <span class="item">серверов <b class="n" id="f-servers">—</b></span>
+    <span class="item"><span id="f-servers-w">servers</span> <b class="n" id="f-servers">—</b></span>
     <span class="dotsep opt" aria-hidden="true">·</span>
-    <span class="item opt">работают <b class="n" id="f-running">—</b></span>
+    <span class="item opt"><span id="f-running-w">running</span> <b class="n" id="f-running">—</b></span>
     <span class="push item"><span class="muted" id="f-updated">—</span></span>
   </footer>
 </div>
 
 <dialog id="keys-dlg" aria-labelledby="keys-title">
   <div class="dlg-h">
-    <h3 id="keys-title">Ключи набора <span class="n" id="dlg-set">—</span></h3>
-    <button class="mini" type="button" id="keys-close">закрыть</button>
+    <h3 id="keys-title"><span data-i18n="keys.title">Set keys</span> <span class="n" id="dlg-set">—</span></h3>
+    <button class="mini" type="button" id="keys-close" data-i18n="common.close">close</button>
   </div>
   <div class="dlg-body">
     <div class="tw">
       <table class="t">
         <thead>
-          <tr><th scope="col">Ключ</th><th scope="col">Создан</th><th scope="col">Состояние</th><th scope="col" class="hide-sm">Примечание</th><th scope="col"><span class="sr">Действие</span></th></tr>
+          <tr><th scope="col" data-i18n="keys.thKey">Key</th><th scope="col" data-i18n="keys.thCreated">Created</th><th scope="col" data-i18n="sets.thState">State</th><th scope="col" class="hide-sm" data-i18n="keys.thNote">Note</th><th scope="col"><span class="sr" data-i18n="keys.thAction">Action</span></th></tr>
         </thead>
         <tbody id="keys-body"></tbody>
       </table>
     </div>
-    <p class="dlg-note">Токен знает только тот, кто его выпустил: панель показывает лишь первые 8 символов. Отзыв ключа действует без перезапуска набора.</p>
+    <p class="dlg-note" data-i18n="keys.note">Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.</p>
   </div>
   <div class="dlg-f">
-    <button class="btn" type="button" id="keys-issue">выпустить ключ</button>
-    <button class="btn" type="button" id="keys-done">готово</button>
+    <button class="btn" type="button" id="keys-issue" data-i18n="keys.issue">issue a key</button>
+    <button class="btn" type="button" id="keys-done" data-i18n="common.done">done</button>
   </div>
 </dialog>
 </body>

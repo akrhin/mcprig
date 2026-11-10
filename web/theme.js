@@ -9,4 +9,9 @@
   try { saved = localStorage.getItem(KEY); } catch (e) { /* приватный режим */ }
   var theme = saved || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'mcprig');
   document.documentElement.setAttribute('data-theme', theme);
+
+  // язык нужен в <html lang> до app.js: разметка по умолчанию английская
+  var lang = null;
+  try { lang = localStorage.getItem('mcprig.lang'); } catch (e) { /* приватный режим */ }
+  document.documentElement.setAttribute('lang', lang === 'ru' ? 'ru' : 'en');
 }());
