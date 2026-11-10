@@ -64,7 +64,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
 | `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500; for one set it also carries `schema` |
-| `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day` | call history from disk: totals, series, per-tool, per-server and per-client breakdown |
+| `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | export the registry or one set |
@@ -128,9 +128,9 @@ period=30d      last 30 calendar days  from the histogram, approximate=true
 period=archive  older than 30 days     from month files, approximate=true
 ```
 
-`bucket=hour|day` picks the series step where the source is fine enough: today
+`bucket=hour|day|month` picks the series step (default follows the period): today
 and 7d answer hourly (or daily with `bucket=day`), 30d answers daily, archive
-monthly. `server`, `tool` and `client` filter every part of the answer. `set=all`
+monthly. An unknown `bucket` is `400`. `server`, `tool` and `client` filter every part of the answer. `set=all`
 (or no `set`) sums all sets. The answer is `period`, `from`, `to`, `approximate`,
 `totals` and `series` (`{t, calls, failures, p50ms, p95ms}`), plus `tools`,
 `servers` and `clients` breakdowns of the same shape. A set whose stats

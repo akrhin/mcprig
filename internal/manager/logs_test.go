@@ -87,7 +87,7 @@ func TestLogMigrationKeepsExistingFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	migrateLog(dir, "main")
+	migrateLog(nil, dir, "main")
 
 	if b, err := os.ReadFile(next); err != nil || string(b) != "новый\n" {
 		t.Fatalf("mcprig.log затёрт: %q, %v", b, err)

@@ -55,9 +55,14 @@ func (m *Manager) apiStats(req *request) error {
 		}
 	}
 
+	bucket := q.Get("bucket")
+	if bucket != "" && bucket != "hour" && bucket != "day" && bucket != "month" {
+		return badRequest("bucket: hour, day или month")
+	}
+
 	res := stats.QueryHistory(dirs, stats.Query{
 		Period: period,
-		Bucket: q.Get("bucket"),
+		Bucket: bucket,
 		Server: q.Get("server"),
 		Tool:   q.Get("tool"),
 		Client: q.Get("client"),

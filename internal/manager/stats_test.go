@@ -127,3 +127,9 @@ func TestAPIStatsFiltersAndAll(t *testing.T) {
 		t.Fatalf("unreachable при set=all = %v, ожидался %q", got.Unreachable, silent)
 	}
 }
+
+// Шаг ряда ограничен hour|day|month: опечатка не должна молча давать дефолт.
+func TestAPIStatsBucketValidation(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	status(t, e.do(t, http.MethodGet, "/api/stats?period=today&bucket=year", nil), http.StatusBadRequest)
+}

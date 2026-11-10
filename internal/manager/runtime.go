@@ -177,7 +177,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	}
 
 	logPath := LogPath(rt.dataDir, set.ID)
-	migrateLog(rt.dataDir, set.ID)
+	migrateLog(rt.log, rt.dataDir, set.ID)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return RuntimeStatus{}, fmt.Errorf("лог набора %s: %w", set.ID, err)
@@ -307,17 +307,25 @@ func (rt *Runtime) Stop(set *registry.Set) RuntimeStatus {
 	l := rt.setLock(set.ID)
 	l.Lock()
 	defer l.Unlock()
-	rt.mu.Lock()
-	p := rt.procs[set.ID]
-	rt.mu.Unlock()
-	if p != nil {
-		rt.kill(p, stopGrace)
-		rt.mu.Lock()
-		delete(rt.procs, set.ID)
-		rt.mu.Unlock()
-		rt.log.Info("набор " + set.ID + ": остановлен")
+	if p := rt.proc(set.ID); p != nil {
+		rt.stopProc(set.ID, p)
 	}
 	return rt.status(set)
+}
+
+// stopProc гасит процесс набора и пишет одну строку «остановлен» — общий путь
+// Stop и Restart. Уже упавший процесс строки не даёт: остановки не было.
+func (rt *Runtime) stopProc(id string, p *process) {
+	rt.mu.Lock()
+	live := !p.exited && !p.stopping
+	rt.mu.Unlock()
+	rt.kill(p, stopGrace)
+	rt.mu.Lock()
+	delete(rt.procs, id)
+	rt.mu.Unlock()
+	if live {
+		rt.log.Info("набор " + id + ": остановлен")
+	}
 }
 
 // Restart — stop + start под той же блокировкой набора.
@@ -326,10 +334,7 @@ func (rt *Runtime) Restart(ctx context.Context, set *registry.Set, servers []reg
 	l.Lock()
 	defer l.Unlock()
 	if p := rt.proc(set.ID); p != nil {
-		rt.kill(p, stopGrace)
-		rt.mu.Lock()
-		delete(rt.procs, set.ID)
-		rt.mu.Unlock()
+		rt.stopProc(set.ID, p)
 	}
 	return rt.startLocked(ctx, set, servers)
 }

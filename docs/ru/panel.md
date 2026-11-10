@@ -63,7 +63,7 @@ Gruvbox, Solarized и Tokyo Night. Выбор — в шапке, хранитс�
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | изменение и удаление; работающие наборы перезапускаются |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, бюджет 60 с, текст ошибки в теле |
 | `GET /api/calls?set=<id>&limit=<N>` | объединённый хвост вызовов работающих наборов; по умолчанию 50, максимум 500; для одного набора — ещё и `schema` |
-| `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day` | история вызовов с диска: итоги, ряд, разрезы по инструментам, серверам и клиентам |
+| `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | история вызовов с диска: итоги, ряд, разрезы по инструментам, серверам и клиентам |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | переменные: только имена, флаг заданности и источник — никогда значения |
 | `POST /api/import` | импорт объекта `mcpServers`; возвращает `added` и `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | экспорт реестра или одного набора |
@@ -124,9 +124,9 @@ period=30d      последние 30 суток      по гистограмм�
 period=archive  старше 30 суток         по месячным файлам, approximate=true
 ```
 
-`bucket=hour|day` задаёт шаг ряда там, где источник достаточно мелок: today и 7d
+`bucket=hour|day|month` задаёт шаг ряда (по умолчанию — по периоду): today и 7d
 отвечают по часам (или по суткам с `bucket=day`), 30d — по суткам, архив — по
-месяцам. `server`, `tool` и `client` фильтруют все части ответа. `set=all` (или
+месяцам. Неизвестный `bucket` — `400`. `server`, `tool` и `client` фильтруют все части ответа. `set=all` (или
 без `set`) складывает все наборы. Ответ: `period`, `from`, `to`, `approximate`,
 `totals` и `series` (`{t, calls, failures, p50ms, p95ms}`), плюс разрезы
 `tools`, `servers`, `clients` той же формы. Набор без каталога истории попадает
