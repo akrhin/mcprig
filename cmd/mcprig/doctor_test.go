@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // doctorFreePort берёт свободный порт из диапазона наборов: слушатель

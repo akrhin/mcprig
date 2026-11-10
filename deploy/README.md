@@ -60,7 +60,8 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 ```
 
 Юнит берёт порт панели из `MCPRIG_PANEL_URL` (в шаблоне —
-`http://127.0.0.1:9088`, переопределяется в `~/.config/mcprig/panel.env`), пароль
+`http://127.0.0.1:9091`, дефолт панели; при нестандартном `MCPRIG_PORT`
+переопредели её в `~/.config/mcprig/panel.env`), пароль
 панели — из `~/.config/mcprig/env`, токен набора — из
 `~/.config/mcprig/<набор>.token`; набор с `open: true` прогревается без токена.
 Вручную то же самое: `mcprig warm --set main` (или `--all --panel <адрес>`).
@@ -71,7 +72,7 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 `slim`, `ops` — stdio-сервер через `npx`, ему нужен образ с node.
 
 ```bash
-# образы уже в реестре Gitea: latest (slim), latest-full и теги релиза 0.3.7-slim/0.3.7-full
+# образы уже в реестре Gitea: latest (slim), latest-full и теги релиза 0.3.8-slim/0.3.8-full
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest
 docker compose up -d
 

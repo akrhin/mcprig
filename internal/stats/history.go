@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sintez/mcprig/internal/atomicfile"
+	"github.com/akrhin/mcprig/internal/atomicfile"
 )
 
 const (

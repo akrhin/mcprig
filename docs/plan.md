@@ -73,7 +73,8 @@ health, вызовы). Экран показывает то, чего сейча
 1. «Вызов» — собственный счётчик в `invoke_command` (`internal/stats`), не
    разбор лога: лог набора не содержит клиента и не переживает рестарт.
 2. Репозиторий — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`, операции через `gt`.
-   Путь модуля (`github.com/sintez/mcprig` не резолвится) — ещё открыт.
+   Путь модуля — `github.com/akrhin/mcprig` (снято 2026-11-11: резолвится,
+   `proxy.golang.org/.../@latest` → `v0.3.8`).
 3. Формат конфига — только JSON (`servers.json`): это общий формат с lazy-mcp и
    родной формат секции `mcpServers` у клиентов, менять его ради TOML значило бы
    ломать копипаст из чужих README и тянуть парсер в бинарник без зависимостей.
@@ -195,5 +196,5 @@ check` (`b2ce4cb`) — шаг в джобе `release` перед `release --clea
 образы Docker публикуются в реестр Gitea — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`
 (`latest` = slim 32 МБ, `latest-full` = с node и python, 334 МБ, плюс теги
 `0.3.7-slim`/`0.3.7-full`);
-путь модуля остаётся `github.com/sintez/mcprig`, публичный репозиторий на GitHub —
+путь модуля остаётся `github.com/akrhin/mcprig`, публичный репозиторий на GitHub —
 зеркало `akrhin/mcprig` (п. 6 выше).

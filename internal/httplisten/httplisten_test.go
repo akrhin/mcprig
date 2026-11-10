@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/stats"
 )
 
 const testToken = "s3cret-token"

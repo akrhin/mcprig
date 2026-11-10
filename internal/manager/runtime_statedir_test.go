@@ -13,8 +13,8 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/sintez/mcprig/internal/oauth"
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/oauth"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // Каждый набор получает свой каталог состояния: общий oauth.json затирался

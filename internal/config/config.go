@@ -495,6 +495,42 @@ var (
 	fileRefPattern = regexp.MustCompile(`\{file:([^}]+)\}`)
 )
 
+// ReservedEnvPrefixes — переменные менеджера и хранилища секретов. Их имена
+// не уходят вниз ни через env/envAllow, ни через ${VAR} набора: иначе сервер
+// получает пароль панели или токен OpenBao.
+var ReservedEnvPrefixes = []string{"MCPRIG_", "BAO_", "OPENBAO_"}
+
+// ReservedEnvName — имя принадлежит менеджеру, а не нижестоящему серверу.
+func ReservedEnvName(name string) bool {
+	for _, prefix := range ReservedEnvPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// reservedEnvName — резервное имя в envAllow/env вместе с текстом ошибки;
+// пустая строка — нарушений нет.
+func reservedEnvName(s *Server) string {
+	for _, name := range s.EnvAllow {
+		if ReservedEnvName(name) {
+			return fmt.Sprintf("envAllow «%s»: резервный префикс, передача вниз запрещена", name)
+		}
+	}
+	names := make([]string, 0, len(s.Env))
+	for name := range s.Env {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if ReservedEnvName(name) {
+			return fmt.Sprintf("env «%s»: резервный префикс, передача вниз запрещена", name)
+		}
+	}
+	return ""
+}
+
 // expandSecrets resolves the two reference forms the TS manager supports:
 // `{file:/abs/path}` reads a secret file (one trailing newline stripped),
 // `${VAR}` takes the variable from the process environment. A relative secret
@@ -535,11 +571,28 @@ func expandSecrets(value string) (string, error) {
 	return out, firstErr
 }
 
+// reservedRef — резервное имя ${VAR} в тексте: раскрывать его нельзя, значение
+// ушло бы в env или заголовок нижестоящего сервера.
+func reservedRef(text string) (string, bool) {
+	for _, m := range varRefPattern.FindAllStringSubmatch(text, -1) {
+		if ReservedEnvName(m[1]) {
+			return m[1], true
+		}
+	}
+	return "", false
+}
+
 // expandSecrets resolves references in env and headers; a failure is a
 // soft ConfigError of this server, like every other validation defect.
 func (s *Server) expandSecrets() {
 	expandMap := func(field string, m map[string]string) {
 		for key, value := range m {
+			if name, ok := reservedRef(value); ok {
+				if s.ConfigError == "" {
+					s.ConfigError = fmt.Sprintf("%s.%s: переменная ${%s} — резервный префикс, передача вниз запрещена", field, key, name)
+				}
+				continue
+			}
 			out, err := expandSecrets(value)
 			if err != nil {
 				if s.ConfigError == "" {
@@ -567,6 +620,10 @@ func (s *Server) validate() bool {
 func (s *Server) validateSandbox(sandbox *Sandbox) bool {
 	if s.Name == "" {
 		s.ConfigError = "нет имени"
+		return false
+	}
+	if name := reservedEnvName(s); name != "" {
+		s.ConfigError = name
 		return false
 	}
 	switch s.Transport {

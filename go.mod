@@ -1,4 +1,4 @@
-module github.com/sintez/mcprig
+module github.com/akrhin/mcprig
 
 go 1.27.3
 

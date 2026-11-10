@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sintez/mcprig/internal/atomicfile"
-	"github.com/sintez/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/atomicfile"
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // Store is the manager registry. Every exported method takes the lock, so the

@@ -13,9 +13,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/downstream"
-	"github.com/sintez/mcprig/internal/sandbox"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/sandbox"
 )
 
 // probeResult — что удалось внутри песочницы. Песочница считается рабочей,
@@ -35,7 +35,7 @@ const canaryVar = "MCPRIG_SANDBOX_CANARY"
 // TestSandboxChildServer — тот же бинарь, запущенный под bwrap: настоящий
 // stdio MCP-сервер, который пробует выйти из песочницы.
 func TestSandboxChildServer(t *testing.T) {
-	if os.Getenv("MCPRIG_SANDBOX_CHILD") != "1" {
+	if os.Getenv("SANDBOX_CHILD_TEST") != "1" {
 		t.Skip("служебный процесс: запускается из TestSandboxIsolatesStdioServer")
 	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "probe", Version: "test"}, nil)
@@ -94,7 +94,7 @@ func TestSandboxIsolatesStdioServer(t *testing.T) {
 		Name:      "probe",
 		Transport: config.TransportStdio,
 		Command:   []string{exe, "-test.run=TestSandboxChildServer"},
-		Env:       map[string]string{"MCPRIG_SANDBOX_CHILD": "1"},
+		Env:       map[string]string{"SANDBOX_CHILD_TEST": "1"},
 		Sandbox: &config.Sandbox{
 			Mode:          config.SandboxModeBwrap,
 			OnUnavailable: config.OnUnavailableDeny,

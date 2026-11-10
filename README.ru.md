@@ -55,9 +55,9 @@ lazy-mcp — проект, из которого вырос mcprig; конфиг
 Цифры ниже замерены на одном хосте против **того же** набора из одиннадцати
 серверов (`serena`, `socraticode`, `xerj`, `open-design`, `context7`,
 `tavily-mcp`, `playwright`, `raven`, `designer-skill`, `gitea`,
-`portainer-mcp`, 421 инструмент) и тех же четырёх мета-инструментов.
+`portainer-mcp`, 421 инструмент) и тех же пяти мета-инструментов.
 
-| | mcprig 0.1.0 | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
+| | mcprig 0.1.0 (замер) | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
 | --- | --- | --- |
 | RSS процесса-прокси после прогрева, 421 инструмент в кэше | **29 МиБ** | 67 МиБ |
 | RSS до первого вызова | **13 МиБ** | — |
@@ -109,13 +109,15 @@ curl -s http://127.0.0.1:9091/healthz
 ```json
 {
   "mcp": {
-    "mcprig-demo": {
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer <token>"
-      },
-      "type": "remote",
-      "url": "http://127.0.0.1:9100/mcp"
+    "servers": {
+      "mcprig-demo": {
+        "enabled": true,
+        "headers": {
+          "Authorization": "Bearer <token>"
+        },
+        "type": "remote",
+        "url": "http://127.0.0.1:9100/mcp"
+      }
     }
   }
 }
@@ -225,7 +227,7 @@ true. Полный справочник полей: [docs/ru/configuration.md](d
 | область | по умолчанию |
 | --- | --- |
 | bearer набора | сравнивается за постоянное время; пустой `authToken` отказывается стартовать, если набор не открыт явно |
-| пароль панели | простой текст или `scrypt$N$r$p$salt$hash`; сравнение за постоянное время; 5 неудачных входов в минуту на IP, один scrypt за раз |
+| пароль панели | простой текст или `scrypt$N$r$p$salt$hash`; сравнение за постоянное время; 5 неудачных входов в минуту на IP, одновременно считается не больше двух scrypt, до восьми ждут в очереди, сверх этого — `429` |
 | сессия панели | cookie `mcp_session`: случайный id, подписанный HMAC-SHA256, TTL 12 ч, `HttpOnly`, `SameSite=Lax`, `Secure` поверх TLS; сессии живут в памяти, поэтому перезапуск разлогинивает всех |
 | CSRF | записи отклоняют `Sec-Fetch-Site: cross-site`, требуют совпадения `Origin` с `Host` и JSON-тела |
 | политика Host | пустые `allowedHosts` / `MCPRIG_ALLOWED_HOSTS` означают только loopback; `*` отключает проверку |
@@ -245,7 +247,7 @@ true. Полный справочник полей: [docs/ru/configuration.md](d
   `deploy/mcprig-set@.service` (один набор на юнит).
 - Docker: `slim` (только бинарник, HTTP-нижестоящие) и `full` (добавляет node и
   python для stdio-серверов `npx`/`uvx`). Оба опубликованы в реестре Gitea как
-  `0.3.7-slim`, `0.3.7-full`, а `latest`/`latest-full` идут за релизом.
+  `0.3.8-slim`, `0.3.8-full`, а `latest`/`latest-full` идут за релизом.
 
 Подробности: [docs/ru/install.md](docs/ru/install.md).
 
@@ -269,7 +271,7 @@ Issue и pull request оформляются по [CONTRIBUTING.ru.md](CONTRIBUT
 
 До 1.0, один оператор: одна панель, один пароль, без ролей на пользователя.
 Этапы 0–6 приняты (конфигурация, ядро прокси, OAuth, HTTP-транспорт, менеджер,
-панель, поставка); релизы до 0.3.7 опубликованы. Справка CLI и строки логов в
+панель, поставка); релизы до 0.3.8 опубликованы. Справка CLI и строки логов в
 этой сборке — на русском.
 
 Лицензия: MIT, см. [LICENSE](LICENSE).

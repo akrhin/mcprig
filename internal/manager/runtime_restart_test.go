@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // TestCleanExitDoesNotRestart: код 0 — штатный выход, бюджет рестартов не

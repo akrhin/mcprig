@@ -82,18 +82,18 @@ Both are published to the project's Gitea registry, so you can skip the build:
 ```bash
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest        # slim
 docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest-full   # full
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.7-slim    # pinned release
-docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.7-full
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-slim    # pinned release
+docker pull frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.8-full
 ```
 
 `latest` and `latest-full` follow the newest release; the version tags pin one
-pair (`0.3.7-slim`, `0.3.7-full` are the current pair).
+pair (`0.3.8-slim`, `0.3.8-full` are the current pair).
 
 Or build them yourself:
 
 ```bash
-docker build --build-arg VERSION=v0.3.7 -t mcprig:slim .
-docker build --build-arg VERSION=v0.3.7 --target full -t mcprig:full .
+docker build --build-arg VERSION=0.3.8 -t mcprig:slim .
+docker build --build-arg VERSION=0.3.8 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
@@ -103,7 +103,9 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 The image entrypoint is `mcprig`; the default command is
 `serve --config /config/servers.json`; the set listen address comes from
 `transport.host` and `transport.port`, so mount a config whose transport says
-`0.0.0.0` and publish the port you chose. The working directory is `/data`,
+`0.0.0.0` and publish the port you chose. `VERSION` is the version **without**
+the leading `v` — `0.3.8`, not `v0.3.8`; a value that starts with `v` is
+rejected and the build fails. The working directory is `/data`,
 owned by uid 10001; mount a volume there and set
 `MCPRIG_DATA_DIR=/data` so OAuth tokens and other state survive a restart.
 Both images set `MCPRIG_HOST=0.0.0.0`, so the panel listens on every interface
@@ -111,9 +113,11 @@ inside the container; publish it on `MCPRIG_PORT` (the panel default is 9091,
 `deploy/docker-compose.yml` runs the `ops` set on 9101). Outside Docker
 `MCPRIG_HOST` stays unset and the panel keeps the `127.0.0.1` default — do not
 copy the container value to a host unit.
-The image healthcheck checks `http://127.0.0.1:9100/healthz`; it assumes the
-default port, so with another `transport.port` pass `--health-cmd` or set the
-healthcheck in compose.
+The image healthcheck asks the set on `http://127.0.0.1:9100/healthz` and the
+panel on `http://127.0.0.1:9091/healthz`, so the container counts as healthy
+only when both answer; it assumes the default ports, so with another
+`transport.port` or `MCPRIG_PORT` pass `--health-cmd` or set the healthcheck in
+compose.
 
 `deploy/docker-compose.yml` runs two sets (`demo` on 9100, `ops` on 9101) from
 `frosty-ad-gt.cloudpub.ru/sintez/mcprig:latest`, mounts each `servers.json` read-only and keeps

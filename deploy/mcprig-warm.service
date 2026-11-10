@@ -13,7 +13,7 @@ Type=oneshot
 # MCPRIG_PANEL_URL: значение ниже — дефолт, файл panel.env его переопределяет
 # (он объявлен позже, поэтому выигрывает). Если панель открыта или вызов идёт
 # с явным --url, ни то, ни другое не нужно.
-Environment=MCPRIG_PANEL_URL=http://127.0.0.1:9088
+Environment=MCPRIG_PANEL_URL=http://127.0.0.1:9091
 EnvironmentFile=-%h/.config/mcprig/panel.env
 # MCPRIG_PASSWORD из общего env панели: без него /api/sets отвечает 401.
 EnvironmentFile=-%h/.config/mcprig/env

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sintez/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/stats"
 )
 
 // statsPeriods — допустимые значения period.

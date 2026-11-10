@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/sintez/mcprig/internal/registry"
-	"github.com/sintez/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/stats"
 )
 
 // clientNames в servers.json: подпись ключа под отпечатком, чтобы набор

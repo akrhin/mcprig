@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sintez/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // TestCloseStopsStartingSet: панель гаснет, пока набор ещё стартует — процесс

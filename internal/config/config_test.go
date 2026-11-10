@@ -267,3 +267,32 @@ func TestExpandSecretsSoftFail(t *testing.T) {
 		t.Errorf("сломанные записи не должны быть пригодны: %d", len(cfg.Usable()))
 	}
 }
+
+// Резервные имена отвергаются на загрузке набора: в envAllow, в env и в
+// ${VAR} заголовка — сервер иначе получает секрет менеджера.
+func TestReservedEnvRejected(t *testing.T) {
+	path := write(t, `{"servers":[
+	  {"name":"allow","command":["x"],"envAllow":["MCPRIG_LEAKTEST"]},
+	  {"name":"env","command":["x"],"env":{"OPENBAO_TOKEN":"x"}},
+	  {"name":"header","command":["x"],"headers":{"Authorization":"Bearer ${MCPRIG_PROXY_SECRET}"}},
+	  {"name":"ref","command":["x"],"env":{"T":"${BAO_TOKEN}"}}
+	]}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []string{
+		"envAllow «MCPRIG_LEAKTEST»: резервный префикс",
+		"env «OPENBAO_TOKEN»: резервный префикс",
+		"headers.Authorization: переменная ${MCPRIG_PROXY_SECRET} — резервный префикс",
+		"env.T: переменная ${BAO_TOKEN} — резервный префикс",
+	}
+	for i, w := range want {
+		if got := cfg.Servers[i].ConfigError; !strings.Contains(got, w) {
+			t.Errorf("сервер %d: want %q, got %q", i, w, got)
+		}
+	}
+	if n := len(cfg.Usable()); n != 0 {
+		t.Errorf("резервные серверы пригодны: %d", n)
+	}
+}

@@ -20,10 +20,10 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/downstream"
-	"github.com/sintez/mcprig/internal/mcpserver"
-	"github.com/sintez/mcprig/internal/oauth"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/mcpserver"
+	"github.com/akrhin/mcprig/internal/oauth"
 )
 
 // errWarmProblems — строки уже напечатаны; main выходит с кодом 1 без лишней

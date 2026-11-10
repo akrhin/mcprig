@@ -12,9 +12,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/sintez/mcprig/internal/config"
-	"github.com/sintez/mcprig/internal/oauth"
-	"github.com/sintez/mcprig/internal/sandbox"
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/oauth"
+	"github.com/akrhin/mcprig/internal/sandbox"
 )
 
 // Connector opens sessions to downstream servers. OAuth is optional: without a
@@ -144,7 +144,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		if c.Env != nil {
 			base = c.Env(srv)
 		}
-		cmd.Env = append(base, flatten(srv.Env)...)
+		cmd.Env = append(withoutReserved(base), flatten(srv.Env)...)
 		return &mcp.CommandTransport{Command: cmd}, tail, nil
 	case config.TransportHTTP:
 		if srv.URL == "" {
@@ -237,7 +237,23 @@ func sameHostRedirect(req *http.Request, via []*http.Request) error {
 func flatten(env map[string]string) []string {
 	out := make([]string, 0, len(env))
 	for k, v := range env {
+		if reservedName(k) {
+			continue
+		}
 		out = append(out, k+"="+v)
+	}
+	return out
+}
+
+// withoutReserved убирает служебные переменные менеджера из готового env:
+// c.Env может не сузить окружение, а вниз эти имена не уходят никогда.
+func withoutReserved(env []string) []string {
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if name, _, ok := strings.Cut(kv, "="); ok && reservedName(name) {
+			continue
+		}
+		out = append(out, kv)
 	}
 	return out
 }

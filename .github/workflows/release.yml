@@ -59,17 +59,20 @@ jobs:
           printf '%s\n' "$line" | (cd "$tmp" && sha256sum -c -)
           tar -xzf "$tmp/$file" -C "$tmp" goreleaser
           echo "GORELEASER_BIN=$tmp/goreleaser" >> "$GITHUB_ENV"
+      - name: Проверить конфиг goreleaser
+        run: |
+          set -euo pipefail
+          if ! "$GORELEASER_BIN" check; then
+            echo "goreleaser check: .goreleaser.yaml невалиден — релиз остановлен"
+            exit 1
+          fi
       - name: Собрать архивы
         run: |
           set -euo pipefail
           tag="${{ inputs.tag || github.ref_name }}"
           notes="${RUNNER_TEMP:-/tmp}/release-notes.md"
           bash scripts/release-notes.sh "$tag" > "$notes"
-          if [ -s "$notes" ]; then
-            "$GORELEASER_BIN" release --clean --skip=publish --release-notes "$notes"
-          else
-            "$GORELEASER_BIN" release --clean --skip=publish
-          fi
+          "$GORELEASER_BIN" release --clean --skip=publish --release-notes "$notes"
       - name: Опубликовать релиз
         env:
           GH_TOKEN: ${{ github.token }}
@@ -79,11 +82,8 @@ jobs:
           notes="${RUNNER_TEMP:-/tmp}/release-notes.md"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" dist/*.tar.gz dist/checksums.txt --clobber
-            if [ -s "$notes" ]; then gh release edit "$tag" --notes-file "$notes"; fi
-          elif [ -s "$notes" ]; then
-            gh release create "$tag" --title "$tag" --notes-file "$notes" \
-              dist/*.tar.gz dist/checksums.txt
+            gh release edit "$tag" --notes-file "$notes"
           else
-            gh release create "$tag" --title "$tag" --generate-notes \
+            gh release create "$tag" --title "$tag" --notes-file "$notes" \
               dist/*.tar.gz dist/checksums.txt
           fi
