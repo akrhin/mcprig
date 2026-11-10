@@ -93,26 +93,35 @@ func (s step) truncate(t time.Time) time.Time {
 }
 
 // acc accumulates one group of calls, exactly and as a histogram at once: the
-// exact list is unused when the answer is approximate.
+// exact distribution is unused when the answer is approximate.
 type acc struct {
 	calls    int64
 	failures int64
-	exact    []int64
-	hist     Hist
+	totalMs  int64
+	// exact — счётчик значений ms: процентиль остаётся точным, а память —
+	// O(различных латентностей), а не O(строк). Журнал за 7 суток читается
+	// потоково, поэтому список значений в память не помещается; nil в
+	// приблизительном режиме, там процентиль берётся из hist.
+	exact map[int64]int64
+	hist  Hist
 }
 
 func (a *acc) addCall(ms int64, failed bool) {
 	a.calls++
+	a.totalMs += ms
 	if failed {
 		a.failures++
 	}
-	a.exact = append(a.exact, ms)
+	if a.exact != nil {
+		a.exact[ms]++
+	}
 	a.hist[histIndex(ms)]++
 }
 
 func (a *acc) addTriple(t Triple) {
 	a.calls += t.Calls
 	a.failures += t.Failures
+	a.totalMs += t.TotalMs
 	for i, n := range t.Hist {
 		a.hist[i] += n
 	}
@@ -123,13 +132,37 @@ func (a *acc) totals(approx bool) Totals {
 	return Totals{Calls: a.calls, Failures: a.failures, P50Ms: p50, P95Ms: p95}
 }
 
-// percentiles: exact from the raw values when the period is ≤ 7d, otherwise
-// the middle of the histogram bucket.
+// percentiles: exact from the latency distribution when the period is ≤ 7d,
+// otherwise the middle of the histogram bucket.
 func (a *acc) percentiles(approx bool) (int64, int64) {
 	if !approx {
-		return quantile(a.exact, 0.50), quantile(a.exact, 0.95)
+		return exactQuantile(a.exact, 0.50), exactQuantile(a.exact, 0.95)
 	}
 	return histQuantile(a.hist, 0.50), histQuantile(a.hist, 0.95)
+}
+
+// exactQuantile is quantile over the values the distribution remembers: one
+// step per distinct latency, so the sort costs distinct values, not calls.
+func exactQuantile(counts map[int64]int64, q float64) int64 {
+	if len(counts) == 0 {
+		return 0
+	}
+	values := make([]int64, 0, len(counts))
+	var n int64
+	for ms, c := range counts {
+		values = append(values, ms)
+		n += c
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
+	rank := int64(q * float64(n-1))
+	var cum int64
+	for _, ms := range values {
+		cum += counts[ms]
+		if rank < cum {
+			return ms
+		}
+	}
+	return values[len(values)-1]
 }
 
 // histQuantile is the bucket where rank lands, reported by its middle.
@@ -165,7 +198,7 @@ type bundle struct {
 }
 
 func newBundle(st step, approx bool, filter Query) *bundle {
-	return &bundle{
+	b := &bundle{
 		step:    st,
 		approx:  approx,
 		filter:  filter,
@@ -174,6 +207,10 @@ func newBundle(st step, approx bool, filter Query) *bundle {
 		clients: map[string]*acc{},
 		series:  map[time.Time]*acc{},
 	}
+	if !approx {
+		b.totals.exact = map[int64]int64{}
+	}
+	return b
 }
 
 func (b *bundle) matches(client, server, tool string) bool {
@@ -201,19 +238,23 @@ func (b *bundle) addTriple(t Triple, when time.Time) {
 }
 
 func (b *bundle) groups(when time.Time, client, server, tool string) []*acc {
+	exact := !b.approx
 	return []*acc{
 		&b.totals,
-		bucketOf(&b.tools, [2]string{server, tool}),
-		bucketOf(&b.servers, server),
-		bucketOf(&b.clients, client),
-		bucketOf(&b.series, b.step.truncate(when)),
+		bucketOf(&b.tools, [2]string{server, tool}, exact),
+		bucketOf(&b.servers, server, exact),
+		bucketOf(&b.clients, client, exact),
+		bucketOf(&b.series, b.step.truncate(when), exact),
 	}
 }
 
-func bucketOf[K comparable](m *map[K]*acc, k K) *acc {
+func bucketOf[K comparable](m *map[K]*acc, k K, exact bool) *acc {
 	a := (*m)[k]
 	if a == nil {
 		a = &acc{}
+		if exact {
+			a.exact = map[int64]int64{}
+		}
 		(*m)[k] = a
 	}
 	return a
