@@ -63,7 +63,7 @@ Gruvbox, Solarized и Tokyo Night. Выбор — в шапке, хранитс�
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | изменение и удаление; работающие наборы перезапускаются |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, бюджет 60 с, текст ошибки в теле |
 | `GET /api/calls?set=<id>&limit=<N>` | объединённый хвост вызовов работающих наборов; по умолчанию 50, максимум 500; для одного набора — ещё и `schema` |
-| `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | история вызовов с диска: итоги, ряд, разрезы по инструментам, серверам и клиентам |
+| `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | история вызовов с диска: итоги, ряд, разрезы по инструментам, серверам и клиентам, `bySet` для всех наборов |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | переменные: только имена, флаг заданности и источник — никогда значения |
 | `POST /api/import` | импорт объекта `mcpServers`; возвращает `added` и `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | экспорт реестра или одного набора |
@@ -129,8 +129,13 @@ period=archive  старше 30 суток         по месячным фай�
 месяцам. Неизвестный `bucket` — `400`. `server`, `tool` и `client` фильтруют все части ответа. `set=all` (или
 без `set`) складывает все наборы. Ответ: `period`, `from`, `to`, `approximate`,
 `totals` и `series` (`{t, calls, failures, p50ms, p95ms}`), плюс разрезы
-`tools`, `servers`, `clients` той же формы. Набор без каталога истории попадает
-в `unreachable` по id, остальной ответ пустой; неизвестный id набора — `404`.
+`tools`, `servers`, `clients` той же формы. `set=all` (или пустой `set`)
+добавляет `bySet`: `{set, calls, failures, totalMs}` по каждому набору, у
+которого в периоде есть вызовы, — таблица наборов показывает счётчики, не
+открывая набор; набор без вызовов в периоде не попадает в разрез, а не
+отвечает нулями. У одного набора `bySet` нет. Набор без каталога истории
+попадает в `unreachable` по id, остальной ответ пустой; неизвестный id
+набора — `404`.
 
 ## Здоровье
 

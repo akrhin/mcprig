@@ -2,13 +2,30 @@ package e2e
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+// waitFor polls cond: учёт и чистка идут в фоне процесса, срок — не точность.
+func waitFor(t *testing.T, limit time.Duration, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(limit)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("%s: не дождались за %v", what, limit)
+}
 
 // TestStdioModeIsClientOwned is the install-mode gate: the client spawns
 // `mcprig stdio`, speaks MCP over stdin/stdout, and needs no port or key.
@@ -26,6 +43,20 @@ func TestStdioModeIsClientOwned(t *testing.T) {
 	cfg := filepath.Join(dir, "servers.json")
 	body := fmt.Sprintf(`{"servers":[{"name":"fx","command":[%q]}]}`, fixture)
 	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Файл с истёкшим TTL: stdio обязан убрать его тем же свипом, что serve.
+	state := filepath.Join(dir, "state")
+	stale := filepath.Join(state, "tool-out", "stale.txt")
+	if err := os.MkdirAll(filepath.Dir(stale), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stale, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,4 +117,27 @@ func TestStdioModeIsClientOwned(t *testing.T) {
 	if len(tools) != 5 {
 		t.Fatalf("ожидалось 5 мета-тулов, получено %d: %v", len(tools), result)
 	}
+
+	// stdio ведёт историю вызовов, как и набор под serve: разрез по периодам
+	// должен читаться с диска и у процесса, которого клиент запустил сам.
+	write(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"invoke_command","arguments":{"server":"fx","command_name":"echo","parameters":{"text":"привет"}}}}`)
+	call := read(3)
+	if call["error"] != nil {
+		t.Fatalf("invoke_command: %v", call["error"])
+	}
+
+	raw := filepath.Join(state, "stdio", "stats", "raw-"+time.Now().Format("2006-01-02")+".jsonl")
+	waitFor(t, 5*time.Second, "история stdio", func() bool {
+		b, err := os.ReadFile(raw)
+		return err == nil && bytes.Contains(b, []byte(`"client":"stdio"`))
+	})
+	if b, _ := os.ReadFile(raw); !bytes.Contains(b, []byte(`"tool":"echo"`)) {
+		t.Fatalf("в истории нет вызова echo: %s", b)
+	}
+
+	// tool-out чистится и в stdio-режиме.
+	waitFor(t, 5*time.Second, "чистка tool-out", func() bool {
+		_, err := os.Stat(stale)
+		return errors.Is(err, fs.ErrNotExist)
+	})
 }

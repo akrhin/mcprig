@@ -171,13 +171,6 @@ func (s *Server) Warnings() []string {
 		(sb.MemoryMb > 0 || sb.Pids > 0 || sb.TmpMb > 0 || sb.TimeoutSec > 0 || len(sb.RO) > 0 || len(sb.RW) > 0) {
 		out = append(out, "sandbox.mode=none: лимиты и монтирования из блока не применяются")
 	}
-	if sb := s.Sandbox; sb != nil && sb.Mode == SandboxModeBwrap && len(sb.RO) > 0 {
-		// Явный ro заменяет умолчания целиком: без /usr внутри песочницы не
-		// запустится даже prlimit, и ошибка выйдет невнятная.
-		if !hasAnyPath(sb.RO, "/", "/usr") {
-			out = append(out, "sandbox.ro не содержит /usr: внутри песочницы не запустится prlimit — перечисли умолчания явно")
-		}
-	}
 	for _, name := range s.EnvAllow {
 		if _, ok := s.Env[name]; ok {
 			continue

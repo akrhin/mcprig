@@ -96,8 +96,8 @@ read-only root, no `/home` unless `rw` or `cwd` names one, no network, no
 A binary outside `/usr` — node from a user prefix, for instance — must be
 listed in `ro` (together with the defaults, which are replaced), or the child
 cannot start. A path under `/home` gets in only through `rw` (read-write) or
-`cwd` (read-only). Without `/usr` in `ro`, `prlimit` — the helper mcprig puts
-the limits through — cannot start either; `doctor` warns about it beforehand.
+`cwd` (read-only). `prlimit`, the helper the limits go through, is mounted by
+the sandbox together with its loader, so an explicit `ro` does not cut it out.
 
 ### Both command forms
 

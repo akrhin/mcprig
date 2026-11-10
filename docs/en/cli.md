@@ -52,9 +52,9 @@ that address for any subcommand; unset by default, so nothing is exposed.
 
 ### tool-out retention
 
-A truncated answer is saved under `${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/`. Both
-`serve` and `panel` sweep those files at startup and then hourly, until the
-process exits:
+A truncated answer is saved under `${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/`.
+`serve`, `stdio` and `panel` sweep that one directory at startup and then
+hourly, until the process exits — stdio uses the base directory, not its own:
 
 | variable | default | meaning |
 | --- | --- | --- |
@@ -78,8 +78,13 @@ mcprig stdio --config ~/.config/mcprig/sets/demo/servers.json
 
 There is no listener and no key: the client owns the process, and the
 transport is the boundary. The proxy writes MCP messages to stdout and logs to
-stderr. `transport` in the file is ignored. Call counters are not collected in
-this mode. Downstream stdio servers are opened with the `initialize` handshake
+stderr. `transport` in the file is ignored. Calls are counted and written to
+history like a set's own: `$MCPRIG_DATA_DIR/stdio/stats/` holds the same
+`raw-YYYY-MM-DD.jsonl`, `day-*.json` and `month-*.json` files, so the period
+breakdown can be read back; the client is always labelled `stdio`, since the
+transport is the only client the process has. If the directory cannot be
+opened, a warning goes to stderr and the proxy keeps serving. Downstream stdio
+servers are opened with the `initialize` handshake
 (protocol `2025-11-25`), which every server understands; HTTP downstreams keep
 the modern `server/discover` handshake.
 

@@ -175,8 +175,8 @@
                     <th scope="col">Состояние</th>
                     <th scope="col" class="num hide-sm">Серверов</th>
                     <th scope="col" class="hide-md">Аптайм</th>
-                    <th scope="col" class="num" title="счётчики показываются для выбранного набора">Вызовов</th>
-                    <th scope="col" class="num" title="счётчики показываются для выбранного набора">Ошибок</th>
+                    <th scope="col" class="num" title="за период, выбранный на вкладке статистики">Вызовов</th>
+                    <th scope="col" class="num" title="за период, выбранный на вкладке статистики">Ошибок</th>
                   </tr>
                 </thead>
                 <tbody id="sets-body"></tbody>
@@ -348,8 +348,80 @@
       </div>
       <div class="side-body">
         <section class="pane" data-pane="servers" id="pane-servers" role="tabpanel" aria-labelledby="sidebtn-servers">
+          <div class="srv-tools">
+            <span class="hint">общий реестр хоста</span>
+            <button class="mini push" type="button" id="srv-add">добавить сервер</button>
+          </div>
           <ul class="list" id="servers"></ul>
-          <p class="srv-note pad" id="servers-empty" hidden>выберите набор</p>
+          <p class="srv-note pad" id="servers-empty" hidden>реестр пуст</p>
+
+          <form class="srvform" id="srvform" role="dialog" aria-modal="true" aria-labelledby="srvform-h" hidden novalidate>
+            <div class="pane-h">
+              <span class="hint" id="srvform-h">сервер</span>
+              <button class="mini push" type="button" id="srvform-close">отмена</button>
+            </div>
+            <div class="sf-body">
+              <label class="sf"><span>имя</span><input name="name" autocomplete="off" spellcheck="false" placeholder="figma"></label>
+              <label class="sf"><span>описание</span><input name="description" autocomplete="off"></label>
+              <label class="sf"><span>транспорт</span>
+                <select name="transport">
+                  <option value="stdio">stdio — локальный процесс</option>
+                  <option value="http">http — удалённый endpoint</option>
+                </select>
+              </label>
+
+              <label class="sf" data-when="stdio"><span>команда · по строке на аргумент</span><textarea name="command" rows="3" spellcheck="false" placeholder="npx&#10;-y&#10;@playwright/mcp@latest"></textarea></label>
+              <label class="sf" data-when="stdio"><span>рабочий каталог</span><input name="cwd" autocomplete="off" spellcheck="false" placeholder="/home/user/project"></label>
+              <label class="sf" data-when="http"><span>url</span><input name="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:9200/mcp"></label>
+              <label class="sf" data-when="http"><span>заголовки · K: V</span><textarea name="headers" rows="2" spellcheck="false" placeholder="Authorization: Bearer ${GITEA_TOKEN}"></textarea></label>
+
+              <label class="sf"><span>env · KEY=значение</span><textarea name="env" rows="2" spellcheck="false" placeholder="TOKEN=${GITEA_TOKEN}"></textarea></label>
+              <label class="sf"><span>envAllow · по строке</span><textarea name="envAllow" rows="2" spellcheck="false" placeholder="PATH"></textarea></label>
+              <label class="sf"><span>теги · через запятую</span><input name="tags" autocomplete="off" placeholder="untrusted, fs"></label>
+              <label class="check"><input type="checkbox" name="enabled"> включён</label>
+
+              <fieldset class="sf-group" data-when="stdio">
+                <legend>песочница</legend>
+                <p class="sf-hint">mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · пусто — умолчание</p>
+                <label class="sf"><span>mode</span>
+                  <select name="sbMode">
+                    <option value="">не задан</option>
+                    <option value="bwrap">bwrap</option>
+                    <option value="none">none</option>
+                  </select>
+                </label>
+                <label class="sf"><span>onUnavailable</span>
+                  <select name="sbOnUnavailable">
+                    <option value="">не задан</option>
+                    <option value="deny">deny</option>
+                    <option value="warn">warn</option>
+                    <option value="allow">allow</option>
+                  </select>
+                </label>
+                <label class="sf"><span>network</span>
+                  <select name="sbNetwork">
+                    <option value="">не задан</option>
+                    <option value="none">none</option>
+                    <option value="allow">allow</option>
+                  </select>
+                </label>
+                <label class="sf"><span>ro · по строке</span><textarea name="sbRo" rows="2" spellcheck="false" placeholder="/usr"></textarea></label>
+                <label class="sf"><span>rw · по строке</span><textarea name="sbRw" rows="2" spellcheck="false" placeholder="/home/user/project"></textarea></label>
+                <div class="sf-nums">
+                  <label class="sf"><span>memoryMb</span><input name="sbMemoryMb" type="number" min="0" inputmode="numeric" placeholder="2048"></label>
+                  <label class="sf"><span>pids</span><input name="sbPids" type="number" min="0" inputmode="numeric" placeholder="256"></label>
+                  <label class="sf"><span>tmpMb</span><input name="sbTmpMb" type="number" min="0" inputmode="numeric" placeholder="128"></label>
+                  <label class="sf"><span>timeoutSec</span><input name="sbTimeoutSec" type="number" min="0" inputmode="numeric" placeholder="30"></label>
+                </div>
+              </fieldset>
+
+              <p class="sf-err" id="srv-err" role="alert" hidden></p>
+            </div>
+            <div class="sf-foot">
+              <button class="btn primary" type="submit" id="srv-save">сохранить</button>
+              <button class="mini push danger" type="button" id="srv-del">удалить сервер</button>
+            </div>
+          </form>
         </section>
         <section class="pane" data-pane="env" id="pane-env" role="tabpanel" aria-labelledby="sidebtn-env" hidden>
           <ul class="list" id="env"></ul>

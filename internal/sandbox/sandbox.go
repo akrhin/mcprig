@@ -172,6 +172,25 @@ func bwrapArgv(srv *config.Server, sb *config.Sandbox, argv []string) ([]string,
 			return nil, err
 		}
 	}
+	// prlimit — динамический бинарник: внутри пустого корня ему нужны и сам
+	// файл, и загрузчик с libc, иначе «bwrap: execvp /usr/bin/prlimit: No
+	// such file or directory» — даже когда /usr есть в ro, но /lib64 нет.
+	// Лимиты при этом остаются частью песочницы: prlimit внутри userns.
+	limits := limitArgs(sb)
+	prlimit := "prlimit"
+	if len(limits) > 0 {
+		if p, err := exec.LookPath("prlimit"); err == nil {
+			prlimit = p
+		}
+		if err := bind("--ro-bind", prlimit, false); err != nil {
+			return nil, err
+		}
+		for _, p := range []string{"/lib", "/lib64", "/usr/lib", "/usr/lib64"} {
+			if err := bind("--ro-bind", p, true); err != nil {
+				return nil, err
+			}
+		}
+	}
 	// Родитель монтируется раньше ребёнка: бинд родителя поверх уже
 	// смонтированного ребёнка его прячет (rw-каталог под ro-корнем молча
 	// становился read-only).
@@ -199,14 +218,9 @@ func bwrapArgv(srv *config.Server, sb *config.Sandbox, argv []string) ([]string,
 	// prlimit — внутри userns, а не снаружи: RLIMIT_NPROC считается по uid в
 	// пространстве имён, и снаружи лимит упирается в уже живые процессы
 	// владельца (bwrap не может создать namespace).
-	if limits := limitArgs(sb); len(limits) > 0 {
-		// Абсолютный путь: bwrap делает execvp по PATH ребёнка, и без
-		// /usr в ro падало «bwrap: execvp prlimit: No such file or directory»
-		// без подсказки, что чинить.
-		prlimit := "prlimit"
-		if p, err := exec.LookPath("prlimit"); err == nil {
-			prlimit = p
-		}
+	if len(limits) > 0 {
+		// Абсолютный путь: bwrap делает execvp по PATH ребёнка, и по имени
+		// он искал prlimit в PATH песочницы, куда его никто не клал.
 		args = append(args, "--", prlimit)
 		args = append(args, limits...)
 		args = append(args, "--")

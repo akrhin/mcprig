@@ -368,3 +368,19 @@ func TestSnapshotWithoutHistory(t *testing.T) {
 		t.Fatalf("stats без истории = %+v", snap.Stats)
 	}
 }
+
+// stdio: клиент у процесса один, поэтому строка называет транспорт, а не
+// то, как клиент представился в initialize.
+func TestRecorderClientLabelOverride(t *testing.T) {
+	r := NewRecorder("s1", 0)
+	r.SetClientLabel("stdio")
+	r.Record("some-harness", "fs", "echo", 5*time.Millisecond, nil)
+
+	s := r.Snapshot()
+	if len(s.Counters) != 1 || s.Counters[0].Client != "stdio" {
+		t.Fatalf("counters = %+v, ожидался client stdio", s.Counters)
+	}
+	if len(s.Tail) != 1 || s.Tail[0].Client != "stdio" {
+		t.Fatalf("tail = %+v, ожидался client stdio", s.Tail)
+	}
+}

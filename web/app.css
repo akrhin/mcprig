@@ -359,7 +359,8 @@ table.t td.tb-name{max-width:0;width:100%}
 .segbtn[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
 .segbtn .cnt{font-size:10.5px;color:var(--text-dim);font-family:var(--font-mono)}
 .side-body{flex:1;min-height:0;display:flex}
-.pane{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;padding:8px 12px 12px;gap:0}
+/* position:relative — якорь для формы сервера, которая накрывает панель целиком */
+.pane{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;padding:8px 12px 12px;gap:0;position:relative}
 .pane.logpane{padding-bottom:0}
 .pane-h{display:flex;align-items:center;gap:8px;flex:none;padding:2px 0 6px}
 .pane-h .hint{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
@@ -378,6 +379,39 @@ ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;fl
 .srv-note,.var-val{font-size:11px;color:var(--text-dim);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srv-note.pad,.var-note.pad{padding:6px 0;white-space:normal;overflow:visible;text-overflow:clip}
 .srv-note.is-err{color:var(--error)}
+
+/* ---------- форма сервера: накрывает панель целиком ----------
+   реестр общий для хоста, поэтому форма живёт там же, где список: не уводит
+   человека на другой экран и не теряет контекст набора */
+.srv-tools{display:flex;align-items:center;gap:8px;flex:none;padding:0 0 8px;min-width:0;border-bottom:1px solid var(--hair);margin-bottom:4px}
+.srv-tools .hint{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv .srv-foot .srv-edit{opacity:1}
+.srvform{position:absolute;inset:0;z-index:3;background:var(--surface);display:flex;flex-direction:column;min-height:0;min-width:0;padding:8px 12px 12px}
+/* hidden должен побеждать display:grid у полей и группы песочницы */
+.srvform [hidden]{display:none}
+.srvform[hidden]{display:none}
+.sf-body{flex:1;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;display:grid;gap:9px;align-content:start;padding-right:2px}
+.sf-body::-webkit-scrollbar{width:9px}
+.sf-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.sf-body::-webkit-scrollbar-track{background:transparent}
+.sf{display:grid;gap:3px;min-width:0}
+.sf > span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+.sf input,.sf select,.sf textarea{width:100%;min-width:0;background:var(--background);border:1px solid var(--border);border-radius:3px;color:var(--text);font:12px var(--font-sans);padding:4px 6px}
+.sf textarea{font-family:var(--font-mono);font-size:11.5px;line-height:1.5;resize:vertical;min-height:46px}
+.sf input:focus,.sf select:focus,.sf textarea:focus{border-color:var(--text-dim);outline:none}
+.sf input::placeholder,.sf textarea::placeholder{color:var(--text-dim)}
+.sf input[readonly]{color:var(--text-dim);background:transparent}
+.sf input[type=number]{font-family:var(--font-mono)}
+.sf-nums{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.sf-group{border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 9px 10px;margin:0;display:grid;gap:9px;min-width:0}
+.sf-group legend{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);padding:0 4px}
+.sf-hint{margin:0;font-size:11px;line-height:1.5;color:var(--text-dim)}
+.sf-err{margin:0;font-size:11.5px;line-height:1.45;color:var(--error);border-left:2px solid var(--error);padding:2px 0 2px 7px;white-space:pre-line}
+.sf-err[hidden]{display:none}
+.sf-foot{flex:none;display:flex;align-items:center;gap:8px;padding-top:9px;margin-top:8px;border-top:1px solid var(--border)}
+.sf-foot .push{margin-left:auto}
+.sf-foot .danger{color:var(--error);border-color:var(--error)}
+.sf-foot .danger:hover{background:var(--surface-2);color:var(--error)}
 .var-top code{font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .log{flex:1;min-height:0;overflow:auto;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;padding-bottom:6px}
 /* лог без переноса: длинная строка уезжает в собственный горизонтальный скролл, а не ломается по буквам */
@@ -466,6 +500,9 @@ dialog::backdrop{background:var(--scrim)}
   .phead-actions{margin-left:0;width:100%}
   /* палец: строка таблицы выше, кнопки не меньше 32 */
   :root{--row-h:36px}
+  /* форма сервера — единственное место с плотными полями: на телефоне их надо попадать пальцем */
+  .srv-tools .mini,.srvform .mini,.srvform .btn{min-height:32px}
+  .sf input,.sf select{min-height:30px}
 }
 
 @media (max-width:1100px){
@@ -493,6 +530,8 @@ dialog::backdrop{background:var(--scrim)}
   .status .opt{display:none}
   .main{padding:10px 10px 8px}
   .tab{padding:7px 10px;font-size:12px}
+  /* 92vw на телефоне оставляли 30 px подглядывания с обрезанным текстом */
+  .side{width:100vw}
 }
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important}

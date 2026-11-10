@@ -56,6 +56,15 @@ type Row struct {
 	P95Ms    int64  `json:"p95ms"`
 }
 
+// SetRow is one set's share of an aggregate answer: the panel's set table needs
+// the counters per row, and one query serves both it and the totals.
+type SetRow struct {
+	Set      string `json:"set"`
+	Calls    int64  `json:"calls"`
+	Failures int64  `json:"failures"`
+	TotalMs  int64  `json:"totalMs"`
+}
+
 // Result is the panel answer for one period.
 type Result struct {
 	Period string    `json:"period"`
@@ -63,12 +72,15 @@ type Result struct {
 	To     time.Time `json:"to"`
 	// Approximate: процентили посчитаны по гистограмме (30d и архив), а не по
 	// точным значениям сырого журнала.
-	Approximate bool     `json:"approximate"`
-	Totals      Totals   `json:"totals"`
-	Series      []Point  `json:"series"`
-	Tools       []Row    `json:"tools"`
-	Servers     []Row    `json:"servers"`
-	Clients     []Row    `json:"clients"`
+	Approximate bool    `json:"approximate"`
+	Totals      Totals  `json:"totals"`
+	Series      []Point `json:"series"`
+	Tools       []Row   `json:"tools"`
+	Servers     []Row   `json:"servers"`
+	Clients     []Row   `json:"clients"`
+	// BySet — разрез по наборам; только у ответа «все наборы», и только по
+	// наборам, где в этом периоде были вызовы.
+	BySet       []SetRow `json:"bySet,omitempty"`
 	Unreachable []string `json:"unreachable,omitempty"`
 }
 
@@ -93,26 +105,35 @@ func (s step) truncate(t time.Time) time.Time {
 }
 
 // acc accumulates one group of calls, exactly and as a histogram at once: the
-// exact list is unused when the answer is approximate.
+// exact distribution is unused when the answer is approximate.
 type acc struct {
 	calls    int64
 	failures int64
-	exact    []int64
-	hist     Hist
+	totalMs  int64
+	// exact — счётчик значений ms: процентиль остаётся точным, а память —
+	// O(различных латентностей), а не O(строк). Журнал за 7 суток читается
+	// потоково, поэтому список значений в память не помещается; nil в
+	// приблизительном режиме, там процентиль берётся из hist.
+	exact map[int64]int64
+	hist  Hist
 }
 
 func (a *acc) addCall(ms int64, failed bool) {
 	a.calls++
+	a.totalMs += ms
 	if failed {
 		a.failures++
 	}
-	a.exact = append(a.exact, ms)
+	if a.exact != nil {
+		a.exact[ms]++
+	}
 	a.hist[histIndex(ms)]++
 }
 
 func (a *acc) addTriple(t Triple) {
 	a.calls += t.Calls
 	a.failures += t.Failures
+	a.totalMs += t.TotalMs
 	for i, n := range t.Hist {
 		a.hist[i] += n
 	}
@@ -123,13 +144,37 @@ func (a *acc) totals(approx bool) Totals {
 	return Totals{Calls: a.calls, Failures: a.failures, P50Ms: p50, P95Ms: p95}
 }
 
-// percentiles: exact from the raw values when the period is ≤ 7d, otherwise
-// the middle of the histogram bucket.
+// percentiles: exact from the latency distribution when the period is ≤ 7d,
+// otherwise the middle of the histogram bucket.
 func (a *acc) percentiles(approx bool) (int64, int64) {
 	if !approx {
-		return quantile(a.exact, 0.50), quantile(a.exact, 0.95)
+		return exactQuantile(a.exact, 0.50), exactQuantile(a.exact, 0.95)
 	}
 	return histQuantile(a.hist, 0.50), histQuantile(a.hist, 0.95)
+}
+
+// exactQuantile is quantile over the values the distribution remembers: one
+// step per distinct latency, so the sort costs distinct values, not calls.
+func exactQuantile(counts map[int64]int64, q float64) int64 {
+	if len(counts) == 0 {
+		return 0
+	}
+	values := make([]int64, 0, len(counts))
+	var n int64
+	for ms, c := range counts {
+		values = append(values, ms)
+		n += c
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
+	rank := int64(q * float64(n-1))
+	var cum int64
+	for _, ms := range values {
+		cum += counts[ms]
+		if rank < cum {
+			return ms
+		}
+	}
+	return values[len(values)-1]
 }
 
 // histQuantile is the bucket where rank lands, reported by its middle.
@@ -162,10 +207,11 @@ type bundle struct {
 	servers map[string]*acc
 	clients map[string]*acc
 	series  map[time.Time]*acc
+	sets    map[string]*acc
 }
 
 func newBundle(st step, approx bool, filter Query) *bundle {
-	return &bundle{
+	b := &bundle{
 		step:    st,
 		approx:  approx,
 		filter:  filter,
@@ -173,7 +219,12 @@ func newBundle(st step, approx bool, filter Query) *bundle {
 		servers: map[string]*acc{},
 		clients: map[string]*acc{},
 		series:  map[time.Time]*acc{},
+		sets:    map[string]*acc{},
 	}
+	if !approx {
+		b.totals.exact = map[int64]int64{}
+	}
+	return b
 }
 
 func (b *bundle) matches(client, server, tool string) bool {
@@ -182,38 +233,69 @@ func (b *bundle) matches(client, server, tool string) bool {
 		(b.filter.Tool == "" || b.filter.Tool == tool)
 }
 
-func (b *bundle) addRaw(l rawLine) {
+// Source is one set's history directory. The set name labels the answer's
+// bySet rows, so an aggregate answer says where the calls came from.
+type Source struct {
+	Set string
+	Dir string
+}
+
+func (b *bundle) addRaw(set string, l rawLine) {
 	if !b.matches(l.Client, l.Server, l.Tool) {
 		return
 	}
 	for _, a := range b.groups(l.Time, l.Client, l.Server, l.Tool) {
 		a.addCall(l.MS, l.Failed)
 	}
+	if a := b.setAcc(set); a != nil {
+		a.addCall(l.MS, l.Failed)
+	}
 }
 
-func (b *bundle) addTriple(t Triple, when time.Time) {
+func (b *bundle) addTriple(set string, t Triple, when time.Time) {
 	if !b.matches(t.Client, t.Server, t.Tool) {
 		return
 	}
 	for _, a := range b.groups(when, t.Client, t.Server, t.Tool) {
 		a.addTriple(t)
 	}
-}
-
-func (b *bundle) groups(when time.Time, client, server, tool string) []*acc {
-	return []*acc{
-		&b.totals,
-		bucketOf(&b.tools, [2]string{server, tool}),
-		bucketOf(&b.servers, server),
-		bucketOf(&b.clients, client),
-		bucketOf(&b.series, b.step.truncate(when)),
+	if a := b.setAcc(set); a != nil {
+		a.addTriple(t)
 	}
 }
 
-func bucketOf[K comparable](m *map[K]*acc, k K) *acc {
+// setAcc is the bySet row of one set. It remembers counters and total time
+// only: the breakdown carries no percentiles, so no distribution is kept.
+func (b *bundle) setAcc(set string) *acc {
+	if set == "" {
+		return nil
+	}
+	a := b.sets[set]
+	if a == nil {
+		a = &acc{}
+		b.sets[set] = a
+	}
+	return a
+}
+
+func (b *bundle) groups(when time.Time, client, server, tool string) []*acc {
+	exact := !b.approx
+	return []*acc{
+		&b.totals,
+		bucketOf(&b.tools, [2]string{server, tool}, exact),
+		bucketOf(&b.servers, server, exact),
+		bucketOf(&b.clients, client, exact),
+		bucketOf(&b.series, b.step.truncate(when), exact),
+	}
+}
+
+func bucketOf[K comparable](m *map[K]*acc, k K, exact bool) *acc {
 	a := (*m)[k]
 	if a == nil {
 		a = &acc{}
+		if exact {
+			a.exact = map[int64]int64{}
+		}
 		(*m)[k] = a
 	}
 	return a
@@ -254,6 +336,15 @@ func (b *bundle) result(period string, from, to time.Time) Result {
 		res.Clients = append(res.Clients, rowOf(Row{Client: k}, a, b.approx))
 	}
 	sort.Slice(res.Clients, func(i, j int) bool { return res.Clients[i].Client < res.Clients[j].Client })
+	// Набор без вызовов в этом периоде — не строка с нулями, а отсутствие
+	// строки: таблица показывает работу, а не список реестра.
+	for set, a := range b.sets {
+		if a.calls == 0 {
+			continue
+		}
+		res.BySet = append(res.BySet, SetRow{Set: set, Calls: a.calls, Failures: a.failures, TotalMs: a.totalMs})
+	}
+	sort.Slice(res.BySet, func(i, j int) bool { return res.BySet[i].Set < res.BySet[j].Set })
 	return res
 }
 
@@ -265,30 +356,41 @@ func rowOf(r Row, a *acc, approx bool) Row {
 
 // QueryHistory answers one period from the given stats directories — one per
 // set, so set=all is just every directory. A missing directory contributes
-// nothing, a broken journal line is skipped.
+// nothing, a broken journal line is skipped. The answer carries no bySet
+// breakdown: the caller did not say which set a directory belongs to.
 func QueryHistory(dirs []string, q Query, now time.Time) Result {
+	sources := make([]Source, len(dirs))
+	for i, dir := range dirs {
+		sources[i].Dir = dir
+	}
+	return QuerySets(sources, q, now)
+}
+
+// QuerySets is QueryHistory with each directory's set attached: the answer then
+// carries the bySet breakdown, counted in the same pass as the totals.
+func QuerySets(sources []Source, q Query, now time.Time) Result {
 	today := startOfDay(now)
 	switch q.Period {
 	case PeriodToday:
 		b := newBundle(q.stepFor(stepHour), false, q)
-		for _, dir := range dirs {
-			readRawDay(dir, today, b)
+		for _, src := range sources {
+			readRawDay(src, today, b)
 		}
 		return b.result(q.Period, today, now)
 
 	case Period7d:
 		b := newBundle(q.stepFor(stepHour), false, q)
-		for _, dir := range dirs {
+		for _, src := range sources {
 			for i := 0; i < 7; i++ {
-				readRawDay(dir, today.AddDate(0, 0, -i), b)
+				readRawDay(src, today.AddDate(0, 0, -i), b)
 			}
 		}
 		return b.result(q.Period, today.AddDate(0, 0, -6), now)
 
 	case Period30d:
 		b := newBundle(q.stepFor(stepDay), true, q)
-		for _, dir := range dirs {
-			readLast30(dir, today, b)
+		for _, src := range sources {
+			readLast30(src, today, b)
 		}
 		return b.result(q.Period, today.AddDate(0, 0, -(DayDays-1)), now)
 
@@ -296,8 +398,8 @@ func QueryHistory(dirs []string, q Query, now time.Time) Result {
 		b := newBundle(q.stepFor(stepMonth), true, q)
 		archiveStart := today.AddDate(0, 0, -(DayDays - 1))
 		from := time.Time{}
-		for _, dir := range dirs {
-			if d := readMonths(dir, archiveStart, b); !d.IsZero() && (from.IsZero() || d.Before(from)) {
+		for _, src := range sources {
+			if d := readMonths(src, archiveStart, b); !d.IsZero() && (from.IsZero() || d.Before(from)) {
 				from = d
 			}
 		}
@@ -321,22 +423,24 @@ func (q Query) stepFor(dflt step) step {
 	return dflt
 }
 
-func readRawDay(dir string, day time.Time, b *bundle) {
-	_ = scanRaw(filepath.Join(dir, "raw-"+day.Format(dayLayout)+".jsonl"), b.addRaw)
+func readRawDay(src Source, day time.Time, b *bundle) {
+	_ = scanRaw(filepath.Join(src.Dir, "raw-"+day.Format(dayLayout)+".jsonl"), func(l rawLine) {
+		b.addRaw(src.Set, l)
+	})
 }
 
 // readLast30 prefers the day file and falls back to the raw journal of days
 // the rotation has not folded yet (today and everything since it last ran).
-func readLast30(dir string, today time.Time, b *bundle) {
+func readLast30(src Source, today time.Time, b *bundle) {
 	for i := 0; i < DayDays; i++ {
 		day := today.AddDate(0, 0, -i)
-		if df, err := readDayFile(filepath.Join(dir, "day-"+day.Format(dayLayout)+".json")); err == nil {
+		if df, err := readDayFile(filepath.Join(src.Dir, "day-"+day.Format(dayLayout)+".json")); err == nil {
 			for _, t := range df.Triples {
-				b.addTriple(t, day)
+				b.addTriple(src.Set, t, day)
 			}
 			continue
 		}
-		readRawDay(dir, day, b)
+		readRawDay(src, day, b)
 	}
 }
 
@@ -344,8 +448,8 @@ func readLast30(dir string, today time.Time, b *bundle) {
 // for good keeps its days on disk, and the archive must not lose them. Days
 // already present in a month file are not counted twice. Reports the earliest
 // archived day.
-func readMonths(dir string, archiveStart time.Time, b *bundle) time.Time {
-	paths, _ := filepath.Glob(filepath.Join(dir, "month-*.json"))
+func readMonths(src Source, archiveStart time.Time, b *bundle) time.Time {
+	paths, _ := filepath.Glob(filepath.Join(src.Dir, "month-*.json"))
 	from := time.Time{}
 	folded := map[string]bool{}
 	for _, p := range paths {
@@ -367,11 +471,11 @@ func readMonths(dir string, archiveStart time.Time, b *bundle) time.Time {
 				from = d
 			}
 			for _, t := range triples {
-				b.addTriple(t, d)
+				b.addTriple(src.Set, t, d)
 			}
 		}
 	}
-	days, _ := filepath.Glob(filepath.Join(dir, "day-*.json"))
+	days, _ := filepath.Glob(filepath.Join(src.Dir, "day-*.json"))
 	for _, p := range days {
 		d, ok := dayOf(p, "day-", ".json")
 		if !ok || !d.Before(archiveStart) || folded[d.Format(dayLayout)] {
@@ -385,7 +489,7 @@ func readMonths(dir string, archiveStart time.Time, b *bundle) time.Time {
 			from = d
 		}
 		for _, t := range df.Triples {
-			b.addTriple(t, d)
+			b.addTriple(src.Set, t, d)
 		}
 	}
 	return from
