@@ -295,3 +295,32 @@ func TestProbeRunRequiresPrlimit(t *testing.T) {
 		t.Fatalf("probeRun = %v", err)
 	}
 }
+
+// Кэшируется только успех: ранняя неудача (userns не готов при загрузке,
+// гонка на /proc) не должна навсегда запрещать песочницу этому процессу.
+func TestProbeRetriesAfterFailure(t *testing.T) {
+	t.Cleanup(func() {
+		probeState.Lock()
+		probeState.ok = false
+		probeState.Unlock()
+	})
+	dir := t.TempDir()
+	t.Setenv("PATH", dir)
+	if err := probe(); err == nil {
+		t.Fatal("без bwrap проба должна падать")
+	}
+
+	for _, name := range []string{"bwrap", "true", "prlimit"} {
+		if err := os.Symlink("/bin/true", filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := probe(); err != nil {
+		t.Fatalf("повторная проба: %v", err)
+	}
+	// Успех кэширован: PATH больше не нужен.
+	t.Setenv("PATH", t.TempDir())
+	if err := probe(); err != nil {
+		t.Fatalf("кэшированный успех: %v", err)
+	}
+}

@@ -24,16 +24,26 @@ import (
 var available = probe
 
 // probe — короткий реальный запуск: LookPath не отличает «нет userns» от
-// «всё хорошо», а fail-closed требует знать ответ до спавна сервера. Успех
-// кэшируется: повторный запуск на каждый сервер стоил бы процесса.
-var probeOnce struct {
-	once sync.Once
-	err  error
+// «всё хорошо», а fail-closed требует знать ответ до спавна сервера.
+// Кэшируется только успех: ранняя неудача (userns ещё не готов при загрузке,
+// гонка на /proc) иначе навсегда запрещала бы песочницу процессу, а проба
+// стоит одного короткого процесса.
+var probeState struct {
+	sync.Mutex
+	ok bool
 }
 
 func probe() error {
-	probeOnce.once.Do(func() { probeOnce.err = probeRun() })
-	return probeOnce.err
+	probeState.Lock()
+	defer probeState.Unlock()
+	if probeState.ok {
+		return nil
+	}
+	if err := probeRun(); err != nil {
+		return err
+	}
+	probeState.ok = true
+	return nil
 }
 
 func probeRun() error {
