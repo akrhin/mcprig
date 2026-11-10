@@ -1,0 +1,50 @@
+{
+  "running": true,
+  "servers": [
+    {
+      "name": "serena",
+      "healthy": true
+    },
+    {
+      "name": "socraticode",
+      "healthy": true
+    },
+    {
+      "name": "xerj",
+      "healthy": true
+    },
+    {
+      "name": "context7",
+      "healthy": true
+    },
+    {
+      "name": "tavily",
+      "healthy": false,
+      "error": "503 upstream"
+    },
+    {
+      "name": "playwright",
+      "healthy": true
+    },
+    {
+      "name": "raven",
+      "healthy": true
+    },
+    {
+      "name": "designer-skill",
+      "healthy": true
+    },
+    {
+      "name": "gitea",
+      "healthy": true
+    },
+    {
+      "name": "portainer",
+      "healthy": true
+    },
+    {
+      "name": "open-design",
+      "healthy": true
+    }
+  ]
+}

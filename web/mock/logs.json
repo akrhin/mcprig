@@ -1,12 +1,13 @@
 {
   "logs": [
-    "2026-11-08 21:03:11 stdio fetch spawn pid 24817",
-    "2026-11-08 21:03:12 INFO health check 4/4 ok",
-    "2026-11-08 21:04:12 INFO key demo_7c1 · 128 вызовов/ч",
-    "2026-11-08 21:04:41 INFO invoke_command fetch → 200 · 96 мс",
-    "2026-11-08 21:04:44 WARN memory: timeout after 5000 ms (2/3)",
-    "2026-11-08 21:04:44 INFO retry memory через 250 мс",
-    "2026-11-08 21:04:58 INFO proxy context7 streamable-http · 84 мс",
-    "2026-11-08 21:05:02 INFO listen demo :9100 · 4 сервера"
+    "2026-11-08 23:13:58 INFO stdio open-design spawn pid 25102",
+    "2026-11-08 23:13:59 INFO tools/list → 117 инструментов, 41230 Б (10307 токенов) в перечне набора",
+    "2026-11-08 23:14:00 INFO invoke_command raven audit_page → 200 · 380 мс",
+    "2026-11-08 23:14:01 INFO invoke_command serena find_symbol → 200 · 41 мс",
+    "2026-11-08 23:14:01 DEBUG {\"jsonrpc\":\"2.0\",\"id\":4711,\"method\":\"tools/call\",\"params\":{\"name\":\"find_symbol\",\"arguments\":{\"name_path_pattern\":\"run\",\"relative_path\":\"internal/manager/calls.go\",\"include_body\":false}},\"_meta\":{\"trace\":\"8f2ab1c4-7c0e-4b1e-9a44-1b0a2c6e55d1\"}}",
+    "2026-11-08 23:14:02 WARN tavily: 503 upstream, повтор 1/3 через 250 мс",
+    "2026-11-08 23:14:03 ERROR tavily: upstream timeout after 5000 ms",
+    "2026-11-08 23:14:03 INFO invoke_command tavily tavily_search → 500 · 5000 мс",
+    "2026-11-08 23:14:04 INFO health check 10/11 ok, не ответил: tavily"
   ]
 }

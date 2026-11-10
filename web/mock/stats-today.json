@@ -1,0 +1,474 @@
+{
+  "period": "today",
+  "from": "2026-11-08T00:00:00+03:00",
+  "to": "2026-11-08T23:00:00+03:00",
+  "approximate": false,
+  "totals": {
+    "calls": 111,
+    "failures": 5,
+    "p50ms": 147,
+    "p95ms": 1374
+  },
+  "series": [
+    {
+      "t": "2026-11-08T00:00:00+03:00",
+      "calls": 0,
+      "failures": 0,
+      "p50ms": 0,
+      "p95ms": 0
+    },
+    {
+      "t": "2026-11-08T01:00:00+03:00",
+      "calls": 0,
+      "failures": 0,
+      "p50ms": 0,
+      "p95ms": 0
+    },
+    {
+      "t": "2026-11-08T02:00:00+03:00",
+      "calls": 0,
+      "failures": 0,
+      "p50ms": 0,
+      "p95ms": 0
+    },
+    {
+      "t": "2026-11-08T03:00:00+03:00",
+      "calls": 0,
+      "failures": 0,
+      "p50ms": 0,
+      "p95ms": 0
+    },
+    {
+      "t": "2026-11-08T04:00:00+03:00",
+      "calls": 0,
+      "failures": 0,
+      "p50ms": 0,
+      "p95ms": 0
+    },
+    {
+      "t": "2026-11-08T05:00:00+03:00",
+      "calls": 1,
+      "failures": 0,
+      "p50ms": 155,
+      "p95ms": 1187
+    },
+    {
+      "t": "2026-11-08T06:00:00+03:00",
+      "calls": 1,
+      "failures": 0,
+      "p50ms": 147,
+      "p95ms": 1369
+    },
+    {
+      "t": "2026-11-08T07:00:00+03:00",
+      "calls": 3,
+      "failures": 1,
+      "p50ms": 146,
+      "p95ms": 1305
+    },
+    {
+      "t": "2026-11-08T08:00:00+03:00",
+      "calls": 5,
+      "failures": 1,
+      "p50ms": 138,
+      "p95ms": 1425
+    },
+    {
+      "t": "2026-11-08T09:00:00+03:00",
+      "calls": 7,
+      "failures": 1,
+      "p50ms": 168,
+      "p95ms": 1036
+    },
+    {
+      "t": "2026-11-08T10:00:00+03:00",
+      "calls": 8,
+      "failures": 0,
+      "p50ms": 106,
+      "p95ms": 794
+    },
+    {
+      "t": "2026-11-08T11:00:00+03:00",
+      "calls": 7,
+      "failures": 1,
+      "p50ms": 176,
+      "p95ms": 1326
+    },
+    {
+      "t": "2026-11-08T12:00:00+03:00",
+      "calls": 5,
+      "failures": 0,
+      "p50ms": 173,
+      "p95ms": 1355
+    },
+    {
+      "t": "2026-11-08T13:00:00+03:00",
+      "calls": 5,
+      "failures": 0,
+      "p50ms": 139,
+      "p95ms": 789
+    },
+    {
+      "t": "2026-11-08T14:00:00+03:00",
+      "calls": 9,
+      "failures": 0,
+      "p50ms": 159,
+      "p95ms": 1236
+    },
+    {
+      "t": "2026-11-08T15:00:00+03:00",
+      "calls": 10,
+      "failures": 0,
+      "p50ms": 208,
+      "p95ms": 899
+    },
+    {
+      "t": "2026-11-08T16:00:00+03:00",
+      "calls": 10,
+      "failures": 0,
+      "p50ms": 206,
+      "p95ms": 819
+    },
+    {
+      "t": "2026-11-08T17:00:00+03:00",
+      "calls": 8,
+      "failures": 0,
+      "p50ms": 181,
+      "p95ms": 1465
+    },
+    {
+      "t": "2026-11-08T18:00:00+03:00",
+      "calls": 8,
+      "failures": 0,
+      "p50ms": 115,
+      "p95ms": 1599
+    },
+    {
+      "t": "2026-11-08T19:00:00+03:00",
+      "calls": 10,
+      "failures": 0,
+      "p50ms": 210,
+      "p95ms": 1403
+    },
+    {
+      "t": "2026-11-08T20:00:00+03:00",
+      "calls": 5,
+      "failures": 1,
+      "p50ms": 121,
+      "p95ms": 1459
+    },
+    {
+      "t": "2026-11-08T21:00:00+03:00",
+      "calls": 5,
+      "failures": 0,
+      "p50ms": 101,
+      "p95ms": 1194
+    },
+    {
+      "t": "2026-11-08T22:00:00+03:00",
+      "calls": 3,
+      "failures": 0,
+      "p50ms": 124,
+      "p95ms": 1329
+    },
+    {
+      "t": "2026-11-08T23:00:00+03:00",
+      "calls": 1,
+      "failures": 0,
+      "p50ms": 161,
+      "p95ms": 1013
+    }
+  ],
+  "tools": [
+    {
+      "calls": 13,
+      "failures": 0,
+      "p50ms": 199,
+      "p95ms": 1276,
+      "server": "fetch",
+      "tool": "fetch"
+    },
+    {
+      "calls": 12,
+      "failures": 0,
+      "p50ms": 34,
+      "p95ms": 122,
+      "server": "xerj",
+      "tool": "xerj_search"
+    },
+    {
+      "calls": 12,
+      "failures": 0,
+      "p50ms": 36,
+      "p95ms": 169,
+      "server": "serena",
+      "tool": "read_file"
+    },
+    {
+      "calls": 9,
+      "failures": 1,
+      "p50ms": 57,
+      "p95ms": 277,
+      "server": "memory",
+      "tool": "memory_query"
+    },
+    {
+      "calls": 9,
+      "failures": 0,
+      "p50ms": 32,
+      "p95ms": 138,
+      "server": "time",
+      "tool": "get_current_time"
+    },
+    {
+      "calls": 8,
+      "failures": 0,
+      "p50ms": 84,
+      "p95ms": 352,
+      "server": "serena",
+      "tool": "find_symbol"
+    },
+    {
+      "calls": 7,
+      "failures": 0,
+      "p50ms": 432,
+      "p95ms": 2358,
+      "server": "context7",
+      "tool": "query-docs"
+    },
+    {
+      "calls": 6,
+      "failures": 2,
+      "p50ms": 84,
+      "p95ms": 298,
+      "server": "serena",
+      "tool": "find_referencing_symbols"
+    },
+    {
+      "calls": 6,
+      "failures": 0,
+      "p50ms": 31,
+      "p95ms": 165,
+      "server": "fs",
+      "tool": "list_directory"
+    },
+    {
+      "calls": 5,
+      "failures": 0,
+      "p50ms": 234,
+      "p95ms": 1399,
+      "server": "context7",
+      "tool": "resolve-library-id"
+    },
+    {
+      "calls": 5,
+      "failures": 1,
+      "p50ms": 135,
+      "p95ms": 656,
+      "server": "gitea",
+      "tool": "list_issues"
+    },
+    {
+      "calls": 3,
+      "failures": 1,
+      "p50ms": 557,
+      "p95ms": 3287,
+      "server": "tavily",
+      "tool": "tavily_search"
+    },
+    {
+      "calls": 3,
+      "failures": 2,
+      "p50ms": 274,
+      "p95ms": 1270,
+      "server": "socraticode",
+      "tool": "codebase_search"
+    },
+    {
+      "calls": 3,
+      "failures": 0,
+      "p50ms": 926,
+      "p95ms": 4739,
+      "server": "playwright",
+      "tool": "browser_navigate"
+    },
+    {
+      "calls": 3,
+      "failures": 0,
+      "p50ms": 210,
+      "p95ms": 924,
+      "server": "portainer",
+      "tool": "list_containers"
+    },
+    {
+      "calls": 2,
+      "failures": 0,
+      "p50ms": 250,
+      "p95ms": 1171,
+      "server": "designer-skill",
+      "tool": "dispatch_intent"
+    },
+    {
+      "calls": 2,
+      "failures": 0,
+      "p50ms": 167,
+      "p95ms": 867,
+      "server": "open-design",
+      "tool": "get_project"
+    },
+    {
+      "calls": 1,
+      "failures": 0,
+      "p50ms": 1402,
+      "p95ms": 7893,
+      "server": "playwright",
+      "tool": "browser_take_screenshot"
+    },
+    {
+      "calls": 1,
+      "failures": 0,
+      "p50ms": 28,
+      "p95ms": 181,
+      "server": "fs",
+      "tool": "read_file"
+    },
+    {
+      "calls": 1,
+      "failures": 0,
+      "p50ms": 405,
+      "p95ms": 1669,
+      "server": "raven",
+      "tool": "audit_page"
+    }
+  ],
+  "servers": [
+    {
+      "calls": 26,
+      "failures": 2,
+      "p50ms": 64,
+      "p95ms": 365,
+      "server": "serena"
+    },
+    {
+      "calls": 13,
+      "failures": 0,
+      "p50ms": 197,
+      "p95ms": 1081,
+      "server": "fetch"
+    },
+    {
+      "calls": 12,
+      "failures": 0,
+      "p50ms": 349,
+      "p95ms": 1490,
+      "server": "context7"
+    },
+    {
+      "calls": 12,
+      "failures": 0,
+      "p50ms": 33,
+      "p95ms": 134,
+      "server": "xerj"
+    },
+    {
+      "calls": 9,
+      "failures": 1,
+      "p50ms": 51,
+      "p95ms": 239,
+      "server": "memory"
+    },
+    {
+      "calls": 9,
+      "failures": 0,
+      "p50ms": 36,
+      "p95ms": 135,
+      "server": "time"
+    },
+    {
+      "calls": 7,
+      "failures": 0,
+      "p50ms": 31,
+      "p95ms": 177,
+      "server": "fs"
+    },
+    {
+      "calls": 5,
+      "failures": 1,
+      "p50ms": 139,
+      "p95ms": 723,
+      "server": "gitea"
+    },
+    {
+      "calls": 4,
+      "failures": 0,
+      "p50ms": 1046,
+      "p95ms": 4694,
+      "server": "playwright"
+    },
+    {
+      "calls": 3,
+      "failures": 1,
+      "p50ms": 553,
+      "p95ms": 2484,
+      "server": "tavily"
+    },
+    {
+      "calls": 3,
+      "failures": 2,
+      "p50ms": 286,
+      "p95ms": 1121,
+      "server": "socraticode"
+    },
+    {
+      "calls": 3,
+      "failures": 0,
+      "p50ms": 201,
+      "p95ms": 759,
+      "server": "portainer"
+    },
+    {
+      "calls": 2,
+      "failures": 0,
+      "p50ms": 274,
+      "p95ms": 1234,
+      "server": "designer-skill"
+    },
+    {
+      "calls": 2,
+      "failures": 0,
+      "p50ms": 166,
+      "p95ms": 1055,
+      "server": "open-design"
+    },
+    {
+      "calls": 1,
+      "failures": 0,
+      "p50ms": 394,
+      "p95ms": 2356,
+      "server": "raven"
+    }
+  ],
+  "clients": [
+    {
+      "calls": 86,
+      "failures": 1,
+      "p50ms": 182,
+      "p95ms": 1009,
+      "client": "opencode/2.2.6"
+    },
+    {
+      "calls": 22,
+      "failures": 2,
+      "p50ms": 185,
+      "p95ms": 1039,
+      "client": "openclaw/0.9.1"
+    },
+    {
+      "calls": 3,
+      "failures": 0,
+      "p50ms": 137,
+      "p95ms": 553,
+      "client": "hermes/1.2"
+    }
+  ]
+}

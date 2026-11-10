@@ -2,16 +2,15 @@
   "running": true,
   "servers": [
     {
-      "name": "fetch",
+      "name": "memory",
+      "healthy": true
+    },
+    {
+      "name": "context7",
       "healthy": true
     },
     {
       "name": "fs",
-      "healthy": false,
-      "error": "npx: ENOTFOUND registry.npmjs.org"
-    },
-    {
-      "name": "time",
       "healthy": true
     }
   ]

@@ -1,102 +1,1672 @@
 {
-  "set": "demo",
   "calls": [
     {
-      "time": "2026-11-08T23:14:00+03:00",
+      "time": "2026-11-08T23:14:03+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 329,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:13:42+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "dev",
+      "server": "fs",
+      "tool": "list_directory",
+      "ms": 17,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:13:24+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 16,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:13:01+03:00",
       "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "ms": 84,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:12:46+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "read_file",
+      "ms": 26,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:12:28+03:00",
+      "client": "hermes/1.2",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
+      "ms": 24,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:12:05+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 522,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:11:49+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "ms": 752,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:11:23+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 446,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:11:05+03:00",
+      "client": "opencode/2.2.6",
+      "set": "dev",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 61,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:10:41+03:00",
+      "client": "hermes/1.2",
+      "set": "dev",
+      "server": "fs",
+      "tool": "list_directory",
+      "ms": 15,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:10:30+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "ms": 696,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:10:10+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "ms": 269,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:09:49+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 137,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:09:26+03:00",
+      "client": "opencode/2.2.6",
+      "set": "dev",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 539,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:09:11+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 51,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:08:51+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "dev",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 40,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:08:33+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 432,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:08:07+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 29,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:07:57+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 258,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:07:26+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 16,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:07:07+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 156,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:06:47+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 11,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:06:32+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "open-design",
+      "tool": "get_project",
+      "ms": 91,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:06:20+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "portainer",
+      "tool": "list_containers",
+      "ms": 97,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:05:57+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "ops",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 99,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:05:32+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 10,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:05:13+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 410,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:04:53+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "open-design",
+      "tool": "get_project",
+      "ms": 135,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:04:33+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "portainer",
+      "tool": "list_containers",
+      "ms": 77,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:04:18+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 388,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:04:00+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 255,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:03:44+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 110,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:03:19+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "ms": 158,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:02:58+03:00",
+      "client": "hermes/1.2",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 14,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:02:44+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 19,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:02:23+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "open-design",
+      "tool": "get_project",
+      "ms": 116,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:02:05+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "ms": 44,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:01:47+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 179,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:01:23+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 13,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:01:08+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "ms": 1717,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:00:39+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 41,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T23:00:29+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
       "server": "serena",
       "tool": "find_symbol",
       "ms": 41,
       "failed": false
     },
     {
-      "time": "2026-11-08T23:13:43+03:00",
+      "time": "2026-11-08T23:00:01+03:00",
       "client": "opencode/2.2.6",
-      "server": "socraticode",
-      "tool": "codebase_search",
-      "ms": 238,
+      "set": "ops",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 101,
       "failed": false
     },
     {
-      "time": "2026-11-08T23:13:26+03:00",
-      "client": "hermes/1.2",
-      "server": "xerj",
-      "tool": "xerj_search",
-      "ms": 12,
-      "failed": false
-    },
-    {
-      "time": "2026-11-08T23:13:09+03:00",
-      "client": "opencode/2.2.6",
-      "server": "serena",
-      "tool": "activate_project",
-      "ms": 2240,
-      "failed": false
-    },
-    {
-      "time": "2026-11-08T23:12:52+03:00",
-      "client": "hermes/1.2",
-      "server": "socraticode",
-      "tool": "codebase_index",
-      "ms": 500,
-      "failed": true,
-      "error": "таймаут вызова 120000 мс"
-    },
-    {
-      "time": "2026-11-08T23:12:35+03:00",
-      "client": "opencode/2.2.6",
-      "server": "xerj",
-      "tool": "xerj_semantic_search",
-      "ms": 18,
-      "failed": false
-    },
-    {
-      "time": "2026-11-08T23:12:18+03:00",
-      "client": "opencode/2.2.6",
+      "time": "2026-11-08T22:59:47+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
       "server": "serena",
       "tool": "find_referencing_symbols",
+      "ms": 76,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:59:21+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "ms": 229,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:59:09+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "ops",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 113,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:58:46+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 543,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:58:29+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "ms": 1421,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:58:12+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 447,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:57:47+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 660,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:57:25+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 80,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:57:10+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 259,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:56:55+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 806,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:56:29+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 127,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:56:16+03:00",
+      "client": "opencode/2.2.6",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
+      "ms": 15,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:55:55+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 148,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:55:29+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 429,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:55:09+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "ms": 69,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:54:57+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 34,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:54:42+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 485,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:54:11+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "tavily",
+      "tool": "tavily_search",
+      "ms": 383,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:54:01+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
       "ms": 33,
       "failed": false
     },
     {
-      "time": "2026-11-08T23:12:01+03:00",
-      "client": "hermes/1.2",
+      "time": "2026-11-08T22:53:42+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 442,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:53:15+03:00",
+      "client": "opencode/2.2.6",
+      "set": "dev",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 44,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:53:04+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "tavily",
+      "tool": "tavily_search",
+      "ms": 665,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:52:35+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "ms": 169,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:52:20+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 361,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:52:03+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 9,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:51:38+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 190,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:51:17+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
       "server": "xerj",
       "tool": "xerj_search",
-      "ms": 9,
+      "ms": 19,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:51:00+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 145,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:50:49+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 247,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:50:28+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 69,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:50:02+03:00",
+      "client": "hermes/1.2",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 375,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:49:47+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 446,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:49:29+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 235,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:49:06+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "ms": 1106,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:48:51+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 1500,
+      "failed": true,
+      "error": "invoke_command: upstream timeout after 5000 ms"
+    },
+    {
+      "time": "2026-11-08T22:48:24+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 174,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:48:12+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 67,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:47:54+03:00",
+      "client": "opencode/2.2.6",
+      "set": "dev",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 184,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:47:29+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "ms": 315,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:47:06+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "ms": 124,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:46:51+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 224,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:46:26+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "ms": 73,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:46:06+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "read_file",
+      "ms": 13,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:45:54+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 65,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:45:29+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "dev",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 4,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:45:15+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 165,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:44:56+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 178,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:44:37+03:00",
+      "client": "opencode/2.2.6",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
+      "ms": 16,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:44:17+03:00",
+      "client": "hermes/1.2",
+      "set": "ops",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 72,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:43:53+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "ms": 178,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:43:37+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 329,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:43:16+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "ms": 91,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:42:56+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "portainer",
+      "tool": "list_containers",
+      "ms": 215,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:42:44+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 1500,
+      "failed": true,
+      "error": "invoke_command: upstream timeout after 5000 ms"
+    },
+    {
+      "time": "2026-11-08T22:42:20+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "tavily",
+      "tool": "tavily_search",
+      "ms": 562,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:42:01+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "ms": 45,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:41:41+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "dev",
+      "server": "fs",
+      "tool": "list_directory",
+      "ms": 5,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:41:23+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "open-design",
+      "tool": "get_project",
+      "ms": 231,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:41:07+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 251,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:40:46+03:00",
+      "client": "opencode/2.2.6",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
+      "ms": 29,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:40:20+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 16,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:40:02+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "ms": 125,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:39:45+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 181,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:39:26+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 135,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:39:02+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "ops",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 1500,
+      "failed": true,
+      "error": "invoke_command: upstream timeout after 5000 ms"
+    },
+    {
+      "time": "2026-11-08T22:38:51+03:00",
+      "client": "opencode/2.2.6",
+      "set": "ops",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 60,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:38:31+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 535,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:38:03+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "memory",
+      "tool": "memory_query",
+      "ms": 33,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:37:51+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 5000,
+      "failed": true,
+      "error": "context7: 429 Too Many Requests"
+    },
+    {
+      "time": "2026-11-08T22:37:25+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 140,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:37:13+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 382,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:36:48+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "tavily",
+      "tool": "tavily_search",
+      "ms": 436,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:36:28+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 553,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:36:15+03:00",
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 8,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:35:55+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "ms": 224,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:35:37+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 49,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:35:10+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "ms": 173,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:34:54+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "ms": 61,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:34:32+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "ms": 1500,
+      "failed": true,
+      "error": "invoke_command: upstream timeout after 5000 ms"
+    },
+    {
+      "time": "2026-11-08T22:34:16+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "ms": 828,
       "failed": false
     }
   ],
   "counters": [
     {
       "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "calls": 6,
+      "failures": 1,
+      "totalMs": 2981,
+      "p50ms": 310,
+      "p95ms": 1220
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "calls": 5,
+      "failures": 0,
+      "totalMs": 820,
+      "p50ms": 145,
+      "p95ms": 215
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "calls": 5,
+      "failures": 0,
+      "totalMs": 905,
+      "p50ms": 158,
+      "p95ms": 261
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "calls": 5,
+      "failures": 0,
+      "totalMs": 4718,
+      "p50ms": 828,
+      "p95ms": 1595
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "calls": 5,
+      "failures": 0,
+      "totalMs": 332,
+      "p50ms": 69,
+      "p95ms": 82
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "designer-skill",
+      "tool": "dispatch_intent",
+      "calls": 4,
+      "failures": 0,
+      "totalMs": 733,
+      "p50ms": 206,
+      "p95ms": 249
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "calls": 4,
+      "failures": 0,
+      "totalMs": 1621,
+      "p50ms": 439,
+      "p95ms": 537
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "calls": 4,
+      "failures": 1,
+      "totalMs": 1544,
+      "p50ms": 18,
+      "p95ms": 1278
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "calls": 4,
+      "failures": 1,
+      "totalMs": 6176,
+      "p50ms": 514,
+      "p95ms": 4331
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "calls": 4,
+      "failures": 1,
+      "totalMs": 1529,
+      "p50ms": 10,
+      "p95ms": 1277
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "calls": 4,
+      "failures": 0,
+      "totalMs": 606,
+      "p50ms": 152,
+      "p95ms": 173
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "open-design",
+      "tool": "get_project",
+      "calls": 4,
+      "failures": 0,
+      "totalMs": 573,
+      "p50ms": 126,
+      "p95ms": 217
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "tavily",
+      "tool": "tavily_search",
+      "calls": 4,
+      "failures": 0,
+      "totalMs": 2046,
+      "p50ms": 499,
+      "p95ms": 650
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "calls": 4,
+      "failures": 0,
+      "totalMs": 64,
+      "p50ms": 16,
+      "p95ms": 19
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "main",
       "server": "serena",
       "tool": "find_symbol",
       "calls": 3,
       "failures": 0,
-      "total_ms": 92,
-      "p50ms": 31,
-      "p95ms": 88
+      "totalMs": 194,
+      "p50ms": 65,
+      "p95ms": 78
     },
     {
-      "client": "opencode/2.2.6",
+      "client": "hermes/1.2",
+      "set": "main",
       "server": "socraticode",
       "tool": "codebase_search",
       "calls": 3,
       "failures": 0,
-      "total_ms": 92,
-      "p50ms": 31,
-      "p95ms": 88
+      "totalMs": 834,
+      "p50ms": 258,
+      "p95ms": 322
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "demo",
+      "server": "memory",
+      "tool": "memory_query",
+      "calls": 3,
+      "failures": 0,
+      "totalMs": 104,
+      "p50ms": 34,
+      "p95ms": 40
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "calls": 3,
+      "failures": 0,
+      "totalMs": 1411,
+      "p50ms": 447,
+      "p95ms": 526
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "portainer",
+      "tool": "list_containers",
+      "calls": 3,
+      "failures": 0,
+      "totalMs": 389,
+      "p50ms": 97,
+      "p95ms": 203
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "calls": 3,
+      "failures": 0,
+      "totalMs": 1876,
+      "p50ms": 660,
+      "p95ms": 791
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
+      "calls": 3,
+      "failures": 0,
+      "totalMs": 60,
+      "p50ms": 16,
+      "p95ms": 28
     },
     {
       "client": "hermes/1.2",
-      "server": "xerj",
-      "tool": "xerj_search",
-      "calls": 3,
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "calls": 2,
       "failures": 0,
-      "total_ms": 92,
-      "p50ms": 31,
-      "p95ms": 88
+      "totalMs": 834,
+      "p50ms": 417,
+      "p95ms": 443
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "fetch",
+      "tool": "fetch",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 354,
+      "p50ms": 177,
+      "p95ms": 181
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "dev",
+      "server": "fs",
+      "tool": "list_directory",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 22,
+      "p50ms": 11,
+      "p95ms": 16
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "dev",
+      "server": "memory",
+      "tool": "memory_query",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 44,
+      "p50ms": 22,
+      "p95ms": 38
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 678,
+      "p50ms": 339,
+      "p95ms": 504
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 167,
+      "p50ms": 84,
+      "p95ms": 90
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "ops",
+      "server": "gitea",
+      "tool": "list_issues",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 212,
+      "p50ms": 106,
+      "p95ms": 112
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "dev",
+      "server": "context7",
+      "tool": "query-docs",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 723,
+      "p50ms": 362,
+      "p95ms": 521
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "dev",
+      "server": "memory",
+      "tool": "memory_query",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 105,
+      "p50ms": 52,
+      "p95ms": 60
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 92,
+      "p50ms": 46,
+      "p95ms": 50
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "read_file",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 39,
+      "p50ms": 20,
+      "p95ms": 25
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 439,
+      "p50ms": 220,
+      "p95ms": 318
+    },
+    {
+      "client": "opencode/2.2.6",
+      "set": "ops",
+      "server": "fetch",
+      "tool": "fetch",
+      "calls": 2,
+      "failures": 0,
+      "totalMs": 161,
+      "p50ms": 80,
+      "p95ms": 99
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "demo",
+      "server": "context7",
+      "tool": "query-docs",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 375,
+      "p50ms": 375,
+      "p95ms": 375
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "demo",
+      "server": "time",
+      "tool": "get_current_time",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 14,
+      "p50ms": 14,
+      "p95ms": 14
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "dev",
+      "server": "fs",
+      "tool": "list_directory",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 15,
+      "p50ms": 15,
+      "p95ms": 15
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 178,
+      "p50ms": 178,
+      "p95ms": 178
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_referencing_symbols",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 44,
+      "p50ms": 44,
+      "p95ms": 44
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 24,
+      "p50ms": 24,
+      "p95ms": 24
+    },
+    {
+      "client": "hermes/1.2",
+      "set": "ops",
+      "server": "gitea",
+      "tool": "list_issues",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 72,
+      "p50ms": 72,
+      "p95ms": 72
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "demo",
+      "server": "memory",
+      "tool": "memory_query",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 33,
+      "p50ms": 33,
+      "p95ms": 33
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "context7",
+      "tool": "resolve-library-id",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 169,
+      "p50ms": 169,
+      "p95ms": 169
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_navigate",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 696,
+      "p50ms": 696,
+      "p95ms": 696
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 1421,
+      "p50ms": 1421,
+      "p95ms": 1421
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 442,
+      "p50ms": 442,
+      "p95ms": 442
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 67,
+      "p50ms": 67,
+      "p95ms": 67
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "ops",
+      "server": "fetch",
+      "tool": "fetch",
+      "calls": 1,
+      "failures": 1,
+      "totalMs": 1500,
+      "p50ms": 1500,
+      "p95ms": 1500
+    },
+    {
+      "client": "openclaw/0.9.1",
+      "set": "ops",
+      "server": "fs",
+      "tool": "read_file",
+      "calls": 1,
+      "failures": 0,
+      "totalMs": 33,
+      "p50ms": 33,
+      "p95ms": 33
     }
-  ]
+  ],
+  "schema": {
+    "schemaBytes": 41230,
+    "schemaTokens": 10307,
+    "tools": 117
+  },
+  "unreachable": []
 }

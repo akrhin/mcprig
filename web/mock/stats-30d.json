@@ -1,0 +1,516 @@
+{
+  "period": "30d",
+  "from": "2026-10-10T00:00:00+03:00",
+  "to": "2026-11-08T00:00:00+03:00",
+  "approximate": true,
+  "totals": {
+    "calls": 5932,
+    "failures": 230,
+    "p50ms": 147,
+    "p95ms": 1180
+  },
+  "series": [
+    {
+      "t": "2026-10-10T00:00:00+03:00",
+      "calls": 191,
+      "failures": 5,
+      "p50ms": 184,
+      "p95ms": 1402
+    },
+    {
+      "t": "2026-10-11T00:00:00+03:00",
+      "calls": 274,
+      "failures": 8,
+      "p50ms": 151,
+      "p95ms": 1580
+    },
+    {
+      "t": "2026-10-12T00:00:00+03:00",
+      "calls": 177,
+      "failures": 6,
+      "p50ms": 197,
+      "p95ms": 804
+    },
+    {
+      "t": "2026-10-13T00:00:00+03:00",
+      "calls": 217,
+      "failures": 12,
+      "p50ms": 183,
+      "p95ms": 1531
+    },
+    {
+      "t": "2026-10-14T00:00:00+03:00",
+      "calls": 246,
+      "failures": 10,
+      "p50ms": 184,
+      "p95ms": 1580
+    },
+    {
+      "t": "2026-10-15T00:00:00+03:00",
+      "calls": 145,
+      "failures": 6,
+      "p50ms": 176,
+      "p95ms": 1328
+    },
+    {
+      "t": "2026-10-16T00:00:00+03:00",
+      "calls": 140,
+      "failures": 6,
+      "p50ms": 133,
+      "p95ms": 1093
+    },
+    {
+      "t": "2026-10-17T00:00:00+03:00",
+      "calls": 178,
+      "failures": 3,
+      "p50ms": 136,
+      "p95ms": 1468
+    },
+    {
+      "t": "2026-10-18T00:00:00+03:00",
+      "calls": 219,
+      "failures": 10,
+      "p50ms": 124,
+      "p95ms": 1099
+    },
+    {
+      "t": "2026-10-19T00:00:00+03:00",
+      "calls": 203,
+      "failures": 6,
+      "p50ms": 205,
+      "p95ms": 1480
+    },
+    {
+      "t": "2026-10-20T00:00:00+03:00",
+      "calls": 160,
+      "failures": 10,
+      "p50ms": 110,
+      "p95ms": 922
+    },
+    {
+      "t": "2026-10-21T00:00:00+03:00",
+      "calls": 161,
+      "failures": 6,
+      "p50ms": 94,
+      "p95ms": 772
+    },
+    {
+      "t": "2026-10-22T00:00:00+03:00",
+      "calls": 198,
+      "failures": 11,
+      "p50ms": 161,
+      "p95ms": 1470
+    },
+    {
+      "t": "2026-10-23T00:00:00+03:00",
+      "calls": 120,
+      "failures": 8,
+      "p50ms": 155,
+      "p95ms": 1059
+    },
+    {
+      "t": "2026-10-24T00:00:00+03:00",
+      "calls": 276,
+      "failures": 11,
+      "p50ms": 194,
+      "p95ms": 947
+    },
+    {
+      "t": "2026-10-25T00:00:00+03:00",
+      "calls": 247,
+      "failures": 6,
+      "p50ms": 171,
+      "p95ms": 1540
+    },
+    {
+      "t": "2026-10-26T00:00:00+03:00",
+      "calls": 191,
+      "failures": 5,
+      "p50ms": 91,
+      "p95ms": 1539
+    },
+    {
+      "t": "2026-10-27T00:00:00+03:00",
+      "calls": 221,
+      "failures": 8,
+      "p50ms": 185,
+      "p95ms": 786
+    },
+    {
+      "t": "2026-10-28T00:00:00+03:00",
+      "calls": 207,
+      "failures": 9,
+      "p50ms": 152,
+      "p95ms": 705
+    },
+    {
+      "t": "2026-10-29T00:00:00+03:00",
+      "calls": 158,
+      "failures": 8,
+      "p50ms": 129,
+      "p95ms": 1440
+    },
+    {
+      "t": "2026-10-30T00:00:00+03:00",
+      "calls": 133,
+      "failures": 6,
+      "p50ms": 116,
+      "p95ms": 1042
+    },
+    {
+      "t": "2026-10-31T00:00:00+03:00",
+      "calls": 233,
+      "failures": 8,
+      "p50ms": 178,
+      "p95ms": 761
+    },
+    {
+      "t": "2026-11-01T00:00:00+03:00",
+      "calls": 200,
+      "failures": 6,
+      "p50ms": 114,
+      "p95ms": 1508
+    },
+    {
+      "t": "2026-11-02T00:00:00+03:00",
+      "calls": 210,
+      "failures": 10,
+      "p50ms": 134,
+      "p95ms": 803
+    },
+    {
+      "t": "2026-11-03T00:00:00+03:00",
+      "calls": 195,
+      "failures": 4,
+      "p50ms": 97,
+      "p95ms": 1461
+    },
+    {
+      "t": "2026-11-04T00:00:00+03:00",
+      "calls": 270,
+      "failures": 8,
+      "p50ms": 93,
+      "p95ms": 997
+    },
+    {
+      "t": "2026-11-05T00:00:00+03:00",
+      "calls": 136,
+      "failures": 6,
+      "p50ms": 123,
+      "p95ms": 802
+    },
+    {
+      "t": "2026-11-06T00:00:00+03:00",
+      "calls": 135,
+      "failures": 7,
+      "p50ms": 134,
+      "p95ms": 1412
+    },
+    {
+      "t": "2026-11-07T00:00:00+03:00",
+      "calls": 233,
+      "failures": 10,
+      "p50ms": 128,
+      "p95ms": 1001
+    },
+    {
+      "t": "2026-11-08T00:00:00+03:00",
+      "calls": 258,
+      "failures": 11,
+      "p50ms": 113,
+      "p95ms": 778
+    }
+  ],
+  "tools": [
+    {
+      "calls": 629,
+      "failures": 26,
+      "p50ms": 34,
+      "p95ms": 124,
+      "server": "xerj",
+      "tool": "xerj_search"
+    },
+    {
+      "calls": 556,
+      "failures": 20,
+      "p50ms": 79,
+      "p95ms": 381,
+      "server": "serena",
+      "tool": "find_symbol"
+    },
+    {
+      "calls": 491,
+      "failures": 20,
+      "p50ms": 41,
+      "p95ms": 226,
+      "server": "serena",
+      "tool": "read_file"
+    },
+    {
+      "calls": 453,
+      "failures": 16,
+      "p50ms": 90,
+      "p95ms": 354,
+      "server": "serena",
+      "tool": "find_referencing_symbols"
+    },
+    {
+      "calls": 414,
+      "failures": 14,
+      "p50ms": 32,
+      "p95ms": 139,
+      "server": "time",
+      "tool": "get_current_time"
+    },
+    {
+      "calls": 350,
+      "failures": 15,
+      "p50ms": 441,
+      "p95ms": 2482,
+      "server": "context7",
+      "tool": "query-docs"
+    },
+    {
+      "calls": 342,
+      "failures": 14,
+      "p50ms": 201,
+      "p95ms": 1292,
+      "server": "fetch",
+      "tool": "fetch"
+    },
+    {
+      "calls": 284,
+      "failures": 11,
+      "p50ms": 279,
+      "p95ms": 1166,
+      "server": "socraticode",
+      "tool": "codebase_search"
+    },
+    {
+      "calls": 281,
+      "failures": 9,
+      "p50ms": 59,
+      "p95ms": 341,
+      "server": "memory",
+      "tool": "memory_query"
+    },
+    {
+      "calls": 275,
+      "failures": 13,
+      "p50ms": 37,
+      "p95ms": 141,
+      "server": "fs",
+      "tool": "read_file"
+    },
+    {
+      "calls": 240,
+      "failures": 6,
+      "p50ms": 140,
+      "p95ms": 692,
+      "server": "gitea",
+      "tool": "list_issues"
+    },
+    {
+      "calls": 227,
+      "failures": 8,
+      "p50ms": 260,
+      "p95ms": 1585,
+      "server": "designer-skill",
+      "tool": "dispatch_intent"
+    },
+    {
+      "calls": 218,
+      "failures": 13,
+      "p50ms": 560,
+      "p95ms": 2127,
+      "server": "tavily",
+      "tool": "tavily_search"
+    },
+    {
+      "calls": 212,
+      "failures": 3,
+      "p50ms": 919,
+      "p95ms": 3347,
+      "server": "playwright",
+      "tool": "browser_navigate"
+    },
+    {
+      "calls": 205,
+      "failures": 6,
+      "p50ms": 37,
+      "p95ms": 130,
+      "server": "fs",
+      "tool": "list_directory"
+    },
+    {
+      "calls": 199,
+      "failures": 8,
+      "p50ms": 230,
+      "p95ms": 1036,
+      "server": "context7",
+      "tool": "resolve-library-id"
+    },
+    {
+      "calls": 146,
+      "failures": 10,
+      "p50ms": 1418,
+      "p95ms": 9013,
+      "server": "playwright",
+      "tool": "browser_take_screenshot"
+    },
+    {
+      "calls": 144,
+      "failures": 2,
+      "p50ms": 399,
+      "p95ms": 2284,
+      "server": "raven",
+      "tool": "audit_page"
+    },
+    {
+      "calls": 136,
+      "failures": 6,
+      "p50ms": 170,
+      "p95ms": 804,
+      "server": "open-design",
+      "tool": "get_project"
+    },
+    {
+      "calls": 130,
+      "failures": 5,
+      "p50ms": 201,
+      "p95ms": 932,
+      "server": "portainer",
+      "tool": "list_containers"
+    }
+  ],
+  "servers": [
+    {
+      "calls": 1500,
+      "failures": 56,
+      "p50ms": 70,
+      "p95ms": 328,
+      "server": "serena"
+    },
+    {
+      "calls": 629,
+      "failures": 26,
+      "p50ms": 34,
+      "p95ms": 138,
+      "server": "xerj"
+    },
+    {
+      "calls": 549,
+      "failures": 23,
+      "p50ms": 365,
+      "p95ms": 1848,
+      "server": "context7"
+    },
+    {
+      "calls": 480,
+      "failures": 19,
+      "p50ms": 37,
+      "p95ms": 152,
+      "server": "fs"
+    },
+    {
+      "calls": 414,
+      "failures": 14,
+      "p50ms": 32,
+      "p95ms": 121,
+      "server": "time"
+    },
+    {
+      "calls": 358,
+      "failures": 13,
+      "p50ms": 1124,
+      "p95ms": 4784,
+      "server": "playwright"
+    },
+    {
+      "calls": 342,
+      "failures": 14,
+      "p50ms": 200,
+      "p95ms": 1085,
+      "server": "fetch"
+    },
+    {
+      "calls": 284,
+      "failures": 11,
+      "p50ms": 281,
+      "p95ms": 1047,
+      "server": "socraticode"
+    },
+    {
+      "calls": 281,
+      "failures": 9,
+      "p50ms": 60,
+      "p95ms": 340,
+      "server": "memory"
+    },
+    {
+      "calls": 240,
+      "failures": 6,
+      "p50ms": 140,
+      "p95ms": 671,
+      "server": "gitea"
+    },
+    {
+      "calls": 227,
+      "failures": 8,
+      "p50ms": 261,
+      "p95ms": 1462,
+      "server": "designer-skill"
+    },
+    {
+      "calls": 218,
+      "failures": 13,
+      "p50ms": 559,
+      "p95ms": 2556,
+      "server": "tavily"
+    },
+    {
+      "calls": 144,
+      "failures": 2,
+      "p50ms": 400,
+      "p95ms": 1506,
+      "server": "raven"
+    },
+    {
+      "calls": 136,
+      "failures": 6,
+      "p50ms": 170,
+      "p95ms": 693,
+      "server": "open-design"
+    },
+    {
+      "calls": 130,
+      "failures": 5,
+      "p50ms": 201,
+      "p95ms": 962,
+      "server": "portainer"
+    }
+  ],
+  "clients": [
+    {
+      "calls": 4153,
+      "failures": 159,
+      "p50ms": 176,
+      "p95ms": 996,
+      "client": "opencode/2.2.6"
+    },
+    {
+      "calls": 1204,
+      "failures": 49,
+      "p50ms": 177,
+      "p95ms": 628,
+      "client": "openclaw/0.9.1"
+    },
+    {
+      "calls": 575,
+      "failures": 22,
+      "p50ms": 171,
+      "p95ms": 766,
+      "client": "hermes/1.2"
+    }
+  ]
+}

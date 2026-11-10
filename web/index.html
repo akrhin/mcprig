@@ -30,18 +30,15 @@
     <div class="counters">
       <span><b class="n" id="c-sets">—</b> наборов</span>
       <span><b class="n" id="c-servers">—</b> серверов</span>
-      <span><b class="n" id="c-calls">—</b> вызовов в хвосте</span>
-      <span>ошибки <b class="n" id="c-err">—</b></span>
+      <span class="opt"><b class="n" id="c-running">—</b> работают</span>
     </div>
     <div class="top-right">
-      <label class="search">
+      <button class="btn side-open" type="button" id="side-open" aria-controls="side" aria-expanded="false">
         <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>
+          <path d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
-        <span class="sr">Поиск по вызовам</span>
-        <input type="search" id="q" placeholder="поиск по вызовам" autocomplete="off">
-        <kbd>/</kbd>
-      </label>
+        Детали
+      </button>
       <label class="themesel">
         <span class="sr">Цветовая схема</span>
         <select id="theme">
@@ -64,12 +61,20 @@
 
   <div class="body">
 
-    <nav class="rail" aria-label="Наборы">
-      <div class="rail-h"><span>Наборы</span><span class="n" id="rail-count">0</span></div>
+    <nav class="rail" id="rail" aria-label="Наборы">
+      <div class="rail-h">
+        <span class="rail-title">Наборы</span>
+        <span class="n rail-count" id="rail-count">0</span>
+        <button class="iconbtn rail-toggle" type="button" id="rail-toggle" aria-label="Свернуть список наборов" aria-pressed="false">
+          <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 6l-6 6 6 6"/>
+          </svg>
+        </button>
+      </div>
       <div class="sets" id="rail-sets"></div>
       <div class="rail-empty" id="rail-empty" hidden>наборов нет</div>
       <div class="rail-foot">
-        <button class="rail-add" type="button" id="add-toggle">+ набор</button>
+        <button class="rail-add" type="button" id="add-toggle"><span class="plus" aria-hidden="true">+</span><span class="lbl">набор</span></button>
         <form class="addform" id="addform" hidden>
           <label class="f"><span>имя</span><input name="name" autocomplete="off" placeholder="staging"></label>
           <label class="f"><span>порт</span><input name="port" class="n" inputmode="numeric" placeholder="9100"></label>
@@ -89,7 +94,7 @@
         <button class="mini" type="button" id="errbar-close">скрыть</button>
       </div>
 
-      <section class="block" id="empty-state" hidden>
+      <section class="block emptywrap" id="empty-state" hidden>
         <div class="block-h"><h2>Нет наборов</h2></div>
         <div class="empty">
           <h3>Соберите первый endpoint</h3>
@@ -104,7 +109,7 @@
       </section>
 
       <div class="phead" id="phead" hidden>
-        <div>
+        <div class="phead-id">
           <div class="title-row">
             <h1 id="set-name">—</h1>
             <span class="port n" id="set-port"></span>
@@ -137,105 +142,240 @@
         <div class="ed" id="set-error-d"></div>
       </div>
 
-      <div class="kpis" id="kpis" hidden>
-        <div class="kpi">
-          <span class="od-stat"><span class="kv n" id="k-calls">—</span><span class="kl">вызовы в хвосте</span></span>
-        </div>
-        <div class="kpi">
-          <span class="od-stat"><span class="kv n" id="k-p50">—</span><span class="kl">p50</span></span>
-        </div>
-        <div class="kpi">
-          <span class="od-stat"><span class="kv n" id="k-p95">—</span><span class="kl">p95</span></span>
-        </div>
-        <div class="kpi">
-          <span class="od-stat"><span class="kv n" id="k-err">—</span><span class="kl">ошибки</span></span>
-        </div>
+      <nav class="tabs" id="tabs" role="tablist" aria-label="Раздел" hidden>
+        <button class="tab" type="button" role="tab" id="tabbtn-overview" aria-controls="tab-overview" aria-selected="true" data-tab="overview">Обзор</button>
+        <button class="tab" type="button" role="tab" id="tabbtn-calls" aria-controls="tab-calls" aria-selected="false" tabindex="-1" data-tab="calls">Вызовы</button>
+        <button class="tab" type="button" role="tab" id="tabbtn-stats" aria-controls="tab-stats" aria-selected="false" tabindex="-1" data-tab="stats">Статистика</button>
+      </nav>
+
+      <div class="region" id="region">
+
+        <section class="tabpane scroll" id="tab-overview" role="tabpanel" aria-labelledby="tabbtn-overview">
+
+          <div class="kpis" id="kpis" hidden>
+            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-calls">—</span><span class="kl">вызовов</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-err">—</span><span class="kl">ошибок</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-p50">—</span><span class="kl">p50</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kv n" id="k-p95">—</span><span class="kl">p95</span></span></div>
+          </div>
+
+          <section class="block" id="sets-block" hidden>
+            <div class="block-h">
+              <h2>Наборы</h2>
+              <span class="hint">одна точка входа на набор · порты выдаёт менеджер</span>
+              <span class="hint n" id="sets-count">0</span>
+            </div>
+            <div class="tw">
+              <table class="t">
+                <caption class="sr">Наборы, их порты, состояние и серверы</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Набор</th>
+                    <th scope="col" class="hide-sm">Порт</th>
+                    <th scope="col">Состояние</th>
+                    <th scope="col" class="num hide-sm">Серверов</th>
+                    <th scope="col" class="hide-md">Аптайм</th>
+                    <th scope="col" class="num" title="счётчики показываются для выбранного набора">Вызовов</th>
+                    <th scope="col" class="num" title="счётчики показываются для выбранного набора">Ошибок</th>
+                  </tr>
+                </thead>
+                <tbody id="sets-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="block" id="tail-block" hidden>
+            <div class="block-h">
+              <h2>Последние вызовы</h2>
+              <span class="hint" id="tail-span">—</span>
+              <button class="mini push" type="button" id="tail-all">все вызовы</button>
+            </div>
+            <div class="tw">
+              <table class="t mini tail">
+                <caption class="sr">Восемь последних вызовов выбранного набора</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Время</th>
+                    <th scope="col" class="hide-xs">Сервер</th>
+                    <th scope="col">Инструмент</th>
+                    <th scope="col" class="num hide-sm">мс</th>
+                    <th scope="col" class="num">Статус</th>
+                  </tr>
+                </thead>
+                <tbody id="tail-body"></tbody>
+              </table>
+            </div>
+            <p class="emptymsg sm" id="tail-empty" hidden>вызовов пока нет — набор ещё не получал запросов</p>
+          </section>
+        </section>
+
+        <section class="tabpane" id="tab-calls" role="tabpanel" aria-labelledby="tabbtn-calls" hidden>
+          <div class="toolbar">
+            <label class="search">
+              <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>
+              </svg>
+              <span class="sr">Поиск по вызовам</span>
+              <input type="search" id="q" placeholder="поиск по вызовам" autocomplete="off">
+              <kbd>/</kbd>
+            </label>
+            <label class="check"><input type="checkbox" id="only-err"> только ошибки</label>
+            <span class="hint n push" id="calls-count">0</span>
+          </div>
+          <div class="tw fill">
+            <table class="t stick">
+              <caption class="sr">Последние вызовы выбранного набора</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Время</th>
+                  <th scope="col">Сервер</th>
+                  <th scope="col">Инструмент</th>
+                  <th scope="col" class="hide-md">Клиент</th>
+                  <th scope="col" class="num">мс</th>
+                  <th scope="col" class="num">Статус</th>
+                </tr>
+              </thead>
+              <tbody id="calls-body"></tbody>
+            </table>
+          </div>
+          <p class="emptymsg" id="calls-note" hidden></p>
+        </section>
+
+        <section class="tabpane scroll" id="tab-stats" role="tabpanel" aria-labelledby="tabbtn-stats" hidden>
+
+          <div class="toolbar">
+            <div class="periods" id="s-period" role="group" aria-label="Период">
+              <button class="segbtn" type="button" data-period="today" aria-pressed="true">Сегодня</button>
+              <button class="segbtn" type="button" data-period="7d" aria-pressed="false" tabindex="-1">7 дней</button>
+              <button class="segbtn" type="button" data-period="30d" aria-pressed="false" tabindex="-1">30 дней</button>
+              <button class="segbtn" type="button" data-period="archive" aria-pressed="false" tabindex="-1">Архив</button>
+            </div>
+            <label class="field">
+              <span>набор</span>
+              <select id="s-set"><option value="">все наборы</option></select>
+            </label>
+            <label class="field">
+              <span>сервер</span>
+              <select id="s-server"><option value="">все</option></select>
+            </label>
+            <label class="field">
+              <span>инструмент</span>
+              <select id="s-tool"><option value="">все</option></select>
+            </label>
+            <label class="field">
+              <span>клиент</span>
+              <select id="s-client"><option value="">все</option></select>
+            </label>
+            <button class="mini push" type="button" id="s-reset">сбросить</button>
+          </div>
+
+          <div class="kpis" id="s-kpis">
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-calls">—</span></span><span class="kl">вызовов</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-fail">—</span></span><span class="kl">ошибок</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p50">—</span><span class="approx" id="s-p50-a" hidden title="по гистограмме">≈</span></span><span class="kl">p50</span></span></div>
+            <div class="kpi"><span class="od-stat"><span class="kvv"><span class="kv n" id="s-p95">—</span><span class="approx" id="s-p95-a" hidden title="по гистограмме">≈</span></span><span class="kl">p95</span></span></div>
+          </div>
+
+          <div class="sgrid" id="s-charts">
+            <section class="card" id="s-activity">
+              <div class="card-h">
+                <h2 id="s-activity-title">Вызовы по часам</h2>
+                <span class="hint" id="s-span">—</span>
+              </div>
+              <div class="bars" id="activity-bars" role="img" aria-label="Вызовы по корзинам периода"></div>
+              <div class="bars-x"><span id="s-from">—</span><span id="s-to">—</span></div>
+              <p class="emptymsg sm" id="activity-empty" hidden>в этом периоде вызовов нет</p>
+            </section>
+
+            <section class="card" id="s-tools">
+              <div class="card-h"><h2>Топ инструментов</h2><span class="hint n" id="s-tools-count">0</span></div>
+              <div class="tw">
+                <table class="t mini">
+                  <thead><tr><th scope="col">Инструмент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x">p50</th><th scope="col" class="num col-x">p95</th></tr></thead>
+                  <tbody id="tools-body"></tbody>
+                </table>
+              </div>
+              <p class="emptymsg sm" id="tools-empty" hidden>данных нет</p>
+            </section>
+          </div>
+
+          <div class="sgrid two" id="s-breakdowns">
+            <section class="card" id="s-byserver">
+              <div class="card-h"><h2>По серверам</h2></div>
+              <div class="tw">
+                <table class="t mini">
+                  <thead><tr><th scope="col">Сервер</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x">p50</th><th scope="col" class="num col-x">p95</th></tr></thead>
+                  <tbody id="byserver-body"></tbody>
+                </table>
+              </div>
+              <p class="emptymsg sm" id="byserver-empty" hidden>данных нет</p>
+            </section>
+
+            <section class="card" id="s-byclient">
+              <div class="card-h"><h2>По клиентам</h2></div>
+              <div class="tw">
+                <table class="t mini">
+                  <thead><tr><th scope="col">Клиент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x">p50</th><th scope="col" class="num col-x">p95</th></tr></thead>
+                  <tbody id="byclient-body"></tbody>
+                </table>
+              </div>
+              <p class="emptymsg sm" id="byclient-empty" hidden>данных нет</p>
+            </section>
+          </div>
+
+          <p class="emptymsg" id="stats-empty" hidden>
+            <span class="strong">Статистике нечего показать</span>
+            <span id="stats-empty-why">за период вызовов нет</span>
+          </p>
+          <p class="stats-note" id="stats-unreach" hidden></p>
+        </section>
+
       </div>
-
-      <section class="block" id="sets-block" hidden>
-        <div class="block-h">
-          <h2>Наборы</h2>
-          <span class="hint">одна точка входа на набор · порты выдаёт менеджер</span>
-          <span class="hint n" id="sets-count">0</span>
-        </div>
-        <div class="tw">
-          <table class="t">
-            <caption class="sr">Наборы, их порты, состояние и серверы</caption>
-            <thead>
-              <tr>
-                <th scope="col">Набор</th>
-                <th scope="col">Порт</th>
-                <th scope="col">Состояние</th>
-                <th scope="col" class="num">Серверов</th>
-                <th scope="col">Аптайм</th>
-                <th scope="col" class="num">Вызовов в хвосте</th>
-                <th scope="col" class="num">Ошибок</th>
-              </tr>
-            </thead>
-            <tbody id="sets-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="block" id="calls-block" hidden>
-        <div class="block-h">
-          <h2>Вызовы</h2>
-          <span class="hint">живой хвост · <span class="n" id="calls-count">0</span></span>
-        </div>
-        <div class="tw">
-          <table class="t">
-            <caption class="sr">Последние вызовы выбранного набора</caption>
-            <thead>
-              <tr>
-                <th scope="col">Время</th>
-                <th scope="col">Сервер</th>
-                <th scope="col">Инструмент</th>
-                <th scope="col">Клиент</th>
-                <th scope="col" class="num">мс</th>
-                <th scope="col" class="num">Статус</th>
-              </tr>
-            </thead>
-            <tbody id="calls-body"></tbody>
-          </table>
-        </div>
-        <p class="srv-note" id="calls-note" hidden></p>
-      </section>
-
     </main>
 
-    <aside class="side" aria-label="Детали набора">
-
-      <section class="pane">
-        <div class="pane-h"><h2>Серверы набора</h2><span class="cnt n" id="srv-count">0</span></div>
-        <ul class="list" id="servers"></ul>
-        <p class="srv-note" id="servers-empty" hidden>выберите набор</p>
-      </section>
-
-      <section class="pane">
-        <div class="pane-h"><h2>Переменные</h2><span class="cnt n" id="env-count">0</span></div>
-        <ul class="list" id="env"></ul>
-        <p class="srv-note" id="env-empty" hidden>переменных нет</p>
-      </section>
-
-      <section class="pane">
-        <div class="pane-h">
-          <h2>Хвост лога</h2>
-          <button class="mini" type="button" id="log-refresh">обновить</button>
-          <span class="cnt n" id="log-count">0</span>
+    <aside class="side" id="side" aria-label="Детали набора">
+      <div class="side-h">
+        <div class="seg" role="tablist" aria-label="Детали набора">
+          <button class="segbtn" type="button" role="tab" data-side="servers" aria-selected="true">Серверы <span class="cnt n" id="srv-count">0</span></button>
+          <button class="segbtn" type="button" role="tab" data-side="env" aria-selected="false" tabindex="-1">Переменные <span class="cnt n" id="env-count">0</span></button>
+          <button class="segbtn" type="button" role="tab" data-side="log" aria-selected="false" tabindex="-1">Лог <span class="cnt n" id="log-count">0</span></button>
         </div>
-        <div class="log" id="log" aria-live="polite"></div>
-        <p class="srv-note" id="log-empty" hidden>лог пуст</p>
-      </section>
-
+        <button class="iconbtn side-close" type="button" id="side-close" aria-label="Закрыть панель">
+          <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+            <path d="M7 7l10 10M17 7L7 17"/>
+          </svg>
+        </button>
+      </div>
+      <div class="side-body">
+        <section class="pane" data-pane="servers">
+          <ul class="list" id="servers"></ul>
+          <p class="srv-note pad" id="servers-empty" hidden>выберите набор</p>
+        </section>
+        <section class="pane" data-pane="env" hidden>
+          <ul class="list" id="env"></ul>
+          <p class="srv-note pad" id="env-empty" hidden>переменных нет</p>
+          <p class="srv-note pad">значения подставляет процесс набора — панель их не хранит и не показывает</p>
+        </section>
+        <section class="pane logpane" data-pane="log" hidden>
+          <div class="pane-h">
+            <span class="hint">хвост лога набора</span>
+            <button class="mini push" type="button" id="log-wide" aria-pressed="false" title="развернуть панель лога">шире</button>
+            <button class="mini" type="button" id="log-refresh">обновить</button>
+          </div>
+          <div class="log" id="log" aria-live="polite" tabindex="0"></div>
+          <p class="srv-note pad" id="log-empty" hidden>лог пуст</p>
+        </section>
+      </div>
     </aside>
+    <div class="scrim" id="scrim" hidden></div>
   </div>
 
   <footer class="status">
     <span class="item">наборов <b class="n" id="f-sets">—</b></span>
     <span class="dotsep" aria-hidden="true">·</span>
     <span class="item">серверов <b class="n" id="f-servers">—</b></span>
-    <span class="dotsep" aria-hidden="true">·</span>
-    <span class="item">работают <b class="n" id="f-running">—</b></span>
+    <span class="dotsep opt" aria-hidden="true">·</span>
+    <span class="item opt">работают <b class="n" id="f-running">—</b></span>
     <span class="push item"><span class="muted" id="f-updated">—</span></span>
   </footer>
 </div>
@@ -246,12 +386,14 @@
     <button class="mini" type="button" id="keys-close">закрыть</button>
   </div>
   <div class="dlg-body">
-    <table class="t">
-      <thead>
-        <tr><th scope="col">Ключ</th><th scope="col">Создан</th><th scope="col">Состояние</th><th scope="col">Примечание</th><th scope="col"><span class="sr">Действие</span></th></tr>
-      </thead>
-      <tbody id="keys-body"></tbody>
-    </table>
+    <div class="tw">
+      <table class="t">
+        <thead>
+          <tr><th scope="col">Ключ</th><th scope="col">Создан</th><th scope="col">Состояние</th><th scope="col" class="hide-sm">Примечание</th><th scope="col"><span class="sr">Действие</span></th></tr>
+        </thead>
+        <tbody id="keys-body"></tbody>
+      </table>
+    </div>
     <p class="dlg-note">Токен знает только тот, кто его выпустил: панель показывает лишь первые 8 символов. Отзыв ключа действует без перезапуска набора.</p>
   </div>
   <div class="dlg-f">
