@@ -209,6 +209,47 @@ func healthError(out setHealth, err error) setHealth {
 	return out
 }
 
+// startHealthLoop опрашивает запущенные наборы в фоне; Close останавливает.
+func (m *Manager) startHealthLoop() {
+	m.healthStop = make(chan struct{})
+	m.healthDone = make(chan struct{})
+	go func() {
+		defer close(m.healthDone)
+		t := time.NewTicker(m.healthEvery)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				m.pollHealth()
+			case <-m.healthStop:
+				return
+			}
+		}
+	}()
+}
+
+func (m *Manager) stopHealthLoop() {
+	m.healthOnce.Do(func() {
+		if m.healthStop != nil {
+			close(m.healthStop)
+			<-m.healthDone
+		}
+	})
+}
+
+// pollHealth — тот же путь, что GET /api/sets/<id>/servers, но мимо кэша
+// панели: журналу нужен переход, а не ответ браузеру.
+func (m *Manager) pollHealth() {
+	for _, set := range m.store.Sets() {
+		if !m.rt.status(set).Running {
+			continue
+		}
+		view := m.probe(context.Background(), set)
+		view.Running = true
+		m.noteHealth(set.ID, view)
+	}
+}
+
 // noteHealth пишет в stdout (его забирает systemd) только смену состояния:
 // сервер снова здоров — молчим, стал нездоровым — одна строка. Иначе журнал
 // забивается одной и той же строкой каждый цикл опроса.

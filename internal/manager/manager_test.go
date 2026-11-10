@@ -43,6 +43,10 @@ type env struct {
 }
 
 func newEnv(t *testing.T, auth AuthOptions) *env {
+	return newEnvLog(t, auth, nil)
+}
+
+func newEnvLog(t *testing.T, auth AuthOptions, log *slog.Logger) *env {
 	t.Helper()
 	dir := t.TempDir()
 	// httptest.NewRequest ставит Host example.com: пустой список теперь значит
@@ -50,12 +54,15 @@ func newEnv(t *testing.T, auth AuthOptions) *env {
 	if auth.AllowedHosts == nil {
 		auth.AllowedHosts = []string{"example.com"}
 	}
+	if log == nil {
+		log = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	m, err := New(Options{
 		DataDir: dir,
 		Version: "test",
 		CLIPath: fakeBin,
 		Auth:    auth,
-		Log:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Log:     log,
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)

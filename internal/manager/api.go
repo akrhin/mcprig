@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -40,6 +41,11 @@ type Options struct {
 	Version  string
 	Auth     AuthOptions
 	Log      *slog.Logger
+
+	// healthEvery и probe — дырки для тестов фонового опроса здоровья:
+	// в бою период 30 с и настоящая проба набора.
+	healthEvery time.Duration
+	probe       func(context.Context, *registry.Set) setHealth
 }
 
 func FromEnv(version string) Options {
@@ -92,6 +98,12 @@ type Manager struct {
 	health  *healthCache
 	browse  *browser
 	routes  []route
+
+	healthStop  chan struct{}
+	healthDone  chan struct{}
+	healthOnce  sync.Once
+	healthEvery time.Duration
+	probe       func(context.Context, *registry.Set) setHealth
 }
 
 func New(opts Options) (*Manager, error) {
@@ -162,12 +174,24 @@ func New(opts Options) (*Manager, error) {
 		return set, m.store.Servers()
 	}
 	m.routes = m.buildRoutes()
+	m.healthEvery = opts.healthEvery
+	if m.healthEvery <= 0 {
+		m.healthEvery = 30 * time.Second
+	}
+	m.probe = opts.probe
+	if m.probe == nil {
+		m.probe = func(ctx context.Context, set *registry.Set) setHealth {
+			return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, set.Servers, m.version)
+		}
+	}
+	m.startHealthLoop()
 	return m, nil
 }
 
 func (m *Manager) Handler() http.Handler { return m }
 
 func (m *Manager) Close() {
+	m.stopHealthLoop()
 	m.browse.closeAll()
 	m.rt.Close()
 }
@@ -1335,7 +1359,7 @@ func (m *Manager) apiSetServers(req *request) error {
 		return nil
 	}
 	view := m.health.get(req.r.Context(), id, func(ctx context.Context) setHealth {
-		return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, names, m.version)
+		return m.probe(ctx, set)
 	})
 	view.Running = status.Running
 	m.noteHealth(id, view)

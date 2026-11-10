@@ -157,7 +157,9 @@ them without credentials. The panel's `/healthz` contains no set names.
 A set starting or stopping, and a server turning unhealthy, each write one line
 to the panel's stdout (`набор <id>: запущен|остановлен`, `набор <id>: сервер
 <name> unhealthy`), which systemd collects. An unhealthy transition is logged
-only when the state changes, not on every health poll.
+only when the state changes, not on every health poll. The same poll runs in the
+background every 30 s for every running set, so lines appear even with no panel
+open.
 
 ## Access
 
