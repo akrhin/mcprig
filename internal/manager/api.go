@@ -575,25 +575,41 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (m *Manager) checkCSRF(r *http.Request) error {
-	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
 		return nil
 	}
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		return &httpError{http.StatusForbidden, "запрос с чужого сайта"}
 	}
-	if origin := r.Header.Get("Origin"); origin != "" && origin != "null" {
+	origin := r.Header.Get("Origin")
+	if origin != "" && origin != "null" {
 		u, err := url.Parse(origin)
-		if err != nil || !m.originOK(u.Host, r) {
+		if err != nil || !m.originOK(u.Host, r) || !sameScheme(u, r) {
 			// Значения в лог: без них отказ не отладить с чужой машины.
 			m.log.Warn("csrf: origin не совпал", "origin", origin, "host", r.Host,
 				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
+	} else if _, err := r.Cookie(sessionCookie); err == nil {
+		// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
+		// сессионной cookie — подделка. Прокси-аутентификация и вход сюда не
+		// попадают: у login cookie ещё нет, у API её нет вовсе.
+		return &httpError{http.StatusForbidden, "нужен заголовок Origin"}
 	}
 	if r.ContentLength != 0 && r.URL.Path != "/api/login" && !isJSON(r.Header.Get("Content-Type")) {
 		return badRequest("ожидался JSON")
 	}
 	return nil
+}
+
+// sameScheme сверяет схему Origin со схемой запроса. За прокси до Go доходит
+// http, а Origin остаётся https — тогда веру даёт X-Forwarded-Host.
+func sameScheme(u *url.URL, r *http.Request) bool {
+	want := "http"
+	if secureRequest(r) {
+		want = "https"
+	}
+	return u.Scheme == want || u.Scheme == "https" && r.Header.Get("X-Forwarded-Host") != ""
 }
 
 // originOK пускает Origin, равный Host, либо Host, под который прокси

@@ -72,6 +72,13 @@ func (e *env) do(t *testing.T, method, path string, body any) *httptest.Response
 
 func (e *env) doWithCookie(t *testing.T, method, path string, body any, cookie *http.Cookie) *httptest.ResponseRecorder {
 	t.Helper()
+	return e.doWithCookieOrigin(t, method, path, body, cookie, "")
+}
+
+// doWithCookieOrigin то же, но с заголовком Origin: браузер шлёт его на каждый
+// небезопасный запрос, и checkCSRF этого требует при сессионной cookie.
+func (e *env) doWithCookieOrigin(t *testing.T, method, path string, body any, cookie *http.Cookie, origin string) *httptest.ResponseRecorder {
+	t.Helper()
 	var rd io.Reader
 	switch v := body.(type) {
 	case nil:
@@ -87,6 +94,9 @@ func (e *env) doWithCookie(t *testing.T, method, path string, body any, cookie *
 	r := httptest.NewRequest(method, path, rd)
 	if body != nil {
 		r.Header.Set("Content-Type", "application/json")
+	}
+	if origin != "" {
+		r.Header.Set("Origin", origin)
 	}
 	if cookie != nil {
 		r.AddCookie(cookie)
@@ -202,7 +212,7 @@ func TestLoginLogout(t *testing.T) {
 	w = e.doWithCookie(t, http.MethodGet, "/api/state", nil, cookie)
 	status(t, w, http.StatusOK)
 
-	w = e.doWithCookie(t, http.MethodPost, "/api/logout", nil, cookie)
+	w = e.doWithCookieOrigin(t, http.MethodPost, "/api/logout", nil, cookie, "http://example.com")
 	status(t, w, http.StatusOK)
 
 	w = e.doWithCookie(t, http.MethodGet, "/api/state", nil, cookie)

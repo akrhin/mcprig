@@ -181,5 +181,8 @@ time. Both modes can be combined; either one is enough to pass.
 
 Writes (`POST`/`PUT`/`DELETE`) are rejected when `Sec-Fetch-Site` is
 `cross-site`, when `Origin` does not match `Host`, or when the body is not
-JSON. `Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback
-only.
+JSON. A cookie-authenticated write must also carry `Origin`: without it the
+request gets `403` "нужен заголовок Origin" — a browser sends it on every such
+request, a forged one from another site does not. Header-based proxy auth and
+login (`POST /api/login`, no cookie yet) are exempt. `Host` must be in
+`MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.
