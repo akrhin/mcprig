@@ -31,8 +31,8 @@ mcprig — это три вещи в одном бинарнике:
 Что менялось от версии к версии — [CHANGELOG.md](CHANGELOG.md).
 
 `servers.json` — формат lazy-mcp, читается как есть: `servers[]`, обе формы
-`command`, `url`, `env`, `headers`, `transport`, `healthMonitor`,
-`requestTimeout`. Сервер с битым полем остаётся в списке нездоровым со своей
+`command`, `url`, `env`, `envAllow`, `headers`, `sandbox`, `transport`,
+`healthMonitor`, `requestTimeout`. Сервер с битым полем остаётся в списке нездоровым со своей
 ошибкой; отсутствующее имя или невалидный JSON валят загрузку.
 
 ## Архитектура

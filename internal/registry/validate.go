@@ -148,6 +148,20 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	envAllow, err := stringSliceStrict(in, "envAllow")
+	if err != nil {
+		return nil, err
+	}
+	// sandbox и envAllow приходят тем же JSON, что читает config.Load: без
+	// переноса сервер из панели молча терял изоляцию.
+	var sandbox *config.Sandbox
+	if raw, ok := in["sandbox"]; ok && !isNull(raw) {
+		var sb config.Sandbox
+		if err := json.Unmarshal(raw, &sb); err != nil {
+			return nil, fmt.Errorf("sandbox: ожидался объект")
+		}
+		sandbox = &sb
+	}
 	headers, err := stringMapStrict(in, "headers")
 	if err != nil {
 		return nil, err
@@ -198,9 +212,16 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	srv.URL = url
 	srv.Cwd = cwd
 	srv.Env = env
+	srv.EnvAllow = envAllow
 	srv.Headers = headers
 	srv.Tags = tags
 	srv.Enabled = enabled
+	srv.Sandbox = sandbox
+	// Те же правила, что у config.Load, включая запрет untrusted без песочницы:
+	// иначе API отвечает 200 и сервер живёт без изоляции.
+	if msg := srv.Check(); msg != "" {
+		return nil, errors.New(msg)
+	}
 	return srv, nil
 }
 

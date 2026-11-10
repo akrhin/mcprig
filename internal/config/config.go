@@ -53,6 +53,9 @@ type Sandbox struct {
 	MemoryMb      int      `json:"memoryMb,omitempty"`
 	Pids          int      `json:"pids,omitempty"`
 	TimeoutSec    int      `json:"timeoutSec,omitempty"`
+	// TmpMb — размер tmpfs /tmp и заодно RLIMIT_FSIZE: иначе сервер набивает
+	// tmpfs до лимита хоста.
+	TmpMb int `json:"tmpMb,omitempty"`
 }
 
 const (
@@ -71,6 +74,9 @@ const (
 	DefaultSandboxMemoryMb = 512
 	DefaultSandboxPids     = 256
 	DefaultSandboxTimeout  = 30
+	// DefaultSandboxTmpMb — /tmp внутри песочницы: 128 МиБ хватает node и
+	// python, а диск хоста не забивается.
+	DefaultSandboxTmpMb = 128
 )
 
 // DefaultSandboxRO — минимум, без которого не живёт ни один интерпретатор.
@@ -99,6 +105,9 @@ func (s *Sandbox) setDefaults() {
 	}
 	if s.TimeoutSec == 0 {
 		s.TimeoutSec = DefaultSandboxTimeout
+	}
+	if s.TmpMb == 0 {
+		s.TmpMb = DefaultSandboxTmpMb
 	}
 }
 
@@ -131,8 +140,8 @@ func (s *Sandbox) validate() string {
 			}
 		}
 	}
-	if s.MemoryMb < 0 || s.Pids < 0 || s.TimeoutSec < 0 {
-		return "sandbox: memoryMb, pids и timeoutSec не могут быть отрицательными"
+	if s.MemoryMb < 0 || s.Pids < 0 || s.TimeoutSec < 0 || s.TmpMb < 0 {
+		return "sandbox: memoryMb, pids, tmpMb и timeoutSec не могут быть отрицательными"
 	}
 	return ""
 }
@@ -149,10 +158,24 @@ func (s *Server) CallTimeout() time.Duration {
 // Warnings — некритичные замечания: npx/uvx без пина версии ставят «сегодняшний
 // latest», а не тот код, который проверяли.
 func (s *Server) Warnings() []string {
-	if len(s.Command) == 0 {
-		return nil
-	}
 	var out []string
+	if sb := s.Sandbox; sb != nil && sb.Mode == SandboxModeBwrap {
+		// RLIMIT_AS — виртуальная память: node падает даже на 1 ГиБ.
+		if sb.MemoryMb > 0 && sb.MemoryMb < 2048 && isNodeCommand(s.Command) {
+			out = append(out, fmt.Sprintf("sandbox.memoryMb=%d: node/npx не поднимется, нужно ≥2048", sb.MemoryMb))
+		}
+	}
+	for _, name := range s.EnvAllow {
+		if _, ok := s.Env[name]; ok {
+			continue
+		}
+		if _, ok := os.LookupEnv(name); !ok {
+			out = append(out, fmt.Sprintf("envAllow: %s не задана в окружении — сервер получит пусто", name))
+		}
+	}
+	if len(s.Command) == 0 {
+		return out
+	}
 	switch filepath.Base(s.Command[0]) {
 	case "npx", "uvx":
 		pinned := false
@@ -170,6 +193,18 @@ func (s *Server) Warnings() []string {
 		}
 	}
 	return out
+}
+
+// isNodeCommand — команда, которой нужен запас виртуальной памяти.
+func isNodeCommand(argv []string) bool {
+	if len(argv) == 0 {
+		return false
+	}
+	switch filepath.Base(argv[0]) {
+	case "node", "npx", "npm", "pnpm", "yarn", "bun":
+		return true
+	}
+	return false
 }
 
 // untrusted требует песочницы: сервер без неё может выгрести ключи хоста,
@@ -476,6 +511,12 @@ func (s *Server) validate() bool {
 	if s.ConfigError != "" {
 		return false
 	}
+	return s.validateSandbox(s.Sandbox)
+}
+
+// validateSandbox — те же правила над явно переданным блоком песочницы:
+// Check проверяет копию, не трогая общий объект реестра.
+func (s *Server) validateSandbox(sandbox *Sandbox) bool {
 	if s.Name == "" {
 		s.ConfigError = "нет имени"
 		return false
@@ -517,22 +558,45 @@ func (s *Server) validate() bool {
 		s.ConfigError = "cwd допустим только для stdio"
 		return false
 	}
-	if s.Sandbox != nil {
+	if sandbox != nil {
 		if s.Transport != TransportStdio {
 			s.ConfigError = "sandbox допустим только для stdio"
 			return false
 		}
-		s.Sandbox.setDefaults()
-		if msg := s.Sandbox.validate(); msg != "" {
+		sandbox.setDefaults()
+		if msg := sandbox.validate(); msg != "" {
 			s.ConfigError = msg
 			return false
 		}
 	}
-	if s.untrusted() && (s.Sandbox == nil || s.Sandbox.Mode == SandboxModeNone) {
+	if s.untrusted() && (sandbox == nil || sandbox.Mode == SandboxModeNone) {
 		s.ConfigError = "тег untrusted требует sandbox: сервер без изоляции не стартует"
 		return false
 	}
+	// warn/allow разрешают старт без изоляции, когда bwrap недоступен, — для
+	// untrusted это тот же запуск без песочницы, только тише.
+	if s.untrusted() && sandbox.OnUnavailable != OnUnavailableDeny {
+		s.ConfigError = fmt.Sprintf("тег untrusted требует sandbox.onUnavailable=deny, задано %q", sandbox.OnUnavailable)
+		return false
+	}
 	return true
+}
+
+// Check прогоняет те же правила, что Load, над сервером, собранным снаружи
+// файла: реестр и кнопки probe/browse запускают ровно то, что набор отверг бы.
+// Работает на копии: стор отдаёт общий объект, а setDefaults и ConfigError —
+// запись в него. Пустая строка — сервер годен.
+func (s *Server) Check() string {
+	tmp := *s
+	tmp.ConfigError = ""
+	if s.Sandbox != nil {
+		cp := *s.Sandbox
+		tmp.Sandbox = &cp
+	}
+	if tmp.validateSandbox(tmp.Sandbox) {
+		return ""
+	}
+	return tmp.ConfigError
 }
 
 // HTTPTransport is the listener the set exposes to MCP clients.

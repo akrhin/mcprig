@@ -882,6 +882,11 @@ func (m *Manager) apiBrowseOpen(req *request) error {
 	if srv == nil {
 		return badRequest("нужен server или entry")
 	}
+	// entry приходит из тела, минуя реестр: без проверки кнопка browse
+	// запускает сервер, который набор отверг бы.
+	if msg := srv.Check(); msg != "" {
+		return badRequest(msg)
+	}
 	view, err := m.browse.open(req.r.Context(), srv)
 	if err != nil {
 		return &httpError{http.StatusBadGateway, truncate(err.Error(), 800)}

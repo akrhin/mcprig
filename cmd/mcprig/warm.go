@@ -181,7 +181,7 @@ func warmLocal(o *warmConfig) warmResult {
 	if err != nil {
 		return warmResult{Set: set, Error: err.Error()}
 	}
-	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store}
+	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Env: downstream.EnvFor}
 	mgr := mcpserver.New(cfg, version, conn)
 	defer mgr.Close()
 

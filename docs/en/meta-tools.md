@@ -48,6 +48,7 @@ connection: a filtered-out server is never dialed.
 | `enabled` | from the config; a disabled server is not probed and is reported `healthy: true` |
 | `healthy` | result of a probe; `false` for a broken config or a failed connect |
 | `error` | probe error text, present with `healthy: false` |
+| `isolation` | `bwrap` when the sandbox is applied; the literal value `без изоляции: <reason>` when it was requested but unavailable; absent for a server without a sandbox |
 | `tags` | from the config, when present |
 | `version` | build version of the proxy |
 | `pid` | proxy process id |

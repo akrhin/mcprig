@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestParseArgsWarm(t *testing.T) {
@@ -183,5 +184,31 @@ func TestEndpointForMarksOpenSet(t *testing.T) {
 	endpoint, err := endpointFor(context.Background(), o, "main")
 	if err != nil || endpoint != "http://127.0.0.1:9101/mcp" || !o.setOpen {
 		t.Fatalf("endpoint=%q open=%v err=%v", endpoint, o.setOpen, err)
+	}
+}
+
+// Прогрев собирает Connector сам: без Env он раздавал ребёнку весь os.Environ().
+func TestWarmLocalEnvWhitelist(t *testing.T) {
+	dir := t.TempDir()
+	dump := filepath.Join(dir, "env.txt")
+	cfgPath := filepath.Join(dir, "servers.json")
+	body := `{"servers":[{"name":"dumper","command":["/bin/sh","-c","env > ` + dump + `; exit 1"]}],"transport":{"type":"stdio"}}`
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MCPRIG_DATA_DIR", dir)
+	t.Setenv("MCPRIG_WARM_CANARY", "topsecret")
+
+	warmLocal(&warmConfig{Config: cfgPath, Timeout: 10 * time.Second})
+
+	data, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("сервер не запустился: %v", err)
+	}
+	if !strings.Contains(string(data), "PATH=") {
+		t.Fatalf("окружение не дошло вовсе — проверка ничего не доказывает: %q", data)
+	}
+	if strings.Contains(string(data), "MCPRIG_WARM_CANARY") {
+		t.Fatalf("warm раздал окружение хоста: %s", data)
 	}
 }

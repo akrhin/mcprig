@@ -25,6 +25,11 @@ func (m *Manager) probeServer(ctx context.Context, srv registry.Server) probeRes
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
 
+	if msg := srv.Check(); msg != "" {
+		out.Error = msg
+		out.MS = time.Since(start).Milliseconds()
+		return out
+	}
 	session, err := (&downstream.Connector{Version: m.version, Env: managerEnv(m.sec)}).Connect(ctx, expandServer(srv, m.sec))
 	if err != nil {
 		out.Error = truncate(err.Error(), 800)

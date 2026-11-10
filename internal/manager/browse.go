@@ -89,6 +89,9 @@ func (b *browser) open(ctx context.Context, srv registry.Server) (*browseView, e
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 
+	if msg := srv.Check(); msg != "" {
+		return nil, errors.New(msg)
+	}
 	session, err := (&downstream.Connector{Version: b.version, Env: managerEnv(b.sec)}).Connect(ctx, expandServer(srv, b.sec))
 	if err != nil {
 		return nil, err

@@ -16,7 +16,7 @@ MCP client ──HTTP/stdio──▶ set process (mcprig serve) ──stdio/HTTP
 | --- | --- |
 | panel | registry, key issuing, supervision, secrets, HTTP API and UI |
 | set process | the five meta-tools, downstream sessions, health, counters, OAuth |
-| downstream | a stdio child process or an HTTP MCP endpoint |
+| downstream | a stdio child process (optionally wrapped in `bwrap` by `internal/sandbox`), or an HTTP MCP endpoint |
 
 The panel is a control plane: it never proxies MCP traffic. Clients talk to
 the set process directly, at `http://<host>:<port>/mcp` with the set's bearer

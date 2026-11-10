@@ -128,5 +128,11 @@ func exportServer(srv Server) map[string]any {
 	if len(srv.Tags) > 0 {
 		out["tags"] = srv.Tags
 	}
+	if len(srv.EnvAllow) > 0 {
+		out["envAllow"] = srv.EnvAllow
+	}
+	if srv.Sandbox != nil {
+		out["sandbox"] = srv.Sandbox
+	}
 	return out
 }

@@ -29,6 +29,9 @@ type serverHealth struct {
 	Name    string `json:"name"`
 	Healthy *bool  `json:"healthy"`
 	Error   string `json:"error,omitempty"`
+	// Isolation повторяет пометку list_servers: «без изоляции: …» видно и в
+	// health, а не только в логе набора.
+	Isolation string `json:"isolation,omitempty"`
 }
 
 type setHealth struct {
@@ -155,9 +158,10 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 	}
 	var payload struct {
 		Servers []struct {
-			Name    string `json:"name"`
-			Healthy bool   `json:"healthy"`
-			Error   string `json:"error"`
+			Name      string `json:"name"`
+			Healthy   bool   `json:"healthy"`
+			Error     string `json:"error"`
+			Isolation string `json:"isolation"`
 		} `json:"servers"`
 	}
 	if text := firstText(res); text != "" {
@@ -166,20 +170,23 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 		}
 	}
 	known := map[string]struct {
-		healthy bool
-		err     string
+		healthy   bool
+		err       string
+		isolation string
 	}{}
 	for _, s := range payload.Servers {
 		known[s.Name] = struct {
-			healthy bool
-			err     string
-		}{s.Healthy, truncate(s.Error, 500)}
+			healthy   bool
+			err       string
+			isolation string
+		}{s.Healthy, truncate(s.Error, 500), s.Isolation}
 	}
 	for i := range out.Servers {
 		if s, ok := known[out.Servers[i].Name]; ok {
 			healthy := s.healthy
 			out.Servers[i].Healthy = &healthy
 			out.Servers[i].Error = s.err
+			out.Servers[i].Isolation = s.isolation
 			continue
 		}
 		errText := fmt.Sprintf("набор не ответил за %s", healthLoadTimeout)

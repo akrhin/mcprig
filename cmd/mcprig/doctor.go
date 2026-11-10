@@ -20,6 +20,7 @@ import (
 	"github.com/sintez/mcprig/internal/config"
 	"github.com/sintez/mcprig/internal/manager"
 	"github.com/sintez/mcprig/internal/registry"
+	"github.com/sintez/mcprig/internal/sandbox"
 	"github.com/sintez/mcprig/internal/toolout"
 )
 
@@ -111,7 +112,8 @@ func buildDoctorReport(o doctorOptions, envLine doctorLine, haveEnv bool) doctor
 	}
 	reg, regRaw, regErr := readRegistry(o.DataDir)
 	var scanRaw []byte
-	rep.Config, scanRaw = checkConfig(o.ConfigPath, reg, regRaw)
+	var cfg *config.Config
+	rep.Config, scanRaw, cfg = checkConfig(o.ConfigPath, reg, regRaw)
 	rep.Sets, rep.Keys = checkSets(reg, regErr, o.DataDir, o.BindIP)
 	if haveEnv {
 		// env панели — документированное место для секретов; без него doctor
@@ -120,7 +122,7 @@ func buildDoctorReport(o doctorOptions, envLine doctorLine, haveEnv bool) doctor
 	} else {
 		rep.Secrets = checkSecrets(scanRaw, o.DataDir)
 	}
-	rep.Services = checkServices(o, reg, regErr)
+	rep.Services = append(checkSandbox(cfg), checkServices(o, reg, regErr)...)
 
 	for _, lines := range [][]doctorLine{rep.Version, rep.Config, rep.Sets, rep.Keys, rep.Secrets, rep.Services} {
 		for _, line := range lines {
@@ -198,13 +200,13 @@ func readRegistry(dataDir string) (*registry.Data, []byte, error) {
 
 // checkConfig сообщает, какой источник конфигурации действует, и отдаёт его
 // сырой текст: по нему ищутся ${VAR}.
-func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, []byte) {
+func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, []byte, *config.Config) {
 	raw, err := os.ReadFile(path)
 	switch {
 	case err == nil:
 		cfg, loadErr := config.Load(path)
 		if loadErr != nil {
-			return []doctorLine{{false, fmt.Sprintf("конфиг %s: %v", path, loadErr)}}, raw
+			return []doctorLine{{false, fmt.Sprintf("конфиг %s: %v", path, loadErr)}}, raw, nil
 		}
 		enabled := 0
 		lines := []doctorLine{}
@@ -217,7 +219,7 @@ func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, 
 			}
 		}
 		lines = append([]doctorLine{{true, fmt.Sprintf("конфиг %s: %d серверов, %d включено", path, len(cfg.Servers), enabled)}}, lines...)
-		return lines, raw
+		return lines, raw, cfg
 	case errors.Is(err, fs.ErrNotExist):
 		if reg != nil {
 			enabled := 0
@@ -226,11 +228,11 @@ func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, 
 					enabled++
 				}
 			}
-			return []doctorLine{{true, fmt.Sprintf("конфиг %s не найден, серверы из реестра: %d, %d включено", path, len(reg.Servers), enabled)}}, regRaw
+			return []doctorLine{{true, fmt.Sprintf("конфиг %s не найден, серверы из реестра: %d, %d включено", path, len(reg.Servers), enabled)}}, regRaw, nil
 		}
-		return []doctorLine{{false, fmt.Sprintf("конфиг %s не найден, реестр недоступен", path)}}, nil
+		return []doctorLine{{false, fmt.Sprintf("конфиг %s не найден, реестр недоступен", path)}}, nil, nil
 	default:
-		return []doctorLine{{false, fmt.Sprintf("конфиг %s: %v", path, err)}}, nil
+		return []doctorLine{{false, fmt.Sprintf("конфиг %s: %v", path, err)}}, nil, nil
 	}
 }
 
@@ -344,6 +346,26 @@ func checkSecrets(raw []byte, dataDir string) []doctorLine {
 		lines = append(lines, doctorLine{false, fmt.Sprintf("OpenBao: %s", sec.RemoteError())})
 	}
 	return lines
+}
+
+// checkSandbox спрашивает то же, что проверит Wrap: bwrap есть и userns
+// разрешён. Провал — ошибка только когда песочницу кто-то просит.
+func checkSandbox(cfg *config.Config) []doctorLine {
+	wanted := false
+	if cfg != nil {
+		for _, srv := range cfg.Servers {
+			if sb := srv.Sandbox; sb != nil && sb.Mode == config.SandboxModeBwrap {
+				wanted = true
+			}
+		}
+	}
+	if err := sandbox.Probe(); err != nil {
+		if wanted {
+			return []doctorLine{{false, fmt.Sprintf("песочница: %v (её просят серверы конфига)", err)}}
+		}
+		return []doctorLine{{true, fmt.Sprintf("предупреждение: песочница: %v", err)}}
+	}
+	return []doctorLine{{true, "песочница: bwrap запускается, userns разрешён"}}
 }
 
 func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLine {

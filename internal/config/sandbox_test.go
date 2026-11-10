@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestSandboxDefaults(t *testing.T) {
 		t.Errorf("умолчания блока: %+v", boxed.Sandbox)
 	}
 	if boxed.Sandbox.MemoryMb != DefaultSandboxMemoryMb || boxed.Sandbox.Pids != DefaultSandboxPids ||
-		boxed.Sandbox.TimeoutSec != DefaultSandboxTimeout {
+		boxed.Sandbox.TimeoutSec != DefaultSandboxTimeout || boxed.Sandbox.TmpMb != DefaultSandboxTmpMb {
 		t.Errorf("числовые умолчания: %+v", boxed.Sandbox)
 	}
 	if len(boxed.Sandbox.RO) != len(DefaultSandboxRO) {
@@ -132,5 +133,64 @@ func TestEnvAllowParsed(t *testing.T) {
 	}
 	if got := cfg.Servers[0].EnvAllow; len(got) != 1 || got[0] != "GITHUB_TOKEN" {
 		t.Fatalf("envAllow: %v", got)
+	}
+}
+
+// envAllow ссылается на переменную владельца: если её нет, сервер получит
+// пусто — это видно в предупреждениях, а не только в поведении.
+func TestWarningsEnvAllowMissing(t *testing.T) {
+	t.Setenv("MCPRIG_PRESENT_VAR", "x")
+	t.Setenv("MCPRIG_ABSENT_VAR", "")
+	os.Unsetenv("MCPRIG_ABSENT_VAR")
+	srv := &Server{Command: []string{"node", "srv.js"}, EnvAllow: []string{"MCPRIG_PRESENT_VAR", "MCPRIG_ABSENT_VAR"}}
+	got := srv.Warnings()
+	if len(got) != 1 || !strings.Contains(got[0], "MCPRIG_ABSENT_VAR") {
+		t.Fatalf("warnings = %v", got)
+	}
+	// Переменная, заданная сервером самим, — не проблема.
+	srv = &Server{Command: []string{"node", "srv.js"}, EnvAllow: []string{"OWN"},
+		Env: map[string]string{"OWN": "1"}}
+	if got := srv.Warnings(); len(got) != 0 {
+		t.Fatalf("warnings = %v", got)
+	}
+}
+
+// node под RLIMIT_AS 512 МиБ не поднимается — предупреждаем заранее.
+func TestWarningsNodeMemory(t *testing.T) {
+	srv := &Server{Command: []string{"npx", "-y", "pkg@1.0.0"},
+		Sandbox: &Sandbox{Mode: SandboxModeBwrap, MemoryMb: 512}}
+	got := srv.Warnings()
+	found := false
+	for _, w := range got {
+		if strings.Contains(w, "memoryMb=512") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("нет предупреждения про память: %v", got)
+	}
+	srv.Sandbox.MemoryMb = 2048
+	if got := srv.Warnings(); len(got) != 0 {
+		t.Fatalf("предупреждение осталось при 2048: %v", got)
+	}
+}
+
+// Check не пишет в сервер: стор отдаёт общий объект, и гонка с BuildSetConfig
+// ловилась race-детектором.
+func TestCheckDoesNotMutate(t *testing.T) {
+	srv := &Server{
+		Name:      "x",
+		Transport: TransportStdio,
+		Command:   []string{"echo"},
+		Sandbox:   &Sandbox{Mode: SandboxModeBwrap},
+	}
+	if msg := srv.Check(); msg != "" {
+		t.Fatalf("ожидался годный сервер, got %q", msg)
+	}
+	if srv.Sandbox.MemoryMb != 0 || srv.Sandbox.OnUnavailable != "" || srv.Sandbox.TmpMb != 0 {
+		t.Fatalf("Check заполнил умолчания в общем объекте: %+v", *srv.Sandbox)
+	}
+	if srv.ConfigError != "" {
+		t.Fatalf("Check записал ConfigError: %q", srv.ConfigError)
 	}
 }

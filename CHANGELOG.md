@@ -18,14 +18,45 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - Servers tagged `untrusted` require a sandbox; without one the config is
   rejected and the server never runs.
 - `envAllow` per server, and a warning in `mcprig doctor` for `npx -y` / `uvx`
-  without a pinned version.
+  without a pinned version, for an `envAllow` name the environment does not
+  have, and for `memoryMb` below 2048 on a node command.
+- `sandbox.tmpMb` (default 128): the `/tmp` tmpfs is size-limited and carries
+  `RLIMIT_FSIZE`, so a child cannot fill the host disk. `mcprig doctor` probes
+  bubblewrap itself.
+- `list_servers` and the panel health answer carry `isolation`: `bwrap` when
+  the sandbox is applied, `без изоляции: <reason>` when it was requested but
+  unavailable. The note clears once the sandbox works again.
 
 ### Fixed
 
 - A stdio server started by `mcprig serve` or `mcprig stdio` received the whole
   environment of the host process, including every API key in it. Now it gets a
   fixed base (`PATH`, `HOME`, `LANG`, `TMPDIR`, `LC_*`, `XDG_*`, `SSL_*`,
-  `NODE_EXTRA_CA_CERTS`) plus what `env` and `envAllow` name explicitly.
+  `TZ`, `NODE_EXTRA_CA_CERTS`) plus what `env` and `envAllow` name explicitly.
+- Editing a server in the panel dropped `sandbox` and `envAllow`: the registry
+  parser did not read them, so the API answered `200` and the isolation
+  disappeared on the next save. Both round-trip through add, update, import and
+  export now.
+- `untrusted` accepted `onUnavailable: warn|allow`, which is the same
+  unprotected start only quieter; only `deny` passes.
+- The `probe` and `browse` buttons, and `mcprig warm`, started a server without
+  the validation `config.Load` applies, and `warm` still handed the child the
+  whole host environment.
+- A sandbox that failed to apply was visible only in the package log; `warn`
+  and `allow` made the server run unprotected while health said it was fine.
+- When a child died before `initialize`, the reason in its stderr was lost:
+  Go sends stderr to `/dev/null`, so `bwrap: execvp …: No such file` arrived as
+  a bare `EOF`. The last 4 KB of stderr now accompanies the error, with the
+  server's own secrets masked.
+- A `timeoutSec` that fired left the session alive, so the next call could read
+  the previous answer; the session is dropped and the error unwraps to
+  `context.DeadlineExceeded`.
+- `probe` hard-coded `/usr/bin/true` and ran on every connect; it now resolves
+  `true` through `PATH` and caches a success.
+- A missing `rw`/`cwd` path was silently skipped, leaving the server without the
+  directory it was meant to have; only missing default `ro` paths are skipped.
+- `Check` filled defaults in the shared registry object, racing with set
+  building; it now validates a copy.
 
 ## [0.3.3] - 2026-11-10
 

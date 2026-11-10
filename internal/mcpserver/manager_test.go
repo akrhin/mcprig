@@ -648,3 +648,20 @@ func TestStatsSkipUnknownTool(t *testing.T) {
 		t.Fatalf("счётчики/хвост от неизвестного имени: %+v", snap)
 	}
 }
+
+// Деградация песочницы должна быть видна в list_servers, а не только в логе.
+func TestIsolationNote(t *testing.T) {
+	boxed := &entry{srv: &config.Server{Sandbox: &config.Sandbox{Mode: config.SandboxModeBwrap}}}
+	if got := boxed.isolationNote(); got != "bwrap" {
+		t.Fatalf("изоляция: %q", got)
+	}
+	boxed.sandboxMu.Lock()
+	boxed.sandboxNote = "bwrap не найден в PATH"
+	boxed.sandboxMu.Unlock()
+	if got := boxed.isolationNote(); !strings.HasPrefix(got, "без изоляции: ") {
+		t.Fatalf("деградация не помечена: %q", got)
+	}
+	if got := (&entry{srv: &config.Server{}}).isolationNote(); got != "" {
+		t.Fatalf("сервер без песочницы помечен: %q", got)
+	}
+}

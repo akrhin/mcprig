@@ -10,12 +10,13 @@
 # TestSandboxIsolatesStdioServer (Canary:clean) — здесь он не воспроизводим:
 # bwrap наследует env, сужение делает Go.
 #
-# Запуск: bash scripts/sandbox-e2e.sh   (переменные: MEMORY_MB, PIDS)
+# Запуск: bash scripts/sandbox-e2e.sh   (переменные: MEMORY_MB, PIDS, TMP_MB)
 set -uo pipefail
 
 BWRAP=${BWRAP:-/usr/bin/bwrap}
 MEMORY_MB=${MEMORY_MB:-4096}
 PIDS=${PIDS:-256}
+TMP_MB=${TMP_MB:-128}
 TIMEOUT_SEC=${TIMEOUT_SEC:-20}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/mcprig-sandbox-e2e.XXXXXX")
@@ -38,18 +39,29 @@ fi
 
 mkdir -p "$WORK/rw"
 
-ARGS=("$BWRAP" --tmpfs /tmp --proc /proc --dev /dev --bind "$WORK/rw" "$WORK/rw")
+ARGS=("$BWRAP" --size "$((TMP_MB * 1024 * 1024))" --tmpfs /tmp --proc /proc --dev /dev
+	--bind "$WORK/rw" "$WORK/rw")
 for p in /usr /bin /lib /lib64 /etc/ssl /etc/resolv.conf /etc/passwd /etc/group; do
 	[ -e "$p" ] && ARGS+=(--ro-bind "$p" "$p")
 done
 ARGS+=(--remount-ro / --unshare-user --unshare-pid --unshare-ipc --unshare-uts
 	--unshare-cgroup-try --unshare-net --die-with-parent --new-session
-	--chdir / --setenv TMPDIR /tmp -- prlimit "--as=$((MEMORY_MB * 1024 * 1024))" "--nproc=$PIDS" --)
+	--chdir / --setenv TMPDIR /tmp -- prlimit "--as=$((MEMORY_MB * 1024 * 1024))" "--nproc=$PIDS"
+	"--fsize=$((TMP_MB * 1024 * 1024))" --)
 
 # sb <команда...> — запускает команду в песочнице.
 sb() {
 	timeout "$TIMEOUT_SEC" env -i PATH=/usr/bin:/bin LANG=C TZ=UTC TMPDIR=/tmp "${ARGS[@]}" "$@"
 }
+
+# Без бинарей внутри песочницы негативные проверки зеленели бы сами собой —
+# «команда не нашлась» выглядит как «доступ запрещён».
+for bin in /usr/bin/test /usr/bin/cat /usr/bin/touch /usr/bin/mount /usr/bin/python3 /usr/bin/bash; do
+	if ! sb /usr/bin/test -x "$bin" 2>/dev/null; then
+		echo "FAIL  в песочнице нет $bin — проверки ниже ничего не доказывают" >&2
+		exit 1
+	fi
+done
 
 # 1. Домашний каталог и ключ: их в песочнице нет.
 if sb /usr/bin/test -e "$HOME" 2>/dev/null; then
@@ -105,15 +117,25 @@ fi
 # 5. env: реальный Go-путь (whitelist + envAllow) проверяется только через
 # mcprig: bwrap env наследует, сужение делает downstream.BaseEnv. Гоняем
 # интеграционный тест — он и есть эта проверка, а не его дубль.
-if go test -C "$ROOT" ./internal/sandbox -run TestSandboxIsolatesStdioServer -count=1 >/dev/null 2>&1; then
-	pass "env: канарейка хоста не доходит до сервера (Canary:clean)"
+# skip возвращает 0 — без -v и проверки "--- SKIP" шаг зелёный на пустом месте.
+if env_out=$(go test -C "$ROOT" ./internal/sandbox -run TestSandboxIsolatesStdioServer -count=1 -v 2>&1); then
+	if printf '%s' "$env_out" | /usr/bin/grep -q -- '--- SKIP'; then
+		fail "env: канарейка" "тест пропущен (SKIP), проверки не было"
+	else
+		pass "env: канарейка хоста не доходит до сервера (Canary:clean)"
+	fi
 else
 	fail "env: канарейка" "TestSandboxIsolatesStdioServer не прошёл"
 fi
 
-# 6. /proc/1/root — корень песочницы, а не хоста.
-if sb /usr/bin/cat /proc/1/root/etc/shadow >/dev/null 2>&1; then
-	fail "/proc/1/root/etc/shadow читается" "cat прошёл"
+# 6. /proc/1/root — корень песочницы, а не хоста. Канарейка своя и читаемая:
+# /etc/shadow в песочнице отсутствует вообще, и проверка зеленела бы даром.
+CANARY="$WORK/canary-proc-root"
+echo "canary-proc-root" >"$CANARY"
+if [ ! -r "$CANARY" ]; then
+	fail "/proc/1/root" "канарейка $CANARY не читается на хосте — проверить нечем"
+elif sb /usr/bin/cat "/proc/1/root$CANARY" >/dev/null 2>&1; then
+	fail "/proc/1/root выводит на хост" "cat $CANARY прошёл"
 else
 	pass "/proc/1/root не выводит на хост"
 fi
@@ -145,9 +167,10 @@ else
 	fail "nproc-лимит не сработал" "$(echo "$out" | head -1)"
 fi
 
-# 10. Лимит памяти: 4 ГиБ не выделяются при --as.
-if sb /usr/bin/python3 -c 'x=bytearray(4*1024**3)' >/dev/null 2>&1; then
-	fail "выделено 4 ГиБ" "MemoryError не пришёл"
+# 10. Лимит памяти: выделение сверх --as отклоняется (mmap режется сразу,
+# страницы не трогаются). Порог считается от MEMORY_MB, а не константой.
+if sb /usr/bin/python3 -c "x=bytearray(($MEMORY_MB + 256) * 1024**2)" >/dev/null 2>&1; then
+	fail "выделено сверх --as" "MemoryError не пришёл"
 else
 	pass "лимит памяти срабатывает"
 fi

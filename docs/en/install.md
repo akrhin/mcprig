@@ -117,6 +117,11 @@ plus CA roots); `--target full` adds node and python and weighs 334 MB. Both
 were run: `slim` served a remote `serena` over the host network and answered
 `find_symbol` through `invoke_command`, and its healthcheck reports `ok`.
 
+Neither image ships `bubblewrap`. A server tagged `untrusted` needs the
+`sandbox` block and, with the default fail-closed `onUnavailable: deny`, refuses
+to start without it — install the package in your own image and make sure the
+container may create user namespaces. Servers without the tag are unaffected.
+
 ## State on disk
 
 `MCPRIG_DATA_DIR` selects the state directory. Defaults:

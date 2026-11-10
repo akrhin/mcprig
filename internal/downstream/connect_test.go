@@ -27,7 +27,7 @@ func TestTransportRejectsBrokenServer(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			conn := &Connector{}
-			_, err := conn.transport(context.Background(), c.srv)
+			_, _, err := conn.transport(context.Background(), c.srv)
 			if err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("want error %q, got %v", c.want, err)
 			}
@@ -86,7 +86,7 @@ func TestConnectorEnvHook(t *testing.T) {
 	c := &Connector{Env: func(*config.Server) []string {
 		return []string{"PATH=/bin", "ONLY=1"}
 	}}
-	tr, err := c.transport(context.Background(), srv)
+	tr, _, err := c.transport(context.Background(), srv)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,5 +134,61 @@ func TestConnectStdioLegacyServer(t *testing.T) {
 	}
 	if len(res.Tools) != 0 {
 		t.Fatalf("инструментов %d, ждали 0", len(res.Tools))
+	}
+}
+
+// Причина отказа старта приходит в stderr ребёнка, а Go без cmd.Stderr
+// отправляет его в /dev/null: наружу был только EOF.
+func TestConnectKeepsChildStderr(t *testing.T) {
+	srv := &config.Server{
+		Name:      "noisy",
+		Transport: config.TransportStdio,
+		Command:   []string{"/bin/sh", "-c", "echo 'bwrap: execvp /opt/node: No such file or directory' >&2; exit 1"},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := (&Connector{Version: "test"}).Connect(ctx, srv)
+	if err == nil {
+		t.Fatal("want a connect error")
+	}
+	if !strings.Contains(err.Error(), "execvp /opt/node") {
+		t.Fatalf("stderr ребёнка потерялся: %v", err)
+	}
+}
+
+// Кольцевой хвост держит последние байты: вечно болтающий сервер не должен
+// копить stderr в памяти.
+func TestStderrTailKeepsLast(t *testing.T) {
+	var tail stderrTail
+	tail.Write([]byte(strings.Repeat("a", stderrLimit)))
+	tail.Write([]byte("конец"))
+	got := tail.String()
+	if len(got) != stderrLimit || !strings.HasSuffix(got, "конец") {
+		t.Fatalf("хвост %d байт, suffix %q", len(got), got[len(got)-10:])
+	}
+}
+
+// Песочница запрошена, но недоступна при onUnavailable:allow — набор обязан
+// узнать об этом, иначе сервер молча живёт без изоляции.
+func TestSandboxFallbackReported(t *testing.T) {
+	t.Setenv("PATH", "/nonexistent") // bwrap не найдётся
+	srv := &config.Server{
+		Name:      "boxed",
+		Transport: config.TransportStdio,
+		Command:   []string{"/bin/sh", "-c", "exit 1"},
+		Sandbox:   &config.Sandbox{Mode: config.SandboxModeBwrap, OnUnavailable: config.OnUnavailableAllow},
+	}
+	var seen string
+	c := &Connector{Version: "test", OnSandboxFallback: func(_ *config.Server, reason string) { seen = reason }}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := c.Connect(ctx, srv); err == nil {
+		t.Fatal("want a connect error from a dead server")
+	}
+	if seen == "" {
+		t.Fatal("деградация песочницы не дошла до набора")
+	}
+	if !strings.Contains(seen, "bwrap") {
+		t.Errorf("причина не та: %q", seen)
 	}
 }

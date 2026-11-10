@@ -84,6 +84,10 @@ type entry struct {
 	healthMu sync.Mutex
 	health   healthState
 
+	// sandboxNote — причина, по которой запрошенная изоляция не применилась.
+	sandboxMu   sync.Mutex
+	sandboxNote string
+
 	// tools кэширует tools/list до переподключения: без него каждый
 	// list_commands заново обходил все апстримы (порт 205 мс у одного portainer).
 	toolsMu sync.Mutex
@@ -170,6 +174,24 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 	// notifications/tools/list_changed. Dropping the cached list here makes the
 	// next list_commands see the change without refresh: true. A caller-supplied
 	// hook wins.
+	if conn.OnSandboxApplied == nil {
+		conn.OnSandboxApplied = func(srv *config.Server) {
+			if e := m.find(srv.Name); e != nil {
+				e.sandboxMu.Lock()
+				e.sandboxNote = ""
+				e.sandboxMu.Unlock()
+			}
+		}
+	}
+	if conn.OnSandboxFallback == nil {
+		conn.OnSandboxFallback = func(srv *config.Server, reason string) {
+			if e := m.find(srv.Name); e != nil {
+				e.sandboxMu.Lock()
+				e.sandboxNote = reason
+				e.sandboxMu.Unlock()
+			}
+		}
+	}
 	if conn.OnToolsChanged == nil {
 		conn.OnToolsChanged = func(srv *config.Server) {
 			if e := m.find(srv.Name); e != nil {
@@ -296,6 +318,9 @@ type serverInfo struct {
 	Healthy     bool     `json:"healthy"`
 	Error       string   `json:"error,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	// Isolation — "bwrap", когда песочница применена, и "без изоляции: …",
+	// когда она запрошена, но недоступна. Пусто — сервер без песочницы.
+	Isolation string `json:"isolation,omitempty"`
 }
 
 func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -333,6 +358,7 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 				Healthy:     healthy,
 				Error:       errText,
 				Tags:        e.srv.Tags,
+				Isolation:   e.isolationNote(),
 			}
 		}()
 	}
@@ -788,17 +814,23 @@ func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolPa
 	}
 	// Сервер в песочнице получает свой, более короткий предел: чужая
 	// песочница не должна держать вызов столько же, сколько свои серверы.
-	var sandboxed bool
-	if limit := e.srv.CallTimeout(); limit > 0 {
+	parent := ctx
+	var limit time.Duration
+	if l := e.srv.CallTimeout(); l > 0 {
+		limit = l
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, limit)
+		ctx, cancel = context.WithTimeout(ctx, l)
 		defer cancel()
-		sandboxed = true
 	}
 	res, err := sess.CallTool(ctx, params)
 	if err != nil {
-		if sandboxed && ctx.Err() == context.DeadlineExceeded {
-			return res, fmt.Errorf("%s: таймаут %s (sandbox)", e.srv.Name, e.srv.CallTimeout())
+		// Свой дедлайн отличается от унаследованного (requestTimeout набора
+		// или клиента): у родителя ошибки нет, значит истёк именно timeoutSec.
+		if limit > 0 && parent.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			// Зависший вызов остаётся в конвейере сессии — сбрасываем её,
+			// иначе следующий вызов получит ответ от прошлого.
+			m.dropSession(e)
+			return res, fmt.Errorf("%s: таймаут %s (sandbox): %w", e.srv.Name, limit, err)
 		}
 		return res, fmt.Errorf("%s: %w", e.srv.Name, err)
 	}
@@ -1083,4 +1115,19 @@ func (c *conn) close() error {
 		return nil
 	}
 	return s.Close()
+}
+
+// isolationNote описывает состояние изоляции: применённая песочница или
+// причина, по которой сервер работает без неё.
+func (e *entry) isolationNote() string {
+	e.sandboxMu.Lock()
+	note := e.sandboxNote
+	e.sandboxMu.Unlock()
+	if note != "" {
+		return "без изоляции: " + note
+	}
+	if sb := e.srv.Sandbox; sb != nil && sb.Mode == config.SandboxModeBwrap {
+		return "bwrap"
+	}
+	return ""
 }

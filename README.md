@@ -31,8 +31,8 @@ touch the others.
 Release notes live in [CHANGELOG.md](CHANGELOG.md).
 
 `servers.json` is the lazy-mcp format, read as-is: `servers[]`, both `command`
-forms, `url`, `env`, `headers`, `transport`, `healthMonitor`,
-`requestTimeout`. A server with a broken field stays in the list as unhealthy
+forms, `url`, `env`, `envAllow`, `headers`, `sandbox`, `transport`,
+`healthMonitor`, `requestTimeout`. A server with a broken field stays in the list as unhealthy
 with its error; a missing name or invalid JSON fails the load.
 
 ## Architecture

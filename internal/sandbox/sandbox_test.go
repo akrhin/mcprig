@@ -29,6 +29,7 @@ func sandboxed(ro ...string) *config.Server {
 			MemoryMb:   config.DefaultSandboxMemoryMb,
 			Pids:       config.DefaultSandboxPids,
 			TimeoutSec: config.DefaultSandboxTimeout,
+			TmpMb:      config.DefaultSandboxTmpMb,
 			RO:         append(append([]string{}, config.DefaultSandboxRO...), ro...),
 		},
 	}
@@ -52,20 +53,30 @@ func hasSeq(args []string, seq ...string) bool {
 	return false
 }
 
-func TestWrapNoSandbox(t *testing.T) {
-	stubAvailable(t, nil)
-	srv := &config.Server{Name: "plain", Command: []string{"echo", "hi"}}
-	got, err := Wrap(srv, srv.Command)
+// mustWrap — argv успешного Wrap: тестам важен сам вызов.
+func mustWrap(t *testing.T, srv *config.Server) []string {
+	t.Helper()
+	res, err := Wrap(srv, srv.Command)
 	if err != nil {
 		t.Fatalf("Wrap: %v", err)
 	}
-	if strings.Join(got, " ") != "echo hi" {
-		t.Fatalf("argv changed: %v", got)
+	return res.Argv
+}
+
+func TestWrapNoSandbox(t *testing.T) {
+	stubAvailable(t, nil)
+	srv := &config.Server{Name: "plain", Command: []string{"echo", "hi"}}
+	res, err := Wrap(srv, srv.Command)
+	if err != nil {
+		t.Fatalf("Wrap: %v", err)
+	}
+	if strings.Join(res.Argv, " ") != "echo hi" || res.Applied || res.Reason != "" {
+		t.Fatalf("argv changed: %+v", res)
 	}
 
 	srv.Sandbox = &config.Sandbox{Mode: config.SandboxModeNone}
-	if got, err = Wrap(srv, srv.Command); err != nil || strings.Join(got, " ") != "echo hi" {
-		t.Fatalf("mode none: %v %v", got, err)
+	if res, err = Wrap(srv, srv.Command); err != nil || strings.Join(res.Argv, " ") != "echo hi" || res.Applied {
+		t.Fatalf("mode none: %+v %v", res, err)
 	}
 }
 
@@ -73,10 +84,14 @@ func TestWrapBwrapArgv(t *testing.T) {
 	stubAvailable(t, nil)
 	srv := sandboxed()
 
-	got, err := Wrap(srv, srv.Command)
+	res, err := Wrap(srv, srv.Command)
 	if err != nil {
 		t.Fatalf("Wrap: %v", err)
 	}
+	if !res.Applied || res.Reason != "" {
+		t.Fatalf("изоляция не помечена применённой: %+v", res)
+	}
+	got := res.Argv
 	if got[0] != "bwrap" {
 		t.Fatalf("argv не начинается с bwrap: %v", got)
 	}
@@ -89,7 +104,8 @@ func TestWrapBwrapArgv(t *testing.T) {
 		{"--die-with-parent", "--new-session"},
 		{"--chdir", "/"},
 		{"--setenv", "TMPDIR", "/tmp"},
-		{"--", "prlimit", "--as=536870912", "--nproc=256", "--", "node", "server.js", "--port", "1"},
+		{"--size", "134217728", "--tmpfs", "/tmp"},
+		{"--", "prlimit", "--as=536870912", "--nproc=256", "--fsize=134217728", "--", "node", "server.js", "--port", "1"},
 	} {
 		if !hasSeq(got, want...) {
 			t.Errorf("нет %v в %v", want, got)
@@ -102,10 +118,7 @@ func TestWrapNetworkAllow(t *testing.T) {
 	srv := sandboxed()
 	srv.Sandbox.Network = config.SandboxNetworkAllow
 
-	got, err := Wrap(srv, srv.Command)
-	if err != nil {
-		t.Fatalf("Wrap: %v", err)
-	}
+	got := mustWrap(t, srv)
 	if hasSeq(got, "--unshare-net") {
 		t.Fatalf("network allow, но сеть отрезана: %v", got)
 	}
@@ -118,10 +131,7 @@ func TestWrapRWAndCwd(t *testing.T) {
 	srv.Sandbox.RW = []string{dir}
 	srv.Cwd = dir
 
-	got, err := Wrap(srv, srv.Command)
-	if err != nil {
-		t.Fatalf("Wrap: %v", err)
-	}
+	got := mustWrap(t, srv)
 	if !hasSeq(got, "--bind", dir, dir) {
 		t.Errorf("rw не привязан: %v", got)
 	}
@@ -144,10 +154,7 @@ func TestWrapChildBindAfterParent(t *testing.T) {
 	srv := sandboxed(parent)
 	srv.Sandbox.RW = []string{child}
 
-	got, err := Wrap(srv, srv.Command)
-	if err != nil {
-		t.Fatalf("Wrap: %v", err)
-	}
+	got := mustWrap(t, srv)
 	if !hasSeq(got, "--ro-bind", parent, parent) {
 		t.Fatalf("родитель не привязан ro: %v", got)
 	}
@@ -169,15 +176,20 @@ func TestWrapFailClosed(t *testing.T) {
 		t.Fatalf("deny должен отбить запуск, получено %v", err)
 	}
 
+	// warn: сервер стартует без изоляции, но причина возвращается наверх —
+	// иначе деградация видна только в логе пакета.
 	srv.Sandbox.OnUnavailable = config.OnUnavailableWarn
-	got, err := Wrap(srv, srv.Command)
-	if err != nil || strings.Join(got, " ") != strings.Join(srv.Command, " ") {
-		t.Fatalf("warn должен вернуть argv как есть: %v %v", got, err)
+	res, err := Wrap(srv, srv.Command)
+	if err != nil || strings.Join(res.Argv, " ") != strings.Join(srv.Command, " ") {
+		t.Fatalf("warn должен вернуть argv как есть: %+v %v", res, err)
+	}
+	if res.Applied || res.Reason == "" {
+		t.Fatalf("warn не сообщил о деградации: %+v", res)
 	}
 
 	srv.Sandbox.OnUnavailable = config.OnUnavailableAllow
-	if got, err = Wrap(srv, srv.Command); err != nil || len(got) != len(srv.Command) {
-		t.Fatalf("allow должен вернуть argv как есть: %v %v", got, err)
+	if res, err = Wrap(srv, srv.Command); err != nil || len(res.Argv) != len(srv.Command) || res.Reason == "" {
+		t.Fatalf("allow должен вернуть argv как есть: %+v %v", res, err)
 	}
 }
 
@@ -191,10 +203,7 @@ func TestWrapPathsAreNotFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := sandboxed(spaced)
-	got, err := Wrap(srv, srv.Command)
-	if err != nil {
-		t.Fatalf("Wrap: %v", err)
-	}
+	got := mustWrap(t, srv)
 	if !hasSeq(got, "--ro-bind", spaced, spaced) {
 		t.Fatalf("путь с пробелом не дошёл одним аргументом: %v", got)
 	}
@@ -207,17 +216,35 @@ func TestWrapPathsAreNotFlags(t *testing.T) {
 	}
 }
 
-func TestWrapMissingPathSkipped(t *testing.T) {
+// Умолчание /lib64 есть не везде — его отсутствие не ошибка. Свой путь,
+// которого нет, — ошибка: сервер иначе не получил бы запрошенный каталог.
+func TestWrapMissingPath(t *testing.T) {
 	stubAvailable(t, nil)
 	missing := filepath.Join(t.TempDir(), "нет-такого")
 	srv := sandboxed(missing)
-
-	got, err := Wrap(srv, srv.Command)
-	if err != nil {
-		t.Fatalf("Wrap: %v", err)
+	if _, err := Wrap(srv, srv.Command); err == nil || !strings.Contains(err.Error(), missing) {
+		t.Fatalf("пропавший ro-путь не отбит: %v", err)
 	}
-	if hasSeq(got, "--ro-bind", missing, missing) {
-		t.Fatalf("несуществующий источник попал в argv (bwrap на нём падает): %v", got)
+
+	srv = sandboxed()
+	srv.Sandbox.RW = []string{missing}
+	if _, err := Wrap(srv, srv.Command); err == nil || !strings.Contains(err.Error(), missing) {
+		t.Fatalf("пропавший rw-путь не отбит: %v", err)
+	}
+
+	srv = sandboxed()
+	srv.Cwd = missing
+	if _, err := Wrap(srv, srv.Command); err == nil {
+		t.Fatalf("пропавший cwd не отбит")
+	}
+
+	// Умолчания из DefaultSandboxRO — единственное исключение: /lib64 есть не
+	// везде, и его отсутствие не должно ломать запуск.
+	got := mustWrap(t, sandboxed())
+	for _, p := range config.DefaultSandboxRO {
+		if _, err := os.Stat(p); err != nil && hasSeq(got, "--ro-bind", p, p) {
+			t.Fatalf("отсутствующий %s попал в argv", p)
+		}
 	}
 }
 
