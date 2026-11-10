@@ -74,6 +74,40 @@ the PR body instead of leaving it unsaid.
 - Defects of the TypeScript reference are requirements to fix, not behaviour
   to copy: no line of TypeScript is ported here.
 
+## Versioning
+
+[SemVer](https://semver.org/), `MAJOR.MINOR.PATCH`, in a git tag `vX.Y.Z`. The
+version comes from the tag alone: goreleaser injects it via
+`-X main.version={{ .Version }}`, a build from source prints `dev`, and
+`mcprig --version` (or the panel's own version) shows what a binary carries.
+There is no version constant in the tree, so nothing to bump by hand.
+
+Pre-1.0 the numbers mean:
+
+| Change | Bump |
+| --- | --- |
+| a fix that keeps every contract, config key and meta-tool schema as it was | `PATCH` |
+| a new meta-tool, config key, flag, panel surface, or a behaviour change an operator can notice | `MINOR` |
+| a breaking change — a renamed or dropped config key, an incompatible meta-tool or `/mcp` contract, a changed auth default | `MINOR` while pre-1.0, `MAJOR` after 1.0 |
+| docs, tests, CI, refactor with no observable change | `PATCH`, or no release at all |
+
+A breaking change ships in a `MINOR` only while the project is pre-1.0, and it
+must say so in its changelog section and carry a migration note. After 1.0 no
+breaking change rides in a minor.
+
+Container tags follow the release: `X.Y.Z-slim` and `X.Y.Z-full`, plus
+`latest` and `latest-full` pointing at the newest release — never at a branch.
+
+Rules:
+
+- A tag is cut from a `release: vX.Y.Z` commit that moves `## [Unreleased]`
+  into `## [X.Y.Z] - YYYY-MM-DD` and leaves `Unreleased` empty. Nothing else
+  changes in that commit.
+- A published tag is never moved and never deleted; a broken release gets a new
+  `PATCH`.
+- `CHANGELOG.md` is the only release-notes source: Added / Changed / Fixed /
+  Removed / Security, highest impact first.
+
 ## Release
 
 A `v*` tag runs gofmt, vet, the race suite and govulncheck, then goreleaser

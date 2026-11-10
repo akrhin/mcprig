@@ -13,6 +13,9 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
   change updates both doc trees and the changelog.
 - `.gitea` issue forms for a bug and a proposal, plus a pull-request template
   that asks what changed, the gate result and the docs touched.
+- Versioning rules in both contributing files: SemVer pre-1.0, the tag is the
+  only version source, what a `PATCH` and a `MINOR` may carry, and how a
+  release commit and a published tag are treated.
 
 ## [0.3.7] - 2026-11-10
 
