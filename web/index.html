@@ -291,7 +291,7 @@
               <div class="card-h"><h2>Топ инструментов</h2><span class="hint n" id="s-tools-count">0</span></div>
               <div class="tw">
                 <table class="t mini">
-                  <thead><tr><th scope="col">Инструмент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x">p50</th><th scope="col" class="num col-x">p95</th></tr></thead>
+                  <thead><tr><th scope="col">Инструмент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
                   <tbody id="tools-body"></tbody>
                 </table>
               </div>
@@ -304,7 +304,7 @@
               <div class="card-h"><h2>По серверам</h2></div>
               <div class="tw">
                 <table class="t mini">
-                  <thead><tr><th scope="col">Сервер</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x">p50</th><th scope="col" class="num col-x">p95</th></tr></thead>
+                  <thead><tr><th scope="col">Сервер</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
                   <tbody id="byserver-body"></tbody>
                 </table>
               </div>
@@ -315,7 +315,7 @@
               <div class="card-h"><h2>По клиентам</h2></div>
               <div class="tw">
                 <table class="t mini">
-                  <thead><tr><th scope="col">Клиент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x">p50</th><th scope="col" class="num col-x">p95</th></tr></thead>
+                  <thead><tr><th scope="col">Клиент</th><th scope="col" class="num">Вызовов</th><th scope="col" class="num">Ошибок</th><th scope="col" class="num col-x ph-pct" data-k="p50">p50</th><th scope="col" class="num col-x ph-pct" data-k="p95">p95</th></tr></thead>
                   <tbody id="byclient-body"></tbody>
                 </table>
               </div>
@@ -336,9 +336,9 @@
     <aside class="side" id="side" aria-label="Детали набора">
       <div class="side-h">
         <div class="seg" role="tablist" aria-label="Детали набора">
-          <button class="segbtn" type="button" role="tab" data-side="servers" aria-selected="true">Серверы <span class="cnt n" id="srv-count">0</span></button>
-          <button class="segbtn" type="button" role="tab" data-side="env" aria-selected="false" tabindex="-1">Переменные <span class="cnt n" id="env-count">0</span></button>
-          <button class="segbtn" type="button" role="tab" data-side="log" aria-selected="false" tabindex="-1">Лог <span class="cnt n" id="log-count">0</span></button>
+          <button class="segbtn" type="button" role="tab" data-side="servers" id="sidebtn-servers" aria-controls="pane-servers" aria-selected="true">Серверы <span class="cnt n" id="srv-count">0</span></button>
+          <button class="segbtn" type="button" role="tab" data-side="env" id="sidebtn-env" aria-controls="pane-env" aria-selected="false" tabindex="-1">Переменные <span class="cnt n" id="env-count">0</span></button>
+          <button class="segbtn" type="button" role="tab" data-side="log" id="sidebtn-log" aria-controls="pane-log" aria-selected="false" tabindex="-1">Лог <span class="cnt n" id="log-count">0</span></button>
         </div>
         <button class="iconbtn side-close" type="button" id="side-close" aria-label="Закрыть панель">
           <svg class="od-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
@@ -347,16 +347,16 @@
         </button>
       </div>
       <div class="side-body">
-        <section class="pane" data-pane="servers">
+        <section class="pane" data-pane="servers" id="pane-servers" role="tabpanel" aria-labelledby="sidebtn-servers">
           <ul class="list" id="servers"></ul>
           <p class="srv-note pad" id="servers-empty" hidden>выберите набор</p>
         </section>
-        <section class="pane" data-pane="env" hidden>
+        <section class="pane" data-pane="env" id="pane-env" role="tabpanel" aria-labelledby="sidebtn-env" hidden>
           <ul class="list" id="env"></ul>
           <p class="srv-note pad" id="env-empty" hidden>переменных нет</p>
           <p class="srv-note pad">значения подставляет процесс набора — панель их не хранит и не показывает</p>
         </section>
-        <section class="pane logpane" data-pane="log" hidden>
+        <section class="pane logpane" data-pane="log" id="pane-log" role="tabpanel" aria-labelledby="sidebtn-log" hidden>
           <div class="pane-h">
             <span class="hint">хвост лога набора</span>
             <button class="mini push" type="button" id="log-wide" aria-pressed="false" title="развернуть панель лога">шире</button>

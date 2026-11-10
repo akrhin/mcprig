@@ -1,936 +1,467 @@
 {
-  "period": "archive",
-  "from": "2026-08-11T00:00:00+03:00",
-  "to": "2026-11-08T00:00:00+03:00",
-  "approximate": true,
-  "totals": {
-    "calls": 10125,
-    "failures": 419,
-    "p50ms": 147,
-    "p95ms": 1180
+ "period": "archive",
+ "from": "2026-08-11T00:00:00+03:00",
+ "to": "2026-11-08T00:00:00+03:00",
+ "approximate": true,
+ "totals": {
+  "calls": 11525,
+  "failures": 487,
+  "p50ms": 128,
+  "p95ms": 1284
+ },
+ "series": [
+  {
+   "t": "2024-11-30T21:00:00Z",
+   "calls": 478,
+   "failures": 12,
+   "p50ms": 162,
+   "p95ms": 1374
   },
-  "series": [
-    {
-      "t": "2026-08-11T00:00:00+03:00",
-      "calls": 110,
-      "failures": 5,
-      "p50ms": 186,
-      "p95ms": 1137
-    },
-    {
-      "t": "2026-08-12T00:00:00+03:00",
-      "calls": 64,
-      "failures": 4,
-      "p50ms": 186,
-      "p95ms": 1231
-    },
-    {
-      "t": "2026-08-13T00:00:00+03:00",
-      "calls": 57,
-      "failures": 0,
-      "p50ms": 113,
-      "p95ms": 1409
-    },
-    {
-      "t": "2026-08-14T00:00:00+03:00",
-      "calls": 59,
-      "failures": 3,
-      "p50ms": 196,
-      "p95ms": 1464
-    },
-    {
-      "t": "2026-08-15T00:00:00+03:00",
-      "calls": 77,
-      "failures": 2,
-      "p50ms": 106,
-      "p95ms": 1520
-    },
-    {
-      "t": "2026-08-16T00:00:00+03:00",
-      "calls": 55,
-      "failures": 1,
-      "p50ms": 101,
-      "p95ms": 1166
-    },
-    {
-      "t": "2026-08-17T00:00:00+03:00",
-      "calls": 61,
-      "failures": 2,
-      "p50ms": 167,
-      "p95ms": 1044
-    },
-    {
-      "t": "2026-08-18T00:00:00+03:00",
-      "calls": 61,
-      "failures": 6,
-      "p50ms": 153,
-      "p95ms": 1247
-    },
-    {
-      "t": "2026-08-19T00:00:00+03:00",
-      "calls": 59,
-      "failures": 5,
-      "p50ms": 130,
-      "p95ms": 1138
-    },
-    {
-      "t": "2026-08-20T00:00:00+03:00",
-      "calls": 83,
-      "failures": 1,
-      "p50ms": 153,
-      "p95ms": 1348
-    },
-    {
-      "t": "2026-08-21T00:00:00+03:00",
-      "calls": 83,
-      "failures": 2,
-      "p50ms": 119,
-      "p95ms": 1247
-    },
-    {
-      "t": "2026-08-22T00:00:00+03:00",
-      "calls": 86,
-      "failures": 3,
-      "p50ms": 190,
-      "p95ms": 803
-    },
-    {
-      "t": "2026-08-23T00:00:00+03:00",
-      "calls": 69,
-      "failures": 5,
-      "p50ms": 110,
-      "p95ms": 798
-    },
-    {
-      "t": "2026-08-24T00:00:00+03:00",
-      "calls": 64,
-      "failures": 5,
-      "p50ms": 132,
-      "p95ms": 1332
-    },
-    {
-      "t": "2026-08-25T00:00:00+03:00",
-      "calls": 89,
-      "failures": 3,
-      "p50ms": 109,
-      "p95ms": 967
-    },
-    {
-      "t": "2026-08-26T00:00:00+03:00",
-      "calls": 81,
-      "failures": 5,
-      "p50ms": 108,
-      "p95ms": 792
-    },
-    {
-      "t": "2026-08-27T00:00:00+03:00",
-      "calls": 94,
-      "failures": 6,
-      "p50ms": 166,
-      "p95ms": 1188
-    },
-    {
-      "t": "2026-08-28T00:00:00+03:00",
-      "calls": 91,
-      "failures": 2,
-      "p50ms": 110,
-      "p95ms": 1419
-    },
-    {
-      "t": "2026-08-29T00:00:00+03:00",
-      "calls": 113,
-      "failures": 5,
-      "p50ms": 204,
-      "p95ms": 1086
-    },
-    {
-      "t": "2026-08-30T00:00:00+03:00",
-      "calls": 94,
-      "failures": 3,
-      "p50ms": 165,
-      "p95ms": 730
-    },
-    {
-      "t": "2026-08-31T00:00:00+03:00",
-      "calls": 76,
-      "failures": 7,
-      "p50ms": 100,
-      "p95ms": 1049
-    },
-    {
-      "t": "2026-09-01T00:00:00+03:00",
-      "calls": 104,
-      "failures": 2,
-      "p50ms": 104,
-      "p95ms": 946
-    },
-    {
-      "t": "2026-09-02T00:00:00+03:00",
-      "calls": 71,
-      "failures": 2,
-      "p50ms": 199,
-      "p95ms": 1199
-    },
-    {
-      "t": "2026-09-03T00:00:00+03:00",
-      "calls": 106,
-      "failures": 1,
-      "p50ms": 134,
-      "p95ms": 795
-    },
-    {
-      "t": "2026-09-04T00:00:00+03:00",
-      "calls": 67,
-      "failures": 1,
-      "p50ms": 202,
-      "p95ms": 1418
-    },
-    {
-      "t": "2026-09-05T00:00:00+03:00",
-      "calls": 87,
-      "failures": 2,
-      "p50ms": 194,
-      "p95ms": 1307
-    },
-    {
-      "t": "2026-09-06T00:00:00+03:00",
-      "calls": 84,
-      "failures": 3,
-      "p50ms": 141,
-      "p95ms": 1553
-    },
-    {
-      "t": "2026-09-07T00:00:00+03:00",
-      "calls": 122,
-      "failures": 6,
-      "p50ms": 188,
-      "p95ms": 1043
-    },
-    {
-      "t": "2026-09-08T00:00:00+03:00",
-      "calls": 112,
-      "failures": 2,
-      "p50ms": 171,
-      "p95ms": 1596
-    },
-    {
-      "t": "2026-09-09T00:00:00+03:00",
-      "calls": 94,
-      "failures": 1,
-      "p50ms": 104,
-      "p95ms": 1039
-    },
-    {
-      "t": "2026-09-10T00:00:00+03:00",
-      "calls": 92,
-      "failures": 4,
-      "p50ms": 165,
-      "p95ms": 945
-    },
-    {
-      "t": "2026-09-11T00:00:00+03:00",
-      "calls": 112,
-      "failures": 5,
-      "p50ms": 113,
-      "p95ms": 1264
-    },
-    {
-      "t": "2026-09-12T00:00:00+03:00",
-      "calls": 81,
-      "failures": 4,
-      "p50ms": 127,
-      "p95ms": 1107
-    },
-    {
-      "t": "2026-09-13T00:00:00+03:00",
-      "calls": 97,
-      "failures": 5,
-      "p50ms": 95,
-      "p95ms": 1470
-    },
-    {
-      "t": "2026-09-14T00:00:00+03:00",
-      "calls": 109,
-      "failures": 2,
-      "p50ms": 140,
-      "p95ms": 1566
-    },
-    {
-      "t": "2026-09-15T00:00:00+03:00",
-      "calls": 112,
-      "failures": 3,
-      "p50ms": 163,
-      "p95ms": 882
-    },
-    {
-      "t": "2026-09-16T00:00:00+03:00",
-      "calls": 95,
-      "failures": 6,
-      "p50ms": 179,
-      "p95ms": 1597
-    },
-    {
-      "t": "2026-09-17T00:00:00+03:00",
-      "calls": 83,
-      "failures": 3,
-      "p50ms": 144,
-      "p95ms": 880
-    },
-    {
-      "t": "2026-09-18T00:00:00+03:00",
-      "calls": 108,
-      "failures": 4,
-      "p50ms": 113,
-      "p95ms": 826
-    },
-    {
-      "t": "2026-09-19T00:00:00+03:00",
-      "calls": 104,
-      "failures": 4,
-      "p50ms": 184,
-      "p95ms": 1088
-    },
-    {
-      "t": "2026-09-20T00:00:00+03:00",
-      "calls": 98,
-      "failures": 1,
-      "p50ms": 101,
-      "p95ms": 838
-    },
-    {
-      "t": "2026-09-21T00:00:00+03:00",
-      "calls": 123,
-      "failures": 8,
-      "p50ms": 171,
-      "p95ms": 964
-    },
-    {
-      "t": "2026-09-22T00:00:00+03:00",
-      "calls": 122,
-      "failures": 7,
-      "p50ms": 108,
-      "p95ms": 991
-    },
-    {
-      "t": "2026-09-23T00:00:00+03:00",
-      "calls": 123,
-      "failures": 5,
-      "p50ms": 147,
-      "p95ms": 1232
-    },
-    {
-      "t": "2026-09-24T00:00:00+03:00",
-      "calls": 103,
-      "failures": 4,
-      "p50ms": 160,
-      "p95ms": 1215
-    },
-    {
-      "t": "2026-09-25T00:00:00+03:00",
-      "calls": 168,
-      "failures": 9,
-      "p50ms": 109,
-      "p95ms": 1122
-    },
-    {
-      "t": "2026-09-26T00:00:00+03:00",
-      "calls": 128,
-      "failures": 4,
-      "p50ms": 130,
-      "p95ms": 773
-    },
-    {
-      "t": "2026-09-27T00:00:00+03:00",
-      "calls": 134,
-      "failures": 5,
-      "p50ms": 146,
-      "p95ms": 1316
-    },
-    {
-      "t": "2026-09-28T00:00:00+03:00",
-      "calls": 105,
-      "failures": 4,
-      "p50ms": 150,
-      "p95ms": 967
-    },
-    {
-      "t": "2026-09-29T00:00:00+03:00",
-      "calls": 99,
-      "failures": 6,
-      "p50ms": 120,
-      "p95ms": 1547
-    },
-    {
-      "t": "2026-09-30T00:00:00+03:00",
-      "calls": 101,
-      "failures": 4,
-      "p50ms": 148,
-      "p95ms": 797
-    },
-    {
-      "t": "2026-10-01T00:00:00+03:00",
-      "calls": 107,
-      "failures": 4,
-      "p50ms": 101,
-      "p95ms": 1137
-    },
-    {
-      "t": "2026-10-02T00:00:00+03:00",
-      "calls": 127,
-      "failures": 6,
-      "p50ms": 118,
-      "p95ms": 1373
-    },
-    {
-      "t": "2026-10-03T00:00:00+03:00",
-      "calls": 132,
-      "failures": 4,
-      "p50ms": 204,
-      "p95ms": 1584
-    },
-    {
-      "t": "2026-10-04T00:00:00+03:00",
-      "calls": 173,
-      "failures": 10,
-      "p50ms": 108,
-      "p95ms": 965
-    },
-    {
-      "t": "2026-10-05T00:00:00+03:00",
-      "calls": 124,
-      "failures": 5,
-      "p50ms": 119,
-      "p95ms": 912
-    },
-    {
-      "t": "2026-10-06T00:00:00+03:00",
-      "calls": 122,
-      "failures": 2,
-      "p50ms": 170,
-      "p95ms": 1119
-    },
-    {
-      "t": "2026-10-07T00:00:00+03:00",
-      "calls": 140,
-      "failures": 10,
-      "p50ms": 199,
-      "p95ms": 1396
-    },
-    {
-      "t": "2026-10-08T00:00:00+03:00",
-      "calls": 112,
-      "failures": 3,
-      "p50ms": 181,
-      "p95ms": 1092
-    },
-    {
-      "t": "2026-10-09T00:00:00+03:00",
-      "calls": 149,
-      "failures": 5,
-      "p50ms": 175,
-      "p95ms": 774
-    },
-    {
-      "t": "2026-10-10T00:00:00+03:00",
-      "calls": 114,
-      "failures": 4,
-      "p50ms": 134,
-      "p95ms": 1064
-    },
-    {
-      "t": "2026-10-11T00:00:00+03:00",
-      "calls": 115,
-      "failures": 5,
-      "p50ms": 130,
-      "p95ms": 1039
-    },
-    {
-      "t": "2026-10-12T00:00:00+03:00",
-      "calls": 121,
-      "failures": 6,
-      "p50ms": 161,
-      "p95ms": 1193
-    },
-    {
-      "t": "2026-10-13T00:00:00+03:00",
-      "calls": 185,
-      "failures": 11,
-      "p50ms": 170,
-      "p95ms": 1447
-    },
-    {
-      "t": "2026-10-14T00:00:00+03:00",
-      "calls": 143,
-      "failures": 6,
-      "p50ms": 118,
-      "p95ms": 1315
-    },
-    {
-      "t": "2026-10-15T00:00:00+03:00",
-      "calls": 118,
-      "failures": 5,
-      "p50ms": 156,
-      "p95ms": 1507
-    },
-    {
-      "t": "2026-10-16T00:00:00+03:00",
-      "calls": 120,
-      "failures": 6,
-      "p50ms": 183,
-      "p95ms": 1191
-    },
-    {
-      "t": "2026-10-17T00:00:00+03:00",
-      "calls": 147,
-      "failures": 8,
-      "p50ms": 160,
-      "p95ms": 984
-    },
-    {
-      "t": "2026-10-18T00:00:00+03:00",
-      "calls": 152,
-      "failures": 9,
-      "p50ms": 158,
-      "p95ms": 1044
-    },
-    {
-      "t": "2026-10-19T00:00:00+03:00",
-      "calls": 154,
-      "failures": 10,
-      "p50ms": 175,
-      "p95ms": 1352
-    },
-    {
-      "t": "2026-10-20T00:00:00+03:00",
-      "calls": 143,
-      "failures": 7,
-      "p50ms": 207,
-      "p95ms": 929
-    },
-    {
-      "t": "2026-10-21T00:00:00+03:00",
-      "calls": 152,
-      "failures": 6,
-      "p50ms": 173,
-      "p95ms": 1287
-    },
-    {
-      "t": "2026-10-22T00:00:00+03:00",
-      "calls": 148,
-      "failures": 6,
-      "p50ms": 166,
-      "p95ms": 1478
-    },
-    {
-      "t": "2026-10-23T00:00:00+03:00",
-      "calls": 134,
-      "failures": 3,
-      "p50ms": 172,
-      "p95ms": 1160
-    },
-    {
-      "t": "2026-10-24T00:00:00+03:00",
-      "calls": 127,
-      "failures": 4,
-      "p50ms": 135,
-      "p95ms": 1143
-    },
-    {
-      "t": "2026-10-25T00:00:00+03:00",
-      "calls": 157,
-      "failures": 3,
-      "p50ms": 173,
-      "p95ms": 1424
-    },
-    {
-      "t": "2026-10-26T00:00:00+03:00",
-      "calls": 108,
-      "failures": 4,
-      "p50ms": 133,
-      "p95ms": 1527
-    },
-    {
-      "t": "2026-10-27T00:00:00+03:00",
-      "calls": 135,
-      "failures": 4,
-      "p50ms": 205,
-      "p95ms": 1366
-    },
-    {
-      "t": "2026-10-28T00:00:00+03:00",
-      "calls": 149,
-      "failures": 4,
-      "p50ms": 120,
-      "p95ms": 1117
-    },
-    {
-      "t": "2026-10-29T00:00:00+03:00",
-      "calls": 135,
-      "failures": 6,
-      "p50ms": 134,
-      "p95ms": 802
-    },
-    {
-      "t": "2026-10-30T00:00:00+03:00",
-      "calls": 150,
-      "failures": 5,
-      "p50ms": 152,
-      "p95ms": 783
-    },
-    {
-      "t": "2026-10-31T00:00:00+03:00",
-      "calls": 182,
-      "failures": 6,
-      "p50ms": 107,
-      "p95ms": 900
-    },
-    {
-      "t": "2026-11-01T00:00:00+03:00",
-      "calls": 145,
-      "failures": 5,
-      "p50ms": 157,
-      "p95ms": 1054
-    },
-    {
-      "t": "2026-11-02T00:00:00+03:00",
-      "calls": 151,
-      "failures": 5,
-      "p50ms": 160,
-      "p95ms": 931
-    },
-    {
-      "t": "2026-11-03T00:00:00+03:00",
-      "calls": 134,
-      "failures": 4,
-      "p50ms": 151,
-      "p95ms": 909
-    },
-    {
-      "t": "2026-11-04T00:00:00+03:00",
-      "calls": 126,
-      "failures": 9,
-      "p50ms": 142,
-      "p95ms": 1560
-    },
-    {
-      "t": "2026-11-05T00:00:00+03:00",
-      "calls": 120,
-      "failures": 6,
-      "p50ms": 144,
-      "p95ms": 1472
-    },
-    {
-      "t": "2026-11-06T00:00:00+03:00",
-      "calls": 137,
-      "failures": 6,
-      "p50ms": 177,
-      "p95ms": 1415
-    },
-    {
-      "t": "2026-11-07T00:00:00+03:00",
-      "calls": 139,
-      "failures": 5,
-      "p50ms": 150,
-      "p95ms": 1344
-    },
-    {
-      "t": "2026-11-08T00:00:00+03:00",
-      "calls": 128,
-      "failures": 10,
-      "p50ms": 204,
-      "p95ms": 818
-    }
-  ],
-  "tools": [
-    {
-      "calls": 1083,
-      "failures": 47,
-      "p50ms": 33,
-      "p95ms": 185,
-      "server": "xerj",
-      "tool": "xerj_search"
-    },
-    {
-      "calls": 977,
-      "failures": 43,
-      "p50ms": 79,
-      "p95ms": 441,
-      "server": "serena",
-      "tool": "find_symbol"
-    },
-    {
-      "calls": 846,
-      "failures": 32,
-      "p50ms": 41,
-      "p95ms": 194,
-      "server": "serena",
-      "tool": "read_file"
-    },
-    {
-      "calls": 733,
-      "failures": 27,
-      "p50ms": 90,
-      "p95ms": 542,
-      "server": "serena",
-      "tool": "find_referencing_symbols"
-    },
-    {
-      "calls": 721,
-      "failures": 28,
-      "p50ms": 32,
-      "p95ms": 113,
-      "server": "time",
-      "tool": "get_current_time"
-    },
-    {
-      "calls": 611,
-      "failures": 26,
-      "p50ms": 200,
-      "p95ms": 1163,
-      "server": "fetch",
-      "tool": "fetch"
-    },
-    {
-      "calls": 588,
-      "failures": 28,
-      "p50ms": 440,
-      "p95ms": 1721,
-      "server": "context7",
-      "tool": "query-docs"
-    },
-    {
-      "calls": 471,
-      "failures": 16,
-      "p50ms": 37,
-      "p95ms": 144,
-      "server": "fs",
-      "tool": "read_file"
-    },
-    {
-      "calls": 453,
-      "failures": 20,
-      "p50ms": 61,
-      "p95ms": 294,
-      "server": "memory",
-      "tool": "memory_query"
-    },
-    {
-      "calls": 451,
-      "failures": 23,
-      "p50ms": 280,
-      "p95ms": 1690,
-      "server": "socraticode",
-      "tool": "codebase_search"
-    },
-    {
-      "calls": 390,
-      "failures": 17,
-      "p50ms": 259,
-      "p95ms": 1174,
-      "server": "designer-skill",
-      "tool": "dispatch_intent"
-    },
-    {
-      "calls": 380,
-      "failures": 8,
-      "p50ms": 920,
-      "p95ms": 5182,
-      "server": "playwright",
-      "tool": "browser_navigate"
-    },
-    {
-      "calls": 374,
-      "failures": 18,
-      "p50ms": 36,
-      "p95ms": 171,
-      "server": "fs",
-      "tool": "list_directory"
-    },
-    {
-      "calls": 366,
-      "failures": 24,
-      "p50ms": 230,
-      "p95ms": 1460,
-      "server": "context7",
-      "tool": "resolve-library-id"
-    },
-    {
-      "calls": 351,
-      "failures": 15,
-      "p50ms": 140,
-      "p95ms": 800,
-      "server": "gitea",
-      "tool": "list_issues"
-    },
-    {
-      "calls": 339,
-      "failures": 12,
-      "p50ms": 560,
-      "p95ms": 3184,
-      "server": "tavily",
-      "tool": "tavily_search"
-    },
-    {
-      "calls": 264,
-      "failures": 16,
-      "p50ms": 201,
-      "p95ms": 1236,
-      "server": "portainer",
-      "tool": "list_containers"
-    },
-    {
-      "calls": 258,
-      "failures": 8,
-      "p50ms": 1419,
-      "p95ms": 5764,
-      "server": "playwright",
-      "tool": "browser_take_screenshot"
-    },
-    {
-      "calls": 246,
-      "failures": 6,
-      "p50ms": 171,
-      "p95ms": 843,
-      "server": "open-design",
-      "tool": "get_project"
-    },
-    {
-      "calls": 223,
-      "failures": 8,
-      "p50ms": 401,
-      "p95ms": 2523,
-      "server": "raven",
-      "tool": "audit_page"
-    }
-  ],
-  "servers": [
-    {
-      "calls": 2556,
-      "failures": 102,
-      "p50ms": 70,
-      "p95ms": 336,
-      "server": "serena"
-    },
-    {
-      "calls": 1083,
-      "failures": 47,
-      "p50ms": 34,
-      "p95ms": 194,
-      "server": "xerj"
-    },
-    {
-      "calls": 954,
-      "failures": 52,
-      "p50ms": 360,
-      "p95ms": 1595,
-      "server": "context7"
-    },
-    {
-      "calls": 845,
-      "failures": 34,
-      "p50ms": 37,
-      "p95ms": 170,
-      "server": "fs"
-    },
-    {
-      "calls": 721,
-      "failures": 28,
-      "p50ms": 32,
-      "p95ms": 130,
-      "server": "time"
-    },
-    {
-      "calls": 638,
-      "failures": 16,
-      "p50ms": 1121,
-      "p95ms": 5331,
-      "server": "playwright"
-    },
-    {
-      "calls": 611,
-      "failures": 26,
-      "p50ms": 199,
-      "p95ms": 861,
-      "server": "fetch"
-    },
-    {
-      "calls": 453,
-      "failures": 20,
-      "p50ms": 60,
-      "p95ms": 319,
-      "server": "memory"
-    },
-    {
-      "calls": 451,
-      "failures": 23,
-      "p50ms": 280,
-      "p95ms": 1175,
-      "server": "socraticode"
-    },
-    {
-      "calls": 390,
-      "failures": 17,
-      "p50ms": 261,
-      "p95ms": 1497,
-      "server": "designer-skill"
-    },
-    {
-      "calls": 351,
-      "failures": 15,
-      "p50ms": 139,
-      "p95ms": 632,
-      "server": "gitea"
-    },
-    {
-      "calls": 339,
-      "failures": 12,
-      "p50ms": 561,
-      "p95ms": 3014,
-      "server": "tavily"
-    },
-    {
-      "calls": 264,
-      "failures": 16,
-      "p50ms": 199,
-      "p95ms": 1103,
-      "server": "portainer"
-    },
-    {
-      "calls": 246,
-      "failures": 6,
-      "p50ms": 170,
-      "p95ms": 1047,
-      "server": "open-design"
-    },
-    {
-      "calls": 223,
-      "failures": 8,
-      "p50ms": 399,
-      "p95ms": 1925,
-      "server": "raven"
-    }
-  ],
-  "clients": [
-    {
-      "calls": 7073,
-      "failures": 289,
-      "p50ms": 175,
-      "p95ms": 822,
-      "client": "opencode/2.2.6"
-    },
-    {
-      "calls": 2043,
-      "failures": 71,
-      "p50ms": 177,
-      "p95ms": 963,
-      "client": "openclaw/0.9.1"
-    },
-    {
-      "calls": 1009,
-      "failures": 45,
-      "p50ms": 174,
-      "p95ms": 991,
-      "client": "hermes/1.2"
-    }
-  ]
+  {
+   "t": "2024-12-31T21:00:00Z",
+   "calls": 503,
+   "failures": 22,
+   "p50ms": 104,
+   "p95ms": 890
+  },
+  {
+   "t": "2025-01-31T21:00:00Z",
+   "calls": 397,
+   "failures": 22,
+   "p50ms": 104,
+   "p95ms": 1374
+  },
+  {
+   "t": "2025-02-28T21:00:00Z",
+   "calls": 466,
+   "failures": 18,
+   "p50ms": 131,
+   "p95ms": 890
+  },
+  {
+   "t": "2025-03-31T21:00:00Z",
+   "calls": 366,
+   "failures": 14,
+   "p50ms": 147,
+   "p95ms": 1502
+  },
+  {
+   "t": "2025-04-30T21:00:00Z",
+   "calls": 345,
+   "failures": 16,
+   "p50ms": 147,
+   "p95ms": 1374
+  },
+  {
+   "t": "2025-05-31T21:00:00Z",
+   "calls": 368,
+   "failures": 14,
+   "p50ms": 96,
+   "p95ms": 1010
+  },
+  {
+   "t": "2025-06-30T21:00:00Z",
+   "calls": 540,
+   "failures": 23,
+   "p50ms": 96,
+   "p95ms": 1502
+  },
+  {
+   "t": "2025-07-31T21:00:00Z",
+   "calls": 478,
+   "failures": 13,
+   "p50ms": 118,
+   "p95ms": 890
+  },
+  {
+   "t": "2025-08-31T21:00:00Z",
+   "calls": 473,
+   "failures": 16,
+   "p50ms": 147,
+   "p95ms": 1374
+  },
+  {
+   "t": "2025-09-30T21:00:00Z",
+   "calls": 565,
+   "failures": 23,
+   "p50ms": 104,
+   "p95ms": 1174
+  },
+  {
+   "t": "2025-10-31T21:00:00Z",
+   "calls": 451,
+   "failures": 17,
+   "p50ms": 104,
+   "p95ms": 1174
+  },
+  {
+   "t": "2025-11-30T21:00:00Z",
+   "calls": 517,
+   "failures": 33,
+   "p50ms": 131,
+   "p95ms": 1374
+  },
+  {
+   "t": "2025-12-31T21:00:00Z",
+   "calls": 542,
+   "failures": 18,
+   "p50ms": 162,
+   "p95ms": 1502
+  },
+  {
+   "t": "2026-01-31T21:00:00Z",
+   "calls": 504,
+   "failures": 29,
+   "p50ms": 162,
+   "p95ms": 1174
+  },
+  {
+   "t": "2026-02-28T21:00:00Z",
+   "calls": 560,
+   "failures": 37,
+   "p50ms": 162,
+   "p95ms": 1010
+  },
+  {
+   "t": "2026-03-31T21:00:00Z",
+   "calls": 421,
+   "failures": 16,
+   "p50ms": 162,
+   "p95ms": 1174
+  },
+  {
+   "t": "2026-04-30T21:00:00Z",
+   "calls": 447,
+   "failures": 26,
+   "p50ms": 104,
+   "p95ms": 890
+  },
+  {
+   "t": "2026-05-31T21:00:00Z",
+   "calls": 610,
+   "failures": 28,
+   "p50ms": 104,
+   "p95ms": 1502
+  },
+  {
+   "t": "2026-06-30T21:00:00Z",
+   "calls": 516,
+   "failures": 15,
+   "p50ms": 147,
+   "p95ms": 890
+  },
+  {
+   "t": "2026-07-31T21:00:00Z",
+   "calls": 544,
+   "failures": 21,
+   "p50ms": 162,
+   "p95ms": 890
+  },
+  {
+   "t": "2026-08-31T21:00:00Z",
+   "calls": 384,
+   "failures": 13,
+   "p50ms": 118,
+   "p95ms": 890
+  },
+  {
+   "t": "2026-09-30T21:00:00Z",
+   "calls": 436,
+   "failures": 12,
+   "p50ms": 131,
+   "p95ms": 890
+  },
+  {
+   "t": "2026-10-31T21:00:00Z",
+   "calls": 614,
+   "failures": 29,
+   "p50ms": 147,
+   "p95ms": 1502
+  }
+ ],
+ "tools": [
+  {
+   "calls": 1083,
+   "failures": 47,
+   "p50ms": 33,
+   "p95ms": 185,
+   "server": "xerj",
+   "tool": "xerj_search"
+  },
+  {
+   "calls": 977,
+   "failures": 43,
+   "p50ms": 79,
+   "p95ms": 441,
+   "server": "serena",
+   "tool": "find_symbol"
+  },
+  {
+   "calls": 846,
+   "failures": 32,
+   "p50ms": 41,
+   "p95ms": 194,
+   "server": "serena",
+   "tool": "read_file"
+  },
+  {
+   "calls": 733,
+   "failures": 27,
+   "p50ms": 90,
+   "p95ms": 542,
+   "server": "serena",
+   "tool": "find_referencing_symbols"
+  },
+  {
+   "calls": 721,
+   "failures": 28,
+   "p50ms": 32,
+   "p95ms": 113,
+   "server": "time",
+   "tool": "get_current_time"
+  },
+  {
+   "calls": 611,
+   "failures": 26,
+   "p50ms": 200,
+   "p95ms": 1163,
+   "server": "fetch",
+   "tool": "fetch"
+  },
+  {
+   "calls": 588,
+   "failures": 28,
+   "p50ms": 440,
+   "p95ms": 1721,
+   "server": "context7",
+   "tool": "query-docs"
+  },
+  {
+   "calls": 471,
+   "failures": 16,
+   "p50ms": 37,
+   "p95ms": 144,
+   "server": "fs",
+   "tool": "read_file"
+  },
+  {
+   "calls": 453,
+   "failures": 20,
+   "p50ms": 61,
+   "p95ms": 294,
+   "server": "memory",
+   "tool": "memory_query"
+  },
+  {
+   "calls": 451,
+   "failures": 23,
+   "p50ms": 280,
+   "p95ms": 1690,
+   "server": "socraticode",
+   "tool": "codebase_search"
+  },
+  {
+   "calls": 390,
+   "failures": 17,
+   "p50ms": 259,
+   "p95ms": 1174,
+   "server": "designer-skill",
+   "tool": "dispatch_intent"
+  },
+  {
+   "calls": 380,
+   "failures": 8,
+   "p50ms": 920,
+   "p95ms": 5182,
+   "server": "playwright",
+   "tool": "browser_navigate"
+  },
+  {
+   "calls": 374,
+   "failures": 18,
+   "p50ms": 36,
+   "p95ms": 171,
+   "server": "fs",
+   "tool": "list_directory"
+  },
+  {
+   "calls": 366,
+   "failures": 24,
+   "p50ms": 230,
+   "p95ms": 1460,
+   "server": "context7",
+   "tool": "resolve-library-id"
+  },
+  {
+   "calls": 351,
+   "failures": 15,
+   "p50ms": 140,
+   "p95ms": 800,
+   "server": "gitea",
+   "tool": "list_issues"
+  },
+  {
+   "calls": 339,
+   "failures": 12,
+   "p50ms": 560,
+   "p95ms": 3184,
+   "server": "tavily",
+   "tool": "tavily_search"
+  },
+  {
+   "calls": 264,
+   "failures": 16,
+   "p50ms": 201,
+   "p95ms": 1236,
+   "server": "portainer",
+   "tool": "list_containers"
+  },
+  {
+   "calls": 258,
+   "failures": 8,
+   "p50ms": 1419,
+   "p95ms": 5764,
+   "server": "playwright",
+   "tool": "browser_take_screenshot"
+  },
+  {
+   "calls": 246,
+   "failures": 6,
+   "p50ms": 171,
+   "p95ms": 843,
+   "server": "open-design",
+   "tool": "get_project"
+  },
+  {
+   "calls": 223,
+   "failures": 8,
+   "p50ms": 401,
+   "p95ms": 2523,
+   "server": "raven",
+   "tool": "audit_page"
+  }
+ ],
+ "servers": [
+  {
+   "calls": 2556,
+   "failures": 102,
+   "p50ms": 70,
+   "p95ms": 336,
+   "server": "serena"
+  },
+  {
+   "calls": 1083,
+   "failures": 47,
+   "p50ms": 34,
+   "p95ms": 194,
+   "server": "xerj"
+  },
+  {
+   "calls": 954,
+   "failures": 52,
+   "p50ms": 360,
+   "p95ms": 1595,
+   "server": "context7"
+  },
+  {
+   "calls": 845,
+   "failures": 34,
+   "p50ms": 37,
+   "p95ms": 170,
+   "server": "fs"
+  },
+  {
+   "calls": 721,
+   "failures": 28,
+   "p50ms": 32,
+   "p95ms": 130,
+   "server": "time"
+  },
+  {
+   "calls": 638,
+   "failures": 16,
+   "p50ms": 1121,
+   "p95ms": 5331,
+   "server": "playwright"
+  },
+  {
+   "calls": 611,
+   "failures": 26,
+   "p50ms": 199,
+   "p95ms": 861,
+   "server": "fetch"
+  },
+  {
+   "calls": 453,
+   "failures": 20,
+   "p50ms": 60,
+   "p95ms": 319,
+   "server": "memory"
+  },
+  {
+   "calls": 451,
+   "failures": 23,
+   "p50ms": 280,
+   "p95ms": 1175,
+   "server": "socraticode"
+  },
+  {
+   "calls": 390,
+   "failures": 17,
+   "p50ms": 261,
+   "p95ms": 1497,
+   "server": "designer-skill"
+  },
+  {
+   "calls": 351,
+   "failures": 15,
+   "p50ms": 139,
+   "p95ms": 632,
+   "server": "gitea"
+  },
+  {
+   "calls": 339,
+   "failures": 12,
+   "p50ms": 561,
+   "p95ms": 3014,
+   "server": "tavily"
+  },
+  {
+   "calls": 264,
+   "failures": 16,
+   "p50ms": 199,
+   "p95ms": 1103,
+   "server": "portainer"
+  },
+  {
+   "calls": 246,
+   "failures": 6,
+   "p50ms": 170,
+   "p95ms": 1047,
+   "server": "open-design"
+  },
+  {
+   "calls": 223,
+   "failures": 8,
+   "p50ms": 399,
+   "p95ms": 1925,
+   "server": "raven"
+  }
+ ],
+ "clients": [
+  {
+   "calls": 7073,
+   "failures": 289,
+   "p50ms": 175,
+   "p95ms": 822,
+   "client": "opencode/2.2.6"
+  },
+  {
+   "calls": 2043,
+   "failures": 71,
+   "p50ms": 177,
+   "p95ms": 963,
+   "client": "openclaw/0.9.1"
+  }
+ ]
 }

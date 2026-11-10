@@ -69,6 +69,12 @@
     return mins(d.getDate()) + '.' + mins(d.getMonth() + 1) + '.' + d.getFullYear();
   }
 
+  function mon(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return '—'; }
+    return mins(d.getMonth() + 1) + '.' + d.getFullYear();
+  }
+
   function uptime(set) {
     var from = set.runtime && set.runtime.startedAt;
     if (!set.runtime || !set.runtime.running || !from) { return '—'; }
@@ -609,9 +615,15 @@
   var PERIODS = ['today', '7d', '30d', 'archive'];
   var PERIOD_NAMES = { today: 'Сегодня', '7d': '7 дней', '30d': '30 дней', archive: 'Архив' };
 
+  // корзина среза: час на день, день на неделю/месяц, месяц на архив —
+  // иначе архив рисуется сотнями дневных столбиков
+  function bucketOf(period) {
+    return period === 'today' ? 'hour' : period === 'archive' ? 'month' : 'day';
+  }
+
   function statsPath(filters) {
     var p = '/api/stats?set=' + encodeURIComponent(st.st.set || 'all') +
-      '&period=' + st.st.period + '&bucket=' + (st.st.period === 'today' ? 'hour' : 'day');
+      '&period=' + st.st.period + '&bucket=' + bucketOf(st.st.period);
     if (filters) {
       if (st.st.server) { p += '&server=' + encodeURIComponent(st.st.server); }
       if (st.st.tool) { p += '&tool=' + encodeURIComponent(st.st.tool); }
@@ -647,6 +659,11 @@
           tools: uniq(d.tools, 'tool'),
           clients: uniq(d.clients, 'client')
         } : { servers: [], tools: [], clients: [] };
+        // выбор, которого нет в новом наборе, снимаем: иначе список показывает
+        // «все», а запрос продолжает фильтровать старым значением
+        if (st.st.server && st.st.facets.servers.indexOf(st.st.server) < 0) { st.st.server = ''; }
+        if (st.st.tool && st.st.facets.tools.indexOf(st.st.tool) < 0) { st.st.tool = ''; }
+        if (st.st.client && st.st.facets.clients.indexOf(st.st.client) < 0) { st.st.client = ''; }
         fillFilters();
         return get(statsPath(true));
       });
@@ -742,6 +759,11 @@
     $('s-p95').textContent = ms(t.p95ms);
     show($('s-p50-a'), !!d.approximate);
     show($('s-p95-a'), !!d.approximate);
+    // процентили разрезов считаются по тем же гистограммам — помечаем их так же
+    [].forEach.call(document.querySelectorAll('.ph-pct'), function (th) {
+      th.textContent = d.approximate ? th.dataset.k + ' ≈' : th.dataset.k;
+      if (d.approximate) { th.title = 'по гистограмме'; } else { th.removeAttribute('title'); }
+    });
 
     renderSeries(d.series || []);
     $('s-tools-count').textContent = fmtN((d.tools || []).length);
@@ -779,8 +801,10 @@
   function renderSeries(rows) {
     var box = $('activity-bars');
     var hour = st.st.period === 'today';
+    var monthly = st.st.period === 'archive';
+    var label = hour ? function (iso) { return hm(new Date(iso).getTime()); } : monthly ? mon : day;
     show($('activity-empty'), rows.length === 0);
-    $('s-activity-title').textContent = hour ? 'Вызовы по часам' : 'Вызовы по дням';
+    $('s-activity-title').textContent = hour ? 'Вызовы по часам' : monthly ? 'Вызовы по месяцам' : 'Вызовы по дням';
     if (!rows.length) {
       box.replaceChildren();
       $('s-span').textContent = '—';
@@ -809,17 +833,15 @@
         o.style.height = ((n - err) / max * 100) + '%';
         col.appendChild(o);
       }
-      var when = new Date(r.t);
-      col.title = (hour ? hm(when.getTime()) : day(r.t)) + ' · ' + n + ' вызовов' +
+      col.title = label(r.t) + ' · ' + n + ' вызовов' +
         (err ? ', ошибок ' + err : '');
       frag.appendChild(col);
     });
     box.replaceChildren(frag);
 
-    $('s-span').textContent = fmtN(calls) + ' вызовов · ' + rows.length + (hour ? ' ч' : ' дн');
-    var first = new Date(rows[0].t), last = new Date(rows[rows.length - 1].t);
-    $('s-from').textContent = hour ? hm(first.getTime()) : day(rows[0].t);
-    $('s-to').textContent = hour ? hm(last.getTime()) : day(rows[rows.length - 1].t);
+    $('s-span').textContent = fmtN(calls) + ' вызовов · ' + rows.length + (hour ? ' ч' : monthly ? ' мес' : ' дн');
+    $('s-from').textContent = label(rows[0].t);
+    $('s-to').textContent = label(rows[rows.length - 1].t);
   }
 
   /* ---------- вкладки основной области ---------- */
@@ -838,6 +860,20 @@
     if (hash && location.hash !== hash) { history.replaceState(null, '', hash); }
   }
 
+  /* Стрелки/Home/End внутри группы кнопок: roving tabindex сам по себе оставлял
+     недостижимыми всё, кроме выбранного (Tab ходит только по tabIndex=0). */
+  function arrowNav(e, group, pick) {
+    if (['ArrowRight', 'ArrowLeft', 'Home', 'End'].indexOf(e.key) < 0) { return; }
+    var btns = [].slice.call(group.querySelectorAll('.segbtn'));
+    var i = btns.indexOf(document.activeElement);
+    if (i < 0) { return; }
+    var j = e.key === 'Home' ? 0 : e.key === 'End' ? btns.length - 1
+      : (i + (e.key === 'ArrowRight' ? 1 : -1) + btns.length) % btns.length;
+    e.preventDefault();
+    pick(btns[j]);
+    btns[j].focus();
+  }
+
   /* ---------- панель деталей ---------- */
 
   function setSideTab(name) {
@@ -852,15 +888,28 @@
   }
 
   function openSide() {
+    var drawer = window.innerWidth < 1200;
+    st.sideReturn = document.activeElement;
     document.body.classList.add('side-open');
     $('side-open').setAttribute('aria-expanded', 'true');
-    show($('scrim'), window.innerWidth < 1280);
+    show($('scrim'), drawer);
+    if (drawer) {
+      var tab = document.querySelector('.seg .segbtn[aria-selected="true"]') || $('side-close');
+      tab.focus();
+    }
   }
 
   function closeSide() {
+    var was = document.body.classList.contains('side-open');
     document.body.classList.remove('side-open');
     $('side-open').setAttribute('aria-expanded', 'false');
     show($('scrim'), false);
+    // фокус не должен оставаться в скрытой панели: возвращаем туда, откуда открыли,
+    // а если оттуда некуда (открыли программно) — на саму кнопку «Детали»
+    var back = st.sideReturn && document.contains(st.sideReturn) && st.sideReturn.offsetParent !== null
+      ? st.sideReturn : ($('side-open').offsetParent !== null ? $('side-open') : null);
+    st.sideReturn = null;
+    if (was && back) { back.focus(); }
   }
 
   function applyRail() {
@@ -963,6 +1012,23 @@
   document.querySelector('.seg').addEventListener('click', function (e) {
     var btn = e.target.closest('.segbtn');
     if (btn) { setSideTab(btn.dataset.side); }
+  });
+  document.querySelector('.seg').addEventListener('keydown', function (e) {
+    arrowNav(e, this, function (b) { setSideTab(b.dataset.side); });
+  });
+  $('s-period').addEventListener('keydown', function (e) {
+    arrowNav(e, this, function (b) { setPeriod(b.dataset.period); });
+  });
+
+  // Tab не уходит в контент под дровером
+  $('side').addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab' || !document.body.classList.contains('side-open')) { return; }
+    var f = [].slice.call(this.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+      .filter(function (n) { return n.offsetParent !== null; });
+    if (!f.length) { return; }
+    var first = f[0], last = f[f.length - 1], at = document.activeElement;
+    if (e.shiftKey && (at === first || !this.contains(at))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
   });
 
   $('side-open').addEventListener('click', openSide);
