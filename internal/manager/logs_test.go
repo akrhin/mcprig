@@ -71,6 +71,32 @@ func TestSetLogMigratesInheritedFile(t *testing.T) {
 	}
 }
 
+// Существующий mcprig.log миграция не затирает: старый файл остаётся на месте.
+func TestLogMigrationKeepsExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	setDir := filepath.Join(dir, "sets", "main")
+	if err := os.MkdirAll(setDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	old := filepath.Join(setDir, "lazy-mcp.log")
+	next := filepath.Join(setDir, "mcprig.log")
+	if err := os.WriteFile(old, []byte("старый\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(next, []byte("новый\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	migrateLog(dir, "main")
+
+	if b, err := os.ReadFile(next); err != nil || string(b) != "новый\n" {
+		t.Fatalf("mcprig.log затёрт: %q, %v", b, err)
+	}
+	if b, err := os.ReadFile(old); err != nil || string(b) != "старый\n" {
+		t.Fatalf("lazy-mcp.log пропал: %q, %v", b, err)
+	}
+}
+
 // TestLogWriterRotatesBySize: долгоживущий набор не растёт без предела —
 // .log переезжает в .log.1 при 5 МиБ.
 func TestLogWriterRotatesBySize(t *testing.T) {
