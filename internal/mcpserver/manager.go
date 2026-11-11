@@ -34,11 +34,6 @@ const (
 	// в internal/manager/health.go. Холодный stdio (npx, uvx) и первый коннект к
 	// LSP поднимаются дольше 15 с, и сервер выглядел мёртвым, хотя вызовы проходят.
 	healthTimeout = 15 * time.Second
-	// connectTimeout bounds one connect+initialize: без дедлайна зависший
-	// апстрим навсегда занимал бы c.try, и сервер считался бы живым.
-	connectTimeout = 30 * time.Second
-	// closeWait bounds how long Close waits for an in-flight connect.
-	closeWait = 5 * time.Second
 	// maxPages stops a server that keeps handing out cursors.
 	maxPages = 20
 	// maxProbes caps concurrent status probes in one list_servers call.
@@ -49,6 +44,16 @@ const (
 	// invokeRetryDelay is the pause before repeating an invoke whose connection
 	// died before the first response byte.
 	invokeRetryDelay = 250 * time.Millisecond
+)
+
+// Variables, not constants: a test of the hung-connect paths cannot spend 30
+// seconds per case. Nothing writes them outside tests.
+var (
+	// connectTimeout bounds one connect+initialize: без дедлайна зависший
+	// апстрим навсегда занимал бы c.try, и сервер считался бы живым.
+	connectTimeout = 30 * time.Second
+	// closeWait bounds how long Close waits for an in-flight connect.
+	closeWait = 5 * time.Second
 )
 
 var (

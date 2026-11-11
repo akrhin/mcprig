@@ -21,7 +21,7 @@ func TestHealthConstantsMatchManager(t *testing.T) {
 		"healthTTL":     healthTTL,
 		"healthTimeout": healthTimeout,
 	} {
-		re := regexp.MustCompile(`(?m)^\s*` + name + `\s*=\s*(\d+)\s*\*\s*time\.Second\s*$`)
+		re := regexp.MustCompile(`(?m)^\s*` + name + `\s*=\s*([0-9]+)\s*\*\s*time\.Second`)
 		m := re.FindSubmatch(raw)
 		if m == nil {
 			t.Fatalf("%s не найден в internal/manager/health.go", name)

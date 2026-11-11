@@ -25,7 +25,8 @@ const (
 )
 
 // toolOutDir is where an oversized answer is written; created on first use.
-func toolOutDir() string { return toolout.Dir(toolout.Base()) }
+// A variable so a test can point the dump at a directory of its own.
+var toolOutDir = func() string { return toolout.Dir(toolout.Base()) }
 
 // truncateResult caps a downstream answer at maxBytes and points at the file
 // carrying the full one. An answer that fits is returned untouched: no file,
