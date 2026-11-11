@@ -80,8 +80,8 @@ type Manager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// slots bounds simultaneous calls to one downstream across every request:
-	// a per-request limiter let two parallel invoke_many send 8 at once.
+	// slots bounds simultaneous calls to one downstream inside invoke_many: a
+	// per-request limiter let two parallel fan-outs send twice the limit.
 	slots *serverSlots
 
 	// Stats, when set, counts every downstream invocation per client and
