@@ -86,7 +86,7 @@ func (f *envFile) saveLocked() error {
 	if err != nil {
 		return err
 	}
-	return writeAtomic(f.path, append(body, '\n'), 0o600)
+	return writeAtomic(f.path, append(body, '\n'))
 }
 
 // bao — клиент OpenBao KV v2.

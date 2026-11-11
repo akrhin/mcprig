@@ -227,6 +227,11 @@ func (m *Manager) startHealthLoop() {
 		for {
 			select {
 			case <-t.C:
+				// Просроченные сессии убирает тот же тикер: иначе карта растёт
+				// до рестарта менеджера.
+				if m.auth != nil && m.auth.sessions != nil {
+					m.auth.sessions.gc()
+				}
 				m.pollHealth()
 			case <-m.healthStop:
 				return

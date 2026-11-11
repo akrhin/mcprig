@@ -107,14 +107,14 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
 | `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token |
-| `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key |
+| `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key; revoking the active key stops the set and the answer carries `stopped: true` |
 | `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"note":"hermes"}`; the note becomes the client's label in the statistics, an empty string clears it, a running set is restarted |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
 | `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500; for one set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |
-| `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values |
+| `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; the answer returns at once, sets using the variable restart in the background (60 s budget) and `restarted` lists them |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | export the registry or one set |
 | `POST /api/browse` | open a live session to a server for tool inspection |
@@ -129,7 +129,9 @@ are ignored.
 
 The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at
 5 MiB. A `lazy-mcp.log` inherited from the old proxy is renamed on the set's
-first start, so the old tail stays visible in the panel.
+first start, so the old tail stays visible in the panel. A failed rotation
+(rename or reopen) loses no output: the old file stays in place and the error
+text is shown in the set status `error`.
 
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
 registry key. A set that does not answer is listed in `unreachable` by id; its
@@ -180,7 +182,9 @@ period=archive  older than 30 days     from month files, approximate=true
 `bucket=hour|day|month` picks the series step (default follows the period): today
 and 7d answer hourly (or daily with `bucket=day`), 30d answers daily, archive
 monthly. An unknown `bucket` is `400`. `server`, `tool` and `client` filter every part of the answer. `set=all`
-(or no `set`) sums all sets. The answer is `period`, `from`, `to`, `approximate`,
+(or no `set`) sums all sets. Parsed history files are cached: a file is re-read
+only when its `mtime` or size changes, so a repeated query for the same period
+touches no disk. The answer is `period`, `from`, `to`, `approximate`,
 `totals` and `series` (`{t, calls, failures, p50ms, p95ms}`), plus `tools`,
 `servers` and `clients` breakdowns of the same shape. `set=all` (or no `set`) adds `bySet`:
 `{set, calls, failures, totalMs}` per set with calls in the period, which the

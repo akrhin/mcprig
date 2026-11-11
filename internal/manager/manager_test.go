@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fakeBin — фейковый «прокси» набора, собранный один раз на пакет.
@@ -509,9 +510,18 @@ func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
 	w := e.do(t, http.MethodPut, "/api/env/DB_PASSWORD", map[string]any{"value": "s3cret"})
 	status(t, w, http.StatusOK)
 
-	e.m.rt.mu.Lock()
-	gotDB, gotOther := e.m.rt.procs[dbSet], e.m.rt.procs[otherSet]
-	e.m.rt.mu.Unlock()
+	// Перезапуск после ответа — в горутине: ждём замену процесса.
+	deadline := time.Now().Add(5 * time.Second)
+	var gotDB, gotOther *process
+	for {
+		e.m.rt.mu.Lock()
+		gotDB, gotOther = e.m.rt.procs[dbSet], e.m.rt.procs[otherSet]
+		e.m.rt.mu.Unlock()
+		if gotDB != dbProc || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	if gotDB == dbProc {
 		t.Fatal("набор со ссылкой на переменную не перезапускался")
 	}

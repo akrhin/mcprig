@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"sort"
 	"sync"
 	"time"
 
@@ -77,6 +76,11 @@ type browseSession struct {
 	view *browseView
 	sess *mcp.ClientSession
 	used time.Time
+	// refs — сколько вызовов сейчас держат сессию. close и sweep помечают её
+	// closing и закрывают, когда refs снова 0: иначе закрытие прилетает в
+	// середину вызова.
+	refs    int
+	closing bool
 }
 
 // browser держит открытые MCP-сессии просмотра: не больше 8, TTL 15 минут.
@@ -159,44 +163,76 @@ func (b *browser) open(ctx context.Context, srv registry.Server) (*browseView, e
 	}
 
 	b.mu.Lock()
+	var victim *browseSession
 	if len(b.items) >= browseMax {
-		b.evictLocked()
+		victim = b.evictLocked()
 	}
 	b.items[view.ID] = &browseSession{view: view, sess: session, used: time.Now()}
 	b.mu.Unlock()
+	if victim != nil {
+		go victim.sess.Close()
+	}
 	return view, nil
 }
 
+// lookup берёт сессию на время вызова: refs++ не даёт close/sweep закрыть её
+// посреди работы. Пара к нему — release.
 func (b *browser) lookup(id string) (*browseSession, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	s, ok := b.items[id]
-	if !ok {
+	if !ok || s.closing {
 		return nil, errBrowseGone
 	}
-	if time.Since(s.used) > browseTTL {
+	if s.refs == 0 && time.Since(s.used) > browseTTL {
 		delete(b.items, id)
+		s.closing = true
 		go s.sess.Close()
 		return nil, errBrowseGone
 	}
 	s.used = time.Now()
+	s.refs++
 	return s, nil
 }
 
-func (b *browser) get(id string) (*browseView, error) {
-	s, err := b.lookup(id)
-	if err != nil {
-		return nil, err
+// release отпускает сессию; закрывается она здесь, если её уже пометили.
+func (b *browser) release(s *browseSession) {
+	b.mu.Lock()
+	s.refs--
+	closeNow := s.closing && s.refs <= 0
+	b.mu.Unlock()
+	if closeNow {
+		s.sess.Close()
 	}
+}
+
+func (b *browser) get(id string) (*browseView, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	s, ok := b.items[id]
+	if !ok || s.closing {
+		return nil, errBrowseGone
+	}
+	if s.refs == 0 && time.Since(s.used) > browseTTL {
+		delete(b.items, id)
+		s.closing = true
+		go s.sess.Close()
+		return nil, errBrowseGone
+	}
+	s.used = time.Now()
 	return s.view, nil
 }
 
 func (b *browser) close(id string) bool {
 	b.mu.Lock()
 	s, ok := b.items[id]
-	delete(b.items, id)
-	b.mu.Unlock()
 	if ok {
+		delete(b.items, id)
+		s.closing = true
+	}
+	closeNow := ok && s.refs == 0
+	b.mu.Unlock()
+	if closeNow {
 		go s.sess.Close()
 	}
 	return ok
@@ -207,6 +243,7 @@ func (b *browser) callTool(ctx context.Context, id, name string, args map[string
 	if err != nil {
 		return nil, err
 	}
+	defer b.release(s)
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
@@ -221,6 +258,7 @@ func (b *browser) readResource(ctx context.Context, id, uri string) (any, error)
 	if err != nil {
 		return nil, err
 	}
+	defer b.release(s)
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
@@ -235,6 +273,7 @@ func (b *browser) getPrompt(ctx context.Context, id, name string, args map[strin
 	if err != nil {
 		return nil, err
 	}
+	defer b.release(s)
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.GetPrompt(ctx, &mcp.GetPromptParams{Name: name, Arguments: args})
@@ -246,46 +285,56 @@ func (b *browser) getPrompt(ctx context.Context, id, name string, args map[strin
 
 func (b *browser) sweep() {
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	now := time.Now()
+	var closeNow []*browseSession
 	for id, s := range b.items {
-		if time.Since(s.used) > browseTTL {
-			delete(b.items, id)
-			go s.sess.Close()
+		if s.refs > 0 || now.Sub(s.used) <= browseTTL {
+			continue
 		}
+		delete(b.items, id)
+		s.closing = true
+		closeNow = append(closeNow, s)
+	}
+	b.mu.Unlock()
+	for _, s := range closeNow {
+		go s.sess.Close()
 	}
 }
 
-// evictLocked закрывает самую старую сессию — вызывается под b.mu.
-func (b *browser) evictLocked() {
-	oldest := ""
-	var oldestAt time.Time
+// evictLocked отдаёт самую старую свободную сессию — вызывается под b.mu, а
+// закрывает её open уже после разблокировки. Сессии в работе не вытесняются.
+func (b *browser) evictLocked() *browseSession {
+	var oldest *browseSession
+	oldestID := ""
 	for id, s := range b.items {
-		if oldest == "" || s.used.Before(oldestAt) {
-			oldest, oldestAt = id, s.used
+		if s.refs > 0 {
+			continue
+		}
+		if oldest == nil || s.used.Before(oldest.used) {
+			oldest, oldestID = s, id
 		}
 	}
-	if oldest == "" {
-		return
+	if oldest == nil {
+		return nil
 	}
-	if s := b.items[oldest]; s != nil {
-		go s.sess.Close()
-	}
-	delete(b.items, oldest)
+	delete(b.items, oldestID)
+	oldest.closing = true
+	return oldest
 }
 
 func (b *browser) closeAll() {
 	b.mu.Lock()
-	ids := make([]string, 0, len(b.items))
-	for id := range b.items {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 	items := b.items
 	b.items = map[string]*browseSession{}
-	b.mu.Unlock()
-	for _, id := range ids {
-		if s := items[id]; s != nil {
-			s.sess.Close()
+	var closeNow []*browseSession
+	for _, s := range items {
+		s.closing = true
+		if s.refs == 0 {
+			closeNow = append(closeNow, s)
 		}
+	}
+	b.mu.Unlock()
+	for _, s := range closeNow {
+		s.sess.Close()
 	}
 }
