@@ -2,7 +2,10 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"io"
+	"net"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -80,6 +83,10 @@ func TestRetryableCall(t *testing.T) {
 		{"tool error result", &mcp.CallToolResult{IsError: true}, nil, false},
 		{"deadline", nil, context.DeadlineExceeded, false},
 		{"no error", nil, nil, false},
+		// A net timeout may have run the call upstream: repeating it would
+		// double the side effect.
+		{"net timeout", nil, &net.OpError{Op: "dial", Net: "tcp", Err: os.ErrDeadlineExceeded}, false},
+		{"net error without timeout", nil, &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

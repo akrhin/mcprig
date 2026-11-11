@@ -75,7 +75,7 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 	label := labelOf(ctx, req)
 
 	out := make([]manyAnswer, len(calls))
-	slots := newServerSlots(maxPerServer)
+	slots := m.slots
 	var wg sync.WaitGroup
 	for i, c := range calls {
 		wg.Add(1)
@@ -83,11 +83,20 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 			defer wg.Done()
 			start := time.Now()
 			ans := manyAnswer{Server: c.Server, CommandName: c.CommandName}
-			slot := slots.get(c.Server)
+			// The slot is keyed by the server entry: looking it up by the raw
+			// name would keep a channel for every name a caller makes up.
+			e := m.find(c.Server)
+			if e == nil {
+				ans.Error = fmt.Sprintf("неизвестный сервер %q", c.Server)
+				ans.MS = time.Since(start).Milliseconds()
+				out[i] = ans
+				return
+			}
+			slot := slots.get(e)
 			select {
 			case slot <- struct{}{}:
 				defer func() { <-slot }()
-				if err := m.runManyCall(ctx, label, c, maxBytes, &ans); err != nil {
+				if err := m.runManyCall(ctx, label, e, c, maxBytes, &ans); err != nil {
 					ans.Error = err.Error()
 				}
 			case <-ctx.Done():
@@ -139,11 +148,7 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 
 // runManyCall executes one call and fills ans. A downstream isError counts as a
 // failed call, as it does in the counter.
-func (m *Manager) runManyCall(ctx context.Context, label string, c manyCall, maxBytes int, ans *manyAnswer) error {
-	e := m.find(c.Server)
-	if e == nil {
-		return fmt.Errorf("неизвестный сервер %q", c.Server)
-	}
+func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c manyCall, maxBytes int, ans *manyAnswer) error {
 	if !usable(e.srv) {
 		return serverProblem(e.srv)
 	}
@@ -193,23 +198,24 @@ func (m *Manager) timeoutText() string {
 }
 
 // serverSlots hands out one bounded channel per server, created on first use.
+// Keyed by the entry, not the name: the map then cannot grow past the set.
 type serverSlots struct {
 	mu    sync.Mutex
 	limit int
-	byKey map[string]chan struct{}
+	byKey map[*entry]chan struct{}
 }
 
 func newServerSlots(limit int) *serverSlots {
-	return &serverSlots{limit: limit, byKey: map[string]chan struct{}{}}
+	return &serverSlots{limit: limit, byKey: map[*entry]chan struct{}{}}
 }
 
-func (s *serverSlots) get(key string) chan struct{} {
+func (s *serverSlots) get(e *entry) chan struct{} {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ch := s.byKey[key]
+	ch := s.byKey[e]
 	if ch == nil {
 		ch = make(chan struct{}, s.limit)
-		s.byKey[key] = ch
+		s.byKey[e] = ch
 	}
 	return ch
 }

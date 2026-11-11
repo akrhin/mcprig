@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -240,6 +241,61 @@ func TestInvokeManyCapsCallsPerServer(t *testing.T) {
 	}
 	if peak := f.peak("same"); peak != maxPerServer {
 		t.Fatalf("одновременных вызовов к серверу %d, want %d", peak, maxPerServer)
+	}
+}
+
+// The per-server cap is set-wide: two requests in flight at once share it,
+// otherwise the downstream sees twice the limit it can take.
+func TestInvokeManyCapsCallsPerServerAcrossRequests(t *testing.T) {
+	f := newFanTracker()
+	m := fanManager(t, f, nil, "same")
+	cs := clientFor(t, m.Server())
+
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			calls := make([]any, maxPerServer)
+			for i := range calls {
+				calls[i] = echoCall("same", "x", 60)
+			}
+			res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+				Name: "invoke_many", Arguments: map[string]any{"calls": calls},
+			})
+			if err != nil || res.IsError {
+				t.Errorf("invoke_many: %v %v", err, res)
+			}
+		}()
+	}
+	wg.Wait()
+	if peak := f.peak("same"); peak > maxPerServer {
+		t.Fatalf("два запроса вместе дали %d одновременных вызовов, предел %d", peak, maxPerServer)
+	}
+}
+
+// A made-up server name must not leave a slot channel behind: the map is keyed
+// by the server entry, so it stays bounded by the set.
+func TestInvokeManyUnknownServerKeepsSlotsBounded(t *testing.T) {
+	f := newFanTracker()
+	m := fanManager(t, f, nil, "same")
+	cs := clientFor(t, m.Server())
+
+	calls := make([]any, 5)
+	for i := range calls {
+		calls[i] = echoCall(fmt.Sprintf("ghost-%d", i), "x", 0)
+	}
+	out := manyAnswers(t, call(t, cs, "invoke_many", map[string]any{"calls": calls}))
+	for i, ans := range out {
+		if ans.OK || !strings.Contains(ans.Error, "неизвестный сервер") {
+			t.Fatalf("calls[%d] должен быть ошибкой неизвестного сервера: %+v", i, ans)
+		}
+	}
+	m.slots.mu.Lock()
+	n := len(m.slots.byKey)
+	m.slots.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("slots завёл %d канал(ов) на выдуманные имена", n)
 	}
 }
 
