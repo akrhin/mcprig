@@ -292,6 +292,31 @@ func TestBrokenServerIsSoftFail(t *testing.T) {
 	}
 }
 
+// Битый сервер с именем занимает это имя: здоровый тёзка помечается дублем,
+// иначе поиск по имени молча вернул бы битую запись.
+func TestBrokenServerKeepsNameReserved(t *testing.T) {
+	path := write(t, `{"servers":[
+	  {"name":"a","command":5},
+	  {"name":"a","command":["x"]}
+	]}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Servers) != 2 {
+		t.Fatalf("серверов: want 2, got %d", len(cfg.Servers))
+	}
+	if got := cfg.Servers[0].ConfigError; !strings.Contains(got, "command") {
+		t.Errorf("битый сервер: %q", got)
+	}
+	if got := cfg.Servers[1].ConfigError; !strings.Contains(got, "дубль имени") {
+		t.Errorf("здоровый тёзка не помечен дублем: %q", got)
+	}
+	if n := len(cfg.Usable()); n != 0 {
+		t.Errorf("пригодных серверов: want 0, got %d", n)
+	}
+}
+
 // Резервный ${VAR} в transport.authToken не раскрывается: токен ушёл бы
 // заголовком нижестоящего сервера.
 func TestReservedAuthTokenFailsLoad(t *testing.T) {

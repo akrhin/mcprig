@@ -800,6 +800,10 @@ func Load(path string) (*Config, error) {
 			// чтобы панель показала причину, а остальные продолжили работать.
 			if srv.Name == "" {
 				srv.Name = fmt.Sprintf("#%d", i+1)
+			} else {
+				// Имя занято битой записью: здоровый тёзка получит «дубль
+				// имени», иначе поиск по имени молча отдал бы битого.
+				seen[srv.Name] = true
 			}
 			srv.ConfigError = fmt.Sprintf("сервер #%d: %v", i+1, err)
 			cfg.Servers = append(cfg.Servers, srv)
