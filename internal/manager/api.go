@@ -109,6 +109,10 @@ type Manager struct {
 	healthOnce  sync.Once
 	healthEvery time.Duration
 	probe       func(context.Context, *registry.Set) setHealth
+
+	// ctx живёт до Close: фоновые работы (рестарт наборов) умирают вместе с панелью.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func New(opts Options) (*Manager, error) {
@@ -170,6 +174,7 @@ func New(opts Options) (*Manager, error) {
 		}
 	}
 	version := envOr(opts.Version, "dev")
+	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{
 		opts:    opts,
 		store:   store,
@@ -179,6 +184,8 @@ func New(opts Options) (*Manager, error) {
 		version: version,
 		health:  newHealthCache(),
 		browse:  newBrowser(sec, version),
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 	m.rt = NewRuntime(opts.DataDir, cli, opts.BindIP, sec, log)
 	m.rt.allowedHosts = opts.Auth.AllowedHosts
@@ -207,6 +214,7 @@ func New(opts Options) (*Manager, error) {
 func (m *Manager) Handler() http.Handler { return m }
 
 func (m *Manager) Close() {
+	m.cancel()
 	m.stopHealthLoop()
 	m.browse.closeAll()
 	m.rt.Close()
@@ -1573,9 +1581,12 @@ func (m *Manager) restartSetsUsingEnv(name string) []string {
 		return out
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), restartTimeout)
+		ctx, cancel := context.WithTimeout(m.ctx, restartTimeout)
 		defer cancel()
 		for _, set := range sets {
+			if ctx.Err() != nil {
+				return
+			}
 			if _, err := m.RestartSet(ctx, set); err != nil {
 				m.log.Warn("перезапуск набора после смены секрета не удался", "set", set.ID, "err", err)
 			}
@@ -1590,7 +1601,10 @@ func (m *Manager) restartSetsUsing(server string) []string {
 		if !containsName(set.Servers, server) || !m.rt.status(set).Running {
 			continue
 		}
-		if _, err := m.RestartSet(context.Background(), set); err != nil {
+		if m.ctx.Err() != nil {
+			return out
+		}
+		if _, err := m.RestartSet(m.ctx, set); err != nil {
 			m.log.Warn("перезапуск набора после правки сервера не удался", "set", set.ID, "err", err)
 			continue
 		}

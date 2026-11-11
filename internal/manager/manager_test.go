@@ -2,6 +2,7 @@ package manager
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -527,6 +528,41 @@ func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
 	}
 	if gotOther != otherProc {
 		t.Fatal("набор без ссылки на переменную перезапущен")
+	}
+}
+
+// Фоновый рестарт после смены секрета не переживает панель: иначе после
+// Close остаётся живой дочерний процесс и держит порт набора.
+func TestEnvRestartStopsWithManager(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServerWithEnv(t, "db", map[string]string{"PASSWORD": "${DB_PASSWORD}"})
+	id := e.addSet(t, "db", "db")
+	set := e.m.store.Set(id)
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("старт: %v", err)
+	}
+
+	w := e.do(t, http.MethodPut, "/api/env/DB_PASSWORD", map[string]any{"value": "s3cret"})
+	status(t, w, http.StatusOK)
+
+	e.m.Close()
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		e.m.rt.mu.Lock()
+		_, alive := e.m.rt.procs[id]
+		e.m.rt.mu.Unlock()
+		ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(set.Port)))
+		if err == nil {
+			ln.Close()
+		}
+		if !alive && err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("после Close: процесс в rt=%v, порт %d свободен=%v", alive, set.Port, err == nil)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
