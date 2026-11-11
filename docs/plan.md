@@ -72,7 +72,7 @@ health, вызовы). Экран показывает то, чего сейча
 
 1. «Вызов» — собственный счётчик в `invoke_command` (`internal/stats`), не
    разбор лога: лог набора не содержит клиента и не переживает рестарт.
-2. Репозиторий — `frosty-ad-gt.cloudpub.ru/sintez/mcprig`, операции через `gt`.
+2. Репозиторий — Gitea, `<host>/mcprig`, операции через `gt`.
    Путь модуля — `github.com/akrhin/mcprig` (снято 2026-11-11: резолвится,
    `proxy.golang.org/.../@latest` → `v0.3.8`).
 3. Формат конфига — только JSON (`servers.json`): это общий формат с lazy-mcp и

@@ -29,5 +29,5 @@ Go-тулчейн: локально 1.24.4, модуль требует 1.27.3 �
 ## Ссылки
 
 - Стенд на настоящих серверах: `docs/dev-real-servers.md` (serena, socraticode, xerj).
-- Эталон: `/home/sintez/git/lazy-mcp@5a963c5` (заморожен) и распакованный менеджер `/tmp/opencode/mm/mcp-manager`.
+- Эталон: замороженный `lazy-mcp@5a963c5` (upstream-совместимый пакет) и распакованный менеджер в `/tmp/opencode/mm/mcp-manager`.
 - MCP Go SDK: `github.com/modelcontextprotocol/go-sdk` v1.8.0, протокол по умолчанию `2026-07-28`.

@@ -5,7 +5,7 @@ LSP серены, индексация socraticode и поисковые инд�
 Стенд поднимает панель и открытый набор с этими тремя серверами.
 
 ```bash
-bash scripts/dev-real-set.sh          # панель :9177, набор :9101, данные /tmp/mcprig-dev-real
+bash scripts/dev-real-set.sh          # поднимает панель и открытый набор; порты — дефолты скрипта (PANEL_PORT / SET_PORT)
 bash scripts/dev-real-set.sh stop
 ```
 
@@ -20,7 +20,7 @@ bash scripts/dev-real-set.sh stop
 Вызовы идут через прокси, а не напрямую:
 
 ```bash
-curl -s -XPOST http://127.0.0.1:9101/mcp \
+curl -s -XPOST http://127.0.0.1:${SET_PORT:-9100}/mcp \
   -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"invoke_command","arguments":{"server":"serena","command_name":"find_symbol","parameters":{"name_path_pattern":"Connect","relative_path":"internal/downstream/connect.go"}}}}'
 ```

@@ -1,7 +1,7 @@
 # Проверка замечаний пользователя по mcprig (2026-11-10)
 
 Проверено: `master` `b94a3fd` (v0.3.7), образы реестра
-`frosty-ad-gt.cloudpub.ru/sintez/mcprig:0.3.7-slim` и `:0.3.7-full`,
+`mcprig:0.3.7-slim` и `:0.3.7-full`,
 живые контейнеры `docker run`, тестовый прогон инструментов в пакете
 `internal/mcpserver`. Код не менялся.
 

@@ -118,7 +118,7 @@ namespaces. Используется Flatpak и (по документации) 
   `/usr/lib/node_modules`, `TMPDIR`).
 - **Проверено на этом хосте** (2026-11-10, ядро `6.12.115+deb13.1-amd64`,
   `/proc/sys/kernel/unprivileged_userns_clone=1`): `bwrap --unshare-all` даёт
-  `NET-BLOCKED`, `/home/sintez/.ssh` отсутствует, `/home` можно отдать пустым tmpfs.
+  `NET-BLOCKED`, `/home/<user>/.ssh` отсутствует, `/home` можно отдать пустым tmpfs.
 
 ### 4.2 `systemd-run --user` — свойства юнита, без root
 

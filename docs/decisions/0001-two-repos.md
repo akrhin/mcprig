@@ -21,9 +21,9 @@ esbuild-бандл, crates через `build.rs` с prebuilt bun-бинарни�
 
 Два независимых репозитория, а не две папки в одном.
 
-- `/home/sintez/git/lazy-mcp` — заморожен: upstream-совместимый пакет, эталон
+- `<workdir>/lazy-mcp` — заморожен: upstream-совместимый пакет, эталон
   поведения, только критичные исправления. Не перемещаем каталоги, не трогаем CI.
-- `/home/sintez/git/mcp-manager` — продукт: Go, один бинарник (прокси + панель +
+- `<workdir>/mcp-manager` — продукт: Go, один бинарник (прокси + панель +
   дашборд), `goreleaser`, upstream не отслеживает.
 
 Мост односторонний и документный: `docs/reference/ts-manager-contract.md` описывает
