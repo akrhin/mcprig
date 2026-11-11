@@ -145,7 +145,9 @@ MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9091 mcprig doctor
 
 One pass over what otherwise means reading panel logs. No running panel is
 required: file checks work on their own, and a dead listener is reported as a
-problem rather than a crash.
+problem rather than a crash. The panel password is read from
+`~/.config/mcprig/panel.env` first and from the older `env` file second; quotes,
+`export` and comments are understood.
 
 | flag | default | meaning |
 | --- | --- | --- |

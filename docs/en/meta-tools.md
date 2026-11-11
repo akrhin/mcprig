@@ -67,6 +67,7 @@ Input is one of two forms:
 | `{"servers": ["alpha", "beta"]}` | object keyed by server name, each value an array; a failed server's value is `{"error": "…"}` |
 | `{"prefix": "se"}` | with either form above: keep only command names starting with the prefix (case-insensitive); no match gives `[]` |
 | `{"namesOnly": true}` | with either form above: names only — an array of strings, or arrays keyed by server. `arr-status` returns 443 tools and 89 KB of catalog; names cost about a sixth of that, and `describe_commands` gives one schema when needed |
+| `{"maxBytes": 4096}` | with either form above: cap the answer, same default 32768 and limit 1048576 as `invoke_command`; a catalog over the cap is written to a file and the marker `[файл обрезан: N из M байт]` says how much arrived |
 | both | `Error: укажи server или servers, не оба` |
 | neither | `Error: нужен параметр server или servers` |
 
@@ -124,7 +125,8 @@ required.
 
 `missing` is always present and lists names the server does not expose; they do
 not fail the call. `outputSchema` appears when the downstream tool declares
-one.
+one. `maxBytes` works here too: a batch of schemas over the cap goes to a file
+with the same truncation marker.
 
 ## invoke_command
 

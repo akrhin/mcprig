@@ -110,7 +110,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key |
 | `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"note":"hermes"}`; the note becomes the client's label in the statistics, an empty string clears it, a running set is restarted |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
-| `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted |
+| `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
 | `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500; for one set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |

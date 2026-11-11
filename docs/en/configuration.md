@@ -153,8 +153,9 @@ arguments come only from `args`.
 | unknown `transport` | `_configError: неизвестный transport "…"` |
 
 A server whose `name` is empty fails the whole load
-(`сервер #N без имени`); every other defect is soft-failed onto that server.
-Bad JSON fails the load too.
+(`сервер #N без имени`); a file that is not valid JSON fails too. A single
+server entry that does not decode (a typo in `args`, say) is soft-failed like
+any other defect, so one bad entry never bricks the set.
 
 ### Soft fail
 
@@ -172,6 +173,11 @@ values and `transport.authToken`:
 | --- | --- | --- |
 | `${VAR}` | process environment | name must match `[A-Za-z_][A-Za-z0-9_]*`; an unset variable is an error |
 | `{file:/absolute/path}` | file contents | path must be absolute; one trailing `\n` or `\r\n` is stripped |
+
+Both forms are matched anywhere in a value, not only at its start; the set
+importer therefore refuses a value that carries a `{file:…}` reference at all.
+A `${…}` naming a reserved prefix (`MCPRIG_`, `BAO_`, `OPENBAO_`) is refused in
+`transport.authToken` too, as it already was in `env` and `headers`.
 
 ```json
 {
@@ -262,8 +268,8 @@ or 403. An empty block is fine.
 | field | default | meaning |
 | --- | --- | --- |
 | `disabled` | `false` | turn the flow off for this server |
-| `callbackPort` | `8947` | loopback port for the redirect listener |
-| `redirectUrl` | `http://127.0.0.1:<callbackPort>/callback` | registered redirect URI |
+| `callbackPort` | `8947` | loopback port for the redirect listener; when `redirectUrl` sets a port, that one wins — the browser returns exactly there |
+| `redirectUrl` | `http://127.0.0.1:<callbackPort>/callback` | registered redirect URI; its port is where the listener binds |
 | `clientId` | | pre-registered client |
 | `clientSecret` | | with `clientId` only; a secret without an id is an error |
 | `scopes` | | requested scopes |
