@@ -5,6 +5,7 @@ package sandbox
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
 )
@@ -23,27 +25,49 @@ import (
 // userns разрешён. Переменная, а не функция в вызове, — тесты подменяют.
 var available = probe
 
-// probe — короткий реальный запуск: LookPath не отличает «нет userns» от
-// «всё хорошо», а fail-closed требует знать ответ до спавна сервера.
-// Кэшируется только успех: ранняя неудача (userns ещё не готов при загрузке,
-// гонка на /proc) иначе навсегда запрещала бы песочницу процессу, а проба
-// стоит одного короткого процесса.
+// probeTimeout — сколько ждём пробный запуск: зависший bwrap не должен
+// блокировать запуск серверов навсегда. Переменная — тесты сокращают ожидание.
+var probeTimeout = 10 * time.Second
+
+// probeState — одна проба на процесс: успех кэшируется, неудача — нет (ранняя
+// гонка на /proc не должна навсегда запрещать песочницу), но пришедшие во
+// время пробы ждут её результата и не запускают свою.
 var probeState struct {
-	sync.Mutex
-	ok bool
+	mu      sync.Mutex
+	ok      bool
+	running bool
+	done    chan struct{}
+	err     error
 }
 
 func probe() error {
-	probeState.Lock()
-	defer probeState.Unlock()
+	probeState.mu.Lock()
 	if probeState.ok {
+		probeState.mu.Unlock()
 		return nil
 	}
-	if err := probeRun(); err != nil {
-		return err
+	if probeState.running {
+		done := probeState.done
+		probeState.mu.Unlock()
+		<-done
+		probeState.mu.Lock()
+		defer probeState.mu.Unlock()
+		return probeState.err
 	}
-	probeState.ok = true
-	return nil
+	probeState.running = true
+	probeState.done = make(chan struct{})
+	done := probeState.done
+	probeState.mu.Unlock()
+
+	err := probeRun()
+
+	probeState.mu.Lock()
+	probeState.running = false
+	probeState.err = err
+	probeState.ok = err == nil
+	close(done)
+	probeState.mu.Unlock()
+	return err
 }
 
 func probeRun() error {
@@ -69,7 +93,9 @@ func probeRun() error {
 	// Пробный запуск несёт минимум привязок: без них корень — пустой tmpfs,
 	// и "execvp: No such file or directory" означало бы не отказ userns, а
 	// пустую песочницу.
-	cmd := exec.Command(bwrap, "--unshare-all", "--die-with-parent",
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bwrap, "--unshare-all", "--die-with-parent",
 		"--ro-bind-try", "/usr", "/usr",
 		"--ro-bind-try", "/bin", "/bin",
 		"--ro-bind-try", "/lib", "/lib",
@@ -78,6 +104,9 @@ func probeRun() error {
 	var stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = io.Discard, &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("bwrap не ответил за %s: проба песочницы прервана", probeTimeout)
+		}
 		msg := strings.TrimSpace(stderr.String())
 		if strings.Contains(msg, "execvp") {
 			return fmt.Errorf("exec внутри песочницы не удался (%s): %s", trueBin, msg)
