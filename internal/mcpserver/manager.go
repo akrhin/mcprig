@@ -237,6 +237,11 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 
 // Close cancels in-flight connects and shuts every open downstream session.
 func (m *Manager) Close() error {
+	// Mark the conns closed before cancelling the context: a caller released by
+	// the cancel must hear "менеджер закрыт", not "context canceled".
+	for _, e := range m.entries {
+		e.conn.markClosed()
+	}
 	m.cancel()
 	var errs []error
 	for _, e := range m.entries {
@@ -1236,6 +1241,9 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 		case <-a.done:
 			return a.sess, a.err
 		case <-ctx.Done():
+			if c.isClosed() {
+				return nil, errClosed
+			}
 			return nil, ctx.Err()
 		}
 	}
@@ -1285,9 +1293,27 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 	select {
 	case <-a.done:
 	case <-ctx.Done():
+		if c.isClosed() {
+			return nil, errClosed
+		}
 		return nil, ctx.Err()
 	}
 	return a.sess, a.err
+}
+
+// isClosed reports whether Close has marked the conn, so a caller woken by the
+// manager's context cancel still learns the real reason.
+func (c *conn) isClosed() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
+// markClosed makes new and waiting callers see errClosed. Idempotent.
+func (c *conn) markClosed() {
+	c.mu.Lock()
+	c.closed = true
+	c.mu.Unlock()
 }
 
 // reset drops the cached session; the next call dials again.
@@ -1304,8 +1330,8 @@ func (c *conn) reset() {
 // close marks the conn closed, waits at most closeWait for an in-flight
 // connect and closes the session.
 func (c *conn) close() error {
+	c.markClosed()
 	c.mu.Lock()
-	c.closed = true
 	a := c.try
 	c.mu.Unlock()
 	if a != nil {
