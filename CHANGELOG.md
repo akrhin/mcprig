@@ -7,6 +7,10 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.0] - 2026-11-11
+
 ### Added
 
 - Панель говорит по-английски и по-русски: по умолчанию английский, переключатель
