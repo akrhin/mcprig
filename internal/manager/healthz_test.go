@@ -91,11 +91,6 @@ func TestDeleteLastServerRefused(t *testing.T) {
 	}
 
 	w := e.do(t, http.MethodDelete, "/api/servers/only", nil)
-	if w.Code == http.StatusOK {
-		// Инвариант добавлен в ветке registry (fix/audit-config): до её сведения
-		// отказ проверить нечем.
-		t.Skip("registry.DeleteServer ещё не отказывает последнему серверу набора")
-	}
 	status(t, w, http.StatusBadRequest)
 	if e.m.store.Server("only") == nil {
 		t.Fatal("сервер удалён при отказе")
