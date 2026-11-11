@@ -69,6 +69,37 @@ func TestLoadPanelEnvPanelFirst(t *testing.T) {
 	}
 }
 
+// Таблица синтаксиса, который parseEnvFile обещает: export, пробелы вокруг
+// имени, пустое значение, кавычки и незакрытая кавычка.
+func TestParseEnvFile(t *testing.T) {
+	body := strings.Join([]string{
+		"# комментарий",
+		"export K=v",
+		"Kspaced = v2",
+		"EMPTY=",
+		`DQ="a\"b\\c"`,
+		`UNCLOSED="x`,
+		`SQ='p a s s'`,
+	}, "\n")
+	want := map[string]string{
+		"K":        "v",
+		"Kspaced":  "v2",
+		"EMPTY":    "",
+		"DQ":       `a"b\c`,
+		"UNCLOSED": `"x`,
+		"SQ":       "p a s s",
+	}
+	got := parseEnvFile(body)
+	if len(got) != len(want) {
+		t.Fatalf("переменных: want %d, got %d (%v)", len(want), len(got), got)
+	}
+	for key, value := range want {
+		if got[key] != value {
+			t.Errorf("%s: want %q, got %q", key, value, got[key])
+		}
+	}
+}
+
 // doctor зарегистрирован как подкоманда и разбирает свои флаги.
 func TestParseArgsDoctor(t *testing.T) {
 	mode, rest, err := parseArgs([]string{"doctor", "-json"})

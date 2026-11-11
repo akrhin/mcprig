@@ -320,8 +320,10 @@ func loadPanelEnv(dir string) (doctorLine, bool) {
 	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d переменных", strings.Join(paths, ", "), added)}, true
 }
 
-// parseEnvFile разбирает systemd EnvironmentFile: KEY=value, необязательный
-// export, строки-комментарии и кавычки вокруг значения.
+// parseEnvFile разбирает подмножество systemd EnvironmentFile, которого
+// хватает panel.env: «KEY=value», необязательный «export », комментарии
+// целой строкой, пробелы вокруг имени. Продолжения строк через «\» и
+// escape \n/\t не поддерживаются.
 func parseEnvFile(body string) map[string]string {
 	out := make(map[string]string)
 	for _, raw := range strings.Split(body, "\n") {
@@ -341,7 +343,8 @@ func parseEnvFile(body string) map[string]string {
 }
 
 // unquoteEnvValue снимает одну пару кавычек: внутри двойных раскрываются \"
-// и \\, как в systemd; незакрытая кавычка остаётся частью значения.
+// и \\, как в systemd; незакрытая кавычка остаётся частью значения. Других
+// escape-последовательностей парсер не знает.
 func unquoteEnvValue(value string) string {
 	if len(value) < 2 {
 		return value
