@@ -53,9 +53,8 @@ from is `docs/diagrams/mcprig.architecture.en.json`. Russian: `…ru.html` /
 
 lazy-mcp is the project mcprig grew out of, and mcprig speaks its configuration.
 The numbers below are measured on one host against the **same** eleven
-downstream servers (`serena`, `socraticode`, `xerj`, `open-design`, `context7`,
-`tavily-mcp`, `playwright`, `raven`, `designer-skill`, `gitea`,
-`portainer-mcp`, 421 tools), through the same five meta-tools.
+downstream servers (search, documentation, browser and infrastructure servers;
+421 tools in total), through the same five meta-tools.
 
 | | mcprig 0.1.0 (measured) | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
 | --- | --- | --- |
@@ -240,10 +239,11 @@ All five are thin wrappers over the downstream MCP servers. Response forms:
 
 ## Install
 
-Release archives are built by CI (`.gitea/workflows/release.yml`) for linux and
+Release archives are built by CI (`.github/workflows/release.yml`) for linux and
 darwin on amd64 and arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, plus
-`checksums.txt`) and published on Gitea; the GitHub mirror (`akrhin/mcprig`)
-ships the same archives. Release notes for a tag come from `CHANGELOG.md`.
+`checksums.txt`) and published on GitHub releases
+(<https://github.com/akrhin/mcprig/releases>). Release notes for a tag come from
+`CHANGELOG.md`.
 
 - systemd user units: `deploy/mcprig.service` (panel) and
   `deploy/mcprig-set@.service` (one set per unit).

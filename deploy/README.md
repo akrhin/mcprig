@@ -52,15 +52,15 @@ systemctl --user enable --now mcprig-set@demo.service
 install -Dm644 deploy/mcprig-warm.service ~/.config/systemd/user/mcprig-warm@.service
 install -Dm644 deploy/mcprig-warm.timer   ~/.config/systemd/user/mcprig-warm@.timer
 systemctl --user daemon-reload
-systemctl --user enable --now mcprig-warm@main.timer
+systemctl --user enable --now mcprig-warm@example.timer
 systemctl --user list-timers 'mcprig-warm*'
 ```
 
 Проверить, что прогрев идёт:
 
 ```bash
-journalctl --user -u mcprig-warm@main -n 20    # строка «итог: 1 набор, N инструмент(ов), X мс»
-systemctl --user start mcprig-warm@main.service # прогнать немедленно
+journalctl --user -u mcprig-warm@example -n 20  # строка «итог: 1 набор, N инструмент(ов), X мс»
+systemctl --user start mcprig-warm@example.service # прогнать немедленно
 ```
 
 Юнит берёт порт панели из `MCPRIG_PANEL_URL` (в шаблоне —
@@ -68,7 +68,7 @@ systemctl --user start mcprig-warm@main.service # прогнать немедл�
 переопредели её в `~/.config/mcprig/panel.env`), пароль
 панели — из `~/.config/mcprig/env`, токен набора — из
 `~/.config/mcprig/<набор>.token`; набор с `open: true` прогревается без токена.
-Вручную то же самое: `mcprig warm --set main` (или `--all --panel <адрес>`).
+Вручную то же самое: `mcprig warm --set example` (или `--all --panel <адрес>`).
 
 ## Compose
 
@@ -86,7 +86,7 @@ docker build --build-arg VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//'
 MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
 ```
 
-Проверено на этом хосте: оба контейнера `healthy`, `demo` отвечает
+Проверено: оба контейнера `healthy`, `demo` отвечает
 `list_servers`, `ops` отвечает `Echo: compose ok`. Что важно знать:
 
 - Конфиги наборов лежат в `sets/<набор>/servers.json` и монтируются read-only;

@@ -66,7 +66,7 @@ Input is one of two forms:
 | `{"server": "alpha"}` | array of commands |
 | `{"servers": ["alpha", "beta"]}` | object keyed by server name, each value an array; a failed server's value is `{"error": "…"}` |
 | `{"prefix": "se"}` | with either form above: keep only command names starting with the prefix (case-insensitive); no match gives `[]` |
-| `{"namesOnly": true}` | with either form above: names only — an array of strings, or arrays keyed by server. `arr-status` returns 443 tools and 89 KB of catalog; names cost about a sixth of that, and `describe_commands` gives one schema when needed |
+| `{"namesOnly": true}` | with either form above: names only — an array of strings, or arrays keyed by server. A large server returns hundreds of tools and tens of KB of catalog; names cost about a sixth of that, and `describe_commands` gives one schema when needed |
 | `{"maxBytes": 4096}` | with either form above: cap the answer, limit 1048576. Catalogs have **no default cap** — without the field the whole catalog arrives, as before; over an explicit cap it goes to a file and the marker says how much arrived |
 | both | `Error: укажи server или servers, не оба` |
 | neither | `Error: нужен параметр server или servers` |

@@ -53,9 +53,8 @@ mcprig — это три вещи в одном бинарнике:
 
 lazy-mcp — проект, из которого вырос mcprig; конфиг он понимает без правок.
 Цифры ниже замерены на одном хосте против **того же** набора из одиннадцати
-серверов (`serena`, `socraticode`, `xerj`, `open-design`, `context7`,
-`tavily-mcp`, `playwright`, `raven`, `designer-skill`, `gitea`,
-`portainer-mcp`, 421 инструмент) и тех же пяти мета-инструментов.
+серверов (поиск, документация, браузер и инфраструктура; 421 инструмент в
+сумме) и тех же пяти мета-инструментов.
 
 | | mcprig 0.1.0 (замер) | lazy-mcp 2.10 (Docker, `node dist/cli.js`) |
 | --- | --- | --- |
@@ -238,9 +237,9 @@ true. Полный справочник полей: [docs/ru/configuration.md](d
 
 ## Установка
 
-Релизные архивы собирает CI (`.gitea/workflows/release.yml`) для linux и darwin
+Релизные архивы собирает CI (`.github/workflows/release.yml`) для linux и darwin
 на amd64 и arm64 (`mcprig_<version>_<os>_<arch>.tar.gz`, плюс `checksums.txt`) и
-публикует в Gitea; GitHub-зеркало (`akrhin/mcprig`) отдаёт те же архивы.
+публикует в GitHub releases (<https://github.com/akrhin/mcprig/releases>).
 Заметки релиза берутся из `CHANGELOG.md`.
 
 - юниты systemd (пользовательские): `deploy/mcprig.service` (панель) и

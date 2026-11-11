@@ -177,10 +177,10 @@ mcprig doctor, версия dev (/usr/local/bin/mcprig)
 ok: конфиг /home/user/.config/mcprig/servers.json: 11 серверов, 11 включено
 
 [наборы]
-ok: main: порт 9101, слушает, autostart, /healthz 200
+ok: example: порт 9101, слушает, autostart, /healthz 200
 
 [ключи]
-ok: main: 3 ключа, активный eef8bf86
+ok: example: 3 ключа, активный eef8bf86
 
 [секреты]
 ok: CONTEXT7_API_KEY: окружение
@@ -197,7 +197,7 @@ ok: панель 127.0.0.1:9091: /healthz 200
 ## warm
 
 ```bash
-mcprig warm --set main
+mcprig warm --set example
 mcprig warm --all --panel http://127.0.0.1:9091 --password "$MCPRIG_PASSWORD"
 mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 ```
@@ -228,7 +228,7 @@ Key precedence: `-token`, `-token-file`, `MCPRIG_TOKEN`, then
 to `mcprig init`. An open set is warmed without a key.
 
 ```text
-main: 421 инструмент(ов), 5.6 мс
+example: 421 инструмент(ов), 5.6 мс
 итог: 1 набор, 421 инструмент(ов), 5.6 мс
 ```
 
@@ -237,7 +237,7 @@ main: 421 инструмент(ов), 5.6 мс
 ```json
 [
   {
-    "set": "main",
+    "set": "example",
     "tools": 421,
     "ms": 5.6
   }

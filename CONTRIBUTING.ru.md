@@ -1,7 +1,7 @@
 # Участие в разработке
 
-mcprig — проект до 1.0 с одним оператором. Источник истины — Gitea
-(`sintez/mcprig`), GitHub (`akrhin/mcprig`) зеркалит архивы релизов.
+mcprig — проект до 1.0 с одним оператором. Источник истины — GitHub
+(`akrhin/mcprig`).
 
 Прочитать до первой правки: `AGENTS.md` (правила репозитория),
 `docs/CURRENT-GOAL.md` (этап и его ворота), `docs/ru/development.md` (сборка,
@@ -34,12 +34,12 @@ mcprig — проект до 1.0 с одним оператором. Источ�
 
 ## Pull request
 
-- Ветка: `<префикс>/<короткое-имя>`, например `openchamber/panel-isolation`.
+- Ветка: `<префикс>/<короткое-имя>`, например `feat/panel-isolation`.
 - Коммиты: Conventional Commits с русским заголовком —
   `type(scope): subject`. Типы: `feat`, `fix`, `docs`, `test`, `refactor`,
   `perf`, `chore`, `release`. Один коммит — одно осмысленное изменение.
-- Заголовок PR = изменение одной строкой, в той же форме, что коммит: Gitea
-  делает из него merge-коммит.
+- Заголовок PR = изменение одной строкой, в той же форме, что коммит: он
+  становится заголовком merge-коммита.
 - Тело PR: что изменилось и зачем, какие ворота прогнаны и с каким
   результатом, какие доки и changelog тронуты, `Closes #N`.
 - `git commit` без `--no-verify`: хук собирает дерево и гоняет тесты.
@@ -111,8 +111,7 @@ E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 ## Образы
 
 Два образа, `slim` и `full` (см. [docs/ru/install.md](docs/ru/install.md)), раздаются
-из GitHub Container Registry как `ghcr.io/akrhin/mcprig`; реестр Gitea закрыт и
-каналом раздачи не служит — в нём те же теги лежат только для своих хостов.
+из GitHub Container Registry как `ghcr.io/akrhin/mcprig`.
 
 Задача на тег в GitHub собирает и пушит оба (см. ниже). Руками:
 

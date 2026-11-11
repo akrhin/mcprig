@@ -1,7 +1,7 @@
 # Contributing
 
-mcprig is pre-1.0 and single-operator. Gitea (`sintez/mcprig`) is the source of
-truth; GitHub (`akrhin/mcprig`) mirrors release archives.
+mcprig is pre-1.0 and single-operator. The GitHub repository (`akrhin/mcprig`)
+is the source of truth.
 
 Read before you write: `AGENTS.md` (repository rules), `docs/CURRENT-GOAL.md`
 (the stage and its gate), `docs/en/development.md` (build, tests, live stand).
@@ -33,12 +33,12 @@ One problem per issue; search the closed ones first.
 
 ## Pull requests
 
-- Branch: `<prefix>/<short-name>`, for example `openchamber/panel-isolation`.
+- Branch: `<prefix>/<short-name>`, for example `feat/panel-isolation`.
 - Commits: Conventional Commits with a Russian subject —
   `type(scope): subject`. Types: `feat`, `fix`, `docs`, `test`, `refactor`,
   `perf`, `chore`, `release`. One commit carries one meaningful change.
-- PR title = the change in one line, same form as a commit: Gitea turns it
-  into the merge commit.
+- PR title = the change in one line, same form as a commit: it becomes the
+  merge commit subject.
 - PR body: what changed and why, the gate you ran and its result, the docs and
   changelog you touched, and `Closes #N`.
 - `git commit` without `--no-verify`: the hook builds the tree and runs the
@@ -111,9 +111,7 @@ Rules:
 ## Images
 
 Two images, `slim` and `full` (see [docs/en/install.md](docs/en/install.md)), are
-distributed from GitHub Container Registry as `ghcr.io/akrhin/mcprig`; the Gitea
-registry is private and is not a distribution channel, it only keeps the same
-tags for our own hosts.
+distributed from GitHub Container Registry as `ghcr.io/akrhin/mcprig`.
 
 The tag job on GitHub builds and pushes both (see below). By hand:
 

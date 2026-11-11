@@ -97,7 +97,7 @@ Logs: the panel writes `$DATA/panel.log`, the set writes
 ## Release build
 
 `.goreleaser.yaml` is the release definition (`goreleaser release --snapshot
---clean` to check locally). CI builds and publishes the archives on a `v*` tag
-(Gitea, mirrored to GitHub); release notes are the tag's `CHANGELOG.md` section
+--clean` to check locally). CI builds and publishes the archives on a `v*` tag;
+release notes are the tag's `CHANGELOG.md` section
 via `scripts/release-notes.sh`. `goreleaser` itself is not installed on the
 development host.

@@ -12,15 +12,13 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | archive | `mcprig_<version>_<os>_<arch>.tar.gz` |
 | contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
 | checksum | `checksums.txt` |
-| release | draft in Gitea; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
+| release | draft on GitHub; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Releases are published twice: on Gitea (source of truth — tests, `govulncheck`
-and `goreleaser` run there on a tag) and on GitHub in the public mirror
-`akrhin/mcprig`, where `.github/workflows/release.yml` builds the same archives
-with `goreleaser --skip=publish` and uploads them with `gh`. Download from
-<https://github.com/akrhin/mcprig/releases>; any tag can also be released by
-hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Releases are published on GitHub: `.github/workflows/release.yml` runs the
+tests, `govulncheck` and `goreleaser` on a tag and uploads the archives with
+`gh` to <https://github.com/akrhin/mcprig/releases>; any tag can also be
+released by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` is not installed on the development host, so archives are built by
 CI, not here. To build the same binary by hand:
@@ -87,8 +85,7 @@ docker pull ghcr.io/akrhin/mcprig:0.4.0-full
 ```
 
 `latest` and `latest-full` follow the newest release; the version tags pin one
-pair (`0.4.0-slim`, `0.4.0-full` are the current pair). The project's own Gitea
-registry is private and is not a distribution channel.
+pair (`0.4.0-slim`, `0.4.0-full` are the current pair).
 
 Or build them yourself:
 
@@ -124,7 +121,7 @@ compose.
 `ghcr.io/akrhin/mcprig:latest`, mounts each `servers.json` read-only and keeps
 state in named volumes.
 
-Measured on this host (rootless Docker 29.9.3): the bare `docker build .` gives
+Measured (rootless Docker 29.9.3): the bare `docker build .` gives
 `slim` (44 MB, binary plus CA roots, `bwrap` and `prlimit`); `--target full`
 adds node/npm, python/pip and uv/uvx and weighs 446 MB. Pass the release into
 the build, or the binary inside the image answers `dev`:

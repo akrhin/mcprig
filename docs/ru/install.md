@@ -12,13 +12,11 @@
 | архив | `mcprig_<version>_<os>_<arch>.tar.gz` |
 | содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
 | контрольная сумма | `checksums.txt` |
-| релиз | черновик в Gitea; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
+| релиз | черновик на GitHub; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Релиз публикуется дважды: в Gitea (источник истины — на тег там идут тесты,
-`govulncheck` и `goreleaser`) и на GitHub в публичном зеркале `akrhin/mcprig`,
-где `.github/workflows/release.yml` собирает те же архивы через
-`goreleaser --skip=publish` и загружает их `gh`. Скачивать с
+Релиз публикуется на GitHub: `.github/workflows/release.yml` по тегу гоняет
+тесты, `govulncheck` и `goreleaser` и загружает архивы через `gh` в
 <https://github.com/akrhin/mcprig/releases>; любой тег можно выпустить и
 руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
 
@@ -86,10 +84,6 @@ docker pull ghcr.io/akrhin/mcprig:0.4.0-full
 ```
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
-(`0.4.0-slim`, `0.4.0-full` — текущая). Собственный реестр Gitea закрыт и
-каналом раздачи не является.
-
-`latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
 (`0.4.0-slim`, `0.4.0-full` — текущая).
 
 Либо собрать самому:
@@ -122,7 +116,7 @@ Healthcheck образа спрашивает набор на `http://127.0.0.1:
 из `ghcr.io/akrhin/mcprig:latest`, монтирует каждый `servers.json` только для
 чтения и держит состояние в именованных томах.
 
-Замерено на этом хосте: `docker build .` без `--target` даёт `slim` — 44 МБ,
+Замерено: `docker build .` без `--target` даёт `slim` — 44 МБ,
 бинарь, корневые сертификаты, `bwrap` и `prlimit`; `--target full` добавляет
 node/npm, python/pip и uv/uvx и весит 446 МБ. Передавайте релиз в сборку, иначе
 бинарь внутри образа отвечает `dev`:

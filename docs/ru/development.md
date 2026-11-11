@@ -98,7 +98,7 @@ bash scripts/dev-real-set.sh stop
 ## Релизная сборка
 
 `.goreleaser.yaml` — определение релиза (`goreleaser release --snapshot
---clean` для локальной проверки). Архивы собирает и публикует CI по тегу `v*`
-(Gitea, зеркало на GitHub); заметки релиза — раздел `CHANGELOG.md` для тега
+--clean` для локальной проверки). Архивы собирает и публикует CI по тегу `v*`;
+заметки релиза — раздел `CHANGELOG.md` для тега
 через `scripts/release-notes.sh`. Сам `goreleaser` на хосте разработки не
 установлен.
