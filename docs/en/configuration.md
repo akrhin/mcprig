@@ -269,7 +269,7 @@ or 403. An empty block is fine.
 | --- | --- | --- |
 | `disabled` | `false` | turn the flow off for this server |
 | `callbackPort` | `8947` | loopback port for the redirect listener; when `redirectUrl` sets a port, that one wins — the browser returns exactly there |
-| `redirectUrl` | `http://127.0.0.1:<callbackPort>/callback` | registered redirect URI; its port is where the listener binds |
+| `redirectUrl` | `http://127.0.0.1:<callbackPort>/callback` | registered redirect URI; its port is where the listener binds. A URL without a port (or with `:0`) is rejected at startup: the browser would return to a different port, and the wait would hang for five minutes |
 | `clientId` | | pre-registered client |
 | `clientSecret` | | with `clientId` only; a secret without an id is an error |
 | `scopes` | | requested scopes |
