@@ -3,10 +3,12 @@ package oauth
 import (
 	"context"
 	"log/slog"
+	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/auth"
 	"golang.org/x/oauth2"
 )
 
@@ -91,6 +93,64 @@ func TestNewHandlerRequiresRedirectURL(t *testing.T) {
 	_, err := NewHandler(context.Background(), Options{ServerName: testServer, ServerURL: testServerUL})
 	if err == nil || !strings.Contains(err.Error(), "RedirectURL") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Занятый порт из redirect_uri обязан сорвать приём кода сразу — иначе вход
+// висит пять минут. Здесь же ловится мутация «вернуть DefaultCallbackAddr»:
+// тогда приёмник ушёл бы на свободный 8947 и ждал до таймаута.
+func TestNewHandlerBindsRedirectPort(t *testing.T) {
+	saved := BrowserOpen
+	BrowserOpen = func(string) error { return nil }
+	t.Cleanup(func() { BrowserOpen = saved })
+
+	newHandler := func(redirect string) *Handler {
+		t.Helper()
+		h, err := NewHandler(context.Background(), Options{
+			ServerName:  testServer,
+			ServerURL:   testServerUL,
+			RedirectURL: redirect,
+		})
+		if err != nil {
+			t.Fatalf("NewHandler(%s): %v", redirect, err)
+		}
+		return h
+	}
+
+	// P занят: приём кода обязан упасть на нём, а не молча слушать 8947.
+	busy, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	_, port, err := net.SplitHostPort(busy.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := newHandler("http://127.0.0.1:" + port + "/callback")
+	if got, want := h.Addr(), "127.0.0.1:"+port; got != want {
+		t.Fatalf("Addr = %q, want %q", got, want)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err = h.fetch(ctx, &auth.AuthorizationArgs{URL: "https://as.example/authorize?state=st-1"})
+	if err == nil || !strings.Contains(err.Error(), "занять порт") {
+		t.Fatalf("занятый порт: err = %v", err)
+	}
+
+	// Свободный порт P2 — адрес приёмника тот же, что в redirect_uri.
+	ln2, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, port2, err := net.SplitHostPort(ln2.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln2.Close()
+	if got, want := newHandler("http://127.0.0.1:"+port2+"/callback").Addr(), "127.0.0.1:"+port2; got != want {
+		t.Fatalf("Addr = %q, want %q", got, want)
 	}
 }
 

@@ -16,8 +16,16 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Handler — OAuth-обработчик MCP-транспорта: то, что возвращает NewHandler.
-type Handler = auth.AuthorizationCodeHandler
+// Handler — OAuth-обработчик MCP-транспорта: SDK-обработчик (методы продвинуты
+// встраиванием) плюс адрес приёмника, выведенный из redirect_uri.
+type Handler struct {
+	*auth.AuthorizationCodeHandler
+	addr  string
+	fetch func(context.Context, *auth.AuthorizationArgs) (*auth.AuthorizationResult, error)
+}
+
+// Addr — loopback-адрес приёмника кода из redirect_uri (для логов и проверок).
+func (h *Handler) Addr() string { return h.addr }
 
 // Options — параметры фабрики обработчика.
 type Options struct {
@@ -57,7 +65,7 @@ func callbackAddr(redirectURL string, log *slog.Logger) (string, error) {
 // NewHandler собирает auth.AuthorizationCodeHandler: обнаружение метаданных,
 // DCR, PKCE, обмен кода и refresh делаются go-sdk, здесь — только регистрация
 // клиента, хранение токенов и приём редиректа.
-func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, error) {
+func NewHandler(_ context.Context, o Options) (*Handler, error) {
 	if o.RedirectURL == "" {
 		return nil, errors.New("oauth: RedirectURL обязателен")
 	}
@@ -78,28 +86,30 @@ func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, e
 	}
 	key := Key(o.ServerName, o.ServerURL)
 
+	fetch := func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
+		log.Info("требуется авторизация MCP-сервера: откройте URL в браузере",
+			"server", o.ServerName, "url", args.URL)
+		cb, err := NewCallback(addr, stateFromURL(args.URL))
+		if err != nil {
+			return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
+		}
+		defer cb.Close()
+		if err := browser(args.URL); err != nil {
+			// URL остаётся в логе — его можно открыть вручную.
+			log.Warn("не удалось открыть браузер, откройте URL из лога вручную",
+				"server", o.ServerName, "err", err)
+		}
+		res, err := cb.Wait(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
+		}
+		return &auth.AuthorizationResult{Code: res.Code, State: res.State, Iss: res.Iss}, nil
+	}
+
 	cfg := &auth.AuthorizationCodeHandlerConfig{
-		RedirectURL:         o.RedirectURL,
-		RequestRefreshToken: true,
-		AuthorizationCodeFetcher: func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
-			log.Info("требуется авторизация MCP-сервера: откройте URL в браузере",
-				"server", o.ServerName, "url", args.URL)
-			cb, err := NewCallback(addr, stateFromURL(args.URL))
-			if err != nil {
-				return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
-			}
-			defer cb.Close()
-			if err := browser(args.URL); err != nil {
-				// URL остаётся в логе — его можно открыть вручную.
-				log.Warn("не удалось открыть браузер, откройте URL из лога вручную",
-					"server", o.ServerName, "err", err)
-			}
-			res, err := cb.Wait(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
-			}
-			return &auth.AuthorizationResult{Code: res.Code, State: res.State, Iss: res.Iss}, nil
-		},
+		RedirectURL:              o.RedirectURL,
+		RequestRefreshToken:      true,
+		AuthorizationCodeFetcher: fetch,
 	}
 
 	if o.ClientID != "" {
@@ -156,7 +166,7 @@ func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, e
 	if err != nil {
 		return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
 	}
-	return h, nil
+	return &Handler{AuthorizationCodeHandler: h, addr: addr, fetch: fetch}, nil
 }
 
 // savedTokenSource отдаёт сохранённый токен и, если для него известны

@@ -169,8 +169,13 @@ func TestCallbackEmptyStateRejected(t *testing.T) {
 	if code, _ := get(t, cb.URL()+"?code=abc&state=st-1"); code != http.StatusOK {
 		t.Fatalf("верный редирект: статус = %d, want 200", code)
 	}
-	if o := <-ch; o.err != nil || o.res.Code != "abc" {
-		t.Fatalf("Wait: %+v", o)
+	select {
+	case o := <-ch:
+		if o.err != nil || o.res.Code != "abc" {
+			t.Fatalf("Wait: %+v", o)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Wait не завершился после верного редиректа")
 	}
 }
 
