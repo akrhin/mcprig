@@ -290,7 +290,7 @@ func (m *Manager) Server() *mcp.Server {
 			},
 			"maxBytes": map[string]any{
 				"type":        "integer",
-				"description": "Optional: cap on the answer in bytes (default 32768, max 1048576); a cut answer names the file with the full one",
+				"description": "Optional: cap on the answer in bytes (max 1048576); without it the answer is not cut. A cut answer names the file with the full one",
 			},
 		}),
 	}, m.listCommands)
@@ -311,7 +311,7 @@ func (m *Manager) Server() *mcp.Server {
 			},
 			"maxBytes": map[string]any{
 				"type":        "integer",
-				"description": "Optional: cap on the answer in bytes (default 32768, max 1048576); a cut answer names the file with the full one",
+				"description": "Optional: cap on the answer in bytes (max 1048576); without it the answer is not cut. A cut answer names the file with the full one",
 			},
 		}, "server", "command_names"),
 	}, m.describeCommands)
@@ -510,9 +510,14 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 	if err := strictArgs(req, &in, "", "server", "servers", "prefix", "refresh", "namesOnly", "maxBytes"); err != nil {
 		return errResult(err)
 	}
-	maxBytes, err := resolveMaxBytes(in.MaxBytes)
-	if err != nil {
-		return errResult(err)
+	// No maxBytes in the request — no cap: a catalog used to arrive whole, and
+	// a 32 KiB cut of JSON is not JSON at all.
+	maxBytes := 0
+	if in.MaxBytes > 0 {
+		var err error
+		if maxBytes, err = resolveMaxBytes(in.MaxBytes); err != nil {
+			return errResult(err)
+		}
 	}
 	if in.Refresh {
 		for _, e := range m.entries {
@@ -634,9 +639,13 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	if err := strictArgs(req, &in, "", "server", "command_names", "refresh", "maxBytes"); err != nil {
 		return errResult(err)
 	}
-	maxBytes, err := resolveMaxBytes(in.MaxBytes)
-	if err != nil {
-		return errResult(err)
+	// Same as list_commands: only an explicit cap cuts the answer.
+	maxBytes := 0
+	if in.MaxBytes > 0 {
+		var err error
+		if maxBytes, err = resolveMaxBytes(in.MaxBytes); err != nil {
+			return errResult(err)
+		}
 	}
 	if in.Server == "" {
 		return errResult(errors.New("server обязателен"))
@@ -1170,11 +1179,12 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(data)}}}, nil
 }
 
-// jsonTruncResult is jsonResult under the same maxBytes cap as invoke_command:
-// a huge catalog is cut and the full answer lands in a file.
+// jsonTruncResult is jsonResult under maxBytes when the caller asked for a cap:
+// a cut JSON catalog is not valid JSON, so an absent or zero maxBytes means no
+// cap at all, exactly as the tool behaved before the parameter existed.
 func jsonTruncResult(v any, maxBytes int) (*mcp.CallToolResult, error) {
 	res, err := jsonResult(v)
-	if err != nil {
+	if err != nil || maxBytes <= 0 {
 		return res, err
 	}
 	return truncateResult(res, maxBytes)

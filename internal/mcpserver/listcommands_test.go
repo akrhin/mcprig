@@ -122,6 +122,19 @@ func TestListCommandsTruncatesHugeCatalog(t *testing.T) {
 	t.Cleanup(func() { _ = m.Close() })
 	cs := clientFor(t, m.Server())
 
+	// Without maxBytes the catalog arrives whole: the old contract, untouched.
+	whole := resultText(t, call(t, cs, "list_commands", map[string]any{"server": "wide"}))
+	var catalog []any
+	if err := json.Unmarshal([]byte(whole), &catalog); err != nil {
+		t.Fatalf("без maxBytes каталог должен быть целым JSON: %v", err)
+	}
+	if len(catalog) != 40 {
+		t.Fatalf("без maxBytes в каталоге %d команд, ожидалось 40", len(catalog))
+	}
+	if !strings.Contains(whole, "tool-39") || strings.Contains(whole, "[обрезано: ") {
+		t.Fatalf("без maxBytes каталог обрезан")
+	}
+
 	text := resultText(t, call(t, cs, "list_commands", map[string]any{"server": "wide", "maxBytes": 2000}))
 	const cutMark = "[обрезано: "
 	i := strings.Index(text, cutMark)
