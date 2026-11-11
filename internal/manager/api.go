@@ -31,6 +31,10 @@ import (
 
 const maxBody = 1 << 20
 
+// restartTimeout — сколько фоновый перезапуск после правки секрета ждёт все
+// наборы. Два больных набора укладываются в него с запасом.
+const restartTimeout = 60 * time.Second
+
 // Options — всё, что нужно менеджеру. FromEnv читает MCPRIG_*.
 type Options struct {
 	DataDir  string
@@ -105,6 +109,10 @@ type Manager struct {
 	healthOnce  sync.Once
 	healthEvery time.Duration
 	probe       func(context.Context, *registry.Set) setHealth
+
+	// ctx живёт до Close: фоновые работы (рестарт наборов) умирают вместе с панелью.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func New(opts Options) (*Manager, error) {
@@ -166,6 +174,7 @@ func New(opts Options) (*Manager, error) {
 		}
 	}
 	version := envOr(opts.Version, "dev")
+	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{
 		opts:    opts,
 		store:   store,
@@ -175,6 +184,8 @@ func New(opts Options) (*Manager, error) {
 		version: version,
 		health:  newHealthCache(),
 		browse:  newBrowser(sec, version),
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 	m.rt = NewRuntime(opts.DataDir, cli, opts.BindIP, sec, log)
 	m.rt.allowedHosts = opts.Auth.AllowedHosts
@@ -203,6 +214,7 @@ func New(opts Options) (*Manager, error) {
 func (m *Manager) Handler() http.Handler { return m }
 
 func (m *Manager) Close() {
+	m.cancel()
 	m.stopHealthLoop()
 	m.browse.closeAll()
 	m.rt.Close()
@@ -1184,10 +1196,16 @@ func (m *Manager) apiServerDelete(req *request) error {
 	if m.store.Server(name) == nil {
 		return notFound("нет сервера " + name)
 	}
-	stopped := m.stopSetsUsing(name)
+	// Сначала снимок наборов и запись в реестр: отказ (последний сервер
+	// набора) не должен оставлять наборы остановленными при живом сервере.
+	sets := m.setsUsing(name)
 	if err := m.store.DeleteServer(name); err != nil {
+		if strings.Contains(err.Error(), "последний в наборе") {
+			return badRequest(err.Error())
+		}
 		return err
 	}
+	stopped := m.stopSets(sets)
 	writeJSON(req.w, http.StatusOK, map[string]any{"ok": true, "stopped": stopped})
 	return nil
 }
@@ -1243,6 +1261,24 @@ func (m *Manager) apiSetUpdate(req *request) error {
 		return err
 	}
 	running := m.rt.status(old).Running
+	// Проверки — до записи в реестр: иначе занятый порт или отозванный ключ
+	// оставят набор остановленным, а ответ — 500.
+	if running && !registry.CanServe(old) {
+		return conflict("у набора " + id + " нет активного ключа — выдайте новый")
+	}
+	var patch struct {
+		Port *int `json:"port"`
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &patch); err != nil {
+			return badRequest("ожидался JSON")
+		}
+	}
+	if running && patch.Port != nil && *patch.Port != old.Port {
+		if err := portFree(listenHost(m.rt.bindIP), *patch.Port); err != nil {
+			return conflict(err.Error())
+		}
+	}
 	set, err := m.store.UpdateSet(id, json.RawMessage(body))
 	if err != nil {
 		if strings.Contains(err.Error(), "занят") {
@@ -1495,6 +1531,7 @@ func (m *Manager) apiKeyRevoke(req *request) error {
 	if wasActive {
 		m.rt.Stop(set)
 		m.health.clear(id)
+		m.log.Info("набор остановлен: отозван активный ключ", "set", id, "key", keyID)
 	}
 	var revoked registry.PublicKey
 	for _, key := range registry.PublicSet(set).Keys {
@@ -1505,6 +1542,7 @@ func (m *Manager) apiKeyRevoke(req *request) error {
 	writeJSON(req.w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"wasActive": wasActive,
+		"stopped":   wasActive,
 		"key":       revoked,
 		"set":       m.setView(set),
 	})
@@ -1525,21 +1563,35 @@ func activeKey(set *registry.Set) any {
 
 // ─── вспомогательные ────────────────────────────────────────────────────────
 
-// restartSetsUsingEnv перезапускает работающие наборы, в серверах которых
-// встречается ${name}: остальных правка секрета не касается.
+// restartSetsUsingEnv возвращает id работающих наборов, где встречается
+// ${name}, и перезапускает их в фоне: правка секрета не должна ждать до ~40 s
+// двух больных наборов. Ошибки рестарта — в лог, не в ответ.
 func (m *Manager) restartSetsUsingEnv(name string) []string {
 	out := []string{}
+	sets := []*registry.Set{}
 	servers := m.store.Servers()
 	for _, set := range m.store.Sets() {
 		if !containsName(envRefs(setServers(set, servers)), name) || !m.rt.status(set).Running {
 			continue
 		}
-		if _, err := m.RestartSet(context.Background(), set); err != nil {
-			m.log.Warn("перезапуск набора после смены секрета не удался", "set", set.ID, "err", err)
-			continue
-		}
 		out = append(out, set.ID)
+		sets = append(sets, set)
 	}
+	if len(sets) == 0 {
+		return out
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(m.ctx, restartTimeout)
+		defer cancel()
+		for _, set := range sets {
+			if ctx.Err() != nil {
+				return
+			}
+			if _, err := m.RestartSet(ctx, set); err != nil {
+				m.log.Warn("перезапуск набора после смены секрета не удался", "set", set.ID, "err", err)
+			}
+		}
+	}()
 	return out
 }
 
@@ -1549,7 +1601,10 @@ func (m *Manager) restartSetsUsing(server string) []string {
 		if !containsName(set.Servers, server) || !m.rt.status(set).Running {
 			continue
 		}
-		if _, err := m.RestartSet(context.Background(), set); err != nil {
+		if m.ctx.Err() != nil {
+			return out
+		}
+		if _, err := m.RestartSet(m.ctx, set); err != nil {
 			m.log.Warn("перезапуск набора после правки сервера не удался", "set", set.ID, "err", err)
 			continue
 		}
@@ -1558,12 +1613,21 @@ func (m *Manager) restartSetsUsing(server string) []string {
 	return out
 }
 
-func (m *Manager) stopSetsUsing(server string) []string {
-	out := []string{}
+// setsUsing — снимок наборов, в списке серверов которых есть server.
+func (m *Manager) setsUsing(server string) []*registry.Set {
+	out := []*registry.Set{}
 	for _, set := range m.store.Sets() {
-		if !containsName(set.Servers, server) {
-			continue
+		if containsName(set.Servers, server) {
+			out = append(out, set)
 		}
+	}
+	return out
+}
+
+// stopSets останавливает наборы и возвращает id работавших.
+func (m *Manager) stopSets(sets []*registry.Set) []string {
+	out := []string{}
+	for _, set := range sets {
 		// Статус — до Stop: Stop удаляет запись, и после него набор всегда «не работает».
 		wasRunning := m.rt.status(set).Running
 		m.rt.Stop(set)

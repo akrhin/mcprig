@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/akrhin/mcprig/internal/atomicfile"
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/stats"
@@ -113,7 +114,7 @@ func WriteSetConfig(dataDir, id string, body []byte) (string, error) {
 		return "", err
 	}
 	path := filepath.Join(dir, "servers.json")
-	if err := writeAtomic(path, body, 0o600); err != nil {
+	if err := writeAtomic(path, body); err != nil {
 		return "", err
 	}
 	return path, nil
@@ -141,36 +142,17 @@ func migrateLog(log *slog.Logger, dataDir, id string) {
 	}
 }
 
-func writeAtomic(path string, body []byte, mode os.FileMode) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	f, err := os.CreateTemp(dir, ".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmp := f.Name()
-	defer os.Remove(tmp)
-	if err := f.Chmod(mode); err != nil {
-		f.Close()
-		return err
-	}
-	if _, err := f.Write(body); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+// writeAtomic делегирует в atomicfile.Write: та же замена через rename, но с
+// fsync каталога. Файлы наборов и секретов всегда 0600.
+func writeAtomic(path string, body []byte) error {
+	return atomicfile.Write(path, body)
 }
 
 var envRefRe = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+// fileRefRe повторяет шаблон раскрывателя config: {file:путь} где угодно в
+// строке. После сведения с веткой config это config.HasFileRef.
+var fileRefRe = regexp.MustCompile(`\{file:[^}]+\}`)
 
 // addRefs собирает имена ${VAR} из строки в seen.
 func addRefs(seen map[string]bool, text string) {
@@ -237,10 +219,12 @@ func reservedRefs(s *config.Server) []string {
 // fileRefs — {file:…} в env или заголовке: значение читается с диска и уходит
 // в процесс набора или на URL. Импортированный конфиг так уносит env.json с
 // ключами всех наборов, поэтому такая ссылка отклоняется, а не разрешается.
+// Шаблон ищется в любом месте строки: раскрыватель config матчит его не только
+// в начале, и «p{file:…}» иначе проходит проверку.
 func fileRefs(s *config.Server) (string, bool) {
 	scan := func(m map[string]string) (string, bool) {
 		for key, value := range m {
-			if strings.HasPrefix(strings.TrimSpace(value), "{file:") {
+			if fileRefRe.MatchString(value) {
 				return key, true
 			}
 		}

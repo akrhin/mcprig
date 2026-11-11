@@ -160,6 +160,10 @@ func (m *Manager) fetchSetStats(ctx context.Context, set *registry.Set, port int
 	if err != nil {
 		return stats.Snapshot{}, err
 	}
+	// Набор проверяет Host: без имени из allowlist он ответит «forbidden host».
+	if hosts := m.rt.allowedHosts; len(hosts) > 0 {
+		req.Host = hosts[0]
+	}
 	if set.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+set.Token)
 	}

@@ -150,14 +150,22 @@ func (rt *Runtime) Start(ctx context.Context, set *registry.Set, servers []regis
 }
 
 func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers []registry.Server) (RuntimeStatus, error) {
+	// Все поля процесса читаются одним захватом: wait и kill пишут их под тем
+	// же замком, и чтение вне его — гонка.
 	rt.mu.Lock()
 	cur := rt.procs[set.ID]
 	closed := rt.closed
+	curExited, curStopping := false, false
+	restarts := 0
+	if cur != nil {
+		curExited, curStopping = cur.exited, cur.stopping
+		restarts = cur.restarts
+	}
 	rt.mu.Unlock()
 	if closed {
 		return RuntimeStatus{}, errors.New("менеджер остановлен")
 	}
-	if cur != nil && !cur.exited && !cur.stopping {
+	if cur != nil && !curExited && !curStopping {
 		return rt.status(set), nil
 	}
 	if !registry.CanServe(set) {
@@ -201,10 +209,6 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		return RuntimeStatus{}, fmt.Errorf("набор %s не стартовал: %w", set.ID, err)
 	}
 
-	restarts := 0
-	if cur != nil {
-		restarts = cur.restarts
-	}
 	p := &process{
 		cmd:       cmd,
 		pid:       cmd.Process.Pid,
@@ -380,8 +384,12 @@ func killGroup(pid int, sig syscall.Signal) {
 func (rt *Runtime) status(set *registry.Set) RuntimeStatus {
 	rt.mu.Lock()
 	p := rt.procs[set.ID]
+	r := rt.rings[set.ID]
 	rt.mu.Unlock()
 	out := RuntimeStatus{ID: set.ID, Port: set.Port}
+	if r != nil {
+		out.Error = r.lastError()
+	}
 	if p == nil {
 		return out
 	}
@@ -391,7 +399,9 @@ func (rt *Runtime) status(set *registry.Set) RuntimeStatus {
 	out.StartedAt = p.startedAt.UTC().Format(time.RFC3339)
 	out.Port = p.port
 	out.Restarts = p.restarts
-	out.Error = p.err
+	if p.err != "" {
+		out.Error = p.err
+	}
 	if p.exited {
 		code := p.exitCode
 		out.ExitCode = &code
@@ -411,22 +421,60 @@ func (rt *Runtime) Logs(id string, lines int) []string {
 	return rt.ring(id).tail(lines)
 }
 
-// tailFile — последние lines строк файла. Логи ротируются на 5 МиБ, поэтому
-// читать файл целиком дешевле, чем возиться с seek.
+// tailFile — последние lines строк файла. Логи ротируются на 5 МиБ, а панель
+// опрашивает хвост раз в 10 с: читаем последние байты через Seek, а предел
+// растёт, только если строк не хватило.
 func tailFile(path string, lines int) ([]string, error) {
-	body, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	text := strings.TrimRight(string(body), "\n")
-	if text == "" {
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	size := info.Size()
+	if size == 0 {
 		return []string{}, nil
 	}
-	all := strings.Split(text, "\n")
-	if len(all) > lines {
-		all = all[len(all)-lines:]
+	for read := int64(64 << 10); ; read *= 2 {
+		if read > size {
+			read = size
+		}
+		off := size - read
+		buf := make([]byte, read)
+		if _, err := f.ReadAt(buf, off); err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		text := string(buf)
+		if off > 0 {
+			// Первая строка обрезана посередине: отбрасываем её.
+			i := strings.IndexByte(text, '\n')
+			if i < 0 {
+				if read == size {
+					break
+				}
+				continue
+			}
+			text = text[i+1:]
+		}
+		text = strings.TrimRight(text, "\n")
+		var all []string
+		if text != "" {
+			all = strings.Split(text, "\n")
+		}
+		if len(all) >= lines || off == 0 {
+			if len(all) > lines {
+				all = all[len(all)-lines:]
+			}
+			if all == nil {
+				all = []string{}
+			}
+			return all, nil
+		}
 	}
-	return all, nil
+	return []string{}, nil
 }
 
 // ServerLogs — строки лога, где имя сервера встречается отдельным словом.
@@ -587,6 +635,9 @@ type ring struct {
 	mu      sync.Mutex
 	lines   []string
 	partial string
+	// err — последняя ошибка записи лога на диск. Пишется, даже когда Write
+	// продолжает работать на старом файле: панель должна её видеть.
+	err string
 }
 
 func (r *ring) add(chunk string) {
@@ -625,6 +676,19 @@ func (r *ring) tail(n int) []string {
 	return out
 }
 
+// setError запоминает ошибку записи лога: пустая строка — ошибка снята.
+func (r *ring) setError(msg string) {
+	r.mu.Lock()
+	r.err = msg
+	r.mu.Unlock()
+}
+
+func (r *ring) lastError() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.err
+}
+
 // logWriter пишет и в файл, и в кольцо: два потока ребёнка зовут Write
 // параллельно. Файл ротируется по размеру, иначе долгоживущий набор растёт без
 // предела.
@@ -634,6 +698,13 @@ type logWriter struct {
 	path string
 	size int64
 	ring *ring
+	// err — последняя ошибка ротации; дублируется в ring для статуса набора.
+	err string
+}
+
+func (w *logWriter) setErr(msg string) {
+	w.err = msg
+	w.ring.setError(msg)
 }
 
 func (w *logWriter) Write(p []byte) (int, error) {
@@ -642,27 +713,39 @@ func (w *logWriter) Write(p []byte) (int, error) {
 	if w.size+int64(len(p)) > maxLogBytes {
 		w.rotate()
 	}
-	if w.file != nil {
-		if _, err := w.file.Write(p); err != nil {
-			return 0, err
-		}
-		w.size += int64(len(p))
+	if w.file == nil {
+		// Файла нет вовсе: строку сохраняет кольцо, а ошибка — в статусе.
+		w.ring.add(string(p))
+		return len(p), errors.New("лог набора недоступен: " + w.err)
 	}
+	if _, err := w.file.Write(p); err != nil {
+		w.setErr("запись лога: " + err.Error())
+		return 0, err
+	}
+	w.size += int64(len(p))
 	w.ring.add(string(p))
 	return len(p), nil
 }
 
-// rotate заменяет .log на свежий файл, оставляя один .log.1.
+// rotate заменяет .log на свежий файл, оставляя один .log.1. Сбой открытия не
+// теряет вывод: старый дескриптор остаётся жив (файл уже .log.1), а ошибка
+// уходит в статус набора.
 func (w *logWriter) rotate() {
+	if err := os.Rename(w.path, w.path+".1"); err != nil {
+		w.setErr("ротация лога: " + err.Error())
+		return
+	}
+	f, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		w.setErr("новый лог не открыт: " + err.Error())
+		return
+	}
 	if w.file != nil {
 		w.file.Close()
-		w.file = nil
 	}
-	_ = os.Rename(w.path, w.path+".1")
-	if f, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
-		w.file = f
-	}
+	w.file = f
 	w.size = 0
+	w.setErr("")
 }
 
 var _ io.Writer = (*logWriter)(nil)

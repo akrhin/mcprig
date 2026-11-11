@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -423,10 +424,87 @@ func (q Query) stepFor(dflt step) step {
 	return dflt
 }
 
-func readRawDay(src Source, day time.Time, b *bundle) {
-	_ = scanRaw(filepath.Join(src.Dir, "raw-"+day.Format(dayLayout)+".jsonl"), func(l rawLine) {
-		b.addRaw(src.Set, l)
+// fileCache хранит разобранные файлы истории по пути с проверкой mtime+size:
+// панель спрашивает один и тот же период повторно, а файлы меняются только
+// записью. Журнал сегодняшнего дня растёт, поэтому он и перечитывается.
+type cacheEntry struct {
+	mtime time.Time
+	size  int64
+	val   any
+}
+
+const cacheMax = 4096
+
+var fileCache = struct {
+	sync.Mutex
+	m map[string]cacheEntry
+}{m: map[string]cacheEntry{}}
+
+// cached отдаёт разобранное значение, если файл не менялся с прошлого раза.
+// nil — файла нет или он битый; битый файл не кэшируется.
+func cached(path string, load func() (any, error)) any {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	fileCache.Lock()
+	entry, ok := fileCache.m[path]
+	fileCache.Unlock()
+	if ok && entry.size == info.Size() && entry.mtime.Equal(info.ModTime()) {
+		return entry.val
+	}
+	val, err := load()
+	if err != nil {
+		return nil
+	}
+	fileCache.Lock()
+	if len(fileCache.m) >= cacheMax {
+		fileCache.m = map[string]cacheEntry{}
+	}
+	fileCache.m[path] = cacheEntry{mtime: info.ModTime(), size: info.Size(), val: val}
+	fileCache.Unlock()
+	return val
+}
+
+func loadRaw(path string) []rawLine {
+	v := cached(path, func() (any, error) {
+		out := []rawLine{}
+		err := scanRaw(path, func(l rawLine) { out = append(out, l) })
+		return out, err
 	})
+	if v == nil {
+		return nil
+	}
+	return v.([]rawLine)
+}
+
+func loadDay(path string) (dayFile, bool) {
+	v := cached(path, func() (any, error) { return readDayFile(path) })
+	if v == nil {
+		return dayFile{}, false
+	}
+	return v.(dayFile), true
+}
+
+func loadMonth(path string) (monthFile, bool) {
+	v := cached(path, func() (any, error) {
+		var mf monthFile
+		raw, err := readHistoryFile(path)
+		if err != nil {
+			return mf, err
+		}
+		return mf, json.Unmarshal(raw, &mf)
+	})
+	if v == nil {
+		return monthFile{}, false
+	}
+	return v.(monthFile), true
+}
+
+func readRawDay(src Source, day time.Time, b *bundle) {
+	for _, l := range loadRaw(filepath.Join(src.Dir, "raw-"+day.Format(dayLayout)+".jsonl")) {
+		b.addRaw(src.Set, l)
+	}
 }
 
 // readLast30 prefers the day file and falls back to the raw journal of days
@@ -434,7 +512,7 @@ func readRawDay(src Source, day time.Time, b *bundle) {
 func readLast30(src Source, today time.Time, b *bundle) {
 	for i := 0; i < DayDays; i++ {
 		day := today.AddDate(0, 0, -i)
-		if df, err := readDayFile(filepath.Join(src.Dir, "day-"+day.Format(dayLayout)+".json")); err == nil {
+		if df, ok := loadDay(filepath.Join(src.Dir, "day-"+day.Format(dayLayout)+".json")); ok {
 			for _, t := range df.Triples {
 				b.addTriple(src.Set, t, day)
 			}
@@ -453,12 +531,8 @@ func readMonths(src Source, archiveStart time.Time, b *bundle) time.Time {
 	from := time.Time{}
 	folded := map[string]bool{}
 	for _, p := range paths {
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		var mf monthFile
-		if json.Unmarshal(raw, &mf) != nil {
+		mf, ok := loadMonth(p)
+		if !ok {
 			continue
 		}
 		for day, triples := range mf.Days {
@@ -481,8 +555,8 @@ func readMonths(src Source, archiveStart time.Time, b *bundle) time.Time {
 		if !ok || !d.Before(archiveStart) || folded[d.Format(dayLayout)] {
 			continue
 		}
-		df, err := readDayFile(p)
-		if err != nil {
+		df, ok := loadDay(p)
+		if !ok {
 			continue
 		}
 		if from.IsZero() || d.Before(from) {
