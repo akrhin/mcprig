@@ -2,7 +2,6 @@ package oauth
 
 import (
 	"context"
-	"log/slog"
 	"net"
 	"strings"
 	"testing"
@@ -24,11 +23,10 @@ func TestNewHandlerWithoutSavedToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	h, err := NewHandler(context.Background(), Options{
-		ServerName:   testServer,
-		ServerURL:    testServerUL,
-		RedirectURL:  testRedirect,
-		CallbackAddr: "127.0.0.1:0",
-		Store:        store,
+		ServerName:  testServer,
+		ServerURL:   testServerUL,
+		RedirectURL: testRedirect,
+		Store:       store,
 	})
 	if err != nil {
 		t.Fatalf("NewHandler: %v", err)
@@ -155,19 +153,34 @@ func TestNewHandlerBindsRedirectPort(t *testing.T) {
 }
 
 // Адрес приёмника берётся из redirect_uri: другой порт означал бы, что браузер
-// стучится мимо, и вход висел бы до пятиминутного таймаута.
+// стучится мимо, и вход висел бы до пятиминутного таймаута. Без порта
+// возвращаться некуда — ошибка конфигурации, а не эфемерный порт.
 func TestCallbackAddrFollowsRedirectURL(t *testing.T) {
-	log := slog.New(slog.DiscardHandler)
-	got, err := callbackAddr("http://127.0.0.1:9107/callback", log)
+	got, err := callbackAddr("http://127.0.0.1:9107/callback")
 	if err != nil || got != "127.0.0.1:9107" {
 		t.Fatalf("callbackAddr = %q, %v", got, err)
 	}
-	// Без порта — эфемерный, с предупреждением в лог.
-	got, err = callbackAddr("http://127.0.0.1/callback", log)
-	if err != nil || got != "127.0.0.1:0" {
-		t.Fatalf("callbackAddr без порта = %q, %v", got, err)
+	for _, u := range []string{"http://127.0.0.1/callback", "http://127.0.0.1:0/callback"} {
+		if got, err := callbackAddr(u); err == nil || !strings.Contains(err.Error(), "без порта") {
+			t.Fatalf("callbackAddr(%s) = %q, %v; ждали ошибку про порт", u, got, err)
+		}
 	}
-	if _, err := callbackAddr("://bad", log); err == nil {
+	if _, err := callbackAddr("://bad"); err == nil {
 		t.Fatal("неверный RedirectURL принят")
+	}
+}
+
+// Без порта в redirect_uri приём кода некуда вернуть: NewHandler обязан
+// отказать сразу, а не ждать пять минут на молчащем эфемерном порту.
+func TestNewHandlerRejectsRedirectURLWithoutPort(t *testing.T) {
+	for _, u := range []string{"http://127.0.0.1/callback", "http://127.0.0.1:0/callback"} {
+		_, err := NewHandler(context.Background(), Options{
+			ServerName:  testServer,
+			ServerURL:   testServerUL,
+			RedirectURL: u,
+		})
+		if err == nil || !strings.Contains(err.Error(), "redirectUrl без порта") {
+			t.Fatalf("NewHandler(%s): err = %v, want «redirectUrl без порта»", u, err)
+		}
 	}
 }

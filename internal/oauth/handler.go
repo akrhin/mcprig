@@ -29,13 +29,9 @@ func (h *Handler) Addr() string { return h.addr }
 
 // Options — параметры фабрики обработчика.
 type Options struct {
-	ServerName  string
-	ServerURL   string
-	RedirectURL string // обязателен, обычно http://127.0.0.1:8947/callback
-	// CallbackAddr не используется: адрес прослушивания выводится из
-	// RedirectURL — иначе редирект уходил на чужой порт и ожидание висело
-	// до таймаута. Оставлен ради совместимости.
-	CallbackAddr string
+	ServerName   string
+	ServerURL    string
+	RedirectURL  string // обязателен, http://127.0.0.1:<port>/callback — порт задаёт приёмник
 	ClientID     string // если пуст — динамическая регистрация клиента
 	ClientSecret string
 	Scopes       []string
@@ -46,18 +42,16 @@ type Options struct {
 
 // callbackAddr — адрес приёмника из redirect_uri: браузер вернётся ровно на
 // указанный там порт, поэтому слушать другой — гарантированный пятиминутный
-// таймаут. Пустой порт (или "0") — эфемерный с предупреждением: предрегистри-
-// рованный redirect_uri так не совпадёт.
-func callbackAddr(redirectURL string, log *slog.Logger) (string, error) {
+// таймаут. Без порта (или с ":0") возвращаться некуда — это ошибка конфигурации,
+// а не повод слушать эфемерный порт.
+func callbackAddr(redirectURL string) (string, error) {
 	u, err := url.Parse(redirectURL)
 	if err != nil || u.Hostname() == "" {
 		return "", fmt.Errorf("oauth: неверный RedirectURL %q", redirectURL)
 	}
 	host, port := u.Hostname(), u.Port()
 	if port == "" || port == "0" {
-		log.Warn("oauth: redirectUrl не задаёт порт приёма кода — слушаю эфемерный порт, редирект может не дойти",
-			"redirectUrl", redirectURL)
-		port = "0"
+		return "", errors.New("oauth: redirectUrl без порта — браузеру некуда вернуться, укажите http://127.0.0.1:<port>/callback")
 	}
 	return net.JoinHostPort(host, port), nil
 }
@@ -80,7 +74,7 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 	if browser == nil {
 		browser = BrowserOpen
 	}
-	addr, err := callbackAddr(o.RedirectURL, log)
+	addr, err := callbackAddr(o.RedirectURL)
 	if err != nil {
 		return nil, err
 	}

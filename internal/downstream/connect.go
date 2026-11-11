@@ -208,7 +208,6 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 		ServerName:   srv.Name,
 		ServerURL:    srv.URL,
 		RedirectURL:  block.RedirectURL,
-		CallbackAddr: fmt.Sprintf("127.0.0.1:%d", block.CallbackPort),
 		ClientID:     block.ClientID,
 		ClientSecret: block.ClientSecret,
 		Scopes:       block.Scopes,
