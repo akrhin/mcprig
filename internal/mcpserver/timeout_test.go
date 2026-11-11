@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -67,6 +68,44 @@ func TestConnectTimeoutReportsAndRetries(t *testing.T) {
 	}
 }
 
+// A server with an oauth block waits for a human at the browser: the plain
+// 30 s deadline would kill the first authorization, so the connect gets minutes.
+func TestConnectDeadlineForOAuth(t *testing.T) {
+	oauthSrv := stdio("oauth")
+	oauthSrv.OAuth = &config.OAuth{}
+	m := New(&config.Config{Servers: []*config.Server{stdio("plain"), oauthSrv}}, "test", nil)
+	t.Cleanup(func() { _ = m.Close() })
+
+	var mu sync.Mutex
+	seen := map[string]time.Duration{}
+	m.dial = func(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
+		deadline, ok := ctx.Deadline()
+		mu.Lock()
+		if ok {
+			seen[srv.Name] = time.Until(deadline)
+		} else {
+			seen[srv.Name] = -1
+		}
+		mu.Unlock()
+		return nil, errors.New("соединения нет: проверяем только дедлайн")
+	}
+
+	cs := clientFor(t, m.Server())
+	for _, name := range []string{"plain", "oauth"} {
+		call(t, cs, "invoke_command", map[string]any{"server": name, "command_name": "ping"})
+	}
+
+	mu.Lock()
+	plain, oauth := seen["plain"], seen["oauth"]
+	mu.Unlock()
+	if plain < 25*time.Second || plain > 35*time.Second {
+		t.Fatalf("обычный сервер получил дедлайн %s, ожидалось ~30s", plain)
+	}
+	if oauth < 5*time.Minute+30*time.Second || oauth > 6*time.Minute+30*time.Second {
+		t.Fatalf("сервер с oauth получил дедлайн %s, ожидалось ~6m", oauth)
+	}
+}
+
 // Close must not claim success while a connect is still hanging: the caller
 // learns the child may still be alive.
 func TestCloseReportsUnfinishedConnect(t *testing.T) {
@@ -87,7 +126,7 @@ func TestCloseReportsUnfinishedConnect(t *testing.T) {
 	}
 
 	e := m.entries[0]
-	go func() { _, _ = e.conn.session(context.Background(), m.dialFor(e.srv)) }()
+	go func() { _, _ = e.conn.session(context.Background(), m.dialFor(e.srv), connectDeadline(e.srv)) }()
 	<-entered
 	e.conn.mu.Lock()
 	a := e.conn.try

@@ -54,6 +54,10 @@ var (
 	connectTimeout = 30 * time.Second
 	// closeWait bounds how long Close waits for an in-flight connect.
 	closeWait = 5 * time.Second
+	// oauthConnectTimeout is the budget for a server whose first connect may
+	// wait for a human: the SDK blocks the same dial while the browser hands
+	// over the authorization code (up to 5 minutes).
+	oauthConnectTimeout = 6 * time.Minute
 )
 
 var (
@@ -474,7 +478,7 @@ func (m *Manager) probe(ctx context.Context, e *entry) error {
 	case <-probeCtx.Done():
 		return fmt.Errorf("%w: %w", errProbeSkipped, probeCtx.Err())
 	}
-	_, err := e.conn.session(probeCtx, m.dialFor(e.srv))
+	_, err := e.conn.session(probeCtx, m.dialFor(e.srv), connectDeadline(e.srv))
 	return err
 }
 
@@ -880,7 +884,7 @@ func (m *Manager) callCtx(ctx context.Context) (context.Context, context.CancelF
 // (ErrConnectionClosed) is closed and dialed once more; a second failure is
 // returned with its cause.
 func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.ClientSession) error) error {
-	sess, err := e.conn.session(ctx, m.dialFor(e.srv))
+	sess, err := e.conn.session(ctx, m.dialFor(e.srv), connectDeadline(e.srv))
 	if err != nil {
 		return fmt.Errorf("%s: %w", e.srv.Name, err)
 	}
@@ -892,7 +896,7 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 		return nil
 	}
 	m.dropSession(e)
-	sess, err = e.conn.session(ctx, m.dialFor(e.srv))
+	sess, err = e.conn.session(ctx, m.dialFor(e.srv), connectDeadline(e.srv))
 	if err != nil {
 		return fmt.Errorf("%s: переподключение после обрыва: %w", e.srv.Name, err)
 	}
@@ -905,7 +909,7 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 // callTool runs one call on the cached session. Unlike withSession it never
 // retries: invokeCommand decides from the outcome whether a repeat is safe.
 func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolParams) (*mcp.CallToolResult, error) {
-	sess, err := e.conn.session(ctx, m.dialFor(e.srv))
+	sess, err := e.conn.session(ctx, m.dialFor(e.srv), connectDeadline(e.srv))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", e.srv.Name, err)
 	}
@@ -1205,7 +1209,17 @@ type attempt struct {
 	err  error
 }
 
-func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.ClientSession, error)) (*mcp.ClientSession, error) {
+// connectDeadline picks the budget for one connect: a server with an oauth
+// block may wait for a human, while a plain server should not hold the caller
+// for minutes when its initialize hangs.
+func connectDeadline(srv *config.Server) time.Duration {
+	if srv.OAuth != nil {
+		return oauthConnectTimeout
+	}
+	return connectTimeout
+}
+
+func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.ClientSession, error), timeout time.Duration) (*mcp.ClientSession, error) {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -1234,7 +1248,7 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 	// The deadline does belong to the connect: a hung initialize would otherwise
 	// hold c.try forever and make the server look alive.
 	go func() {
-		dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), connectTimeout)
+		dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 		sess, err := dial(dctx)
 		timedOut := dctx.Err() == context.DeadlineExceeded
 		cancel()
@@ -1248,7 +1262,7 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 			if err == nil {
 				err = context.DeadlineExceeded
 			}
-			err = fmt.Errorf("подключение не уложилось в %s: %w", connectTimeout, err)
+			err = fmt.Errorf("подключение не уложилось в %s: %w", timeout, err)
 		}
 		c.mu.Lock()
 		if c.closed {
