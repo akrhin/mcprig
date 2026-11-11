@@ -11,7 +11,7 @@
       "id": "prompt",
       "type": "external",
       "label": "agent prompt",
-      "sublabel": "5 meta-tools, not 421",
+      "sublabel": "the catalog is not in context",
       "pos": [
         40,
         20
@@ -22,10 +22,10 @@
       ]
     },
     {
-      "id": "opencode",
+      "id": "client",
       "type": "external",
-      "label": "opencode",
-      "sublabel": "mcprig-route plugin",
+      "label": "MCP client",
+      "sublabel": "any harness: tools/call",
       "pos": [
         40,
         120
@@ -36,13 +36,13 @@
       ]
     },
     {
-      "id": "claude",
+      "id": "client2",
       "type": "external",
-      "label": "Claude Code · Codex",
-      "sublabel": "mcprig init --client",
+      "label": "second client",
+      "sublabel": "its own set and token",
       "pos": [
         40,
-        240
+        300
       ],
       "size": [
         170,
@@ -50,25 +50,10 @@
       ]
     },
     {
-      "id": "hermes",
-      "type": "external",
-      "label": "Hermes",
-      "sublabel": "own client, set ha",
-      "pos": [
-        40,
-        430
-      ],
-      "size": [
-        170,
-        68
-      ]
-    },
-    {
-      "id": "main",
+      "id": "setA",
       "type": "backend",
-      "label": "mcprig serve :9101",
-      "sublabel": "set main · 11 servers",
-      "tag": "5 meta-tools",
+      "label": "set A",
+      "sublabel": "one endpoint · its servers",
       "pos": [
         300,
         110
@@ -76,27 +61,14 @@
       "size": [
         200,
         96
-      ]
-    },
-    {
-      "id": "core",
-      "type": "backend",
-      "label": "proxy core",
-      "sublabel": "catalog · tool-out · /stats",
-      "pos": [
-        300,
-        250
       ],
-      "size": [
-        200,
-        96
-      ]
+      "tag": "5 meta tools"
     },
     {
-      "id": "ha",
+      "id": "setB",
       "type": "backend",
-      "label": "mcprig serve :9102",
-      "sublabel": "set ha · 8 servers",
+      "label": "set B",
+      "sublabel": "separate process and port",
       "pos": [
         300,
         410
@@ -107,11 +79,24 @@
       ]
     },
     {
+      "id": "core",
+      "type": "backend",
+      "label": "proxy core",
+      "sublabel": "catalog · policies · tool-out",
+      "pos": [
+        300,
+        250
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
       "id": "stdio",
       "type": "backend",
       "label": "stdio servers",
-      "sublabel": "child process",
-      "tag": "initialize",
+      "sublabel": "one child process each",
       "pos": [
         850,
         70
@@ -119,14 +104,14 @@
       "size": [
         200,
         96
-      ]
+      ],
+      "tag": "initialize"
     },
     {
       "id": "http",
       "type": "cloud",
       "label": "HTTP servers",
-      "sublabel": "serena · gitea · raven",
-      "tag": "server/discover",
+      "sublabel": "URL · headers · OAuth",
       "pos": [
         620,
         230
@@ -134,13 +119,14 @@
       "size": [
         200,
         96
-      ]
+      ],
+      "tag": "server/discover"
     },
     {
       "id": "panel",
       "type": "backend",
-      "label": "panel :9088",
-      "sublabel": "start · keys · logs",
+      "label": "panel",
+      "sublabel": "sets · keys · logs",
       "pos": [
         300,
         570
@@ -153,8 +139,8 @@
     {
       "id": "disk",
       "type": "database",
-      "label": "config and data",
-      "sublabel": "keys · secrets · tool-out",
+      "label": "state files",
+      "sublabel": "config · keys · secrets · tool-out",
       "pos": [
         620,
         570
@@ -182,83 +168,78 @@
   "boundaries": [
     {
       "kind": "security-group",
-      "label": "a set = one MCP server · bearer token",
+      "label": "a set = one MCP server · Bearer token",
       "wraps": [
-        "main",
+        "setA",
         "core",
-        "ha"
+        "setB"
       ]
     }
   ],
   "connections": [
     {
-      "id": "prompt-to-opencode",
+      "id": "p-c",
       "from": "prompt",
-      "to": "opencode",
+      "to": "client",
       "variant": "dashed"
     },
     {
-      "id": "opencode-to-main",
-      "from": "opencode",
-      "to": "main",
+      "id": "c-a",
+      "from": "client",
+      "to": "setA",
       "label": "tools/call",
       "variant": "emphasis"
     },
     {
-      "id": "claude-to-main",
-      "from": "claude",
-      "to": "main"
+      "id": "c2-b",
+      "from": "client2",
+      "to": "setB"
     },
     {
-      "id": "hermes-to-ha",
-      "from": "hermes",
-      "to": "ha"
-    },
-    {
-      "id": "main-to-core",
-      "from": "main",
+      "id": "a-core",
+      "from": "setA",
       "to": "core"
     },
     {
-      "id": "ha-to-core",
-      "from": "ha",
+      "id": "b-core",
+      "from": "setB",
       "to": "core"
     },
     {
-      "id": "main-to-http",
-      "from": "main",
+      "id": "a-http",
+      "from": "setA",
       "to": "http",
       "label": "url + headers"
     },
     {
-      "id": "ha-to-http",
-      "from": "ha",
+      "id": "b-http",
+      "from": "setB",
       "to": "http"
     },
     {
-      "id": "panel-to-ha",
+      "id": "p-b",
       "from": "panel",
-      "to": "ha",
+      "to": "setB",
       "label": "start/stop",
       "variant": "dashed",
       "fromSide": "top",
       "toSide": "bottom"
     },
     {
-      "id": "panel-to-disk",
+      "id": "p-d",
       "from": "panel",
       "to": "disk",
       "label": "config · env",
       "variant": "dashed"
     },
     {
-      "id": "main-to-sandbox",
-      "from": "main",
+      "id": "a-sandbox",
+      "from": "setA",
       "to": "sandbox",
       "label": "spawn + env"
     },
     {
-      "id": "sandbox-to-stdio",
+      "id": "sandbox-stdio",
       "from": "sandbox",
       "to": "stdio",
       "label": "exec"
@@ -269,43 +250,43 @@
       "dot": "cyan",
       "title": "Context economy",
       "items": [
-        "The set's 421 tools never enter the prompt: the agent sees 5 meta-tools",
-        "list_commands serves the catalog on demand, cache 8–12 ms vs 27 ms",
-        "describe_commands returns the schema of just the tool being called",
-        "invoke_many — a batch of calls in one response instead of N round-trips",
-        "maxBytes trims a large result; the full text lands in a tool-out file"
+        "A catalog of hundreds of tools never enters the prompt: the agent sees five meta tools",
+        "list_commands returns the catalog on demand and caches it",
+        "describe_commands sends the schema of just the tool being called",
+        "invoke_many runs a batch in one answer instead of N round-trips",
+        "maxBytes cuts a large answer; the whole text stays in a file"
       ]
     },
     {
       "dot": "emerald",
       "title": "The agent works as usual",
       "items": [
-        "The harness is unchanged: the same tools/call and JSON-RPC on /mcp",
-        "Tool names are real: invoke_command{server, command_name, parameters}",
-        "Errors come back as tool text: unknown server, Unknown tool",
-        "/stats counts calls and errors per server, health every 60 s"
+        "The harness does not change: the same tools/call and JSON-RPC on /mcp",
+        "Tool names stay real: invoke_command{server, command_name, parameters}",
+        "Errors come back as tool text: unknown server, unknown tool",
+        "Stats count calls and errors per server; health is polled periodically"
       ]
     },
     {
       "dot": "rose",
       "title": "Transports and tokens",
       "items": [
-        "stdio: spawn(command) + set env, initialize handshake (2025-11-25)",
-        "HTTP: server/discover (2026-07-28), OAuth on 401",
-        "One bearer token per set: main.key / ha.key",
-        "Sets are panel children or mcprig-set@ units"
+        "stdio: spawn(command) + its own env, initialize handshake",
+        "HTTP: server/discover, OAuth on 401",
+        "One Bearer token per set; each client can have its own set",
+        "A set runs as a child of the panel or as its own unit"
       ]
     },
     {
       "dot": "rose",
       "title": "Sandbox",
       "items": [
-        "`untrusted` without `sandbox` never starts: fail-closed",
-        "`ro` replaces the defaults wholesale — list the paths you need",
-        "`prlimit` and its loader are mounted for you; `/usr` is not required",
-        "Limits: AS / NPROC / FSIZE; CPU and subtree RSS are not limited",
-        "node: `memoryMb` ≥ 2048 and `ro` for the runtime prefix",
-        "Isolation: `/home`, network, `/proc/1`, writes to `/`"
+        "`untrusted` without `sandbox` does not start: fail-closed, not «we'll see»",
+        "`ro` replaces the defaults entirely — list the paths you need",
+        "`prlimit` comes from the host: on alpine that is util-linux",
+        "Limits AS / NPROC / FSIZE; subtree CPU and RSS are not limited",
+        "node: `memoryMb` ≥ 2048 and `ro` on the node prefix",
+        "Isolation: `/home`, network, `/proc/1`, writes to the root"
       ]
     }
   ]

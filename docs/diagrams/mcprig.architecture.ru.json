@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "mcprig: MCP-набор как один сервер",
-    "output": "mcprig.architecture.html",
+    "output": "mcprig.architecture.ru.html",
     "quality_profile": "showcase"
   },
   "components": [
@@ -11,7 +11,7 @@
       "id": "prompt",
       "type": "external",
       "label": "промпт агента",
-      "sublabel": "5 мета-тулов вместо 421",
+      "sublabel": "каталог в контексте не лежит",
       "pos": [
         40,
         20
@@ -22,10 +22,10 @@
       ]
     },
     {
-      "id": "opencode",
+      "id": "client",
       "type": "external",
-      "label": "opencode",
-      "sublabel": "плагин mcprig-route",
+      "label": "MCP-клиент",
+      "sublabel": "любой харнесс: tools/call",
       "pos": [
         40,
         120
@@ -36,13 +36,13 @@
       ]
     },
     {
-      "id": "claude",
+      "id": "client2",
       "type": "external",
-      "label": "Claude Code · Codex",
-      "sublabel": "mcprig init --client",
+      "label": "другой клиент",
+      "sublabel": "свой набор и токен",
       "pos": [
         40,
-        240
+        300
       ],
       "size": [
         170,
@@ -50,25 +50,10 @@
       ]
     },
     {
-      "id": "hermes",
-      "type": "external",
-      "label": "Hermes",
-      "sublabel": "свой клиент, набор ha",
-      "pos": [
-        40,
-        430
-      ],
-      "size": [
-        170,
-        68
-      ]
-    },
-    {
-      "id": "main",
+      "id": "setA",
       "type": "backend",
-      "label": "mcprig serve :9101",
-      "sublabel": "набор main · 11 серверов",
-      "tag": "5 мета-тулов",
+      "label": "набор A",
+      "sublabel": "один endpoint · свои серверы",
       "pos": [
         300,
         110
@@ -76,27 +61,14 @@
       "size": [
         200,
         96
-      ]
-    },
-    {
-      "id": "core",
-      "type": "backend",
-      "label": "ядро прокси",
-      "sublabel": "каталог · tool-out · /stats",
-      "pos": [
-        300,
-        250
       ],
-      "size": [
-        200,
-        96
-      ]
+      "tag": "5 мета-тулов"
     },
     {
-      "id": "ha",
+      "id": "setB",
       "type": "backend",
-      "label": "mcprig serve :9102",
-      "sublabel": "набор ha · 8 серверов",
+      "label": "набор B",
+      "sublabel": "отдельный процесс и порт",
       "pos": [
         300,
         410
@@ -107,11 +79,24 @@
       ]
     },
     {
+      "id": "core",
+      "type": "backend",
+      "label": "ядро прокси",
+      "sublabel": "каталог · политики · tool-out",
+      "pos": [
+        300,
+        250
+      ],
+      "size": [
+        200,
+        96
+      ]
+    },
+    {
       "id": "stdio",
       "type": "backend",
       "label": "stdio-серверы",
-      "sublabel": "дочерний процесс",
-      "tag": "initialize",
+      "sublabel": "дочерний процесс на сервер",
       "pos": [
         850,
         70
@@ -119,14 +104,14 @@
       "size": [
         200,
         96
-      ]
+      ],
+      "tag": "initialize"
     },
     {
       "id": "http",
       "type": "cloud",
       "label": "HTTP-серверы",
-      "sublabel": "serena · gitea · raven",
-      "tag": "server/discover",
+      "sublabel": "URL · заголовки · OAuth",
       "pos": [
         620,
         230
@@ -134,13 +119,14 @@
       "size": [
         200,
         96
-      ]
+      ],
+      "tag": "server/discover"
     },
     {
       "id": "panel",
       "type": "backend",
-      "label": "панель :9088",
-      "sublabel": "старт · ключи · логи",
+      "label": "панель",
+      "sublabel": "наборы · ключи · логи",
       "pos": [
         300,
         570
@@ -153,8 +139,8 @@
     {
       "id": "disk",
       "type": "database",
-      "label": "конфиг и данные",
-      "sublabel": "keys · secrets · tool-out",
+      "label": "файлы состояния",
+      "sublabel": "config · keys · secrets · tool-out",
       "pos": [
         620,
         570
@@ -184,81 +170,76 @@
       "kind": "security-group",
       "label": "набор = один MCP-сервер · Bearer-токен",
       "wraps": [
-        "main",
+        "setA",
         "core",
-        "ha"
+        "setB"
       ]
     }
   ],
   "connections": [
     {
-      "id": "prompt-to-opencode",
+      "id": "p-c",
       "from": "prompt",
-      "to": "opencode",
+      "to": "client",
       "variant": "dashed"
     },
     {
-      "id": "opencode-to-main",
-      "from": "opencode",
-      "to": "main",
+      "id": "c-a",
+      "from": "client",
+      "to": "setA",
       "label": "tools/call",
       "variant": "emphasis"
     },
     {
-      "id": "claude-to-main",
-      "from": "claude",
-      "to": "main"
+      "id": "c2-b",
+      "from": "client2",
+      "to": "setB"
     },
     {
-      "id": "hermes-to-ha",
-      "from": "hermes",
-      "to": "ha"
-    },
-    {
-      "id": "main-to-core",
-      "from": "main",
+      "id": "a-core",
+      "from": "setA",
       "to": "core"
     },
     {
-      "id": "ha-to-core",
-      "from": "ha",
+      "id": "b-core",
+      "from": "setB",
       "to": "core"
     },
     {
-      "id": "main-to-http",
-      "from": "main",
+      "id": "a-http",
+      "from": "setA",
       "to": "http",
       "label": "url + headers"
     },
     {
-      "id": "ha-to-http",
-      "from": "ha",
+      "id": "b-http",
+      "from": "setB",
       "to": "http"
     },
     {
-      "id": "panel-to-ha",
+      "id": "p-b",
       "from": "panel",
-      "to": "ha",
+      "to": "setB",
       "label": "старт/стоп",
       "variant": "dashed",
       "fromSide": "top",
       "toSide": "bottom"
     },
     {
-      "id": "panel-to-disk",
+      "id": "p-d",
       "from": "panel",
       "to": "disk",
       "label": "config · env",
       "variant": "dashed"
     },
     {
-      "id": "main-to-sandbox",
-      "from": "main",
+      "id": "a-sandbox",
+      "from": "setA",
       "to": "sandbox",
       "label": "spawn + env"
     },
     {
-      "id": "sandbox-to-stdio",
+      "id": "sandbox-stdio",
       "from": "sandbox",
       "to": "stdio",
       "label": "exec"
@@ -269,11 +250,11 @@
       "dot": "cyan",
       "title": "Экономия контекста",
       "items": [
-        "421 инструмент набора не попадает в промпт: агент видит 5 мета-тулов",
-        "list_commands отдаёт каталог по запросу, кэш — 8–12 мс вместо 27 мс",
+        "Каталог на сотни инструментов не попадает в промпт: агент видит пять мета-тулов",
+        "list_commands отдаёт каталог по запросу и кэширует его",
         "describe_commands присылает схему только того инструмента, который зовут",
         "invoke_many — пачка вызовов одним ответом вместо N round-trip",
-        "maxBytes режет крупный ответ, полный текст лежит файлом в tool-out"
+        "maxBytes режет крупный ответ, полный текст лежит файлом"
       ]
     },
     {
@@ -282,18 +263,18 @@
       "items": [
         "Харнесс не меняется: те же tools/call и JSON-RPC на /mcp",
         "Имена инструментов настоящие: invoke_command{server, command_name, parameters}",
-        "Ошибка приходит текстом инструмента: неизвестный сервер, Unknown tool",
-        "/stats считает вызовы и ошибки по каждому серверу, health — каждые 60 с"
+        "Ошибка приходит текстом инструмента: неизвестный сервер, неизвестный инструмент",
+        "Статистика считает вызовы и ошибки по каждому серверу, health опрашивается периодически"
       ]
     },
     {
       "dot": "rose",
       "title": "Транспорты и токены",
       "items": [
-        "stdio: spawn(command) + env набора, хендшейк initialize (2025-11-25)",
-        "HTTP: server/discover (2026-07-28), OAuth по 401",
-        "Один Bearer-токен на набор: main.key / ha.key",
-        "Наборы — дочерние процессы панели или юниты mcprig-set@"
+        "stdio: spawn(command) + своё окружение, рукопожатие initialize",
+        "HTTP: server/discover, OAuth по 401",
+        "Один Bearer-токен на набор; у каждого клиента может быть свой набор",
+        "Набор живёт дочерним процессом панели или отдельным юнитом"
       ]
     },
     {
@@ -302,10 +283,10 @@
       "items": [
         "`untrusted` без `sandbox` не стартует: fail-closed, а не «повезёт»",
         "`ro` заменяет умолчания целиком — нужные пути перечисляй сам",
-        "`prlimit` и его загрузчик монтируются сами, `/usr` не обязателен",
+        "`prlimit` берётся с хоста: на alpine это пакет util-linux",
         "Лимиты AS / NPROC / FSIZE; CPU и RSS поддерева не ограничены",
         "node: `memoryMb` ≥ 2048 и `ro` на префикс узла",
-        "Изоляция: `/home`, сеть, `/proc/1`, запись в `/`"
+        "Изоляция: `/home`, сеть, `/proc/1`, запись в корень"
       ]
     }
   ]
