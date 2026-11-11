@@ -17,6 +17,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -289,8 +290,20 @@ func Rotate(dir string, now time.Time, log ...*slog.Logger) error {
 // scanRaw reads a journal line by line. A broken line is skipped: a process
 // killed mid-write leaves a torn last line, and that must not stop the fold
 // or the query.
+// openHistoryFile — точка чтения истории: тест подменяет её и считает открытия.
+var openHistoryFile = os.Open
+
+func readHistoryFile(path string) ([]byte, error) {
+	f, err := openHistoryFile(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
 func scanRaw(path string, fn func(rawLine)) error {
-	f, err := os.Open(path)
+	f, err := openHistoryFile(path)
 	if err != nil {
 		return err
 	}
@@ -346,7 +359,7 @@ func readRawTriples(path string) ([]Triple, error) {
 
 func readDayFile(path string) (dayFile, error) {
 	var df dayFile
-	b, err := os.ReadFile(path)
+	b, err := readHistoryFile(path)
 	if err != nil {
 		return df, err
 	}
