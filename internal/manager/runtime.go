@@ -217,7 +217,16 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		restarts:  restarts,
 		done:      make(chan struct{}),
 	}
+	// Close мог прийти, пока мы запускали процесс: закрытый рантайм не
+	// регистрирует новый, иначе он переживёт панель и удержит порт набора.
 	rt.mu.Lock()
+	if rt.closed {
+		rt.mu.Unlock()
+		logFile.Close()
+		killGroup(p.pid, syscall.SIGKILL)
+		_ = cmd.Wait()
+		return RuntimeStatus{}, errors.New("менеджер остановлен")
+	}
 	rt.procs[set.ID] = p
 	rt.mu.Unlock()
 
@@ -519,6 +528,9 @@ func (rt *Runtime) Close() {
 		}
 		if p := rt.proc(id); p != nil {
 			rt.kill(p, closeGrace)
+			rt.mu.Lock()
+			delete(rt.procs, id)
+			rt.mu.Unlock()
 		}
 		if timedOut {
 			// Старт ещё держит лок: отпустим его из горутины, когда закончит.
