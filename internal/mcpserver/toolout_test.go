@@ -39,13 +39,18 @@ func dumpPath(t *testing.T, text string) string {
 	return rest[:j]
 }
 
-// The 4 MiB file ceiling is real: an answer past it is cut on disk too, not
-// only in the text the caller sees.
-func TestTruncateResultCapsFourMiB(t *testing.T) {
-	dumpDir(t, t.TempDir())
+// The file carries the whole answer even far past the old 4 MiB ceiling: a
+// truncated dump would make the marker's "полный ответ" a lie.
+func TestTruncateResultWritesWholeAnswer(t *testing.T) {
+	dir := t.TempDir()
+	dumpDir(t, dir)
 
-	const fileCap = maxAllowedBytes * 4
-	res, err := truncateResult(textResult(fileCap+64*1024), maxAllowedBytes)
+	const payload = 6*1024*1024 + 12345
+	const tail = "zeta"
+	body := strings.Repeat("x", payload-len(tail)) + tail
+	res, err := truncateResult(&mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: body}},
+	}, defaultMaxBytes)
 	if err != nil {
 		t.Fatalf("truncateResult: %v", err)
 	}
@@ -54,18 +59,37 @@ func TestTruncateResultCapsFourMiB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dump: %v", err)
 	}
-	const marker = "\n[файл обрезан: "
-	i := strings.Index(string(data), marker)
-	if i < 0 || !strings.HasSuffix(string(data), " байт]") {
-		t.Fatalf("файл не помечен как обрезанный: %d байт", len(data))
+	if len(data) != payload || !strings.HasSuffix(string(data), tail) {
+		t.Fatalf("файл %d байт, ожидалось %d с хвостом %q", len(data), payload, tail)
 	}
-	if kept := int64(i); kept != int64(fileCap) {
-		t.Fatalf("в файл попало %d байт, потолок %d", kept, fileCap)
+	if strings.Contains(string(data[len(data)-64:]), "файл обрезан") {
+		t.Fatalf("в файле остался маркер обрезки")
 	}
 }
 
-// A dump directory that cannot be created is an error, not a silent cut: the
-// caller must not think the full answer is on disk.
+// A directory that cannot be written to leaves no half-written dump behind.
+func TestTruncateResultLeavesNoFileOnWriteError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	dir := t.TempDir()
+	dumpDir(t, dir)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	if _, err := truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes); err == nil {
+		t.Fatal("ожидалась ошибка записи полного ответа")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("readdir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("в каталоге остались файлы: %d", len(entries))
+	}
+}
 func TestTruncateResultReportsDumpDirError(t *testing.T) {
 	blocker := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
@@ -95,13 +119,13 @@ func TestFilterCommandsNamesOnly(t *testing.T) {
 	}
 }
 
-// The dump file is capped: past capBytes nothing more is written, and the file
-// says so, otherwise a reader takes a cut dump for the whole answer.
-func TestSpillWriterCapsAndMarks(t *testing.T) {
+// The dump file keeps the whole answer: it streams to disk, so there is no
+// reason to cut it and promise a "full answer" that is not there.
+func TestSpillWriterWritesWholeAnswer(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("MCPRIG_DATA_DIR", dir)
 
-	w := &spillWriter{headLimit: 10, capBytes: 16}
+	w := &spillWriter{headLimit: 10}
 	if _, err := w.Write([]byte(strings.Repeat("a", 100))); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -113,11 +137,7 @@ func TestSpillWriterCapsAndMarks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dump: %v", err)
 	}
-	const marker = "[файл обрезан: 16 из 100 байт]"
-	if !strings.HasSuffix(string(data), marker) {
-		t.Fatalf("нет отметки об обрезке файла: %q", data)
-	}
-	if kept := strings.TrimSuffix(string(data), "\n"+marker); len(kept) != 16 {
-		t.Fatalf("в файл попало %d байт, потолок 16", len(kept))
+	if len(data) != 100 || data[0] != 'a' || data[99] != 'a' {
+		t.Fatalf("файл не содержит весь ответ: %d байт", len(data))
 	}
 }

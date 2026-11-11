@@ -35,7 +35,7 @@ var toolOutDir = func() string { return toolout.Dir(toolout.Base()) }
 func truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult, error) {
 	// headLimit carries maxBytes plus one rune of slack: the cut may land
 	// inside a multi-byte rune and the check needs the byte after it.
-	w := &spillWriter{headLimit: maxBytes + utf8.UTFMax, capBytes: int64(maxAllowedBytes) * 4}
+	w := &spillWriter{headLimit: maxBytes + utf8.UTFMax}
 	if err := writePayload(w, res); err != nil {
 		w.abort()
 		return nil, err
@@ -121,15 +121,13 @@ func writePayload(w io.Writer, res *mcp.CallToolResult) error {
 
 // spillWriter keeps the first headLimit bytes in memory and streams the rest to
 // a file created on first overflow, so an answer under the cap never touches
-// the disk. capBytes bounds the file: past it bytes are counted, not written.
+// the disk. The file keeps the whole answer: it streams, so its size costs no
+// memory.
 type spillWriter struct {
 	head      []byte
 	headLimit int
-	capBytes  int64
 	file      *os.File
 	total     int64 // bytes offered by the source
-	kept      int64 // bytes accepted by the file
-	capped    bool
 }
 
 func (w *spillWriter) Write(p []byte) (int, error) {
@@ -146,18 +144,9 @@ func (w *spillWriter) Write(p []byte) (int, error) {
 	if err := w.ensureFile(); err != nil {
 		return 0, err
 	}
-	if w.kept >= w.capBytes {
-		w.capped = true
-		return n, nil
-	}
-	if room := w.capBytes - w.kept; int64(len(p)) > room {
-		p = p[:room]
-		w.capped = true
-	}
 	if _, err := w.file.Write(p); err != nil {
 		return 0, err
 	}
-	w.kept += int64(len(p))
 	return n, nil
 }
 
@@ -175,21 +164,17 @@ func (w *spillWriter) ensureFile() error {
 	if _, err := f.Write(w.head); err != nil {
 		return err
 	}
-	w.kept = int64(len(w.head))
 	return nil
 }
 
-// finish closes the file, marking a capped one so a reader knows it is short.
+// finish closes the file. A failure leaves no half-written dump behind: the
+// caller gets the error and the file is removed.
 func (w *spillWriter) finish() error {
 	if w.file == nil {
 		return nil
 	}
-	if w.capped {
-		if _, err := fmt.Fprintf(w.file, "\n[файл обрезан: %d из %d байт]", w.kept, w.total); err != nil {
-			return fmt.Errorf("усечение: запись полного ответа: %w", err)
-		}
-	}
 	if err := w.file.Close(); err != nil {
+		w.abort()
 		return fmt.Errorf("усечение: запись полного ответа: %w", err)
 	}
 	return nil
