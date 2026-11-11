@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
 )
@@ -293,5 +294,121 @@ func TestProbeRunRequiresPrlimit(t *testing.T) {
 	err := probeRun()
 	if err == nil || !strings.Contains(err.Error(), "prlimit не найден в PATH") {
 		t.Fatalf("probeRun = %v", err)
+	}
+}
+
+// Кэшируется только успех: ранняя неудача (userns не готов при загрузке,
+// гонка на /proc) не должна навсегда запрещать песочницу этому процессу.
+func TestProbeRetriesAfterFailure(t *testing.T) {
+	resetProbe(t)
+	dir := t.TempDir()
+	t.Setenv("PATH", dir)
+	if err := probe(); err == nil {
+		t.Fatal("без bwrap проба должна падать")
+	}
+
+	for _, name := range []string{"bwrap", "true", "prlimit"} {
+		if err := os.Symlink("/bin/true", filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := probe(); err != nil {
+		t.Fatalf("повторная проба: %v", err)
+	}
+	// Успех кэширован: PATH больше не нужен.
+	t.Setenv("PATH", t.TempDir())
+	if err := probe(); err != nil {
+		t.Fatalf("кэшированный успех: %v", err)
+	}
+}
+
+// resetProbe снимает кэш между тестами: состояние пробы — на процесс.
+func resetProbe(t *testing.T) {
+	t.Helper()
+	probeState.mu.Lock()
+	probeState.ok, probeState.running, probeState.err = false, false, nil
+	probeState.mu.Unlock()
+	t.Cleanup(func() {
+		probeState.mu.Lock()
+		probeState.ok, probeState.running, probeState.err = false, false, nil
+		probeState.mu.Unlock()
+	})
+}
+
+// fakeBwrap кладёт в PATH поддельный bwrap: тело — shell, счётчик запусков —
+// файл в BWRAP_COUNT. true и prlimit — симлинки на /bin/true (нужны только
+// LookPath).
+func fakeBwrap(t *testing.T, body string) string {
+	t.Helper()
+	dir := t.TempDir()
+	count := filepath.Join(dir, "count")
+	for _, name := range []string{"true", "prlimit"} {
+		if err := os.Symlink("/bin/true", filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	shim := filepath.Join(dir, "bwrap")
+	if err := os.WriteFile(shim, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("BWRAP_COUNT", count)
+	return count
+}
+
+// Параллельные вызовы делают один запуск bwrap: второй ждёт уже идущую пробу,
+// а не запускает свою.
+func TestProbeSingleFlight(t *testing.T) {
+	resetProbe(t)
+	count := fakeBwrap(t, `echo run >> "$BWRAP_COUNT"
+/bin/sleep 0.3
+exit 0`)
+
+	first := make(chan error, 1)
+	go func() { first <- probe() }()
+	// Второй приходит, когда первый уже внутри bwrap.
+	for i := 0; ; i++ {
+		if b, _ := os.ReadFile(count); len(b) > 0 {
+			break
+		}
+		if i > 400 {
+			t.Fatal("первая проба не дошла до bwrap")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if err := probe(); err != nil {
+		t.Fatalf("вторая проба: %v", err)
+	}
+	if err := <-first; err != nil {
+		t.Fatalf("первая проба: %v", err)
+	}
+	b, err := os.ReadFile(count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runs := strings.Count(string(b), "run"); runs != 1 {
+		t.Fatalf("bwrap запущен %d раз, want 1:\n%s", runs, b)
+	}
+}
+
+// Зависший bwrap не блокирует навсегда: пробу обрывает таймаут.
+func TestProbeTimeout(t *testing.T) {
+	resetProbe(t)
+	fakeBwrap(t, `exec /bin/sleep 60`)
+	old := probeTimeout
+	probeTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { probeTimeout = old })
+
+	start := time.Now()
+	err := probe()
+	if err == nil || !strings.Contains(err.Error(), "не ответил за") {
+		t.Fatalf("probe = %v, want ошибку таймаута", err)
+	}
+	if d := time.Since(start); d > 5*time.Second {
+		t.Fatalf("проба висела %s", d)
+	}
+	// Неудача не кэширована: следующий вызов пробует снова.
+	if err := probe(); err == nil {
+		t.Fatal("неудача закэширована")
 	}
 }

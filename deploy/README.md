@@ -35,6 +35,10 @@ systemctl --user daemon-reload
 systemctl --user enable --now mcprig-set@demo.service
 ```
 
+`~/.config/mcprig/sets/<набор>/env` опционален: юнит читает его с `-`, и без
+файла набор стартует (переменных `${VAR}` из него тогда нет, `authToken`
+нужен литералом в `servers.json`). Быстрый старт выше файл не создаёт.
+
 В контейнере состояние — том на `/data`, поэтому `MCPRIG_DATA_DIR=/data` уже
 выставлен в `docker-compose.yml`.
 

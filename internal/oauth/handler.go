@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/url"
 	"os/exec"
 	"runtime"
@@ -15,15 +16,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Handler — OAuth-обработчик MCP-транспорта: то, что возвращает NewHandler.
-type Handler = auth.AuthorizationCodeHandler
+// Handler — OAuth-обработчик MCP-транспорта: SDK-обработчик (методы продвинуты
+// встраиванием) плюс адрес приёмника, выведенный из redirect_uri.
+type Handler struct {
+	*auth.AuthorizationCodeHandler
+	addr  string
+	fetch func(context.Context, *auth.AuthorizationArgs) (*auth.AuthorizationResult, error)
+}
+
+// Addr — loopback-адрес приёмника кода из redirect_uri (для логов и проверок).
+func (h *Handler) Addr() string { return h.addr }
 
 // Options — параметры фабрики обработчика.
 type Options struct {
 	ServerName   string
 	ServerURL    string
-	RedirectURL  string // обязателен, обычно http://127.0.0.1:8947/callback
-	CallbackAddr string // "127.0.0.1:8947"; пустой — DefaultCallbackAddr
+	RedirectURL  string // обязателен, http://127.0.0.1:<port>/callback — порт задаёт приёмник
 	ClientID     string // если пуст — динамическая регистрация клиента
 	ClientSecret string
 	Scopes       []string
@@ -32,10 +40,26 @@ type Options struct {
 	Log          *slog.Logger
 }
 
+// callbackAddr — адрес приёмника из redirect_uri: браузер вернётся ровно на
+// указанный там порт, поэтому слушать другой — гарантированный пятиминутный
+// таймаут. Без порта (или с ":0") возвращаться некуда — это ошибка конфигурации,
+// а не повод слушать эфемерный порт.
+func callbackAddr(redirectURL string) (string, error) {
+	u, err := url.Parse(redirectURL)
+	if err != nil || u.Hostname() == "" {
+		return "", fmt.Errorf("oauth: неверный RedirectURL %q", redirectURL)
+	}
+	host, port := u.Hostname(), u.Port()
+	if port == "" || port == "0" {
+		return "", errors.New("oauth: redirectUrl без порта — браузеру некуда вернуться, укажите http://127.0.0.1:<port>/callback")
+	}
+	return net.JoinHostPort(host, port), nil
+}
+
 // NewHandler собирает auth.AuthorizationCodeHandler: обнаружение метаданных,
 // DCR, PKCE, обмен кода и refresh делаются go-sdk, здесь — только регистрация
 // клиента, хранение токенов и приём редиректа.
-func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, error) {
+func NewHandler(_ context.Context, o Options) (*Handler, error) {
 	if o.RedirectURL == "" {
 		return nil, errors.New("oauth: RedirectURL обязателен")
 	}
@@ -50,34 +74,36 @@ func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, e
 	if browser == nil {
 		browser = BrowserOpen
 	}
-	addr := o.CallbackAddr
-	if addr == "" {
-		addr = DefaultCallbackAddr
+	addr, err := callbackAddr(o.RedirectURL)
+	if err != nil {
+		return nil, err
 	}
 	key := Key(o.ServerName, o.ServerURL)
 
+	fetch := func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
+		log.Info("требуется авторизация MCP-сервера: откройте URL в браузере",
+			"server", o.ServerName, "url", args.URL)
+		cb, err := NewCallback(addr, stateFromURL(args.URL))
+		if err != nil {
+			return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
+		}
+		defer cb.Close()
+		if err := browser(args.URL); err != nil {
+			// URL остаётся в логе — его можно открыть вручную.
+			log.Warn("не удалось открыть браузер, откройте URL из лога вручную",
+				"server", o.ServerName, "err", err)
+		}
+		res, err := cb.Wait(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
+		}
+		return &auth.AuthorizationResult{Code: res.Code, State: res.State, Iss: res.Iss}, nil
+	}
+
 	cfg := &auth.AuthorizationCodeHandlerConfig{
-		RedirectURL:         o.RedirectURL,
-		RequestRefreshToken: true,
-		AuthorizationCodeFetcher: func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
-			log.Info("требуется авторизация MCP-сервера: откройте URL в браузере",
-				"server", o.ServerName, "url", args.URL)
-			cb, err := NewCallback(addr, stateFromURL(args.URL))
-			if err != nil {
-				return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
-			}
-			defer cb.Close()
-			if err := browser(args.URL); err != nil {
-				// URL остаётся в логе — его можно открыть вручную.
-				log.Warn("не удалось открыть браузер, откройте URL из лога вручную",
-					"server", o.ServerName, "err", err)
-			}
-			res, err := cb.Wait(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
-			}
-			return &auth.AuthorizationResult{Code: res.Code, State: res.State, Iss: res.Iss}, nil
-		},
+		RedirectURL:              o.RedirectURL,
+		RequestRefreshToken:      true,
+		AuthorizationCodeFetcher: fetch,
 	}
 
 	if o.ClientID != "" {
@@ -134,7 +160,7 @@ func NewHandler(_ context.Context, o Options) (*auth.AuthorizationCodeHandler, e
 	if err != nil {
 		return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
 	}
-	return h, nil
+	return &Handler{AuthorizationCodeHandler: h, addr: addr, fetch: fetch}, nil
 }
 
 // savedTokenSource отдаёт сохранённый токен и, если для него известны

@@ -197,6 +197,7 @@
       'keys.revoked': 'revoked {date}',
       'keys.active': 'active',
       'keys.restartWarn': 'the note is saved, but the set did not restart: {err}',
+      'keys.revokedStopped': 'the key is revoked and the set stopped — start it again',
       'status.running': 'running',
       'status.failed': 'failed',
       'status.stopped': 'stopped',
@@ -407,6 +408,7 @@
       'keys.revoked': 'отозван {date}',
       'keys.active': 'активен',
       'keys.restartWarn': 'подпись сохранена, но набор не перезапустился: {err}',
+      'keys.revokedStopped': 'ключ отозван, набор остановлен — запустите его заново',
       'status.running': 'работает',
       'status.failed': 'сбой',
       'status.stopped': 'остановлен',
@@ -2607,9 +2609,19 @@
     var revoke = e.target.closest('[data-revoke]');
     if (!revoke) { return; }
     revoke.disabled = true;
+    show($('keys-warn'), false);
     send('DELETE', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' +
-      encodeURIComponent(revoke.dataset.revoke)).then(function () {
-      return loadState().then(function () { renderKeys(current() || set); });
+      encodeURIComponent(revoke.dataset.revoke)).then(function (r) {
+      return loadState().then(function () {
+        var now = current() || set;
+        renderKeys(now);
+        // Отзыв активного ключа останавливает набор: без токена он не слушает.
+        // Молчать об этом нельзя — панель выглядела бы просто «остановленной».
+        if (r && r.wasActive && !(now.runtime && now.runtime.running)) {
+          $('keys-warn').textContent = t('keys.revokedStopped');
+          show($('keys-warn'), true);
+        }
+      });
     }).catch(function () { revoke.disabled = false; });
   });
 
@@ -2656,7 +2668,7 @@
       var set = current();
       if (set && set.runtime && set.runtime.running) { loadLog(); }
     });
-    every(15000, loadStats);
+    every(15000, function () { if (st.tab === 'stats') { loadStats(); } });
     every(30000, loadEnv);
   });
 })();

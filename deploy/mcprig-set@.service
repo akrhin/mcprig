@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-EnvironmentFile=%h/.config/mcprig/sets/%i/env
+EnvironmentFile=-%h/.config/mcprig/sets/%i/env
 Environment=MCPRIG_DATA_DIR=%h/.local/state/mcprig/sets/%i
 ExecStart=%h/.local/bin/mcprig serve --config %h/.config/mcprig/sets/%i/servers.json
 Restart=on-failure
