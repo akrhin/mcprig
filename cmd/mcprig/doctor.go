@@ -292,33 +292,73 @@ func checkSets(reg *registry.Data, regErr error, dataDir, bindIP string) (sets, 
 	return sets, keys
 }
 
-// loadPanelEnv читает <dir>/env рядом с конфигом и добавляет недостающие
-// переменные в окружение процесса. Значения наружу не печатаются.
+// loadPanelEnv читает panel.env (документированное место секретов) и legacy
+// env рядом с конфигом и добавляет недостающие переменные в окружение
+// процесса. Значения наружу не печатаются; первое найденное значение выигрывает.
 func loadPanelEnv(dir string) (doctorLine, bool) {
-	path := filepath.Join(dir, "env")
-	body, err := os.ReadFile(path)
-	if err != nil {
+	var paths []string
+	added := 0
+	for _, name := range []string{"panel.env", "env"} {
+		path := filepath.Join(dir, name)
+		body, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		paths = append(paths, path)
+		for key, value := range parseEnvFile(string(body)) {
+			if _, set := os.LookupEnv(key); set {
+				continue
+			}
+			if err := os.Setenv(key, value); err == nil {
+				added++
+			}
+		}
+	}
+	if len(paths) == 0 {
 		return doctorLine{}, false
 	}
-	n := 0
-	for _, raw := range strings.Split(string(body), "\n") {
+	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d переменных", strings.Join(paths, ", "), added)}, true
+}
+
+// parseEnvFile разбирает подмножество systemd EnvironmentFile, которого
+// хватает panel.env: «KEY=value», необязательный «export », комментарии
+// целой строкой, пробелы вокруг имени. Продолжения строк через «\» и
+// escape \n/\t не поддерживаются.
+func parseEnvFile(body string) map[string]string {
+	out := make(map[string]string)
+	for _, raw := range strings.Split(body, "\n") {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 		line = strings.TrimPrefix(line, "export ")
 		name, value, found := strings.Cut(line, "=")
+		name = strings.TrimSpace(name)
 		if !found || name == "" {
 			continue
 		}
-		if _, set := os.LookupEnv(name); set {
-			continue
-		}
-		if err := os.Setenv(name, strings.Trim(value, `"'`)); err == nil {
-			n++
-		}
+		out[name] = unquoteEnvValue(strings.TrimSpace(value))
 	}
-	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d переменных", path, n)}, true
+	return out
+}
+
+// unquoteEnvValue снимает одну пару кавычек: внутри двойных раскрываются \"
+// и \\, как в systemd; незакрытая кавычка остаётся частью значения. Других
+// escape-последовательностей парсер не знает.
+func unquoteEnvValue(value string) string {
+	if len(value) < 2 {
+		return value
+	}
+	q := value[0]
+	if (q != '"' && q != '\'') || value[len(value)-1] != q {
+		return value
+	}
+	inner := value[1 : len(value)-1]
+	if q == '\'' {
+		return inner
+	}
+	inner = strings.ReplaceAll(inner, `\"`, `"`)
+	return strings.ReplaceAll(inner, `\\`, `\`)
 }
 
 func checkSecrets(raw []byte, dataDir string) []doctorLine {

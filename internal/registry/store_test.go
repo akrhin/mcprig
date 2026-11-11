@@ -252,6 +252,28 @@ func TestDeleteServerStripsSets(t *testing.T) {
 	}
 }
 
+func TestDeleteServerRefusesLastInSet(t *testing.T) {
+	dir := t.TempDir()
+	store := openStore(t, dir)
+	addServer(t, store, `{"name":"a","command":["x"]}`)
+	addServer(t, store, `{"name":"b","command":["y"]}`)
+	addSet(t, store, `{"name":"demo","servers":["a"],"port":`+strconv.Itoa(freePort(t))+`}`)
+
+	err := store.DeleteServer("a")
+	if err == nil {
+		t.Fatal("удаление последнего сервера набора не вернуло ошибку")
+	}
+	if !strings.Contains(err.Error(), "последний в наборе") {
+		t.Errorf("ошибка: %q", err)
+	}
+	if store.Server("a") == nil {
+		t.Error("сервер удалён, хотя операция должна была отказать")
+	}
+	if got := store.Set("demo").Servers; len(got) != 1 || got[0] != "a" {
+		t.Errorf("набор после отказа: %v", got)
+	}
+}
+
 func TestPublicSetHidesTokens(t *testing.T) {
 	store := openStore(t, t.TempDir())
 	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)

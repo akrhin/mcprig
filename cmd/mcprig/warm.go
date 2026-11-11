@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -183,7 +184,11 @@ func warmLocal(o *warmConfig) warmResult {
 	}
 	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Env: downstream.EnvFor}
 	mgr := mcpserver.New(cfg, version, conn)
-	defer mgr.Close()
+	defer func() {
+		if err := mgr.Close(); err != nil {
+			slog.Default().Warn("закрытие менеджера", "err", err)
+		}
+	}()
 
 	st, ct := mcp.NewInMemoryTransports()
 	if _, err := mgr.Server().Connect(ctx, st, nil); err != nil {

@@ -495,6 +495,13 @@ var (
 	fileRefPattern = regexp.MustCompile(`\{file:([^}]+)\}`)
 )
 
+// HasFileRef сообщает, есть ли {file:…} в любом месте строки: раскрыватель
+// матчит шаблон где угодно, поэтому проверка по префиксу пропускает
+// «p{file:/…}» и уносит файл вниз.
+func HasFileRef(value string) bool {
+	return fileRefPattern.MatchString(value)
+}
+
 // ReservedEnvPrefixes — переменные менеджера и хранилища секретов. Их имена
 // не уходят вниз ни через env/envAllow, ни через ${VAR} набора: иначе сервер
 // получает пароль панели или токен OpenBao.
@@ -747,8 +754,9 @@ func (c *Config) OAuthFor(srv *Server) *OAuth {
 	return own.merge(c.OAuth)
 }
 
-// Load reads a config file. A server that cannot be identified (no name) fails
-// the whole load; every other defect is soft-failed onto that server.
+// Load reads a config file. A server without a name fails the whole load; a
+// server that does not decode is kept with a ConfigError like every other
+// defect, so one typo never bricks the set.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -766,6 +774,9 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if shape.Transport != nil && shape.Transport.AuthToken != "" {
+		if name, ok := reservedRef(shape.Transport.AuthToken); ok {
+			return nil, fmt.Errorf("%s: transport.authToken: переменная ${%s} — резервный префикс, передача вниз запрещена", path, name)
+		}
 		token, err := expandSecrets(shape.Transport.AuthToken)
 		if err != nil {
 			return nil, fmt.Errorf("%s: transport.authToken: %w", path, err)
@@ -785,7 +796,18 @@ func Load(path string) (*Config, error) {
 	for i, raw := range shape.Servers {
 		srv := &Server{}
 		if err := json.Unmarshal(raw, srv); err != nil {
-			return nil, fmt.Errorf("%s: сервер #%d: %w", path, i+1, err)
+			// Битый сервер не валит набор: он остаётся в списке с пометкой,
+			// чтобы панель показала причину, а остальные продолжили работать.
+			if srv.Name == "" {
+				srv.Name = fmt.Sprintf("#%d", i+1)
+			} else {
+				// Имя занято битой записью: здоровый тёзка получит «дубль
+				// имени», иначе поиск по имени молча отдал бы битого.
+				seen[srv.Name] = true
+			}
+			srv.ConfigError = fmt.Sprintf("сервер #%d: %v", i+1, err)
+			cfg.Servers = append(cfg.Servers, srv)
+			continue
 		}
 		if srv.Name == "" {
 			return nil, fmt.Errorf("%s: сервер #%d без имени", path, i+1)

@@ -268,6 +268,85 @@ func TestExpandSecretsSoftFail(t *testing.T) {
 	}
 }
 
+// Битый сервер не валит набор: он остаётся с ConfigError, остальные живы.
+func TestBrokenServerIsSoftFail(t *testing.T) {
+	path := write(t, `{"servers":[
+	  {"name":"ok","command":["x"]},
+	  {"name":"bad","command":["y"],"args":1}
+	]}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("битый сервер не должен валить загрузку: %v", err)
+	}
+	if len(cfg.Servers) != 2 {
+		t.Fatalf("серверов: want 2, got %d", len(cfg.Servers))
+	}
+	if cfg.Servers[0].ConfigError != "" {
+		t.Errorf("здоровый сервер помечен: %q", cfg.Servers[0].ConfigError)
+	}
+	if got := cfg.Servers[1].ConfigError; !strings.Contains(got, "сервер #2") {
+		t.Errorf("битый сервер без пометки: %q", got)
+	}
+	if n := len(cfg.Usable()); n != 1 {
+		t.Errorf("пригодных серверов: want 1, got %d", n)
+	}
+}
+
+// Битый сервер с именем занимает это имя: здоровый тёзка помечается дублем,
+// иначе поиск по имени молча вернул бы битую запись.
+func TestBrokenServerKeepsNameReserved(t *testing.T) {
+	path := write(t, `{"servers":[
+	  {"name":"a","command":5},
+	  {"name":"a","command":["x"]}
+	]}`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.Servers) != 2 {
+		t.Fatalf("серверов: want 2, got %d", len(cfg.Servers))
+	}
+	if got := cfg.Servers[0].ConfigError; !strings.Contains(got, "command") {
+		t.Errorf("битый сервер: %q", got)
+	}
+	if got := cfg.Servers[1].ConfigError; !strings.Contains(got, "дубль имени") {
+		t.Errorf("здоровый тёзка не помечен дублем: %q", got)
+	}
+	if n := len(cfg.Usable()); n != 0 {
+		t.Errorf("пригодных серверов: want 0, got %d", n)
+	}
+}
+
+// Резервный ${VAR} в transport.authToken не раскрывается: токен ушёл бы
+// заголовком нижестоящего сервера.
+func TestReservedAuthTokenFailsLoad(t *testing.T) {
+	path := write(t, `{
+	  "transport": {"authToken": "${MCPRIG_PASSWORD}"},
+	  "servers": [{"name": "a", "command": ["x"]}]
+	}`)
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "transport.authToken: переменная ${MCPRIG_PASSWORD}") {
+		t.Fatalf("want reserved authToken error, got %v", err)
+	}
+}
+
+// HasFileRef ловит {file:…} в любом месте значения: префиксная проверка
+// пропускала «p{file:/…}», и файл уходил вниз.
+func TestHasFileRef(t *testing.T) {
+	cases := map[string]bool{
+		"{file:/etc/token}":    true,
+		"Bearer {file:/x/y}":   true,
+		"p{file:/home/env.js}": true,
+		"plain":                false,
+		"file:/etc/token":      false,
+	}
+	for in, want := range cases {
+		if got := HasFileRef(in); got != want {
+			t.Errorf("HasFileRef(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
 // Резервные имена отвергаются на загрузке набора: в envAllow, в env и в
 // ${VAR} заголовка — сервер иначе получает секрет менеджера.
 func TestReservedEnvRejected(t *testing.T) {

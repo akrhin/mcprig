@@ -219,7 +219,11 @@ func run() error {
 	// Env: ребёнку уходит whitelist плюс envAllow сервера, а не весь os.Environ().
 	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log, Env: downstream.EnvFor}
 	mgr := mcpserver.New(cfg, version, conn)
-	defer mgr.Close()
+	defer func() {
+		if err := mgr.Close(); err != nil {
+			log.Warn("закрытие менеджера", "err", err)
+		}
+	}()
 
 	rec := stats.NewRecorder(os.Getenv("MCPRIG_SET"), 0)
 	// Recorder до прогрева: прогрев наполняет кэш инструментов и публикует
@@ -309,7 +313,11 @@ func runStdio(args []string) error {
 	// Env: ребёнку уходит whitelist плюс envAllow сервера, а не весь os.Environ().
 	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log, Env: downstream.EnvFor}
 	mgr := mcpserver.New(cfg, version, conn)
-	defer mgr.Close()
+	defer func() {
+		if err := mgr.Close(); err != nil {
+			log.Warn("закрытие менеджера", "err", err)
+		}
+	}()
 
 	// История вызовов: у stdio нет панели над процессом, но разрез по
 	// периодам читается с диска так же, как у набора. Без неё прокси работает
