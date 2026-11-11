@@ -150,6 +150,10 @@ func writeAtomic(path string, body []byte) error {
 
 var envRefRe = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
+// fileRefRe повторяет шаблон раскрывателя config: {file:путь} где угодно в
+// строке. После сведения с веткой config это config.HasFileRef.
+var fileRefRe = regexp.MustCompile(`\{file:[^}]+\}`)
+
 // addRefs собирает имена ${VAR} из строки в seen.
 func addRefs(seen map[string]bool, text string) {
 	for _, m := range envRefRe.FindAllStringSubmatch(text, -1) {
@@ -215,10 +219,12 @@ func reservedRefs(s *config.Server) []string {
 // fileRefs — {file:…} в env или заголовке: значение читается с диска и уходит
 // в процесс набора или на URL. Импортированный конфиг так уносит env.json с
 // ключами всех наборов, поэтому такая ссылка отклоняется, а не разрешается.
+// Шаблон ищется в любом месте строки: раскрыватель config матчит его не только
+// в начале, и «p{file:…}» иначе проходит проверку.
 func fileRefs(s *config.Server) (string, bool) {
 	scan := func(m map[string]string) (string, bool) {
 		for key, value := range m {
-			if strings.HasPrefix(strings.TrimSpace(value), "{file:") {
+			if fileRefRe.MatchString(value) {
 				return key, true
 			}
 		}

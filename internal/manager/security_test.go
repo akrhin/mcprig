@@ -283,6 +283,20 @@ func TestReservedRefsRejectedByAPI(t *testing.T) {
 	})
 	status(t, w, http.StatusBadRequest)
 
+	// Шаблон ищется где угодно: префиксная проверка пропускала «p{file:…}».
+	w = e.do(t, http.MethodPost, "/api/import", map[string]any{
+		"mcpServers": map[string]any{
+			"mid": map[string]any{
+				"command": []string{"/bin/true"},
+				"env":     map[string]string{"K": "p{file:/etc/passwd}"},
+			},
+		},
+	})
+	status(t, w, http.StatusBadRequest)
+	if e.m.store.Server("mid") != nil {
+		t.Fatal("сервер со ссылкой на файл в середине значения всё же добавлен")
+	}
+
 	e.addServer(t, "fake")
 	w = e.do(t, http.MethodPut, "/api/servers/fake", map[string]any{
 		"headers": map[string]string{"Authorization": "Bearer ${OPENBAO_TOKEN}"},

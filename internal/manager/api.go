@@ -1188,10 +1188,16 @@ func (m *Manager) apiServerDelete(req *request) error {
 	if m.store.Server(name) == nil {
 		return notFound("нет сервера " + name)
 	}
-	stopped := m.stopSetsUsing(name)
+	// Сначала снимок наборов и запись в реестр: отказ (последний сервер
+	// набора) не должен оставлять наборы остановленными при живом сервере.
+	sets := m.setsUsing(name)
 	if err := m.store.DeleteServer(name); err != nil {
+		if strings.Contains(err.Error(), "последний в наборе") {
+			return badRequest(err.Error())
+		}
 		return err
 	}
+	stopped := m.stopSets(sets)
 	writeJSON(req.w, http.StatusOK, map[string]any{"ok": true, "stopped": stopped})
 	return nil
 }
@@ -1593,12 +1599,21 @@ func (m *Manager) restartSetsUsing(server string) []string {
 	return out
 }
 
-func (m *Manager) stopSetsUsing(server string) []string {
-	out := []string{}
+// setsUsing — снимок наборов, в списке серверов которых есть server.
+func (m *Manager) setsUsing(server string) []*registry.Set {
+	out := []*registry.Set{}
 	for _, set := range m.store.Sets() {
-		if !containsName(set.Servers, server) {
-			continue
+		if containsName(set.Servers, server) {
+			out = append(out, set)
 		}
+	}
+	return out
+}
+
+// stopSets останавливает наборы и возвращает id работавших.
+func (m *Manager) stopSets(sets []*registry.Set) []string {
+	out := []string{}
+	for _, set := range sets {
 		// Статус — до Stop: Stop удаляет запись, и после него набор всегда «не работает».
 		wasRunning := m.rt.status(set).Running
 		m.rt.Stop(set)
