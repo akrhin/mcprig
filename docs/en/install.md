@@ -82,19 +82,19 @@ Both are published to GitHub Container Registry, so no login is needed:
 ```bash
 docker pull ghcr.io/akrhin/mcprig:latest        # slim
 docker pull ghcr.io/akrhin/mcprig:latest-full   # full
-docker pull ghcr.io/akrhin/mcprig:0.3.8-slim    # pinned release
-docker pull ghcr.io/akrhin/mcprig:0.3.8-full
+docker pull ghcr.io/akrhin/mcprig:0.4.0-slim    # pinned release
+docker pull ghcr.io/akrhin/mcprig:0.4.0-full
 ```
 
 `latest` and `latest-full` follow the newest release; the version tags pin one
-pair (`0.3.8-slim`, `0.3.8-full` are the current pair). The project's own Gitea
+pair (`0.4.0-slim`, `0.4.0-full` are the current pair). The project's own Gitea
 registry is private and is not a distribution channel.
 
 Or build them yourself:
 
 ```bash
-docker build --build-arg VERSION=0.3.8 -t mcprig:slim .
-docker build --build-arg VERSION=0.3.8 --target full -t mcprig:full .
+docker build --build-arg VERSION=0.4.0 -t mcprig:slim .
+docker build --build-arg VERSION=0.4.0 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
@@ -105,7 +105,7 @@ The image entrypoint is `mcprig`; the default command is
 `serve --config /config/servers.json`; the set listen address comes from
 `transport.host` and `transport.port`, so mount a config whose transport says
 `0.0.0.0` and publish the port you chose. `VERSION` is the version **without**
-the leading `v` — `0.3.8`, not `v0.3.8`; a value that starts with `v` is
+the leading `v` — `0.4.0`, not `v0.4.0`; a value that starts with `v` is
 rejected and the build fails. The working directory is `/data`,
 owned by uid 10001; mount a volume there and set
 `MCPRIG_DATA_DIR=/data` so OAuth tokens and other state survive a restart.

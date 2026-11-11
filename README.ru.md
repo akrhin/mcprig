@@ -247,7 +247,7 @@ true. Полный справочник полей: [docs/ru/configuration.md](d
   `deploy/mcprig-set@.service` (один набор на юнит).
 - Docker: `slim` (только бинарник, HTTP-нижестоящие) и `full` (добавляет node и
   python для stdio-серверов `npx`/`uvx`). Оба опубликованы в GitHub Container
-  Registry: `ghcr.io/akrhin/mcprig:0.3.8-slim`, `:0.3.8-full`, а
+  Registry: `ghcr.io/akrhin/mcprig:0.4.0-slim`, `:0.4.0-full`, а
   `latest`/`latest-full` идут за релизом — вход не нужен.
 
 Подробности: [docs/ru/install.md](docs/ru/install.md).
@@ -272,7 +272,7 @@ Issue и pull request оформляются по [CONTRIBUTING.ru.md](CONTRIBUT
 
 До 1.0, один оператор: одна панель, один пароль, без ролей на пользователя.
 Этапы 0–6 приняты (конфигурация, ядро прокси, OAuth, HTTP-транспорт, менеджер,
-панель, поставка); релизы до 0.3.8 опубликованы. Справка CLI и строки логов в
+панель, поставка); релизы до 0.4.0 опубликованы. Справка CLI и строки логов в
 этой сборке — на русском.
 
 Лицензия: MIT, см. [LICENSE](LICENSE).

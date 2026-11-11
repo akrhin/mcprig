@@ -81,22 +81,22 @@ systemctl --user enable --now mcprig.service
 ```bash
 docker pull ghcr.io/akrhin/mcprig:latest        # slim
 docker pull ghcr.io/akrhin/mcprig:latest-full   # full
-docker pull ghcr.io/akrhin/mcprig:0.3.8-slim    # закреплённый релиз
-docker pull ghcr.io/akrhin/mcprig:0.3.8-full
+docker pull ghcr.io/akrhin/mcprig:0.4.0-slim    # закреплённый релиз
+docker pull ghcr.io/akrhin/mcprig:0.4.0-full
 ```
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
-(`0.3.8-slim`, `0.3.8-full` — текущая). Собственный реестр Gitea закрыт и
+(`0.4.0-slim`, `0.4.0-full` — текущая). Собственный реестр Gitea закрыт и
 каналом раздачи не является.
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
-(`0.3.8-slim`, `0.3.8-full` — текущая).
+(`0.4.0-slim`, `0.4.0-full` — текущая).
 
 Либо собрать самому:
 
 ```bash
-docker build --build-arg VERSION=0.3.8 -t mcprig:slim .
-docker build --build-arg VERSION=0.3.8 --target full -t mcprig:full .
+docker build --build-arg VERSION=0.4.0 -t mcprig:slim .
+docker build --build-arg VERSION=0.4.0 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
@@ -104,7 +104,7 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 ```
 
 Точка входа образа — `mcprig`; команда по умолчанию —
-`serve --config /config/servers.json`; адрес берётся из `transport.host` и `transport.port` — в конфиге должно стоять `0.0.0.0` и тот порт, который публикуешь. `VERSION` — версия **без** ведущего `v`: `0.3.8`, а не `v0.3.8`; значение с `v` отвергается, и сборка падает. Рабочий каталог —
+`serve --config /config/servers.json`; адрес берётся из `transport.host` и `transport.port` — в конфиге должно стоять `0.0.0.0` и тот порт, который публикуешь. `VERSION` — версия **без** ведущего `v`: `0.4.0`, а не `v0.4.0`; значение с `v` отвергается, и сборка падает. Рабочий каталог —
 `/data`, владелец — uid 10001; смонтируйте туда том и задайте
 `MCPRIG_DATA_DIR=/data`, чтобы токены OAuth и прочее состояние переживали
 перезапуск. Оба образа задают `MCPRIG_HOST=0.0.0.0`, поэтому панель внутри

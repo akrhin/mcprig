@@ -249,7 +249,7 @@ ships the same archives. Release notes for a tag come from `CHANGELOG.md`.
   `deploy/mcprig-set@.service` (one set per unit).
 - Docker: `slim` (binary only, HTTP downstreams) and `full` (adds node and
   python for `npx`/`uvx` stdio servers). Both are published to GitHub Container
-  Registry as `ghcr.io/akrhin/mcprig:0.3.8-slim`, `:0.3.8-full`, with
+  Registry as `ghcr.io/akrhin/mcprig:0.4.0-slim`, `:0.4.0-full`, with
   `latest`/`latest-full` following the release — no login needed.
 
 Details: [docs/en/install.md](docs/en/install.md).
@@ -273,7 +273,7 @@ Issues and pull requests follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Pre-1.0, single operator: one panel, one password, no per-user roles. Stages 0–6
 are accepted (config, proxy core, OAuth, HTTP transport, manager, panel,
-delivery); releases up to 0.3.8 are published. CLI help and log lines are
+delivery); releases up to 0.4.0 are published. CLI help and log lines are
 Russian in this build.
 
 License: MIT, see [LICENSE](LICENSE).
