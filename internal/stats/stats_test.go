@@ -335,8 +335,12 @@ func TestRecorderMirrorsToHistory(t *testing.T) {
 	r := NewRecorder("main", 8)
 	r.SetHistory(h)
 	r.Record("opencode", "alpha", "echo", 25*time.Millisecond, errors.New("boom"))
-	if snap := r.Snapshot(); snap.Stats == nil || snap.Stats.Dropped != 0 {
+	snap := r.Snapshot()
+	if snap.Stats == nil || snap.Stats.Dropped != 0 {
 		t.Fatalf("stats снимка = %+v", snap.Stats)
+	}
+	if len(snap.Tail) != 1 || !snap.Tail[0].Failed || snap.Tail[0].Message != "boom" {
+		t.Fatalf("хвост = %+v", snap.Tail)
 	}
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -352,6 +356,9 @@ func TestRecorderMirrorsToHistory(t *testing.T) {
 	l := lines[0]
 	if l.Client != "opencode" || l.Server != "alpha" || l.Tool != "echo" || l.MS != 25 || !l.Failed {
 		t.Fatalf("строка = %+v", l)
+	}
+	if l.Err != "boom" {
+		t.Fatalf("err = %q, ожидался текст провала", l.Err)
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/akrhin/mcprig/internal/atomicfile"
 )
@@ -89,8 +90,9 @@ type Triple struct {
 	LastMs   int64  `json:"lastMs"`
 }
 
-// rawLine is one line of raw-YYYY-MM-DD.jsonl. Текста ошибки нет намеренно:
-// он бывает большим и не нужен разрезу по периодам.
+// rawLine is one line of raw-YYYY-MM-DD.jsonl. Err нужен, чтобы причина провала
+// читалась из истории, а не терялась вместе с памятью набора; потолок и одна
+// строка — чтобы тело запроса из ошибки апстрима не раздувало журнал.
 type rawLine struct {
 	Time   time.Time `json:"time"`
 	Client string    `json:"client"`
@@ -98,6 +100,25 @@ type rawLine struct {
 	Tool   string    `json:"tool"`
 	MS     int64     `json:"ms"`
 	Failed bool      `json:"failed"`
+	Err    string    `json:"err,omitempty"`
+}
+
+// maxErrText — потолок текста ошибки в строке журнала, в байтах.
+const maxErrText = 300
+
+// cleanErrText делает текст ошибки пригодным для одной строки JSONL: переводы
+// строк заменяются пробелом, длинный текст режется по границе руны.
+// Отсутствие поля в старых строках разбор переживает: пустая строка — не ошибка.
+func cleanErrText(s string) string {
+	s = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(s)
+	if len(s) <= maxErrText {
+		return s
+	}
+	cut := maxErrText
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
 }
 
 type dayFile struct {
@@ -143,10 +164,14 @@ func OpenHistory(dir string, log *slog.Logger) (*History, error) {
 }
 
 // Record queues one finished call. A full queue drops the line and counts it:
-// the tool call never waits for the disk.
-func (h *History) Record(client, server, tool string, ms int64, failed bool) {
+// the tool call never waits for the disk. Текст ошибки обрезается до maxErrText.
+func (h *History) Record(client, server, tool string, ms int64, err error) {
+	l := rawLine{Time: time.Now(), Client: client, Server: server, Tool: tool, MS: ms, Failed: err != nil}
+	if err != nil {
+		l.Err = cleanErrText(err.Error())
+	}
 	select {
-	case h.ch <- rawLine{Time: time.Now(), Client: client, Server: server, Tool: tool, MS: ms, Failed: failed}:
+	case h.ch <- l:
 	default:
 		h.dropped.Add(1)
 	}

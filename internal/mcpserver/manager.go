@@ -263,7 +263,7 @@ func (m *Manager) Server() *mcp.Server {
 		InputSchema: objectSchema(map[string]any{
 			"filter": map[string]any{"type": "string", "description": "Optional: filter servers by name, description, or tag keyword"},
 		}),
-	}, m.listServers)
+	}, m.recordMeta("list_servers", m.listServers))
 	s.AddTool(&mcp.Tool{
 		Name: "list_commands",
 		Description: "List commands from one server (server) or several at once (servers). " +
@@ -293,7 +293,7 @@ func (m *Manager) Server() *mcp.Server {
 				"description": "Optional: cap on the answer in bytes (max 1048576); without it the answer is not cut. A cut answer names the file with the full one",
 			},
 		}),
-	}, m.listCommands)
+	}, m.recordMeta("list_commands", m.listCommands))
 	s.AddTool(&mcp.Tool{
 		Name: "describe_commands",
 		Description: "Get detailed schemas for specific commands from a server. " +
@@ -314,7 +314,7 @@ func (m *Manager) Server() *mcp.Server {
 				"description": "Optional: cap on the answer in bytes (max 1048576); without it the answer is not cut. A cut answer names the file with the full one",
 			},
 		}, "server", "command_names"),
-	}, m.describeCommands)
+	}, m.recordMeta("describe_commands", m.describeCommands))
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_command",
 		Description: "Execute a command from a specific server (auto-discovers if needed). " +
@@ -364,6 +364,25 @@ func (m *Manager) Server() *mcp.Server {
 		}, "calls"),
 	}, m.invokeMany)
 	return s
+}
+
+// recordMeta учитывает и мета-вызов в счётчиках и истории: панель «Вызовы»
+// показывает их на псевдосервере "mcprig", а не только дочерние инструменты.
+// Метка клиента та же, что у invoke_command: labelOf берёт её из _meta и
+// initialize, а не из уровня обработчика.
+func (m *Manager) recordMeta(name string, fn mcp.ToolHandler) mcp.ToolHandler {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		start := time.Now()
+		res, err := fn(ctx, req)
+		recErr := err
+		if recErr == nil && res != nil && res.IsError {
+			recErr = errors.New(resultMessage(res))
+		}
+		if m.Stats != nil {
+			m.Stats.Record(labelOf(ctx, req), "mcprig", name, time.Since(start), recErr)
+		}
+		return res, err
+	}
 }
 
 // ─── list_servers ─────────────────────────────────────────────────────────────

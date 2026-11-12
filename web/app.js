@@ -1613,6 +1613,13 @@
       badge.appendChild(el('span', 'dot' + (c.failed ? '' : '')));
       badge.appendChild(document.createTextNode(c.failed ? t('calls.bad') : t('calls.ok')));
       badge.title = c.error || '';
+      // Причина провала видна в строке: полный текст — в title, чтобы длинное
+      // тело ошибки не растягивало таблицу.
+      if (c.failed && c.error) {
+        var why = el('span', 'call-err', ' · ' + (c.error.length > 80 ? c.error.slice(0, 80) + '…' : c.error));
+        why.title = c.error;
+        stc.appendChild(why);
+      }
       frag.appendChild(tr);
     });
     box.replaceChildren(frag);

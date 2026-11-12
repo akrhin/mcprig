@@ -877,6 +877,62 @@ func TestStatsCountToolErrorAsFailure(t *testing.T) {
 	}
 }
 
+// Мета-вызовы пишутся в счётчики и историю: без этого вкладка «Вызовы»
+// показывает только дочерние инструменты, а провал list_commands не виден.
+func TestListServersRecorded(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	m.Stats = stats.NewRecorder("t", 8)
+	defer m.Close()
+	dir := t.TempDir()
+	h, err := stats.OpenHistory(dir, nil)
+	if err != nil {
+		t.Fatalf("OpenHistory: %v", err)
+	}
+	m.Stats.SetHistory(h)
+	cs := clientFor(t, m.Server())
+
+	if res := call(t, cs, "list_servers", nil); res.IsError {
+		t.Fatalf("list_servers: %s", resultText(t, res))
+	}
+	if res := call(t, cs, "list_commands", map[string]any{"server": "nope"}); !res.IsError {
+		t.Fatalf("неизвестный сервер не дал ошибку: %s", resultText(t, res))
+	}
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	snap := m.Stats.Snapshot()
+	if len(snap.Counters) != 2 {
+		t.Fatalf("counters = %+v", snap.Counters)
+	}
+	for _, c := range snap.Counters {
+		if c.Client != "test-client/test" || c.Server != "mcprig" {
+			t.Fatalf("counter = %+v", c)
+		}
+	}
+	var ok, bad bool
+	for _, c := range snap.Tail {
+		switch c.Tool {
+		case "list_servers":
+			ok = c.Server == "mcprig" && c.Client == "test-client/test" && !c.Failed
+		case "list_commands":
+			bad = c.Server == "mcprig" && c.Failed && strings.Contains(c.Message, "неизвестный сервер")
+		}
+	}
+	if !ok || !bad {
+		t.Fatalf("хвост = %+v", snap.Tail)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, "raw-"+time.Now().Format("2006-01-02")+".jsonl"))
+	if err != nil {
+		t.Fatalf("журнал истории: %v", err)
+	}
+	if !strings.Contains(string(raw), `"server":"mcprig"`) || !strings.Contains(string(raw), `"err":"`) {
+		t.Fatalf("история = %s", raw)
+	}
+}
+
 // Неизвестное имя инструмента не заводит счётчик: иначе любое придуманное
 // command_name оседает в памяти.
 func TestStatsSkipUnknownTool(t *testing.T) {

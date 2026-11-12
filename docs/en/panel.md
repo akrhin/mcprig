@@ -19,7 +19,7 @@ CSP: no inline scripts or styles.
 | tabs | **Overview**, **Calls**, **Statistics** |
 | KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days |
 | servers of the set | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check** and **Edit** |
-| calls table | time, server, tool, client, milliseconds, status; search box and **errors only** |
+| calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
 | details drawer | host registry, variables and the set log; opens from the header and covers the panel width on a phone |
 | footer | `N sets · M servers · K running` and the last refresh time |
 
@@ -156,7 +156,7 @@ of the `servers.json` it was started with. Files are `0600`, the directory
 
 | file | contents | kept |
 | --- | --- | --- |
-| `raw-YYYY-MM-DD.jsonl` | one line per call: `{time, client, server, tool, ms, failed}`; no error text | today + 7 days |
+| `raw-YYYY-MM-DD.jsonl` | one line per call: `{time, client, server, tool, ms, failed, err}`; `err` is the failure reason, a single line of at most 300 bytes, absent on success | today + 7 days |
 | `day-YYYY-MM-DD.json` | per `(client, server, tool)`: `{client, server, tool, calls, failures, totalMs, hist, lastMs}` | up to 30 days |
 | `month-YYYY-MM.json` | the same triples per day under `days` — a repeated fold overwrites a day instead of doubling it | always |
 

@@ -203,7 +203,7 @@ func (r *Recorder) Record(client, server, tool string, d time.Duration, err erro
 
 	// Канал истории неблокирующий: строка теряется только при переполнении.
 	if hist != nil {
-		hist.Record(client, server, tool, ms, err != nil)
+		hist.Record(client, server, tool, ms, err)
 	}
 }
 

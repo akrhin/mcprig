@@ -3,9 +3,11 @@ package stats
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -288,7 +290,7 @@ func TestHistoryFilesArePrivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenHistory: %v", err)
 	}
-	h.Record("opencode", "alpha", "echo", 12, false)
+	h.Record("opencode", "alpha", "echo", 12, nil)
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -316,7 +318,7 @@ func TestRecordDoesNotBlockWhenQueueIsFull(t *testing.T) {
 	go func() {
 		defer close(done)
 		for i := 0; i < 5; i++ {
-			h.Record("c", "s", "t", int64(i), false)
+			h.Record("c", "s", "t", int64(i), nil)
 		}
 	}()
 	select {
@@ -329,7 +331,7 @@ func TestRecordDoesNotBlockWhenQueueIsFull(t *testing.T) {
 	}
 }
 
-// Записанный вызов читается обратно из сырого журнала.
+// Записанный вызов читается обратно из сырого журнала, включая причину провала.
 func TestRecordWritesRawLine(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "stats")
 	day := time.Now().Format(dayLayout)
@@ -337,7 +339,7 @@ func TestRecordWritesRawLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenHistory: %v", err)
 	}
-	h.Record("opencode", "alpha", "echo", 12, true)
+	h.Record("opencode", "alpha", "echo", 12, errors.New("апстрим упал"))
 	if err := h.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -353,6 +355,42 @@ func TestRecordWritesRawLine(t *testing.T) {
 	l := lines[0]
 	if l.Client != "opencode" || l.Server != "alpha" || l.Tool != "echo" || l.MS != 12 || !l.Failed {
 		t.Fatalf("строка = %+v", l)
+	}
+	if l.Err != "апстрим упал" {
+		t.Fatalf("err = %q, ожидался текст провала", l.Err)
+	}
+}
+
+// Длинный текст ошибки режется до maxErrText, переводы строк становятся
+// пробелами: строка журнала остаётся одной строкой JSONL.
+func TestRecordTruncatesErrText(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "stats")
+	day := time.Now().Format(dayLayout)
+	h, err := OpenHistory(dir, nil)
+	if err != nil {
+		t.Fatalf("OpenHistory: %v", err)
+	}
+	h.Record("opencode", "alpha", "echo", 12, errors.New("первая строка\nвторая\r\n"+strings.Repeat("я", 1000)))
+	if err := h.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	var lines []rawLine
+	if err := scanRaw(filepath.Join(dir, "raw-"+day+".jsonl"), func(l rawLine) { lines = append(lines, l) }); err != nil {
+		t.Fatalf("scanRaw: %v", err)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("строк = %d, ожидалась 1", len(lines))
+	}
+	got := lines[0].Err
+	if len(got) > maxErrText+len("…") {
+		t.Fatalf("err %d байт, потолок %d", len(got), maxErrText)
+	}
+	if !strings.HasSuffix(got, "…") || !strings.HasPrefix(got, "первая строка вторая ") {
+		t.Fatalf("err = %q", got)
+	}
+	if strings.ContainsAny(got, "\r\n") {
+		t.Fatalf("перевод строки остался: %q", got)
 	}
 }
 
