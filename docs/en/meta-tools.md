@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/meta-tools.md)
+
 This file documents the meta-tools a client sees, with the exact response
 shapes and error text.
 
@@ -67,7 +70,7 @@ Input is one of two forms:
 | `{"servers": ["alpha", "beta"]}` | object keyed by server name, each value an array; a failed server's value is `{"error": "…"}` |
 | `{"prefix": "se"}` | with either form above: keep only command names starting with the prefix (case-insensitive); no match gives `[]` |
 | `{"namesOnly": true}` | with either form above: names only — an array of strings, or arrays keyed by server. A large server returns hundreds of tools and tens of KB of catalog; names cost about a sixth of that, and `describe_commands` gives one schema when needed |
-| `{"maxBytes": 4096}` | with either form above: cap the answer, limit 1048576. Catalogs have **no default cap** — without the field the whole catalog arrives, as before; over an explicit cap it goes to a file and the marker says how much arrived |
+| `{"maxBytes": 4096}` | with either form above: cap the answer, limit 1048576. Unlike `invoke_command` and `invoke_many`, catalog calls have **no default cap**: without the field, or with `0`, the whole catalog arrives; over an explicit cap the answer goes to a file and the marker says how much arrived |
 | both | `Error: укажи server или servers, не оба` |
 | neither | `Error: нужен параметр server или servers` |
 
@@ -146,7 +149,7 @@ Input:
 | `command_name` | one of `command_name` or its alias `command` (see below) |
 | `command` | alias for `command_name`; `list_commands` returns the name in the `command` field, so either key works. Sending both with different values is an error. The client sees the schema at session start, so after the update it must re-read `tools/list` (or start a new session) — otherwise the old `required: command_name` wins over `anyOf` |
 | `parameters` | optional object; `null` and an empty string mean `{}` |
-| `maxBytes` | optional cap on the returned answer in bytes; default 32768, at most 1048576; `0` means the default |
+| `maxBytes` | optional cap on the returned answer in bytes; default 32768, at most 1048576; `0` means the default. The catalog tools `list_commands` and `describe_commands` are the exception: they cut nothing unless `maxBytes` is given |
 
 Downstream arguments go **inside** `parameters`. Any other top-level key is an
 error, so a call cannot silently run with empty arguments:
@@ -270,3 +273,13 @@ note when the key is signed (`PATCH /api/sets/<id>/keys/<keyID>`), otherwise
 `User-Agent` alone without a key, and `unknown` when neither is present. Reading
 the `/stats` of an open set without its token still redacts every label to
 `(аноним)`.
+
+## See also
+
+- [configuration.md](configuration.md) — permissions, secrets and the servers behind the tools.
+- [cli.md#init](cli.md#init) — the client fragment that connects to a set.
+- [architecture.md](architecture.md) — lazy connections and the per-set process.
+- [troubleshooting.md](troubleshooting.md) — when a tool call comes back as an error.
+
+The normative contract of the rewrite era, with the shapes frozen at that time,
+is in [../history/reference/meta-tools-contract.md](../history/reference/meta-tools-contract.md).

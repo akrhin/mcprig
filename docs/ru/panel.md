@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+[EN](../en/panel.md) · RU
+
 Файл описывает, что показывает панель, какой API за этим стоит и как проверяется
 доступ к обоим.
 
@@ -262,3 +265,10 @@ both      пароль и прокси-секрет
 
 `Host` должен быть в `MCPRIG_ALLOWED_HOSTS`; пустой список означает только
 loopback.
+
+## См. также
+
+- [cli.md#panel](cli.md#panel) — как запустить панель и задать режим доступа.
+- [configuration.md](configuration.md) — серверы и наборы, которые правит панель.
+- [meta-tools.md](meta-tools.md) — счётчики и источник истории вызовов.
+- [troubleshooting.md](troubleshooting.md) — 401 и 403 от панели.

@@ -1,21 +1,24 @@
 # Contributing
 
-mcprig is pre-1.0 and single-operator. The GitHub repository (`akrhin/mcprig`)
-is the source of truth.
+mcprig is pre-1.0 and single-operator. Development happens in a Gitea
+repository: that is where the tree lives, where CI runs and where a release is
+cut. GitHub (`akrhin/mcprig`) is the public reference — issues and pull requests
+are opened there, and every release is republished there with the same archives
+and images.
 
 Read before you write: `AGENTS.md` (repository rules), `docs/CURRENT-GOAL.md`
-(the stage and its gate), `docs/en/development.md` (build, tests, live stand).
-Behaviour comes from `docs/reference/ts-manager-contract.md`; a change that
-contradicts it needs a record in `docs/decisions/`.
+(the stage and its gate), `docs/en/dev/development.md` (build, tests, live stand).
+Behaviour comes from `docs/history/reference/ts-manager-contract.md`; a change that
+contradicts it needs a record in `docs/history/decisions/`.
 
 ## Where things go
 
 | What | Where |
 | --- | --- |
-| a bug or a proposal | an issue here |
+| a bug or a proposal | an issue on GitHub, `akrhin/mcprig/issues` |
 | a security problem | privately to the maintainer, never a public issue |
 | a question about setup | docs first: `docs/en/`, `docs/ru/` |
-| a change | a pull request from a branch, never a commit on `master` |
+| a change | a pull request on GitHub from a branch, never a commit on `master` |
 
 ## Issues
 
@@ -144,7 +147,13 @@ done
 
 ## Release
 
-A `v*` tag runs gofmt, vet, the race suite and govulncheck, then goreleaser
-builds the archives into a draft; a human publishes it. The GitHub mirror
-receives the same archives. Release notes are the tag's `CHANGELOG.md` section,
-cut from `## [Unreleased]` by a `release:` commit.
+A release is cut inside Gitea. A `v*` tag runs gofmt, vet, the race suite and
+govulncheck, then goreleaser builds the archives into a release draft; a human
+publishes it. Release notes are the tag's `CHANGELOG.md` section, cut from
+`## [Unreleased]` by a `release:` commit.
+
+The public side is a second, independent pass: `.github/workflows/release.yml`
+runs on the same tag in the GitHub repository, builds the same archives with
+goreleaser `--skip=publish`, uploads them to the GitHub release with `gh`, and
+pushes the `slim`/`full` images to GHCR. It never publishes to Gitea, and it
+takes no input from the Gitea draft.

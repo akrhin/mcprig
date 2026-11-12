@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+[EN](../en/cli.md) · RU
+
 Файл перечисляет все подкоманды и флаги с настоящими примерами и их выводом.
 
 # CLI
@@ -129,7 +132,7 @@ loopback, если `MCPRIG_HOST` не говорит иного.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
-2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 data=/tmp/opencode/docdata auth=none
+2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 data=/var/lib/mcprig auth=none
 ```
 
 Вторая панель на том же каталоге данных отказывается стартовать из-за
@@ -360,3 +363,10 @@ mcprig init --client opencode --set demo --remote http://127.0.0.1:9100/mcp --ke
 
 Справка CLI, диагностика и строки логов в этой сборке — на русском; в этом
 документе они приведены как есть.
+
+## См. также
+
+- [install.md](install.md) — юниты systemd, которые запускают `panel` и `serve`.
+- [configuration.md](configuration.md) — файл, на который указывает `-config`.
+- [panel.md](panel.md) — UI, который отдаёт `mcprig panel`, и режимы доступа.
+- [troubleshooting.md](troubleshooting.md) — как читать вывод `mcprig doctor`.

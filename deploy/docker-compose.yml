@@ -3,8 +3,10 @@
 #
 #   MCPRIG_IMAGE=mcprig:slim docker compose up -d
 #
-# The image is overridable because published images live on a private registry:
-# build them first with `docker build -t mcprig:slim .` (see install docs).
+# The image is overridable; published images come from the public GitHub
+# Container Registry (ghcr.io/akrhin/mcprig, anonymous pull, no login):
+# set MCPRIG_IMAGE / MCPRIG_IMAGE_FULL, or build your own with
+# `docker build -t mcprig:slim .` (see install docs).
 # The listen port comes from transport.port in each servers.json, so the published
 # port and the config port must match.
 services:

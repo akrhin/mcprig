@@ -1,0 +1,24 @@
+name: docs
+# Любая правка markdown → ворота документации: битые ссылки, личные пути,
+# страницы-сироты, паритет en/ru, факты из docs/anchors.txt.
+on:
+  push:
+    paths:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    paths:
+      - '**.md'
+      - 'docs/**'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: docs-check
+        run: bash scripts/docs-check.sh

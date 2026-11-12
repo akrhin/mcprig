@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/cli.md)
+
 This file lists every subcommand and flag with real examples and their output.
 
 # CLI
@@ -131,7 +134,7 @@ loopback unless `MCPRIG_HOST` says otherwise.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
-2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 data=/tmp/opencode/docdata auth=none
+2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 data=/var/lib/mcprig auth=none
 ```
 
 A second panel on the same data directory refuses to start because of
@@ -363,3 +366,10 @@ the fragment is a `[mcp_servers.<name>]` table with `url` and
 
 CLI help, diagnostics and log lines are Russian in this build; the document
 translates their meaning, not the strings.
+
+## See also
+
+- [install.md](install.md) — the systemd units that run `panel` and `serve`.
+- [configuration.md](configuration.md) — the file `-config` points at.
+- [panel.md](panel.md) — the UI `mcprig panel` serves, and its access modes.
+- [troubleshooting.md](troubleshooting.md) — reading `mcprig doctor` output.

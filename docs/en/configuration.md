@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/configuration.md)
+
 This file documents `servers.json`: every field the proxy reads, both command
 forms, secret references, and what happens when an entry is broken.
 
@@ -278,3 +281,10 @@ A server block is merged over the set-wide block; unset fields fall back to
 the set-wide value, then to the default. Dynamic client registration, PKCE,
 code exchange and refresh are done by the MCP SDK. Tokens are stored in
 `<data dir>/oauth.json`.
+
+## See also
+
+- [install.md](install.md) — where the config and the state directory live.
+- [architecture.md](architecture.md) — what a set does with this config at runtime.
+- [meta-tools.md](meta-tools.md) — what the client sees once the set is up.
+- [troubleshooting.md](troubleshooting.md) — a server that stays `healthy: false`.

@@ -1,0 +1,13 @@
+# Якорные факты: значения, которые документация повторяет, а код задаёт.
+# Формат: must|regex|файл  /  mustnot|regex|файл. Пишем 5–10 строк, каждая
+# закрывает реальный случай расхождения из аудита 2026-11.
+must|9091|docs/en/install.md
+must|9091|docs/ru/install.md
+must|9100–9199|docs/en/configuration.md
+must|8947|docs/en/configuration.md
+must|five MCP tools|docs/en/meta-tools.md
+must|32768|docs/en/meta-tools.md
+mustnot|six colour|README.md
+mustnot|six colour|README.ru.md
+mustnot|Solarized|README.md
+mustnot|Tokyo Night|README.md

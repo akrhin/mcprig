@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+[EN](../en/install.md) · RU
+
 Файл охватывает релизные архивы, юниты systemd, Docker и состояние на диске.
 
 # Установка
@@ -10,15 +13,19 @@
 | --- | --- |
 | ОС / архитектура | linux, darwin × amd64, arm64 |
 | архив | `mcprig_<version>_<os>_<arch>.tar.gz` |
-| содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
+| содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | контрольная сумма | `checksums.txt` |
-| релиз | черновик на GitHub; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
+| релиз | черновик в Gitea, публикует человек; релиз на GitHub создаёт воркфлоу; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Релиз публикуется на GitHub: `.github/workflows/release.yml` по тегу гоняет
-тесты, `govulncheck` и `goreleaser` и загружает архивы через `gh` в
-<https://github.com/akrhin/mcprig/releases>; любой тег можно выпустить и
-руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Релиз выпускается по тегу `v*` в Gitea CI (`.gitea/workflows/release.yml`): он
+гоняет проверки — `go vet`, тесты с `-race`, `govulncheck`, `gofmt` — а затем
+`goreleaser`, который собирает архивы и черновик релиза в Gitea; черновик
+публикует человек. Воркфлоу GitHub (`.github/workflows/release.yml`) идёт по
+тому же тегу и только пересобирает архивы с `goreleaser --skip=publish` и
+заливает их через `gh` в <https://github.com/akrhin/mcprig/releases>; тестов и
+`govulncheck` там нет, только `go build ./...`. Тег можно выпустить и руками:
+`gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` на хосте разработки не установлен, архивы собирает CI, а не он.
 Собрать тот же бинарник руками:
@@ -31,12 +38,17 @@ CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(git describe 
 
 ## systemd (пользовательские юниты)
 
-В `deploy/` лежат два юнита:
+В `deploy/` лежат три юнита и таймер:
 
 | юнит | что запускает | конфигурация |
 | --- | --- | --- |
 | `mcprig.service` | `mcprig panel` — реестр, надзор, панель | `~/.config/mcprig/panel.env` |
 | `mcprig-set@.service` | `mcprig serve --config …` — один набор отдельной службой | `~/.config/mcprig/sets/<set>/servers.json` и `env` |
+| `mcprig-warm.service` + `mcprig-warm.timer` | `mcprig warm --set %i` — держит autostart-набор тёплым каждые 10 минут | `~/.config/mcprig/panel.env` и `env` |
+
+`mcprig-warm.*` поставляются шаблонами: ставьте их как `mcprig-warm@.service` и
+`mcprig-warm@.timer` — имя набора несёт `@` — и включайте по таймеру на каждый
+autostart-набор.
 
 `mcprig-set@` — альтернатива панели: набор может работать под systemd без
 менеджера. Наборы, запущенные из панели, — дочерние процессы панели, а не юниты
@@ -60,8 +72,9 @@ systemctl --user daemon-reload
 systemctl --user enable --now mcprig.service
 ```
 
-Оба юнита используют `Restart=on-failure`, `NoNewPrivileges=yes` и
-`PrivateTmp=yes`. Панель останавливается с `TimeoutStopSec=15`, набор — с
+Юниты панели и набора используют `Restart=on-failure`, `NoNewPrivileges=yes` и
+`PrivateTmp=yes`; юнит прогрева — `oneshot`, `Restart` у него нет. Панель
+останавливается с `TimeoutStopSec=15`, набор — с
 `TimeoutStopSec=10`. `systemd-analyze verify` не сообщает ошибок, кроме пути к
 ещё не установленному бинарнику.
 
@@ -165,3 +178,10 @@ node/npm и uv: серверу на `npx` или `uvx` нужен `full`. Сер
 Все записи идут через временный файл и переименование, поэтому падение не
 оставляет полузаписанного файла. Не копируйте `registry.json`, пока панель
 работает.
+
+## См. также
+
+- [configuration.md](configuration.md) — `servers.json`, из которого живёт набор.
+- [cli.md](cli.md) — `panel`, `doctor`, `warm` и флаги, с которыми юниты запускают бинарник.
+- [dev/release.md](dev/release.md) — как собираются архивы релиза.
+- [troubleshooting.md](troubleshooting.md) — когда юнит не поднимается.

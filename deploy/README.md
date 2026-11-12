@@ -1,11 +1,11 @@
 # deploy/
 
-Файлы для двух способов установки из `docs/decisions/0002-installation.md`.
+Файлы для двух способов установки из `docs/history/decisions/0002-installation.md`.
 
 | файл | что это |
 | --- | --- |
 | `mcprig-set@.service` | шаблонный юнит: один набор на порту из `servers.json` |
-| `mcprig.service` | панель: реестр, супервизия наборов (дашборд — этап 5) |
+| `mcprig.service` | панель: реестр, супервизия наборов, статистика вызовов |
 | `mcprig-warm.service`, `mcprig-warm.timer` | шаблонный прогрев набора раз в 10 минут: первый вызов клиента не платит за холодный кэш |
 | `Dockerfile` | два таргета: `slim` (бинарник, `bwrap`, `prlimit`) и `full` (плюс node/npm, python, uv) |
 | `docker-compose.yml` | два набора, конфиги смонтированы read-only, состояние в томах |
@@ -76,9 +76,11 @@ systemctl --user start mcprig-warm@example.service # прогнать немед
 `slim`, `ops` — stdio-сервер через `npx`, ему нужен образ с node.
 
 ```bash
-# образы в GHCR (публично): latest (slim), latest-full и теги релиза 0.3.8-slim/0.3.8-full
-docker pull ghcr.io/akrhin/mcprig:latest
-docker compose up -d
+# образы в GHCR (публично, анонимный pull проверен):
+# ghcr.io/akrhin/mcprig:0.4.0-slim, :0.4.0-full и :latest (slim), :latest-full
+docker pull ghcr.io/akrhin/mcprig:0.4.0-slim
+MCPRIG_IMAGE=ghcr.io/akrhin/mcprig:0.4.0-slim \
+MCPRIG_IMAGE_FULL=ghcr.io/akrhin/mcprig:0.4.0-full docker compose up -d
 
 # либо собрать локально и указать свои теги; без VERSION образ отвечает «dev»
 docker build --build-arg VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//') -t mcprig:slim .   # 44 МБ, бинарник + bwrap/prlimit
@@ -97,9 +99,9 @@ MCPRIG_IMAGE=mcprig:slim MCPRIG_IMAGE_FULL=mcprig:full docker compose up -d
 - Порт берётся из `transport.port` конфига, а не из команды: опубликованный
   порт и порт в конфиге должны совпадать. Healthcheck образа смотрит на 9100,
   поэтому у `ops` он переопределён.
-- `read_only: true` требует `tmpfs: /tmp:rw,exec` и `HOME=/tmp` с
-  `npm_config_cache=/tmp/npm`: `npx` скачивает и запускает бинарь из `/tmp`, а
-  без `exec` падает с `mcp-server-everything: Permission denied`.
+- `read_only: true` требует `tmpfs: /tmp:rw,exec` и `HOME` с
+  `npm_config_cache` в этом tmpfs: `npx` скачивает и запускает бинарь из
+  tmpfs, а без `exec` падает с `mcp-server-everything: Permission denied`.
 - Песочнице нужны три вещи: `bwrap` и `prlimit` в образе (несут и `slim`, и
   `full`) и разрешённые unprivileged user namespaces от runtime. На хосте с
   дефолтным seccomp Docker — `--security-opt seccomp=unconfined`. На rootless-

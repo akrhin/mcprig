@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/panel.md)
+
 This file describes what the panel shows, the API behind it, and how access to
 both is checked.
 
@@ -260,3 +263,10 @@ panel rejects an `https` Origin on writes. A configured `MCPRIG_PROXY_SECRET`
 (trusted proxy) has the same effect; an `http` Origin is still rejected then.
 
 `Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.
+
+## See also
+
+- [cli.md#panel](cli.md#panel) — how to start the panel and set its access mode.
+- [configuration.md](configuration.md) — the servers and sets the panel edits.
+- [meta-tools.md](meta-tools.md) — the counters and the call history source.
+- [troubleshooting.md](troubleshooting.md) — 401 and 403 from the panel.

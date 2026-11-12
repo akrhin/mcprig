@@ -1,3 +1,5 @@
+Internal stand notes, RU only — not a product page.
+
 # Стенд на настоящих MCP-серверах
 
 Фикстура `cmd/testmcp` проверяет протокол, но не поведение: холодный `npx`,
@@ -20,7 +22,7 @@ bash scripts/dev-real-set.sh stop
 Вызовы идут через прокси, а не напрямую:
 
 ```bash
-curl -s -XPOST http://127.0.0.1:${SET_PORT:-9100}/mcp \
+curl -s -XPOST http://127.0.0.1:${SET_PORT:-9101}/mcp \
   -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"invoke_command","arguments":{"server":"serena","command_name":"find_symbol","parameters":{"name_path_pattern":"Connect","relative_path":"internal/downstream/connect.go"}}}}'
 ```

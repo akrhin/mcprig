@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/install.md)
+
 This file covers release archives, systemd units, Docker and the on-disk state.
 
 # Install
@@ -10,15 +13,19 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | --- | --- |
 | OS / arch | linux, darwin × amd64, arm64 |
 | archive | `mcprig_<version>_<os>_<arch>.tar.gz` |
-| contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
+| contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | checksum | `checksums.txt` |
-| release | draft on GitHub; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
+| release | draft on Gitea, published by hand; the GitHub release is created by the workflow; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Releases are published on GitHub: `.github/workflows/release.yml` runs the
-tests, `govulncheck` and `goreleaser` on a tag and uploads the archives with
-`gh` to <https://github.com/akrhin/mcprig/releases>; any tag can also be
-released by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Releases are cut on a `v*` tag by Gitea CI (`.gitea/workflows/release.yml`): it
+runs the checks — `go vet`, tests with `-race`, `govulncheck`, `gofmt` — and then
+`goreleaser`, which builds the archives and a draft Gitea release that a human
+publishes. The GitHub workflow (`.github/workflows/release.yml`) fires on the
+same tag and only rebuilds the archives with `goreleaser --skip=publish` and
+uploads them with `gh` to <https://github.com/akrhin/mcprig/releases>; it runs
+no tests and no `govulncheck`, just `go build ./...`. A tag can also be released
+by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` is not installed on the development host, so archives are built by
 CI, not here. To build the same binary by hand:
@@ -31,12 +38,17 @@ A plain `go build -o mcprig ./cmd/mcprig` prints `dev` for `mcprig -version`.
 
 ## systemd (user units)
 
-Two units are in `deploy/`:
+Three units and a timer are in `deploy/`:
 
 | unit | what it runs | config |
 | --- | --- | --- |
 | `mcprig.service` | `mcprig panel` — registry, supervision, panel | `~/.config/mcprig/panel.env` |
 | `mcprig-set@.service` | `mcprig serve --config …` — one set as its own service | `~/.config/mcprig/sets/<set>/servers.json` and `env` |
+| `mcprig-warm.service` + `mcprig-warm.timer` | `mcprig warm --set %i` — keeps an autostart set warm every 10 minutes | `~/.config/mcprig/panel.env` and `env` |
+
+`mcprig-warm.*` are shipped as templates: install them as
+`mcprig-warm@.service` and `mcprig-warm@.timer` — the `@` carries the set name —
+and enable one timer per autostart set.
 
 `mcprig-set@` is an alternative to the panel: a set can run under systemd
 without the manager. Sets started from the panel are child processes of the
@@ -61,7 +73,8 @@ systemctl --user daemon-reload
 systemctl --user enable --now mcprig.service
 ```
 
-Both units use `Restart=on-failure`, `NoNewPrivileges=yes` and `PrivateTmp=yes`.
+The panel and set units use `Restart=on-failure`, `NoNewPrivileges=yes` and
+`PrivateTmp=yes`; the warm unit is `oneshot` and has no `Restart`.
 The panel stops with `TimeoutStopSec=15`, a set with `TimeoutStopSec=10`.
 `systemd-analyze verify` reports no errors except the not-yet-installed binary
 path.
@@ -172,3 +185,10 @@ OAuth files live under `sets/<id>/`. The top-level `oauth*.json` files belong to
 
 All writes go through a temp file and a rename, so a crash never leaves a
 half-written file. Never copy `registry.json` while the panel is running.
+
+## See also
+
+- [configuration.md](configuration.md) — the `servers.json` a set runs from.
+- [cli.md](cli.md) — `panel`, `doctor`, `warm` and the flags the units pass.
+- [dev/release.md](dev/release.md) — how the archives in a release are built.
+- [troubleshooting.md](troubleshooting.md) — when the unit does not come up.

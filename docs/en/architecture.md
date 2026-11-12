@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/architecture.md)
+
 This file explains how the processes fit together, why each set is its own
 process, and where health, statistics and OAuth live.
 
@@ -126,3 +129,10 @@ registration, code exchange and refresh are handled by the MCP SDK
 
 The listener binds nothing until a token is actually needed. Tokens survive a
 restart, so a refresh does not require the browser again.
+
+## See also
+
+- [configuration.md](configuration.md) — the per-set config this process reads.
+- [meta-tools.md](meta-tools.md) — the surface a client actually talks to.
+- [panel.md](panel.md) — the manager's HTTP API and UI.
+- [dev/development.md](dev/development.md) — the gates that keep this design honest.

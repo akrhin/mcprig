@@ -1,0 +1,4 @@
+# Запрещённые подстроки в документации (ERE, по одной на строку).
+/tmp/opencode
+/home/sintez/
+frosty-ad-gt
