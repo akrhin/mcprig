@@ -641,10 +641,10 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
-	} else if _, err := r.Cookie(sessionCookie); err == nil {
+	} else if _, err := r.Cookie(sessionCookie); err == nil && r.URL.Path != "/api/login" {
 		// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
-		// сессионной cookie — подделка. Прокси-аутентификация и вход сюда не
-		// попадают: у login cookie ещё нет, у API её нет вовсе.
+		// сессионной cookie — подделка. Вход сюда не попадает: пароль всё равно
+		// проверяется, а старая cookie не должна превращать вход в 403.
 		return &httpError{http.StatusForbidden, "нужен заголовок Origin"}
 	}
 	if r.ContentLength != 0 && r.URL.Path != "/api/login" && !isJSON(r.Header.Get("Content-Type")) {

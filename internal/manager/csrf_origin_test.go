@@ -130,3 +130,16 @@ func TestCSRFTrustedProxyNoXFP(t *testing.T) {
 		t.Fatalf("чужой порт прошёл: %d (%s)", w.Code, w.Body.String())
 	}
 }
+
+// Вход не должен зависеть от Origin: пароль проверяется отдельно, а старая
+// cookie из браузера превращала POST /api/login в 403 «нужен заголовок Origin».
+func TestCSRFLoginWithoutOrigin(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"user":"admin","password":"x"}`))
+	req.Host = "example.com"
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "test"})
+	if err := e.m.checkCSRF(req); err != nil {
+		t.Fatalf("вход со старой cookie без Origin: %v", err)
+	}
+}
