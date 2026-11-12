@@ -27,7 +27,8 @@ func TestCloseStopsStartingSet(t *testing.T) {
 	}()
 
 	var p *process
-	deadline := time.Now().Add(2 * time.Second)
+	// Под общим прогоном набор стартует дольше двух секунд — ждём запас.
+	deadline := time.Now().Add(10 * time.Second)
 	for p == nil && time.Now().Before(deadline) {
 		p = e.m.rt.proc(id)
 		time.Sleep(10 * time.Millisecond)
