@@ -71,6 +71,29 @@ the `201` body, while `GET /api/sets` never repeats it. Issuing a key later
 revokes the previous active key and restarts the set if it is running; revoking
 the active key stops the set.
 
+## OAuth
+
+A remote server that answers `401` shows **authorize** in the row of the
+registry list. The button starts the authorization-code flow inside the daemon
+and draws a dialog with the link; the browser is the user's, so the panel never
+waits for it in a request — the state is polled with
+`GET /api/sets/<set>/servers/<name>/authorize`.
+
+| item | value |
+| --- | --- |
+| redirect URI | `http://<panel host>:<panel port>/oauth/callback` |
+| callback route | public: the browser carries no panel session, `state` is the key |
+| token file | `<data dir>/sets/<set>/oauth.json` |
+| after success | the set restarts itself, so the token is picked up |
+| give up after | 10 minutes |
+
+The redirect address is the one the panel is opened at, so it must be reachable
+from the browser. An authorization server that refuses plain `http` for an
+address that is not loopback (dynamic registration answers `invalid_redirect_uri`)
+needs TLS in front of the panel; the flow itself is the same. `mcprig auth
+--set <set> <server>` does the same thing from a terminal with a loopback
+listener — see [cli.md](cli.md#auth).
+
 ## Themes
 
 The panel ships four colour schemes — dark (default), light, Nord and Gruvbox —

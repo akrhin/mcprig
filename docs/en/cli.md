@@ -114,6 +114,11 @@ afterwards.
 The positional argument is the server name. A server that needs no OAuth
 connects and exits with a line saying so.
 
+The panel does the same from a browser: **authorize** in the server row, the
+link is drawn in a dialog and the code comes back to the panel address — see
+[panel.md](panel.md#oauth). The CLI keeps a loopback receiver, which is what a
+provider demanding `https` for any other address still accepts.
+
 The interactive flow does not run inside a client request on purpose: a set's
 health probe allows 15 s, while a person at a browser needs minutes. Without a
 token the set reports the server unhealthy; `auth` is the way past it.

@@ -215,6 +215,13 @@
       'srv.edit': 'edit',
       'srv.check': 'check',
       'srv.probe': 'probe',
+      'srv.authorize': 'authorize',
+      'auth.title': 'OAuth authorization',
+      'auth.waiting': 'Open the link in a browser — the panel waits for the redirect. The set restarts by itself once the token is saved.',
+      'auth.link': 'authorization link',
+      'auth.open': 'open link',
+      'auth.copy': 'copy link',
+      'auth.copied': 'link copied',
       'srv.notProbed': 'not probed',
       'srv.notInSet': 'not in this set',
       'srv.setOff': 'set is not running',
@@ -425,6 +432,13 @@
       'srv.edit': 'изменить',
       'srv.check': 'проверить',
       'srv.probe': 'проба',
+      'srv.authorize': 'авторизовать',
+      'auth.title': 'Вход по OAuth',
+      'auth.waiting': 'Откройте ссылку в браузере — панель ждёт возврата. После сохранения токена набор перезапустится сам.',
+      'auth.link': 'ссылка авторизации',
+      'auth.open': 'открыть ссылку',
+      'auth.copy': 'скопировать ссылку',
+      'auth.copied': 'ссылка скопирована',
       'srv.notProbed': 'без пробы',
       'srv.notInSet': 'не в наборе',
       'srv.setOff': 'набор не запущен',
@@ -1351,6 +1365,9 @@
         var probe = act.appendChild(el('button', 'btn btn-xs'));
         probe.type = 'button';
         probe.dataset.probe = '';
+        var auth = act.appendChild(el('button', 'btn btn-xs'));
+        auth.type = 'button';
+        auth.dataset.authorize = '';
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
         edit.dataset.regedit = '';
@@ -1377,10 +1394,76 @@
         var probe = tr.querySelector('[data-probe]');
         probe.textContent = t('srv.probe');
         probe.dataset.probe = row.name;
+        // вход по OAuth — у удалённого сервера набора: локальному он не нужен
+        var auth = tr.querySelector('[data-authorize]');
+        var canAuth = row.mine && !!srv.url;
+        auth.hidden = !canAuth;
+        auth.textContent = t('srv.authorize');
+        auth.dataset.authorize = canAuth ? row.name : '';
         var edit = tr.querySelector('[data-regedit]');
         edit.textContent = t('srv.edit');
         edit.dataset.regedit = row.name;
       });
+  }
+
+  /* ---------- вход по OAuth ----------
+     Панель отдаёт ссылку в браузер человека и принимает код на /oauth/callback:
+     вход идёт в демоне, а не в запросе клиента, поэтому состояние читается
+     опросом, а не ожиданием одного долгого ответа. */
+
+  var authFlow = null;
+  var authPoll = 0;
+
+  function authPath(id, name) {
+    return '/api/sets/' + encodeURIComponent(id) + '/servers/' + encodeURIComponent(name) + '/authorize';
+  }
+
+  function showAuth(v) {
+    v = v || {};
+    var pending = v.state === 'pending' || v.state === 'idle';
+    var link = v.url || '';
+    $('auth-note').textContent = pending ? t('auth.waiting') : (v.message || '');
+    show($('auth-link-row'), !!link);
+    show($('auth-open'), !!link);
+    show($('auth-copy'), !!link);
+    if (link) { $('auth-link').value = link; }
+    return pending;
+  }
+
+  function pollAuth() {
+    var flow = authFlow;
+    if (!flow) { return; }
+    clearTimeout(authPoll);
+    get(authPath(flow.id, flow.name)).then(function (v) {
+      if (authFlow !== flow) { return; }
+      if (showAuth(v)) { authPoll = setTimeout(pollAuth, 1500); }
+      else if (v && v.state === 'ok') { setTimeout(loadHealth, 1500); }
+    }).catch(function () {
+      if (authFlow === flow) { authPoll = setTimeout(pollAuth, 3000); }
+    });
+  }
+
+  function startAuth(name) {
+    var set = current();
+    if (!set) { return; }
+    authFlow = { id: set.id, name: name };
+    $('auth-server').textContent = name;
+    $('auth-link').value = '';
+    showAuth({ state: 'pending' });
+    var dlg = $('auth-dlg');
+    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
+    send('POST', authPath(set.id, name), {}).then(function (v) {
+      if (!authFlow) { return; }
+      showAuth(v);
+      pollAuth();
+    });
+  }
+
+  function closeAuth() {
+    authFlow = null;
+    clearTimeout(authPoll);
+    var dlg = $('auth-dlg');
+    if (dlg.open) { dlg.close(); }
   }
 
   /* ---------- редактор сервера ----------
@@ -2527,8 +2610,29 @@
   $('servers').addEventListener('click', function (e) {
     var probe = e.target.closest('[data-probe]');
     if (probe) { probeServer(probe.dataset.probe, probe); return; }
+    var auth = e.target.closest('[data-authorize]');
+    if (auth && auth.dataset.authorize) { startAuth(auth.dataset.authorize); return; }
     var edit = e.target.closest('[data-regedit]');
     if (edit) { openSrv(edit.dataset.regedit); }
+  });
+
+  $('auth-close').addEventListener('click', closeAuth);
+  $('auth-done').addEventListener('click', closeAuth);
+  $('auth-dlg').addEventListener('close', function () {
+    authFlow = null;
+    clearTimeout(authPoll);
+  });
+  $('auth-open').addEventListener('click', function () {
+    var url = $('auth-link').value;
+    if (url) { window.open(url, '_blank', 'noopener'); }
+  });
+  $('auth-copy').addEventListener('click', function () {
+    var btn = this;
+    navigator.clipboard.writeText($('auth-link').value).then(function () {
+      var was = t('auth.copy');
+      btn.textContent = t('auth.copied');
+      setTimeout(function () { btn.textContent = was; }, 1500);
+    });
   });
 
   /* ---------- новый набор ---------- */

@@ -86,10 +86,15 @@ once, not on every start.
 
 **Symptom, second half.** A server that wants OAuth stays `healthy: false`, the
 log carries `требуется авторизация MCP-сервера` with a URL, or the upstream
-answers `401`. The panel has no button for it yet.
+answers `401`.
 
-**What to do.** Run `mcprig auth --set <set> <server>`: it prints the link,
-waits for the redirect and saves the token; restart the set afterwards. A `403`
+**What to do.** Press **authorize** in the row of that server in the registry
+list: the panel shows the link, accepts the redirect on `/oauth/callback` and
+restarts the set once the token is saved. From a terminal the same flow is
+`mcprig auth --set <set> <server>`. If dynamic registration answers
+`invalid_redirect_uri`, the authorization server refuses the plain `http`
+address of the panel and needs TLS in front of it — the loopback variant of the
+CLI is the way out until then. A `403`
 before that is not OAuth but egress — the process cannot reach the server, so
 give it `HTTPS_PROXY`; the link will not help until the request gets through.
 

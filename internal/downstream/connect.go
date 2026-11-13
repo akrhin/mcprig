@@ -42,6 +42,10 @@ type Connector struct {
 	// консольная команда подставляет печать ссылки, чтобы не звать xdg-open.
 	Browser func(string) error
 
+	// Authorize уводит вход из процесса: панель отдаёт ссылку в свой браузер
+	// и принимает код своим HTTP-сервером. nil — Browser плюс loopback.
+	Authorize func(context.Context, string) (*oauth.Result, error)
+
 	// SingleAuthorization — один поток входа на сервер за жизнь Connector.
 	SingleAuthorization bool
 
@@ -221,6 +225,7 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 		Store:         c.Store,
 		Log:           c.Log,
 		Browser:       c.Browser,
+		Authorize:     c.Authorize,
 		SingleAttempt: c.SingleAuthorization,
 	})
 	if err != nil {

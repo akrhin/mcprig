@@ -575,5 +575,31 @@
     </div>
   </div>
 </dialog>
+
+<dialog class="dialog modal" id="auth-dlg" aria-labelledby="auth-h">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <div>
+        <h2 id="auth-h" data-i18n="auth.title">OAuth authorization</h2>
+        <p class="dialog-sub mono" id="auth-server">—</p>
+      </div>
+      <button class="ghost-icon" type="button" id="auth-close" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <p class="field-help" id="auth-note" role="status"></p>
+      <div class="field" id="auth-link-row" hidden>
+        <label class="field-label" for="auth-link" data-i18n="auth.link">authorization link</label>
+        <input class="input mono" id="auth-link" readonly spellcheck="false" autocomplete="off">
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn" type="button" id="auth-copy" data-i18n="auth.copy" hidden>copy link</button>
+      <button class="btn btn-primary" type="button" id="auth-open" data-i18n="auth.open" hidden>open link</button>
+      <button class="btn" type="button" id="auth-done" data-i18n="common.done">done</button>
+    </div>
+  </div>
+</dialog>
 </body>
 </html>

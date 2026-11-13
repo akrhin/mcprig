@@ -127,6 +127,11 @@ registration, code exchange and refresh are handled by the MCP SDK
 | token storage | `<data dir>/oauth.json` (`0600`), client registrations in `oauth-clients.json` |
 | token key | first 32 hex of `sha256(serverName + "\x00" + serverURL)` |
 
+The panel runs the same flow for a person at a browser: **authorize** in the
+server row, the link in a dialog, and the code arrives at `GET
+/oauth/callback` of the panel's own address. The panel then restarts the set,
+because a running process reads its token at start.
+
 The listener binds nothing until a token is actually needed. Tokens survive a
 restart, so a refresh does not require the browser again.
 

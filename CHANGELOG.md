@@ -25,6 +25,12 @@ repository the project is built in.
 
 ### Added
 
+- The **authorize** button in a server row of the panel runs the OAuth flow from
+  the browser: the link is drawn in a dialog, the code comes back to
+  `http://<panel host>:<panel port>/oauth/callback`, and the set restarts itself
+  once the token is saved. A provider that refuses plain `http` for a
+  non-loopback address (dynamic registration answers `invalid_redirect_uri`)
+  still needs TLS in front of the panel.
 - `mcprig auth --set <set> <server>` authorizes a server that asks for OAuth:
   the command prints the authorization link and waits for the redirect instead
   of starting a browser, so it works over SSH and on a host without a graphical

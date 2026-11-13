@@ -110,6 +110,11 @@ type Manager struct {
 	healthEvery time.Duration
 	probe       func(context.Context, *registry.Set) setHealth
 
+	// вход по OAuth: состояние по серверу набора и ожидающие приёмники по state
+	authMu    sync.Mutex
+	authFlows map[string]*authFlow
+	authWait  map[string]chan authOutcome
+
 	// ctx живёт до Close: фоновые работы (рестарт наборов) умирают вместе с панелью.
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -356,6 +361,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/api/logout":
 		m.handleLogout(w, r)
 		return
+	case "/oauth/callback":
+		// Публичный маршрут: браузер человека приходит сюда без сессии панели.
+		m.handleAuthCallback(w, r)
+		return
 	}
 
 	if _, ok := m.auth.check(r); !ok {
@@ -541,6 +550,9 @@ func (m *Manager) buildRoutes() []route {
 			http.MethodPatch: m.apiKeyNote, http.MethodDelete: m.apiKeyRevoke,
 		}),
 		mk(`^/api/sets/`+setPattern+`/servers$`, map[string]handlerFunc{http.MethodGet: m.apiSetServers}),
+		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/authorize$`, map[string]handlerFunc{
+			http.MethodPost: m.apiServerAuthorize, http.MethodGet: m.apiServerAuthorize,
+		}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiServerLogs}),
 		mk(`^/api/sets/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiSetLogs}),
 		mk(`^/api/sets/`+setPattern+`/(start|stop|restart)$`, map[string]handlerFunc{http.MethodPost: m.apiSetAction}),
