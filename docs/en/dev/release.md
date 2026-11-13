@@ -17,9 +17,11 @@ this page does not repeat those numbers.
    so a second tag waits instead of cancelling the first.
 3. A human publishes the draft; CI does not.
 4. The GitHub workflow (`.github/workflows/release.yml`) runs on the same tag:
-   it rebuilds the same archives with `goreleaser --skip=publish` and uploads
-   them with `gh`, so `.goreleaser.yaml` keeps one set of `gitea_urls`/`draft`
-   settings instead of two variants.
+   it rebuilds the same archives with `goreleaser --skip=publish`, builds and
+   pushes the `slim`/`full` images to `ghcr.io/akrhin/mcprig`, and uploads the
+   archives with `gh`, so `.goreleaser.yaml` keeps one set of
+   `gitea_urls`/`draft` settings instead of two variants. It runs no tests and
+   no `govulncheck`.
 5. Release notes are the tag's `CHANGELOG.md` section, cut by
    `scripts/release-notes.sh`.
 

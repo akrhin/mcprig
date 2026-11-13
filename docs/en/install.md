@@ -15,16 +15,17 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | archive | `mcprig_<version>_<os>_<arch>.tar.gz` |
 | contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | checksum | `checksums.txt` |
-| release | draft on Gitea, published by hand; the GitHub release is created by the workflow; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
+| release | `goreleaser` builds the archives, pushes the `slim`/`full` images to the registry and creates a draft Gitea release that a human publishes; the GitHub release is created by the workflow; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
 Releases are cut on a `v*` tag by Gitea CI (`.gitea/workflows/release.yml`): it
 runs the checks — `go vet`, tests with `-race`, `govulncheck`, `gofmt` — and then
 `goreleaser`, which builds the archives and a draft Gitea release that a human
 publishes. The GitHub workflow (`.github/workflows/release.yml`) fires on the
-same tag and only rebuilds the archives with `goreleaser --skip=publish` and
-uploads them with `gh` to <https://github.com/akrhin/mcprig/releases>; it runs
-no tests and no `govulncheck`, just `go build ./...`. A tag can also be released
+same tag: it rebuilds the archives with `goreleaser --skip=publish`, builds and
+pushes the `slim` and `full` images to `ghcr.io/akrhin/mcprig`, and uploads the
+archives with `gh` to <https://github.com/akrhin/mcprig/releases>; it runs no
+tests and no `govulncheck`, just `go build ./...`. A tag can also be released
 by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` is not installed on the development host, so archives are built by
@@ -124,9 +125,10 @@ inside the container; publish it on `MCPRIG_PORT` (the panel default is 9091,
 `deploy/docker-compose.yml` runs the `ops` set on 9101). Outside Docker
 `MCPRIG_HOST` stays unset and the panel keeps the `127.0.0.1` default — do not
 copy the container value to a host unit.
-The image healthcheck asks the set on `http://127.0.0.1:9100/healthz` and the
-panel on `http://127.0.0.1:9091/healthz`, so the container counts as healthy
-only when both answer; it assumes the default ports, so with another
+The image healthcheck asks the set on `http://127.0.0.1:9100/healthz` and, if
+that fails, the panel on `http://127.0.0.1:9091/healthz`, so the container counts
+as healthy when **either** answers — the panel endpoint is the fallback for a
+panel-only container. The check assumes the default ports, so with another
 `transport.port` or `MCPRIG_PORT` pass `--health-cmd` or set the healthcheck in
 compose.
 
@@ -169,11 +171,14 @@ The directory is created `0700`. What lives there:
 | path | contents | mode |
 | --- | --- | --- |
 | `registry.json` | servers, sets, keys, port allocator | `0600` |
+| `registry.json.bak` | the previous `registry.json`, rewritten on every save | `0600` |
 | `registry.json.corrupt-<unix>` | a registry that failed to parse, kept aside | as written |
 | `env.json` | panel-managed variables (flat strings) | `0600` |
 | `manager.pid` | pid of the running panel; a second panel refuses to start | `0600` |
 | `sets/<id>/servers.json` | materialized config the set process reads | `0600` |
 | `sets/<id>/mcprig.log` | set log; rotates to `.log.1` at 5 MiB | `0600` |
+| `sets/<id>/stats/` | call history and per-day `raw-*.jsonl` of that set | `0600` |
+| `sets/<id>/tool-out/` | result bodies truncated out of responses, one file each | `0600` |
 | `sets/<id>/oauth.json` | access and refresh tokens for OAuth downstreams of that set | `0600` |
 | `sets/<id>/oauth-clients.json` | dynamic client registration data of that set | `0600` |
 | `oauth.json` | access and refresh tokens for OAuth downstreams of a standalone `serve`/`stdio` process | `0600` |
@@ -183,8 +188,11 @@ A set started by the panel gets `MCPRIG_DATA_DIR=<data>/sets/<id>`, so its
 OAuth files live under `sets/<id>/`. The top-level `oauth*.json` files belong to
 `serve`/`stdio` processes started with the root state directory.
 
-All writes go through a temp file and a rename, so a crash never leaves a
-half-written file. Never copy `registry.json` while the panel is running.
+`registry.json`, `env.json`, `sets/<id>/servers.json` and the OAuth files are
+written through a temp file and a rename, so a crash never leaves a half-written
+one. The set log and the call history are appended in place (`O_APPEND`, `0600`)
+and may end with a partial last line. Never copy `registry.json` while the panel
+is running.
 
 ## See also
 

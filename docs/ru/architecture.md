@@ -132,6 +132,10 @@ bearer-токеном набора (или через stdio, когда клие
 
 ## См. также
 
+- Та же картина схемой: интерактивно —
+  [diagrams/mcprig.architecture.ru.html](../diagrams/mcprig.architecture.ru.html),
+  растром —
+  [diagrams/mcprig.architecture.ru.png](../diagrams/mcprig.architecture.ru.png).
 - [configuration.md](configuration.md) — конфиг набора, который читает этот процесс.
 - [meta-tools.md](meta-tools.md) — поверхность, с которой на самом деле говорит клиент.
 - [panel.md](panel.md) — HTTP API и UI менеджера.

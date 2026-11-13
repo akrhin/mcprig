@@ -64,8 +64,10 @@ invent one.
 **Symptom.** A call fails with an unknown-tool or extra-keys error although the
 tool exists.
 
-**Cause.** The tool name goes into `command_name`. `command` is not a field of
-`invoke_command` — it belongs to `servers.json`.
+**Cause.** The tool name goes into `command_name` (or its alias `command`). The
+arguments of the downstream tool go inside `parameters`; putting them at the top
+level is exactly what the extra-keys error reports. `command`/`args` as fields
+of a server entry belong to `servers.json`, not to the call.
 
 **What to do.** `{"server": "…", "command_name": "…", "parameters": {…}}`.
 `describe_commands` shows the parameter schema.

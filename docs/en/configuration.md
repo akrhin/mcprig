@@ -50,7 +50,12 @@ and read as-is: no migration, no wrapper.
 `healthMonitor` is written by the panel (`interval: 60000`, `timeout: 120000`)
 so the file stays byte-compatible with lazy-mcp, but health in mcprig is
 governed by the 15 s cache described in
-[architecture.md](architecture.md#health).
+[architecture.md](architecture.md#health). The panel also writes
+`logging: {level: "info"}` and `requestTimeout: 120000`.
+
+A hand-written file without `requestTimeout` means no limit; a set materialized
+by the panel always gets `120000`, so deleting the key by hand is the only way to
+get zero.
 
 ## Servers
 

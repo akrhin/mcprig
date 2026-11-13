@@ -17,8 +17,10 @@
    отменяет первый.
 3. Черновик публикует человек; CI этого не делает.
 4. Воркфлоу GitHub (`.github/workflows/release.yml`) идёт по тому же тегу:
-   пересобирает те же архивы с `goreleaser --skip=publish` и заливает их через
-   `gh` — так `.goreleaser.yaml` остаётся один, с одними `gitea_urls`/`draft`.
+   пересобирает те же архивы с `goreleaser --skip=publish`, собирает и пушит
+   образы `slim`/`full` в `ghcr.io/akrhin/mcprig`, заливает архивы через `gh` —
+   так `.goreleaser.yaml` остаётся один, с одними `gitea_urls`/`draft`.
+   Тестов и `govulncheck` там нет.
 5. Заметки релиза — раздел `CHANGELOG.md` для тега, вырезает
    `scripts/release-notes.sh`.
 

@@ -4,7 +4,35 @@
   "meta": {
     "title": "mcprig: MCP-набор как один сервер",
     "output": "mcprig.architecture.ru.html",
-    "quality_profile": "showcase"
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto"
+    },
+    "viewBox": [
+      548,
+      470
+    ],
+    "locale": "ru",
+    "translations": {
+      "page.title": "{title} — диаграмма",
+      "legend.title": "Легенда",
+      "legend.architecture.frontend": "Интерфейс",
+      "legend.architecture.backend": "Бэкенд",
+      "legend.architecture.database": "База",
+      "legend.architecture.cloud": "Облако",
+      "legend.architecture.security": "Защита",
+      "legend.architecture.messagebus": "Шина",
+      "legend.architecture.external": "Внешние",
+      "node.context.architecture": "Компонент архитектуры",
+      "viewer.outline.title": "Индекс узлов",
+      "viewer.kind.frontend": "Интерфейс",
+      "viewer.kind.backend": "Бэкенд",
+      "viewer.kind.database": "База",
+      "viewer.kind.cloud": "Облако",
+      "viewer.kind.security": "Защита",
+      "viewer.kind.messagebus": "Шина",
+      "viewer.kind.external": "Внешние"
+    }
   },
   "components": [
     {
@@ -13,12 +41,12 @@
       "label": "промпт агента",
       "sublabel": "каталог в контексте не лежит",
       "pos": [
-        40,
-        20
+        12,
+        48
       ],
       "size": [
-        170,
-        64
+        128,
+        56
       ]
     },
     {
@@ -27,12 +55,12 @@
       "label": "MCP-клиент",
       "sublabel": "любой харнесс: tools/call",
       "pos": [
-        40,
-        120
+        12,
+        140
       ],
       "size": [
-        170,
-        68
+        128,
+        56
       ]
     },
     {
@@ -41,12 +69,12 @@
       "label": "другой клиент",
       "sublabel": "свой набор и токен",
       "pos": [
-        40,
-        300
+        12,
+        220
       ],
       "size": [
-        170,
-        68
+        128,
+        56
       ]
     },
     {
@@ -54,15 +82,29 @@
       "type": "backend",
       "label": "набор A",
       "sublabel": "один endpoint · свои серверы",
+      "tag": "5 мета-тулов",
       "pos": [
-        300,
-        110
+        200,
+        48
       ],
       "size": [
+        128,
+        68
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "ядро прокси",
+      "sublabel": "каталог · политики · tools",
+      "pos": [
         200,
-        96
+        140
       ],
-      "tag": "5 мета-тулов"
+      "size": [
+        128,
+        56
+      ]
     },
     {
       "id": "setB",
@@ -70,84 +112,27 @@
       "label": "набор B",
       "sublabel": "отдельный процесс и порт",
       "pos": [
-        300,
-        410
+        200,
+        220
       ],
       "size": [
-        200,
-        96
+        128,
+        56
       ]
-    },
-    {
-      "id": "core",
-      "type": "backend",
-      "label": "ядро прокси",
-      "sublabel": "каталог · политики · tool-out",
-      "pos": [
-        300,
-        250
-      ],
-      "size": [
-        200,
-        96
-      ]
-    },
-    {
-      "id": "stdio",
-      "type": "backend",
-      "label": "stdio-серверы",
-      "sublabel": "дочерний процесс на сервер",
-      "pos": [
-        850,
-        70
-      ],
-      "size": [
-        200,
-        96
-      ],
-      "tag": "initialize"
     },
     {
       "id": "http",
       "type": "cloud",
       "label": "HTTP-серверы",
       "sublabel": "URL · заголовки · OAuth",
+      "tag": "server/discover",
       "pos": [
-        620,
-        230
+        404,
+        48
       ],
       "size": [
-        200,
-        96
-      ],
-      "tag": "server/discover"
-    },
-    {
-      "id": "panel",
-      "type": "backend",
-      "label": "панель",
-      "sublabel": "наборы · ключи · логи",
-      "pos": [
-        300,
-        570
-      ],
-      "size": [
-        200,
-        76
-      ]
-    },
-    {
-      "id": "disk",
-      "type": "database",
-      "label": "файлы состояния",
-      "sublabel": "config · keys · secrets · tool-out",
-      "pos": [
-        620,
-        570
-      ],
-      "size": [
-        200,
-        76
+        128,
+        68
       ]
     },
     {
@@ -156,12 +141,55 @@
       "label": "bwrap · userns",
       "sublabel": "ro / rw · tmpfs · prlimit",
       "pos": [
-        620,
-        70
+        404,
+        140
       ],
       "size": [
+        128,
+        56
+      ]
+    },
+    {
+      "id": "stdio",
+      "type": "backend",
+      "label": "stdio-серверы",
+      "sublabel": "дочерний процесс на сервер",
+      "tag": "initialize",
+      "pos": [
+        404,
+        220
+      ],
+      "size": [
+        128,
+        68
+      ]
+    },
+    {
+      "id": "panel",
+      "type": "backend",
+      "label": "панель",
+      "sublabel": "наборы · ключи · логи",
+      "pos": [
+        12,
+        338
+      ],
+      "size": [
+        128,
+        56
+      ]
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "файлы состояния",
+      "sublabel": "config · keys · secrets",
+      "pos": [
         200,
-        96
+        338
+      ],
+      "size": [
+        128,
+        56
       ]
     }
   ],
@@ -169,6 +197,7 @@
     {
       "kind": "security-group",
       "label": "набор = один MCP-сервер · Bearer-токен",
+      "pad": 30,
       "wraps": [
         "setA",
         "core",
@@ -208,8 +237,7 @@
     {
       "id": "a-http",
       "from": "setA",
-      "to": "http",
-      "label": "url + headers"
+      "to": "http"
     },
     {
       "id": "b-http",
@@ -221,6 +249,10 @@
       "from": "panel",
       "to": "setB",
       "label": "старт/стоп",
+      "labelAt": [
+        170,
+        309
+      ],
       "variant": "dashed",
       "fromSide": "top",
       "toSide": "bottom"
@@ -229,20 +261,24 @@
       "id": "p-d",
       "from": "panel",
       "to": "disk",
-      "label": "config · env",
+      "label": "конфиг·env",
       "variant": "dashed"
     },
     {
       "id": "a-sandbox",
       "from": "setA",
       "to": "sandbox",
-      "label": "spawn + env"
+      "label": "запуск + env"
     },
     {
       "id": "sandbox-stdio",
       "from": "sandbox",
       "to": "stdio",
-      "label": "exec"
+      "label": "exec",
+      "labelAt": [
+        468,
+        208
+      ]
     }
   ],
   "cards": [
@@ -250,21 +286,21 @@
       "dot": "cyan",
       "title": "Экономия контекста",
       "items": [
-        "Каталог на сотни инструментов не попадает в промпт: агент видит пять мета-тулов",
-        "list_commands отдаёт каталог по запросу и кэширует его",
-        "describe_commands присылает схему только того инструмента, который зовут",
-        "invoke_many — пачка вызовов одним ответом вместо N round-trip",
-        "maxBytes режет крупный ответ, полный текст лежит файлом"
+        "Каталог не в промпте: агент видит 5 мета-тулов",
+        "list_commands отдаёт каталог по запросу и кэширует",
+        "describe_commands: схема только зовомого инструмента",
+        "invoke_many: пачка вызовов вместо N кругов",
+        "maxBytes режет ответ, полный текст остаётся файлом"
       ]
     },
     {
       "dot": "emerald",
-      "title": "Агент работает как обычно",
+      "title": "Клиенту менять нечего",
       "items": [
         "Харнесс не меняется: те же tools/call и JSON-RPC на /mcp",
         "Имена инструментов настоящие: invoke_command{server, command_name, parameters}",
         "Ошибка приходит текстом инструмента: неизвестный сервер, неизвестный инструмент",
-        "Статистика считает вызовы и ошибки по каждому серверу, health опрашивается периодически"
+        "Статистика по серверам, health опрашивается сам"
       ]
     },
     {
@@ -273,20 +309,19 @@
       "items": [
         "stdio: spawn(command) + своё окружение, рукопожатие initialize",
         "HTTP: server/discover, OAuth по 401",
-        "Один Bearer-токен на набор; у каждого клиента может быть свой набор",
-        "Набор живёт дочерним процессом панели или отдельным юнитом"
+        "Bearer-токен на набор, у клиента свой набор",
+        "Набор — дочерний процесс панели или свой юнит"
       ]
     },
     {
       "dot": "rose",
       "title": "Песочница",
       "items": [
-        "`untrusted` без `sandbox` не стартует: fail-closed, а не «повезёт»",
-        "`ro` заменяет умолчания целиком — нужные пути перечисляй сам",
-        "`prlimit` берётся с хоста: на alpine это пакет util-linux",
-        "Лимиты AS / NPROC / FSIZE; CPU и RSS поддерева не ограничены",
-        "node: `memoryMb` ≥ 2048 и `ro` на префикс узла",
-        "Изоляция: `/home`, сеть, `/proc/1`, запись в корень"
+        "untrusted без песочницы не стартует: fail-closed",
+        "ro заменяет умолчания целиком, пути перечисляй сам",
+        "prlimit берётся с хоста (alpine: пакет util-linux); лимиты AS/NPROC/FSIZE",
+        "node: memoryMb ≥ 2048 и ro на префикс узла",
+        "Изоляция: /home, сеть, /proc/1, запись в корень"
       ]
     }
   ]

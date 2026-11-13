@@ -50,8 +50,9 @@ waiting for every downstream to unpack. `deploy/mcprig-warm.timer` repeats it
 every ten minutes. See [cli.md#warm](cli.md#warm).
 
 **key** — the bearer token a closed set requires; `mcprig init` prints the client
-fragment that carries it. A key can be signed, in which case call counters label
-the traffic by key instead of by `User-Agent`. See
+fragment that carries it. Counter labels use the key's note when the owner has
+named the key, otherwise `key:<6 hex>/<User-Agent>`: a short fingerprint of the
+key plus the User-Agent product token. See
 [meta-tools.md#counters](meta-tools.md#counters).
 
 **open set** — a set with `transport.allowAnonymous: true`: no `Authorization`

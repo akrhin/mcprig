@@ -259,8 +259,9 @@ The `_meta.lazyMcpPolicy` marker is what host hooks look for.
 Every completed `invoke_command` — and every call inside `invoke_many` — is
 counted in the set process: per client, per server and per tool, with p50/p95
 and a ring of recent calls. A downstream result carrying `isError: true` counts
-as a failure. The panel reads this through `GET /stats`; stdio mode does not
-collect counters.
+as a failure. The panel reads this through `GET /stats`; in stdio mode the same
+counters and history are written to `$MCPRIG_DATA_DIR/stdio/stats/`, every call
+labelled `stdio` — there is simply no panel above the process to read them.
 
 The client label comes from `_meta["io.modelcontextprotocol/clientInfo"]` of the
 request being counted — the SEP-2575 per-request client info. It is written as

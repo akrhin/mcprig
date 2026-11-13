@@ -132,6 +132,10 @@ restart, so a refresh does not require the browser again.
 
 ## See also
 
+- The same picture as a diagram: interactive in
+  [diagrams/mcprig.architecture.en.html](../diagrams/mcprig.architecture.en.html),
+  raster in
+  [diagrams/mcprig.architecture.en.png](../diagrams/mcprig.architecture.en.png).
 - [configuration.md](configuration.md) — the per-set config this process reads.
 - [meta-tools.md](meta-tools.md) — the surface a client actually talks to.
 - [panel.md](panel.md) — the manager's HTTP API and UI.
