@@ -184,3 +184,32 @@ func TestNewHandlerRejectsRedirectURLWithoutPort(t *testing.T) {
 		}
 	}
 }
+
+// TestSingleAttemptRejectsSecondFlow: одна ссылка на человека. Вторая попытка
+// SDK молча выдала бы новый URL и отменила уже открытую в браузере.
+func TestSingleAttemptRejectsSecondFlow(t *testing.T) {
+	h, err := NewHandler(context.Background(), Options{
+		ServerName:    testServer,
+		ServerURL:     testServerUL,
+		RedirectURL:   testRedirect,
+		SingleAttempt: true,
+		Browser:       func(string) error { return nil },
+	})
+	if err != nil {
+		t.Fatalf("NewHandler: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if _, err := h.fetch(ctx, &auth.AuthorizationArgs{URL: "https://as.test/authorize?state=st-1"}); err == nil {
+		t.Fatal("первый поток должен сняться по ctx")
+	}
+
+	start := time.Now()
+	_, err = h.fetch(context.Background(), &auth.AuthorizationArgs{URL: "https://as.test/authorize?state=st-2"})
+	if err == nil || !strings.Contains(err.Error(), "повторная авторизация") {
+		t.Fatalf("второй поток: err = %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("второй поток заблокировался вместо отказа")
+	}
+}

@@ -89,10 +89,11 @@ func runAuth(args []string) error {
 	// Env пустой: это команда владельца, а не набор — stdio-сервер получает то
 	// же окружение, с которым работал бы из терминала (HOME, прокси).
 	conn := &downstream.Connector{
-		Version: version,
-		OAuth:   t.Cfg.OAuth,
-		Store:   store,
-		Log:     log,
+		Version:             version,
+		OAuth:               t.Cfg.OAuth,
+		Store:               store,
+		Log:                 log,
+		SingleAuthorization: true,
 		Browser: func(url string) error {
 			fmt.Printf("откройте ссылку в браузере:\n\n%s\n\n", url)
 			return nil

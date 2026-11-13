@@ -42,6 +42,9 @@ type Connector struct {
 	// консольная команда подставляет печать ссылки, чтобы не звать xdg-open.
 	Browser func(string) error
 
+	// SingleAuthorization — один поток входа на сервер за жизнь Connector.
+	SingleAuthorization bool
+
 	// OnToolsChanged вызывается, когда сервер прислал
 	// notifications/tools/list_changed. Набор по ней сбрасывает кэш
 	// tools/list, и новый инструмент виден без refresh: true. SDK подписывается
@@ -209,15 +212,16 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 		return nil, nil
 	}
 	h, err := oauth.NewHandler(ctx, oauth.Options{
-		ServerName:   srv.Name,
-		ServerURL:    srv.URL,
-		RedirectURL:  block.RedirectURL,
-		ClientID:     block.ClientID,
-		ClientSecret: block.ClientSecret,
-		Scopes:       block.Scopes,
-		Store:        c.Store,
-		Log:          c.Log,
-		Browser:      c.Browser,
+		ServerName:    srv.Name,
+		ServerURL:     srv.URL,
+		RedirectURL:   block.RedirectURL,
+		ClientID:      block.ClientID,
+		ClientSecret:  block.ClientSecret,
+		Scopes:        block.Scopes,
+		Store:         c.Store,
+		Log:           c.Log,
+		Browser:       c.Browser,
+		SingleAttempt: c.SingleAuthorization,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("oauth: %w", err)
