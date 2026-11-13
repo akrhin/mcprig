@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="design/mcprig/logo-hand-dark.png">
+    <img src="design/mcprig/logo-hand-light.png" width="220" alt="mcprig">
+  </picture>
+</p>
+
 # mcprig
 
 One static Go binary that serves many MCP servers through a single MCP endpoint, with a web panel.
@@ -31,6 +38,10 @@ MCPRIG_PASSWORD=change-me ./mcprig panel
 Open <http://localhost:9091>, sign in as `admin`, add a server, add a set that
 contains it, press **Start**, then issue a key for the set. The panel shows the
 token once: save it to `demo.key` and `chmod 600` it.
+
+![mcprig panel](design/ui/panel.png)
+
+*The panel: sets on their own ports and endpoints, and the servers of one set with transport and tool counts.*
 
 Docker works the same way, with no Go toolchain needed:
 `docker pull ghcr.io/akrhin/mcprig:latest` (`latest-full` adds node and python for

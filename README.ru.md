@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="design/mcprig/logo-hand-dark.png">
+    <img src="design/mcprig/logo-hand-light.png" width="220" alt="mcprig">
+  </picture>
+</p>
+
 # mcprig
 
 Один статический бинарник на Go, который отдаёт много MCP-серверов через одну MCP-точку входа, с веб-панелью.
@@ -31,6 +38,10 @@ MCPRIG_PASSWORD=change-me ./mcprig panel
 Откройте <http://localhost:9091>, войдите как `admin`, добавьте сервер, добавьте
 набор с этим сервером, нажмите **Start**, затем выпустите ключ набора. Панель
 показывает токен один раз: сохраните его в `demo.key` и выставьте `chmod 600`.
+
+![mcprig panel](design/ui/panel.png)
+
+*Панель: наборы со своими портами и эндпоинтами и серверы одного набора — транспорт и число инструментов.*
 
 Docker работает так же и не требует Go: `docker pull ghcr.io/akrhin/mcprig:latest`
 (`latest-full` добавляет node и python для `npx`/`uvx`-серверов). Юниты systemd,
