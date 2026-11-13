@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+[EN](../en/architecture.md) · RU
+
 Файл объясняет, как процессы стыкуются, почему каждый набор — свой процесс и где
 живут здоровье, статистика и OAuth.
 
@@ -126,3 +129,14 @@ bearer-токеном набора (или через stdio, когда клие
 
 Слушатель ничего не занимает, пока токен действительно не нужен. Токены
 переживают перезапуск, поэтому обновление не требует браузера снова.
+
+## См. также
+
+- Та же картина схемой: интерактивно —
+  [diagrams/mcprig.architecture.ru.html](../diagrams/mcprig.architecture.ru.html),
+  растром —
+  [diagrams/mcprig.architecture.ru.png](../diagrams/mcprig.architecture.ru.png).
+- [configuration.md](configuration.md) — конфиг набора, который читает этот процесс.
+- [meta-tools.md](meta-tools.md) — поверхность, с которой на самом деле говорит клиент.
+- [panel.md](panel.md) — HTTP API и UI менеджера.
+- [dev/development.md](dev/development.md) — ворота, которые держат эту схему честной.

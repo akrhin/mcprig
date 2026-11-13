@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/panel.md)
+
 This file describes what the panel shows, the API behind it, and how access to
 both is checked.
 
@@ -124,7 +127,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
 least one existing server; its `port`, when given, must be 9100–9199 and free
 in the system, otherwise the manager allocates one; a port held by a process
-gives `409` "port N is taken by another process". `id` and `token` in a create body
+gives `409` «порт N занят другим процессом». `id` and `token` in a create body
 are ignored.
 
 The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at
@@ -235,7 +238,8 @@ both      password and proxy secret
 
 With password auth the panel sets `mcp_session` (HMAC-SHA256, 12 h, `HttpOnly`,
 `SameSite=Lax`, `Secure` over TLS) and keeps sessions in memory. Login is
-limited to 5 failures per minute per IP and runs at most one scrypt at a time.
+limited to 5 failures per minute per IP and runs at most two scrypt hashes at a
+time (the rest wait; past 8 pending the login answers `429`).
 `POST /api/login` answers `400` when `user` or `password` is empty (`401` is
 reserved for a wrong password). An unauthenticated `GET /` redirects to
 `/login`; API calls get
@@ -260,3 +264,10 @@ panel rejects an `https` Origin on writes. A configured `MCPRIG_PROXY_SECRET`
 (trusted proxy) has the same effect; an `http` Origin is still rejected then.
 
 `Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.
+
+## See also
+
+- [cli.md#panel](cli.md#panel) — how to start the panel and set its access mode.
+- [configuration.md](configuration.md) — the servers and sets the panel edits.
+- [meta-tools.md](meta-tools.md) — the counters and the call history source.
+- [troubleshooting.md](troubleshooting.md) — 401 and 403 from the panel.

@@ -1,340 +1,364 @@
 # Changelog
 
-Notable changes to mcprig, newest first. Format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow
-[SemVer](https://semver.org/). Releases are cut from tags: Gitea is the source
-of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
+Notable changes to mcprig, newest first. The format follows
+[Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), versions follow
+[SemVer](https://semver.org/). A release is cut from a git tag; GitHub
+(`akrhin/mcprig`) is the public reference and carries the same archives as the
+repository the project is built in.
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation is restructured: `docs/en/index.md` and `docs/ru/index.md` are
+  the entry points, every product page carries a language switch and a "See
+  also" block, and plans, decisions, audits, proposals and the TS contract moved
+  to `docs/history/`. `bash scripts/docs-check.sh` (also a CI step) fails on a
+  broken link, a personal path, an orphan page, language drift and a stale fact
+  in `docs/anchors.txt`.
+
 ### Added
 
-- Вкладка **Вызовы** показывает мета-инструменты `list_servers`, `list_commands` и
-  `describe_commands` (сервер `mcprig`) и причину провала: текст сокращён в строке,
-  полностью — во всплывающей подсказке. Раньше в историю и счётчики попадали
-  только вызовы дочерних инструментов.
-- Сырой журнал истории (`raw-YYYY-MM-DD.jsonl`) несёт поле `err`: причина провала
-  одной строкой не длиннее 300 байт, переводы строк заменены пробелами. Старые
-  строки без поля читаются как прежде.
+- The **Calls** tab lists the meta-tools `list_servers`, `list_commands` and
+  `describe_commands` (server `mcprig`) and the reason a call failed: the text
+  is shortened in the row and shown in full in a tooltip. Previously only calls
+  of child tools reached the history and the counters.
+- The raw history journal (`raw-YYYY-MM-DD.jsonl`) carries an `err` field: the
+  failure reason as one line of at most 300 bytes with newlines replaced by
+  spaces. Old rows without the field are read as before.
 
 ## [0.4.0] - 2026-11-11
 
 ### Added
 
-- Панель говорит по-английски и по-русски: по умолчанию английский, переключатель
-  `EN`/`RU` в шапке, выбор в `localStorage['mcprig.lang']`, `<html lang>` следует
-  за ним, числа и даты — через `Intl`. Все пользовательские строки собраны в
-  одном словаре `DICT` в `web/app.js`.
-- Клиент в статистике набора называется по подписи ключа: `PATCH
-  /api/sets/<id>/keys/<keyID>` с `{"note":"hermes"}` пишет подпись, набор
-  получает её в `transport.clientNames` под отпечатком ключа (6 hex от sha256,
-  без токена) и считает клиента как `hermes`, а не
-  `key:ce80c4/python-httpx/0.28.1`. Пустая строка снимает подпись, работающий
-  набор перезапускается; в документации набора появилось поле `clientNames`,
-  в `/api/sets` — `note` ключа, который там был и раньше.
-
+- The panel speaks English and Russian: English by default, an `EN`/`RU` switch
+  in the header, the choice kept in `localStorage['mcprig.lang']`, `<html lang>`
+  following it, numbers and dates going through `Intl`. Every user-facing string
+  lives in one `DICT` in `web/app.js`.
+- A set client is named by its key note in statistics: `PATCH
+  /api/sets/<id>/keys/<keyID>` with `{"note":"hermes"}` writes the note, the set
+  gets it in `transport.clientNames` under the key fingerprint (6 hex of sha256,
+  no token) and counts the client as `hermes` instead of
+  `key:ce80c4/python-httpx/0.28.1`. An empty string clears the note and restarts
+  a running set; the set documentation gained `clientNames`, and `/api/sets`
+  gained the key `note`, which the record already had.
 
 ### Changed
 
-- Панель перестала ждать перезапуск наборов после `PUT`/`DELETE /api/env/<NAME>`:
-  ответ приходит сразу, наборы с этой переменной перезапускаются в фоне с
-  бюджетом 60 с, ошибки уходят в лог, `restarted` по-прежнему перечисляет id.
-- `/api/stats` кэширует разобранные файлы истории: файл перечитывается только
-  при смене `mtime` или размера, повторный запрос периода не читает диск.
-- `PUT /api/sets/<id>` проверяет активный ключ и свободный порт **до** записи в
-  реестр: отбитая правка больше не оставляет работающий набор остановленным.
-- `DELETE /api/sets/<id>/keys/<keyID>` при отзыве активного ключа говорит об
-  остановке полем `stopped: true` и одной строкой в журнале.
-- Образы раздаются из GitHub Container Registry — `ghcr.io/akrhin/mcprig`
-  (вход не нужен); реестр Gitea закрыт и публичным каналом не служит. Тег
-  собирает и пушит сам GitHub-workflow релиза.
-- Панель переехала на редизайн: рельс наборов показывает только личность и
-  состояние набора, шапка освободилась от счётчиков, KPI-полоса считает срез
-  истории за 7 дней, статистика получила полосу фильтров с подписями над
-  селектами, а правая колонка стала ящиком деталей с реестром, переменными и
-  логом. Вкладки — **Обзор**, **Вызовы**, **Статистика**.
-- Тем стало четыре вместо шести: тёмная (по умолчанию), светлая, Nord и Gruvbox
-  на одном наборе CSS-переменных. Старые имена в `localStorage['mcprig.theme']`
-  работают и переписываются на новые (`mcprig`,`tokyo` → dark, `solarized` →
-  light).
-- Кнопка **Остановить** вернулась в шапку набора отдельно от **Перезапустить**.
-- Вкладка **Статистика** показывает набор, выбранный в рельсе, и следует за его
-  переключением; свой список набора больше не разъезжается с рельсом.
-- На странице набора вместо таблицы всех наборов — таблица серверов этого
-  набора (имя, тип, здоровье, инструменты, последний вызов); вторая строка
-  строки сервера несёт ошибку демона, изоляцию или описание.
+- The panel no longer waits for sets to restart after `PUT`/`DELETE
+  /api/env/<NAME>`: the answer comes at once, sets using that variable restart
+  in the background with a 60 s budget, errors go to the log, and `restarted`
+  still lists the ids.
+- `/api/stats` caches parsed history files: a file is re-read only when its
+  `mtime` or size changes, so a repeated period request does not touch the disk.
+- `PUT /api/sets/<id>` checks the active key and a free port **before** writing
+  to the registry: a rejected edit no longer leaves a running set stopped.
+- `DELETE /api/sets/<id>/keys/<keyID>` reports the stop of an active key with
+  `stopped: true` and one log line.
+- Images are served from GitHub Container Registry — `ghcr.io/akrhin/mcprig`
+  (no login needed); the Gitea registry is closed and is not a public channel.
+  The release GitHub workflow builds and pushes the tags itself.
+- The panel moved to a redesign: the set rail shows only a set's identity and
+  state, the header dropped its counters, the KPI strip counts the last 7 days
+  of history, statistics gained a filter bar with labels above the selects, and
+  the right column became a details drawer with the registry, the variables and
+  the log. Tabs are **Overview**, **Calls**, **Statistics**.
+- Four themes instead of six: dark (default), light, Nord and Gruvbox on one set
+  of CSS variables. Old names in `localStorage['mcprig.theme']` keep working and
+  are rewritten (`mcprig`,`tokyo` → dark, `solarized` → light).
+- The **Stop** button is back in the set header, separate from **Restart**.
+- The **Statistics** tab shows the set selected in the rail and follows its
+  switches; its own set list no longer drifts from the rail.
+- The set page shows the set's own server table (name, type, health, tools, last
+  call) instead of the table of all sets; the second line of a server row
+  carries the daemon error, the isolation or the description.
 
 ### Fixed
 
-- `redirectUrl` без порта (или с `:0`) отвергается при старте OAuth-приёмника:
-  браузеру некуда вернуться, а прежний эфемерный порт давал пять минут
-  молчаливого ожидания.
-- Проба bwrap ограничена 10 секундами и делится между параллельными стартами:
-  зависший `bwrap` больше не блокирует запуск sandbox-серверов навсегда, а
-  неудача не кэшируется — следующий старт пробует снова.
-- Фоновый перезапуск наборов после смены переменной или сервера отменяется
-  вместе с панелью: раньше горутина переживала `Close` и оставляла живой дочерний
-  процесс на порту набора.
-- Импорт и добавление сервера отвергают `{file:…}` в любом месте значения, а не
-  только в начале: `p{file:/…}` больше не уносит файл в окружение набора.
-- Удаление последнего сервера набора — `400` «сервер X последний в наборе Y», и
-  наборы не останавливаются: сначала запись в реестр, остановка — после успеха.
-- Гонка в `startLocked`: поля процесса (`exited`, `stopping`, `restarts`)
-  читаются одним захватом `rt.mu`, как их пишут `wait` и `kill`.
-- Просмотр сервера не падает с «session closed» на длинном вызове: `lookup`
-  держит сессию рефкаунтом, `close`/`sweep` закрывают её после `release`.
-- Просроченные сессии панели убирает тикер здоровья, а не только `get`.
-- Сбой ротации лога набора не теряет вывод: старый файл остаётся, ошибка видна
-  в поле `error` статуса набора.
-- Хвост лога читается последними килобайтами через `Seek`, а не всем 5 МиБ
-  файлом на каждый опрос панели.
-- `servers.json` набора пишется через `internal/atomicfile` — с fsync каталога
-  и правами `0600`.
-- Запрос `/stats` набора проходит его Host-гард: панель ставит `Host` из
-  первого `AllowedHosts`.
-- Отказ правами внутри `invoke_many` несёт в `result` тот же маркер
-  `🚫 Blocked by mcprig policy: …` и `_meta.lazyMcpPolicy: "blocked"`, что и
-  `invoke_command`: хук-клиент видит отказ в веере, а не только строку `error`.
-- Усечение ответа с `structuredContent` добавляет к маркеру строку
-  `[structuredContent не влезает в maxBytes: полный ответ в файле]` — видно, что
-  структура отброшена и лежит в выгруженном файле.
-- При обоих пустых именах `invoke_command` и `invoke_many` говорят
-  `укажите command_name или command` вместо `command_name обязателен`.
-- `list_servers`: проба, не дождавшаяся свободного слота, больше не помечает
-  сервер `healthy: false` на 15 секунд — исход неизвестен, ответ
-  `healthy: true, unknown: true` без `error` и без записи в кэш. Панель
-  показывает у такого сервера «не проверено», а не «health ok».
-- Панель получила `IdleTimeout` 60 с; `WriteTimeout` не ставится — долгие
-  стримы ответов не должны обрываться.
-- В панели: таблицы статистики больше не дают рваной высоты в двух колонках,
-  подпись «Requests» не наезжает на фильтры, длинный ключ в шапке обрезается, а
-  меню темы на телефоне стало нижним листом и не накрывает кнопки шапки; подписи
-  оси Y при малых числах показывают доли (0.25), а не три одинаковых «1».
-- Ящик деталей на телефоне больше не растягивает строки реестра шире экрана.
-- Подпись ключа правится в диалоге **Ключи**: у строки есть поле подписи и
-  кнопка **Сохранить**, которая появляется, лишь когда значение отличается от
-  сохранённого; `restartError` набора показывается отдельным предупреждением.
-- Образы `slim`/`full` собираются и публикуются на теге самим workflow:
-  `X.Y.Z-slim|full` и `latest`/`latest-full`; без секретов `REGISTRY*` шаг
-  пропускается. Раньше реестр наполнялся руками, а доки обещали автоматику.
-- `Dockerfile`: `VERSION` обязан быть без ведущего `v` (форма `vX.Y.Z`
-  отвергается сборкой), появились метки `org.opencontainers.image.*`,
-  `uv` запинен, `HEALTHCHECK` проверяет и 9100, и 9091 — контейнер панели
-  больше не висит `unhealthy`.
-- `MCPRIG_*`, `BAO_*`, `OPENBAO_*` в `envAllow`/`env` и в `${…}` внутри
-  `headers` отвергаются при загрузке набора: обещание «резервные имена вниз не
-  идут» стало проверкой, а не советом.
-- `{file:…}` ловится в любом месте строки (`config.HasFileRef` на том же
-  шаблоне, что и раскрыватель): `p{file:/…/env.json}` больше не протаскивает
-  файл в окружение ребёнка.
-- `transport.authToken` проходит проверку резервных имён, как `env` и
-  `headers`: `${MCPRIG_…}` в токене больше не раскрывается.
-- Битый сервер не валит весь набор: ошибка `json.Unmarshal` остаётся в
-  `_configError` этой записи, остальные серверы набора загружаются.
-- `DELETE /api/servers/<name>` отказывает, когда сервер последний в наборе:
-  пустой набор больше не создаётся. Ответ — 400 с текстом
-  `сервер X последний в наборе Y`.
-- `doctor` читает пароль панели из `panel.env`, затем из устаревшего `env`;
-  кавычки снимаются парой, `export` и комментарии понимаются.
-- Подключение к серверу ограничено 30 секундами, а `Close` сообщает, что
-  соединение не завершилось, вместо молчания: зависший `initialize` больше не
-  держит вызов до таймаута клиента.
-- Повтор вызова по сети не срабатывает на таймаут: `net.Error` с
-  `Timeout()` больше не считается поводом повторить, двойного побочного
-  эффекта нет.
-- Лимит одновременных вызовов на сервер общий для всех запросов, а не
-  считается заново внутри каждого `invoke_many`; ключ лимита — запись сервера,
-  поэтому выдуманные имена не плодят слоты.
-- `list_commands` и `describe_commands` принимают `maxBytes` (до 1 МиБ); без
-  поля каталог приходит целиком, как раньше. Выгруженный файл держит весь
-  ответ (прежний потолок 4 МиБ снят), текстовый маркер называет путь.
-- Подпись ключа не затирается клиентской меткой: `key:<fp>/<clientInfo>` виден
-  как подпись, когда она задана.
-- Проба `bwrap` кэширует только успех: одна неудача при загрузке хоста больше
-  не запрещает песочницу до перезапуска процесса.
-- OAuth сверяет `state` до обработки `?error=`: чужой callback не снимает
-  ожидание, а адрес приёмника берётся из `redirect_uri`, а не из отдельного
-  `callbackPort` — молчаливого пятиминутного таймаута больше нет.
-- `Bearer` с лишними пробелами даёт и метку, и доступ, а не метку без доступа.
-- Панель опрашивает `/api/stats` только на вкладке «Статистика»; после отзыва
-  ключа, остановившего набор, показывается предупреждение.
-- Юнит `mcprig-set@`: `EnvironmentFile` необязателен — набор без `env`
-  запускается, а не падает в цикл перезапусков.
+- An OAuth receiver started with a `redirectUrl` that has no port (or has
+  `:0`) is rejected: the browser has nowhere to return, and the old ephemeral
+  port meant five minutes of silent waiting.
+- The `bwrap` probe is capped at 10 seconds and shared between parallel starts:
+  a hung `bwrap` no longer blocks sandbox servers forever, and a failure is not
+  cached — the next start tries again.
+- A background set restart after a variable or server change is cancelled with
+  the panel: the goroutine used to outlive `Close` and leave a child process
+  alive on the set port.
+- Server import and add reject `{file:…}` anywhere in a value, not only at the
+  start: `p{file:/…}` no longer smuggles a file into the set environment.
+- Deleting a set's last server answers `400` "server X is the last in set Y",
+  and sets are not stopped: the registry is written first, the stop follows a
+  success.
+- A race in `startLocked`: the process fields (`exited`, `stopping`,
+  `restarts`) are read under a single `rt.mu` lock, matching how `wait` and
+  `kill` write them.
+- Server browsing no longer fails with "session closed" on a long call:
+  `lookup` holds the session by refcount, `close`/`sweep` close it after
+  `release`.
+- Expired panel sessions are removed by the health ticker, not only by `get`.
+- A failed log rotation of a set no longer loses output: the old file stays and
+  the error is visible in the set status `error` field.
+- The log tail is read from the last kilobytes through `Seek` instead of the
+  whole 5 MiB file on every panel poll.
+- A set's `servers.json` is written through `internal/atomicfile` — with a
+  directory fsync and `0600` permissions.
+- A set's `/stats` request passes its Host guard: the panel sets `Host` from
+  the first `AllowedHosts` entry.
+- A policy refusal inside `invoke_many` carries the same marker in `result` —
+  `🚫 Blocked by mcprig policy: …` and `_meta.lazyMcpPolicy: "blocked"` — as
+  `invoke_command`: a hook client sees the refusal in a fan-out, not just an
+  `error` string.
+- Cutting an answer with `structuredContent` adds the line
+  `[structuredContent does not fit maxBytes: full answer in the file]` to the
+  marker — it is visible that the structure was dropped and lies in the dumped
+  file.
+- With both names empty, `invoke_command` and `invoke_many` say
+  `specify command_name or command` instead of `command_name is required`.
+- `list_servers`: a probe that did not get a free slot no longer marks the
+  server `healthy: false` for 15 seconds — the outcome is unknown, and the
+  answer is `healthy: true, unknown: true` with no `error` and no cache write.
+  The panel shows "not checked" for such a server instead of "health ok".
+- The panel got `IdleTimeout` 60 s; `WriteTimeout` is not set — long response
+  streams must not be cut.
+- In the panel: statistics tables no longer give ragged heights in two columns,
+  the "Requests" label no longer runs into the filters, a long key in the header
+  is truncated, and the theme menu on a phone became a bottom sheet that does
+  not cover the header buttons; Y-axis labels at small numbers show fractions
+  (0.25) instead of three identical "1"s.
+- The details drawer on a phone no longer stretches registry rows wider than the
+  screen.
+- The key note is edited in the **Keys** dialog: a row has a note field and a
+  **Save** button that appears only when the value differs from the saved one; a
+  set's `restartError` is shown as a separate warning.
+- The `slim`/`full` images are built and published on the tag by the workflow
+  itself: `X.Y.Z-slim|full` and `latest`/`latest-full`; without the `REGISTRY*`
+  secrets the step is skipped. The registry used to be filled by hand while the
+  docs promised automation.
+- `Dockerfile`: `VERSION` must have no leading `v` (the `vX.Y.Z` form is
+  rejected by the build), `org.opencontainers.image.*` labels appeared, `uv` is
+  pinned, and `HEALTHCHECK` probes both 9100 and 9091 — the panel container no
+  longer hangs `unhealthy`.
+- `MCPRIG_*`, `BAO_*` and `OPENBAO_*` in `envAllow`/`env` and in `${…}` inside
+  `headers` are rejected at set load: the promise that reserved names do not go
+  down became a check rather than advice.
+- `{file:…}` is caught anywhere in a string (`config.HasFileRef` on the same
+  template as the expander): `p{file:/…/env.json}` no longer drags a file into
+  a child's environment.
+- `transport.authToken` goes through the reserved-name check like `env` and
+  `headers`: `${MCPRIG_…}` in the token is no longer expanded.
+- A broken server does not sink the whole set: the `json.Unmarshal` error stays
+  in that record's `_configError` and the other servers of the set still load.
+- `DELETE /api/servers/<name>` refuses when the server is the last in the set:
+  an empty set is no longer created. The answer is `400` with
+  `server X is the last in set Y`.
+- `doctor` reads the panel password from `panel.env`, then from the legacy
+  `env`; quotes are stripped in pairs, `export` and comments are understood.
+- A server connection is limited to 30 seconds, and `Close` reports that the
+  connection did not finish instead of staying silent: a hung `initialize` no
+  longer holds a call until the client times out.
+- A retry over the network does not fire on a timeout: a `net.Error` whose
+  `Timeout()` is true is no longer a reason to repeat, so there is no double
+  side effect.
+- The per-server concurrency limit is shared by all requests instead of being
+  computed afresh inside every `invoke_many`; the limit key is the server
+  record, so invented names do not multiply slots.
+- `list_commands` and `describe_commands` accept `maxBytes` (up to 1 MiB);
+  without the field the catalog comes whole, as before. The dumped file holds
+  the whole answer (the old 4 MiB ceiling is gone), and the text marker names
+  the path.
+- A key note is not overwritten by the client label: `key:<fp>/<clientInfo>`
+  shows as the note when one is set.
+- The `bwrap` probe caches only success: a single failure at host load no longer
+  forbids the sandbox until the process restarts.
+- OAuth checks `state` before handling `?error=`: a foreign callback does not
+  clear the pending wait, and the receiver address comes from `redirect_uri`
+  rather than a separate `callbackPort` — the silent five-minute timeout is
+  gone.
+- `Bearer` with extra spaces yields both a label and access, not a label without
+  access.
+- The panel polls `/api/stats` only on the **Statistics** tab; after revoking a
+  key that stopped a set, a warning is shown.
+- The `mcprig-set@` unit: `EnvironmentFile` is optional — a set without `env`
+  starts instead of looping on restarts.
 
-### Изменено в доках
+### Internal
 
-- Сэмплы `init --client opencode` получили уровень `"servers"` — как печатает
-  бинарь; `deploy/mcprig-warm.service` стучится в `9091` (дефолт панели, а не
-  порт одного хоста); уборка `tool-out` — каждые десять минут, а не раз в час;
-  `doctor` — пять секций; README — два scrypt одновременно и пять
-  мета-инструментов; `docs/decisions/0003` помечен superseded; русская
-  установка догнала английскую по `MCPRIG_HOST` и rootless Docker.
+- The `init --client opencode` samples gained the `"servers"` level, as the
+  binary prints it; `deploy/mcprig-warm.service` calls `9091` (the panel
+  default, not one host's port); `tool-out` cleanup runs every ten minutes
+  instead of hourly; `doctor` has five sections; the README says two scrypt at
+  once and five meta-tools; `docs/history/decisions/0003-naming-and-repo.md` is marked superseded; the
+  Russian install caught up with the English one on `MCPRIG_HOST` and rootless
+  Docker.
 
 ## [0.3.8] - 2026-11-10
 
 ### Added
 
-- `invoke_command` и `invoke_many` принимают `command` синонимом
-  `command_name` — так поле называет `list_commands`; оба ключа с разными
-  значениями отвергаются.
+- `invoke_command` and `invoke_many` accept `command` as a synonym of
+  `command_name` — that is how `list_commands` names the field; both keys with
+  different values are rejected.
 - `CONTRIBUTING.md` and `CONTRIBUTING.ru.md`: where an issue and a pull request
   go, the commit form, the gate before pushing, and the rule that a behaviour
   change updates both doc trees and the changelog.
 - `.gitea` issue forms for a bug and a proposal, plus a pull-request template
   that asks what changed, the gate result and the docs touched.
 - Versioning rules in both contributing files: SemVer pre-1.0, the tag is the
-  only version source, what a `PATCH` and a `MINOR` may carry, and how a
-  release commit and a published tag are treated.
+  only version source, what a `PATCH` and a `MINOR` may carry, and how a release
+  commit and a published tag are treated.
 
 ### Fixed
 
-- Схемы инструментов больше не объявляют `command_name` обязательным: он и
-  `command` — равноправные имена (JSON Schema `anyOf`), поэтому клиент,
-  проверяющий `required`, принимает `command`.
-- `invoke_many` доведён до общего стиля ошибок: тип значения — «ключ command:
-  ожидался тип «строка», получен тип «число»» с индексом вызова, лишний ключ
-  перечисляет допустимые, подсказка упоминает синоним.
-- Топ-level аргументы не-объект переводятся в «аргументы: ожидался тип
-  «объект», получен тип «строка»», без имени Go-типа.
-- Ошибка лишних ключей перечисляет допустимые, а ошибка типа называет ключ и
-  вид значения (`ключ server: ожидался тип «строка», получен тип «число»`)
-  вместо имени Go-структуры.
-- Причина изоляции не дублирует префикс: `без изоляции: bwrap не найден в
-  PATH`, а не `без изоляции: sandbox unavailable: …`.
-- `doctor` проверяет `prlimit` и печатает предупреждения как `внимание:`, не
-  `ok:`.
-- Документация: `command` в таблице `invoke_command` (en/ru), сборка образа с
-  `--build-arg VERSION=` (иначе бинарь отвечает `dev`).
-- Образы везут `bubblewrap` и `prlimit` (`util-linux`): `"sandbox": {}` не
-  падает на `bwrap не найден в PATH`, а песочница больше не отвергает
-  `prlimit` как относительный путь.
-- Образ `full` везёт uv/uvx в `/usr/bin`: stdio-серверы через `uvx` стартуют.
-- Оба образа задают `MCPRIG_HOST=0.0.0.0`: панель в контейнере отвечает на
-  опубликованном порту, а не только на loopback внутри.
-- Ошибка сервера больше не обещает `bwrap` тому, кому песочница не досталась:
-  `list_servers` показывает реальную изоляцию.
+- Tool schemas no longer declare `command_name` required: it and `command` are
+  equal names (JSON Schema `anyOf`), so a client that checks `required` accepts
+  `command`.
+- `invoke_many` moved to the common error style: a value type error reads
+  `key command: expected type "string", got type "number"` with the call index,
+  an extra key lists the allowed ones, and the hint mentions the synonym.
+- Top-level arguments that are not an object become
+  `arguments: expected type "object", got type "string"`, with no Go type name.
+- The extra-keys error lists the allowed keys, and the type error names the key
+  and the kind of value (`key server: expected type "string", got type
+  "number"`) instead of a Go struct name.
+- An isolation reason no longer doubles the prefix: `no isolation: bwrap not
+  found in PATH` instead of `no isolation: sandbox unavailable: …`.
+- `doctor` checks `prlimit` and prints warnings as `warning:`, not `ok:`.
+- Documentation: `command` in the `invoke_command` table (en/ru), image build
+  with `--build-arg VERSION=` (otherwise the binary answers `dev`).
+- Images carry `bubblewrap` and `prlimit` (`util-linux`): `"sandbox": {}` no
+  longer fails with `bwrap not found in PATH`, and the sandbox no longer rejects
+  `prlimit` as a relative path.
+- The `full` image carries uv/uvx in `/usr/bin`: stdio servers through `uvx`
+  start.
+- Both images set `MCPRIG_HOST=0.0.0.0`: a panel in a container answers on the
+  published port, not only on loopback inside.
+- A server error no longer promises `bwrap` to a server that did not get the
+  sandbox: `list_servers` shows the real isolation.
 
 ## [0.3.7] - 2026-11-10
 
 ### Added
+
 - Panel shows each server's isolation: a muted `bwrap` badge when the sandbox
-  applied, a warning `без изоляции` badge when bubblewrap did not start, and
-  `конфиг отвергнут` for a record with `_configError`.
+  applied, a warning `no isolation` badge when bubblewrap did not start, and
+  `config rejected` for a record with `_configError`.
 
 ## [0.3.6] - 2026-11-10
 
 ### Added
 
-- Панель редактирует реестр серверов хоста: `GET/POST /api/servers`,
-  `PUT/DELETE /api/servers/<имя>` и форма в дровере с полями транспорта,
-  `env`/`envAllow`, тегов и блока `sandbox` (`mode`, `onUnavailable`, `ro`,
-  `rw`, `network`, `memoryMb`, `pids`, `tmpMb`, `timeoutSec`). Отказ бэкенда
-  показывается в форме, запись не меняется.
-- Мок панели считает статистику по фильтрам и заполняет счётчики всех наборов
-  из `bySet`.
-- `mcprig stdio` ведёт историю вызовов: `$MCPRIG_DATA_DIR/stdio/stats/` держит
-  те же `raw-*.jsonl`, `day-*.json` и `month-*.json`, что каталог набора, и
-  разрез по периодам читается с диска. Клиент в строке — `stdio`: транспорт и
-  есть единственный клиент процесса. Недоступный каталог — предупреждение в
-  stderr, прокси обслуживает дальше.
-- `GET /api/stats?set=all` (и пустой `set`) отдаёт `bySet`:
-  `{set, calls, failures, totalMs}` по наборам, у которых в периоде есть
-  вызовы, — таблица наборов показывает счётчики, не открывая набор. Набор без
-  вызовов в разрез не попадает, нулями не отвечает; у одного набора `bySet` нет.
-
+- The panel edits the host server registry: `GET/POST /api/servers`,
+  `PUT/DELETE /api/servers/<name>` and a form in the drawer with transport
+  fields, `env`/`envAllow`, tags and the `sandbox` block (`mode`, `onUnavailable`,
+  `ro`, `rw`, `network`, `memoryMb`, `pids`, `tmpMb`, `timeoutSec`). A backend
+  refusal is shown in the form and the record stays unchanged.
+- The panel mock computes statistics by filters and fills the counters of all
+  sets from `bySet`.
+- `mcprig stdio` keeps a call history: `$MCPRIG_DATA_DIR/stdio/stats/` holds the
+  same `raw-*.jsonl`, `day-*.json` and `month-*.json` as a set directory, and
+  period slices are read from disk. The client in the row is `stdio`: the
+  transport is the only client of the process. An unreachable directory is a
+  warning on stderr and the proxy keeps serving.
+- `GET /api/stats?set=all` (and an empty `set`) returns `bySet`:
+  `{set, calls, failures, totalMs}` per set with calls in the period — the set
+  table shows counters without opening a set. A set with no calls in the period
+  is not in the slice and answers no zeros; a single set has no `bySet`.
 
 ### Changed
 
-- `period=7d` держит в памяти распределение латентностей (значение мс → сколько
-  вызовов), а не список всех вызовов: память зависит от числа разных значений
-  латентности, а не от числа строк журнала. Процентили остались точными
+- `period=7d` keeps a latency distribution in memory (ms value → call count)
+  instead of the list of all calls: memory depends on the number of distinct
+  latency values, not on the number of journal rows. Percentiles stay exact
   (`approximate:false`).
-- Просмотр набора показывает `logging` по наличию инструмента
-  `logging/setLevel` в `tools/list`, а не по `ServerCapabilities.Logging`
-  (deprecated с ревизии протокола 2026-07-28, SEP-2577). Где инструмент есть,
-  вид и поведение прежние.
+- Set browsing shows `logging` by the presence of the `logging/setLevel` tool in
+  `tools/list` rather than `ServerCapabilities.Logging` (deprecated since
+  protocol revision 2026-07-28, SEP-2577). Where the tool exists, the look and
+  behaviour are unchanged.
 
 ### Fixed
 
-- `prlimit` с динамическим загрузчиком монтируется в песочницу сам (как
-  `/lib`, `/lib64`, `/usr/lib`, `/usr/lib64` при наличии), поэтому явный `ro`
-  без `/usr` больше не ломает старт сервера с лимитами.
-- `mcprig stdio` чистит `tool-out` (`MCPRIG_TOOLOUT_TTL`/`MCPRIG_TOOLOUT_MAX`)
-  тем же свипом при старте и раз в час, что `serve` и `panel`, и в том же
-  базовом каталоге: выгрузки stdio-процесса больше не остаются навсегда.
+- `prlimit` with a dynamic loader is mounted into the sandbox by itself (like
+  `/lib`, `/lib64`, `/usr/lib`, `/usr/lib64` when present), so an explicit `ro`
+  without `/usr` no longer breaks the start of a server with limits.
+- `mcprig stdio` cleans `tool-out` (`MCPRIG_TOOLOUT_TTL`/`MCPRIG_TOOLOUT_MAX`)
+  with the same sweep at start and hourly as `serve` and `panel`, in the same
+  base directory: stdio process dumps no longer stay forever.
 
 ## [0.3.5] - 2026-11-10
 
 ### Added
 
-- История вызовов на диске у каждого набора (`sets/<id>/stats`, у standalone
-  `serve` — рядом с конфигом): `raw-YYYY-MM-DD.jsonl` по строке на вызов,
-  `day-YYYY-MM-DD.json` с суточной агрегацией и фиксированной гистограммой
-  (1…10000 мс, +∞), `month-YYYY-MM.json` для месяцев старше 30 суток. Ретенция:
-  raw — сегодня + 7 суток, day — до 30, дальше только месяц; ротация и уборка
-  при старте набора и раз в сутки. Запись идёт через ограниченный канал и одна
-  горутина: вызов инструмента не ждёт диска, полный канал теряет строку и
-  считает её в `stats.dropped` снимка набора. Файлы `0600`, каталог `0700`.
+- On-disk call history per set (`sets/<id>/stats`, and next to the config for a
+  standalone `serve`): `raw-YYYY-MM-DD.jsonl` one line per call,
+  `day-YYYY-MM-DD.json` with daily aggregation and a fixed histogram
+  (1…10000 ms, +∞), `month-YYYY-MM.json` for months older than 30 days.
+  Retention: raw — today + 7 days, day — up to 30, after that only the month;
+  rotation and cleanup at set start and once a day. Writes go through a bounded
+  channel and one goroutine: a tool call does not wait for the disk, a full
+  channel drops the row and counts it in the set snapshot's `stats.dropped`.
+  Files `0600`, directory `0700`.
 - `GET /api/stats?set=<id|all>&period=today|7d|30d|archive&server=&tool=&client=&bucket=hour|day|month`:
-  итоги, ряд по времени и разрезы по инструментам, серверам и клиентам. За
-  ≤7 суток процентили считаются по сырому журналу точно (`approximate:false`),
-  за 30 суток и архив — по гистограмме (`approximate:true`, середина корзины).
-  `set=all` складывает все наборы; набор без каталога истории — в `unreachable`.
-  Неизвестный `bucket` — `400`.
-
+  totals, a series over time and breakdowns by tool, server and client. For ≤7
+  days percentiles are computed from the raw journal exactly
+  (`approximate:false`), for 30 days and the archive from the histogram
+  (`approximate:true`, bucket midpoint). `set=all` sums all sets; a set without
+  a history directory lands in `unreachable`. An unknown `bucket` is `400`.
 
 ### Changed
 
-- Лог набора теперь `sets/<id>/mcprig.log` (был `lazy-mcp.log`). При первом
-  старте набора унаследованный `lazy-mcp.log` переименовывается, хвост не
-  теряется; формат `servers.json` не изменился.
-- Панель пишет в свой stdout (его забирает systemd) старт и остановку набора и
-  переход сервера в нездоровье: `набор <id>: запущен|остановлен`,
-  `набор <id>: сервер <имя> unhealthy` с `reason`. Нездоровье логируется только
-  при смене состояния, не на каждом цикле опроса health; состояние опрашивается
-  фоном раз в 30 с, поэтому строки есть и без открытой панели.
-- При старте панель сворачивает `day-*.json` в месячные файлы у всех наборов:
-  набор, остановленный навсегда, больше не теряет свои дни из архива. Архив
-  также читает несвёрнутые `day-*.json` старше 30 суток.
-- Строка `остановлен` пишется общим путём `Stop`/`Restart`: рестарт её больше не
-  пропускает, а `Stop` после падения процесса её не выдумывает.
+- The set log is now `sets/<id>/mcprig.log` (was `lazy-mcp.log`). On a set's
+  first start the inherited `lazy-mcp.log` is renamed and the tail is not lost;
+  the `servers.json` format is unchanged.
+- The panel writes set start and stop and a server going unhealthy to its own
+  stdout (systemd collects it): `set <id>: started|stopped`,
+  `set <id>: server <name> unhealthy` with `reason`. Unhealthy is logged only on
+  a state change, not on every health poll; the state is polled in the
+  background every 30 s, so the lines appear without an open panel.
+- At start the panel folds `day-*.json` into monthly files for all sets: a set
+  stopped for good no longer loses its days from the archive. The archive also
+  reads unfolded `day-*.json` older than 30 days.
+- The `stopped` line is written by the common `Stop`/`Restart` path: a restart
+  no longer skips it, and `Stop` after a process crash no longer invents it.
 
 ### Fixed
 
-- Запись с сессионной cookie, но без `Origin`, больше не проходит: при
-  cookie-аутентификации `POST`/`PUT`/`DELETE` требуют `Origin`, совпадающий с
-  запросом целиком — схема, хост и порт (`403` «нужен заголовок Origin»).
-  `MCPRIG_ALLOWED_HOSTS` источником Origin больше не является: панель на чужом
-  порту того же хоста не может остановить набор. За TLS-прокси исходная схема и
-  хост берутся из `X-Forwarded-Proto`/`X-Forwarded-Host`, а `MCPRIG_PROXY_SECRET`
-  считается доверенным прокси и без них (`403` «origin не совпадает с хостом»
-  остаётся для чужого origin). `POST /api/login` не затронут.
-- Неизвестный `command_name` теперь отвергается по кэшу инструментов сервера
-  до вызова апстрима, с одним текстом `неизвестный инструмент "x" у сервера "y"`;
-  прежние три варианта (`unknown tool %q`, `rejected by transport`, ответ
-  апстрима) больше не расходятся. Пустой кэш — вызов идёт как раньше.
-- Отвергнутый на загрузке сервер больше не обещает `isolation: bwrap` в
-  `list_servers` и health: поле отвечает `нет: конфиг отвергнут`.
-- `prlimit`, через который песочница ставит лимиты, монтируется вместе со
-  своим загрузчиком и libc: явный `ro` без `/usr` больше не даёт
+- A request with a session cookie but no `Origin` no longer passes: with cookie
+  auth `POST`/`PUT`/`DELETE` require `Origin` to match the request in full —
+  scheme, host and port (`403` "Origin header required").
+  `MCPRIG_ALLOWED_HOSTS` is no longer an Origin source: a panel on another port
+  of the same host cannot stop a set. Behind a TLS proxy the original scheme and
+  host come from `X-Forwarded-Proto`/`X-Forwarded-Host`, and
+  `MCPRIG_PROXY_SECRET` is trusted as a proxy even without them (`403` "origin
+  does not match host" stays for a foreign origin). `POST /api/login` is
+  unaffected.
+- An unknown `command_name` is now rejected from the server's tool cache before
+  calling upstream, with one text — `unknown tool "x" on server "y"`; the
+  previous three variants (`unknown tool %q`, `rejected by transport`, an
+  upstream answer) no longer diverge. An empty cache — the call goes as before.
+- A server rejected at load no longer promises `isolation: bwrap` in
+  `list_servers` and health: the field answers `no: config rejected`.
+- `prlimit`, through which the sandbox sets limits, is mounted together with its
+  loader and libc: an explicit `ro` without `/usr` no longer gives
   `bwrap: execvp /usr/bin/prlimit: No such file or directory`.
-- Битый `day-*.json` больше не блокирует свёртку месяца и уборку raw: файл
-  пропускается с предупреждением в журнале набора. Ошибка переименования
-  `lazy-mcp.log` → `mcprig.log` тоже пишется предупреждением, а не глотается.
-
-- Проба песочницы шла через `/bin/true` (симлинк): при `PATH` с `/bin` впереди
-  пробный запуск падал «exec внутри песочницы не удался», и с
-  `onUnavailable: deny` ни один изолированный сервер не стартовал. Теперь путь
-  разворачивается по симлинку, а `/bin` привязан в пробе.
-- `prlimit` запускался по имени из PATH ребёнка: без `/usr` в `ro` падало
-  `bwrap: execvp prlimit: No such file or directory` без подсказки. Теперь
-  абсолютный путь, а `doctor` предупреждает о `sandbox.ro` без `/usr`.
-- Умолчание `sandbox.memoryMb` поднято с 512 до 2048: под 512 не стартовал не
-  только node, но и любой Go-сервер (`failed to reserve page summary memory`).
-- Опечатка в имени поля `sandbox` (`memoryMB`, `cwd` внутри блока) больше не
-  молчит: `config.Load` и панель отвечают «sandbox: неизвестные поля: …».
-- `sandbox.mode=none` с лимитами в блоке теперь даёт предупреждение — раньше
-  блок выглядел настроенным, а лимиты не применялись.
+- A broken `day-*.json` no longer blocks the month fold and raw cleanup: the
+  file is skipped with a warning in the set log. A rename failure
+  `lazy-mcp.log` → `mcprig.log` is also logged as a warning instead of
+  swallowed.
+- The sandbox probe went through `/bin/true` (a symlink): with `/bin` ahead in
+  `PATH` the probe run failed "exec inside the sandbox failed", and with
+  `onUnavailable: deny` no isolated server started. The path is now resolved
+  through the symlink and `/bin` is bound in the probe.
+- `prlimit` was run by name from the child's PATH: without `/usr` in `ro` it
+  failed `bwrap: execvp prlimit: No such file or directory` with no hint. Now an
+  absolute path, and `doctor` warns about `sandbox.ro` without `/usr`.
+- The `sandbox.memoryMb` default is raised from 512 to 2048: under 512 not only
+  node failed to start but any Go server (`failed to reserve page summary
+  memory`).
+- A typo in a `sandbox` field name (`memoryMB`, `cwd` inside the block) is no
+  longer silent: `config.Load` and the panel answer `sandbox: unknown fields:
+  …`.
+- `sandbox.mode=none` with limits in the block now warns — the block used to
+  look configured while the limits did not apply.
 
 ## [0.3.4] - 2026-11-10
 
@@ -361,7 +385,7 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - tool-out is swept every 10 minutes instead of hourly: a chatty server writes
   about 2 MiB an hour, and the old cadence let the 256 MiB cap overshoot.
 - `list_servers` and the panel health answer carry `isolation`: `bwrap` when
-  the sandbox is applied, `без изоляции: <reason>` when it was requested but
+  the sandbox is applied, `no isolation: <reason>` when it was requested but
   unavailable. The note clears once the sandbox works again.
 
 ### Fixed
@@ -417,7 +441,6 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - `POST /api/login` answers `400` for empty fields instead of a misleading `401`.
 
 ## [0.3.2] - 2026-11-09
-
 
 ### Changed
 
@@ -489,3 +512,17 @@ of truth, GitHub (`akrhin/mcprig`) is a public mirror with the same archives.
 - HTTP and stdio transports; `init` prints client configs.
 - Docker images (slim and full), Gitea Actions release with goreleaser and
   govulncheck, Go 1.27.3.
+
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/akrhin/mcprig/compare/v0.3.8...v0.4.0
+[0.3.8]: https://github.com/akrhin/mcprig/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/akrhin/mcprig/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/akrhin/mcprig/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/akrhin/mcprig/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/akrhin/mcprig/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/akrhin/mcprig/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/akrhin/mcprig/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/akrhin/mcprig/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/akrhin/mcprig/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/akrhin/mcprig/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/akrhin/mcprig/releases/tag/v0.1.0

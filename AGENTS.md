@@ -4,7 +4,7 @@
 
 ## Правила репозитория
 
-- **Контракт важнее кода.** Поведение берётся из `docs/reference/ts-manager-contract.md`, а не из TS-исходников. Ни одна строка TS сюда не переносится: перенос строки тянет баг и убивает смысл переписывания.
+- **Контракт важнее кода.** Поведение берётся из `docs/history/reference/ts-manager-contract.md`, а не из TS-исходников. Ни одна строка TS сюда не переносится: перенос строки тянет баг и убивает смысл переписывания.
 - **Дефекты эталона — требования, а не наследство.** Список обязательных исправлений — в конце контракта (auth fail-closed, allowlist env, токены не уходят в клиент).
 - Ворота этапа — одна команда, названная в `docs/CURRENT-GOAL.md`. Агент гоняет её сам.
 - Один коммит — одно осмысленное изменение; `git commit` без `--no-verify` (хуки проверяют сборку и тесты).
@@ -21,6 +21,7 @@ go test ./... -race -count=1 -p 1  # тесты; -p 1 обязателен: па
 go test ./e2e -run TestLifecycle -v   # панель + набор + stdio-даунстрим, без подготовки
 bash scripts/contract-e2e.sh      # контракт против BASE (по умолчанию 127.0.0.1:9091)
 bash scripts/sandbox-e2e.sh       # bwrap-песочница на живом хосте: 14/14 PASS
+bash scripts/docs-check.sh        # ворота документации: ссылки, личные пути, сироты, паритет языков, docs/anchors.txt
 bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
 ```
 
@@ -29,5 +30,5 @@ Go-тулчейн: локально 1.24.4, модуль требует 1.27.3 �
 ## Ссылки
 
 - Стенд на настоящих серверах: `docs/dev-real-servers.md` (serena, socraticode, xerj).
-- Эталон: замороженный `lazy-mcp@5a963c5` (upstream-совместимый пакет) и распакованный менеджер в `/tmp/opencode/mm/mcp-manager`.
+- Эталон: замороженный `lazy-mcp@5a963c5` (upstream-совместимый пакет); поведение, которое переносим, — `docs/history/reference/ts-manager-contract.md`.
 - MCP Go SDK: `github.com/modelcontextprotocol/go-sdk` v1.8.0, протокол по умолчанию `2026-07-28`.

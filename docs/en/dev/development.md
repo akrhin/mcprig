@@ -1,3 +1,6 @@
+[← Docs index](../index.md)
+EN · [RU](../../ru/dev/development.md)
+
 This file covers building, the test gate, the contract suite, and the live
 stand against real MCP servers.
 
@@ -25,6 +28,19 @@ server, HTTP transport rules, the manager API, supervision and statistics.
 
 `-p 1` is required: `internal/manager` and `e2e` start real sets on the shared
 9100–9199 range and take each other's ports when packages run in parallel.
+
+## Documentation
+
+```bash
+bash scripts/docs-check.sh
+```
+
+The documentation gate fails on a broken relative link, a path that only exists
+on the author's machine (`docs/forbidden.txt`), a page no other page links to,
+`docs/en` and `docs/ru` listing different files, and a value in
+`docs/anchors.txt` that no longer matches the text. `docs/history/` is exempt
+from the path rule: a dated audit keeps the commands it was run with. Run it
+before a pull request that touches `docs/`, `README*.md` or `CONTRIBUTING*.md`.
 
 Useful narrower runs:
 
@@ -54,7 +70,7 @@ E2E_BASE=http://127.0.0.1:9091 ./scripts/contract-e2e.sh
 
 The same suite runs against the TypeScript reference (`E2E_STRICT=0`) and
 against this binary (`E2E_STRICT=1`). The checks are derived from
-[the TS manager contract](../reference/ts-manager-contract.md) (Russian).
+[the TS manager contract](../../history/reference/ts-manager-contract.md) (Russian).
 
 An empty `E2E_BASE` skips the suite; with `E2E_STRICT=1` it exits non-zero so a
 skipped run cannot read as a passed gate.
@@ -101,3 +117,9 @@ Logs: the panel writes `$DATA/panel.log`, the set writes
 release notes are the tag's `CHANGELOG.md` section
 via `scripts/release-notes.sh`. `goreleaser` itself is not installed on the
 development host.
+
+## See also
+
+- [release.md](release.md) — tag → CI → archives → mirror, as a checklist.
+- [install.md](../install.md) — what the release archives contain and how they land.
+- [architecture.md](../architecture.md) — what the processes do at runtime.

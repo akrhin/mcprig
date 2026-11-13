@@ -1,21 +1,23 @@
 # Участие в разработке
 
-mcprig — проект до 1.0 с одним оператором. Источник истины — GitHub
-(`akrhin/mcprig`).
+mcprig — проект до 1.0 с одним оператором. Разработка идёт в репозитории Gitea:
+там дерево, там гоняется CI и режется релиз. GitHub (`akrhin/mcprig`) —
+публичный эталон: issue и pull request открывают там, и каждый релиз
+перепубликуется там же с теми же архивами и образами.
 
 Прочитать до первой правки: `AGENTS.md` (правила репозитория),
-`docs/CURRENT-GOAL.md` (этап и его ворота), `docs/ru/development.md` (сборка,
-тесты, стенд). Поведение берётся из `docs/reference/ts-manager-contract.md`;
-правка, которая ему противоречит, требует записи в `docs/decisions/`.
+`docs/CURRENT-GOAL.md` (этап и его ворота), `docs/ru/dev/development.md` (сборка,
+тесты, стенд). Поведение берётся из `docs/history/reference/ts-manager-contract.md`;
+правка, которая ему противоречит, требует записи в `docs/history/decisions/`.
 
 ## Что куда
 
 | Что | Куда |
 | --- | --- |
-| ошибка или предложение | issue здесь |
+| ошибка или предложение | issue на GitHub, `akrhin/mcprig/issues` |
 | проблема безопасности | лично владельцу, не публичным issue |
 | вопрос по установке | сначала документация: `docs/ru/` |
-| правка | pull request из ветки, не коммит в `master` |
+| правка | pull request на GitHub из ветки, не коммит в `master` |
 
 ## Issue
 
@@ -144,7 +146,13 @@ done
 
 ## Релиз
 
-Тег `v*` прогоняет gofmt, vet, тесты с `-race` и govulncheck, затем goreleaser
-собирает архивы в черновик; публикует человек. GitHub-зеркало получает те же
-архивы. Release notes — секция `CHANGELOG.md` этого тега, срезанная из
+Релиз режется внутри Gitea. Тег `v*` прогоняет gofmt, vet, тесты с `-race` и
+govulncheck, затем goreleaser собирает архивы в черновик релиза; публикует
+человек. Release notes — секция `CHANGELOG.md` этого тега, срезанная из
 `## [Unreleased]` коммитом `release:`.
+
+Публичная сторона — отдельный независимый проход: `.github/workflows/release.yml`
+запускается на тот же тег в репозитории GitHub, собирает те же архивы через
+goreleaser `--skip=publish`, загружает их в GitHub-релиз через `gh` и пушит
+образы `slim`/`full` в GHCR. В Gitea он не публикует ничего и из черновика
+Gitea не берёт ничего.

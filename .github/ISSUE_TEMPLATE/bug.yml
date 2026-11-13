@@ -1,0 +1,60 @@
+name: Bug report
+description: Something behaves other than the documentation says
+title: "[bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One problem per issue. Replace secrets (tokens, passwords, provider
+        keys) with `<token>`.
+
+        Error strings are Russian and are searched for in the source, so paste
+        them exactly as they appear — a retyped or translated line cannot be
+        found.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected instead
+      description: The exact error line, plus what you expected it to do.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Commands, a config without secrets, the set and server names.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: mcprig version
+      description: Output of `mcprig --version`, or the image tag.
+      placeholder: 0.4.0 / 0.4.0-full
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How it runs
+      options:
+        - binary or systemd
+        - Docker slim
+        - Docker full
+        - from source
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs around the error
+      description: Panel lines ($DATA/panel.log) or set lines ($DATA/sets/<name>/mcprig.log).
+      render: shell
+  - type: textarea
+    id: area
+    attributes:
+      label: Area
+      description: |
+        One of `panel`, `set`, `stdio`, `sandbox`, `config`, `cli`, `docs`,
+        `docker` — say what you can, or leave this empty.

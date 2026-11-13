@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/install.md)
+
 This file covers release archives, systemd units, Docker and the on-disk state.
 
 # Install
@@ -10,15 +13,20 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | --- | --- |
 | OS / arch | linux, darwin × amd64, arm64 |
 | archive | `mcprig_<version>_<os>_<arch>.tar.gz` |
-| contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
+| contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | checksum | `checksums.txt` |
-| release | draft on GitHub; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
+| release | `goreleaser` builds the archives, pushes the `slim`/`full` images to the registry and creates a draft Gitea release that a human publishes; the GitHub release is created by the workflow; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Releases are published on GitHub: `.github/workflows/release.yml` runs the
-tests, `govulncheck` and `goreleaser` on a tag and uploads the archives with
-`gh` to <https://github.com/akrhin/mcprig/releases>; any tag can also be
-released by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Releases are cut on a `v*` tag by Gitea CI (`.gitea/workflows/release.yml`): it
+runs the checks — `go vet`, tests with `-race`, `govulncheck`, `gofmt` — and then
+`goreleaser`, which builds the archives and a draft Gitea release that a human
+publishes. The GitHub workflow (`.github/workflows/release.yml`) fires on the
+same tag: it rebuilds the archives with `goreleaser --skip=publish`, builds and
+pushes the `slim` and `full` images to `ghcr.io/akrhin/mcprig`, and uploads the
+archives with `gh` to <https://github.com/akrhin/mcprig/releases>; it runs no
+tests and no `govulncheck`, just `go build ./...`. A tag can also be released
+by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` is not installed on the development host, so archives are built by
 CI, not here. To build the same binary by hand:
@@ -31,12 +39,17 @@ A plain `go build -o mcprig ./cmd/mcprig` prints `dev` for `mcprig -version`.
 
 ## systemd (user units)
 
-Two units are in `deploy/`:
+Three units and a timer are in `deploy/`:
 
 | unit | what it runs | config |
 | --- | --- | --- |
 | `mcprig.service` | `mcprig panel` — registry, supervision, panel | `~/.config/mcprig/panel.env` |
 | `mcprig-set@.service` | `mcprig serve --config …` — one set as its own service | `~/.config/mcprig/sets/<set>/servers.json` and `env` |
+| `mcprig-warm.service` + `mcprig-warm.timer` | `mcprig warm --set %i` — keeps an autostart set warm every 10 minutes | `~/.config/mcprig/panel.env` and `env` |
+
+`mcprig-warm.*` are shipped as templates: install them as
+`mcprig-warm@.service` and `mcprig-warm@.timer` — the `@` carries the set name —
+and enable one timer per autostart set.
 
 `mcprig-set@` is an alternative to the panel: a set can run under systemd
 without the manager. Sets started from the panel are child processes of the
@@ -61,7 +74,8 @@ systemctl --user daemon-reload
 systemctl --user enable --now mcprig.service
 ```
 
-Both units use `Restart=on-failure`, `NoNewPrivileges=yes` and `PrivateTmp=yes`.
+The panel and set units use `Restart=on-failure`, `NoNewPrivileges=yes` and
+`PrivateTmp=yes`; the warm unit is `oneshot` and has no `Restart`.
 The panel stops with `TimeoutStopSec=15`, a set with `TimeoutStopSec=10`.
 `systemd-analyze verify` reports no errors except the not-yet-installed binary
 path.
@@ -111,9 +125,10 @@ inside the container; publish it on `MCPRIG_PORT` (the panel default is 9091,
 `deploy/docker-compose.yml` runs the `ops` set on 9101). Outside Docker
 `MCPRIG_HOST` stays unset and the panel keeps the `127.0.0.1` default — do not
 copy the container value to a host unit.
-The image healthcheck asks the set on `http://127.0.0.1:9100/healthz` and the
-panel on `http://127.0.0.1:9091/healthz`, so the container counts as healthy
-only when both answer; it assumes the default ports, so with another
+The image healthcheck asks the set on `http://127.0.0.1:9100/healthz` and, if
+that fails, the panel on `http://127.0.0.1:9091/healthz`, so the container counts
+as healthy when **either** answers — the panel endpoint is the fallback for a
+panel-only container. The check assumes the default ports, so with another
 `transport.port` or `MCPRIG_PORT` pass `--health-cmd` or set the healthcheck in
 compose.
 
@@ -156,11 +171,14 @@ The directory is created `0700`. What lives there:
 | path | contents | mode |
 | --- | --- | --- |
 | `registry.json` | servers, sets, keys, port allocator | `0600` |
+| `registry.json.bak` | the previous `registry.json`, rewritten on every save | `0600` |
 | `registry.json.corrupt-<unix>` | a registry that failed to parse, kept aside | as written |
 | `env.json` | panel-managed variables (flat strings) | `0600` |
 | `manager.pid` | pid of the running panel; a second panel refuses to start | `0600` |
 | `sets/<id>/servers.json` | materialized config the set process reads | `0600` |
 | `sets/<id>/mcprig.log` | set log; rotates to `.log.1` at 5 MiB | `0600` |
+| `sets/<id>/stats/` | call history and per-day `raw-*.jsonl` of that set | `0600` |
+| `sets/<id>/tool-out/` | result bodies truncated out of responses, one file each | `0600` |
 | `sets/<id>/oauth.json` | access and refresh tokens for OAuth downstreams of that set | `0600` |
 | `sets/<id>/oauth-clients.json` | dynamic client registration data of that set | `0600` |
 | `oauth.json` | access and refresh tokens for OAuth downstreams of a standalone `serve`/`stdio` process | `0600` |
@@ -170,5 +188,15 @@ A set started by the panel gets `MCPRIG_DATA_DIR=<data>/sets/<id>`, so its
 OAuth files live under `sets/<id>/`. The top-level `oauth*.json` files belong to
 `serve`/`stdio` processes started with the root state directory.
 
-All writes go through a temp file and a rename, so a crash never leaves a
-half-written file. Never copy `registry.json` while the panel is running.
+`registry.json`, `env.json`, `sets/<id>/servers.json` and the OAuth files are
+written through a temp file and a rename, so a crash never leaves a half-written
+one. The set log and the call history are appended in place (`O_APPEND`, `0600`)
+and may end with a partial last line. Never copy `registry.json` while the panel
+is running.
+
+## See also
+
+- [configuration.md](configuration.md) — the `servers.json` a set runs from.
+- [cli.md](cli.md) — `panel`, `doctor`, `warm` and the flags the units pass.
+- [dev/release.md](dev/release.md) — how the archives in a release are built.
+- [troubleshooting.md](troubleshooting.md) — when the unit does not come up.

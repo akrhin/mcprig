@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/configuration.md)
+
 This file documents `servers.json`: every field the proxy reads, both command
 forms, secret references, and what happens when an entry is broken.
 
@@ -47,7 +50,12 @@ and read as-is: no migration, no wrapper.
 `healthMonitor` is written by the panel (`interval: 60000`, `timeout: 120000`)
 so the file stays byte-compatible with lazy-mcp, but health in mcprig is
 governed by the 15 s cache described in
-[architecture.md](architecture.md#health).
+[architecture.md](architecture.md#health). The panel also writes
+`logging: {level: "info"}` and `requestTimeout: 120000`.
+
+A hand-written file without `requestTimeout` means no limit; a set materialized
+by the panel always gets `120000`, so deleting the key by hand is the only way to
+get zero.
 
 ## Servers
 
@@ -278,3 +286,10 @@ A server block is merged over the set-wide block; unset fields fall back to
 the set-wide value, then to the default. Dynamic client registration, PKCE,
 code exchange and refresh are done by the MCP SDK. Tokens are stored in
 `<data dir>/oauth.json`.
+
+## See also
+
+- [install.md](install.md) — where the config and the state directory live.
+- [architecture.md](architecture.md) — what a set does with this config at runtime.
+- [meta-tools.md](meta-tools.md) — what the client sees once the set is up.
+- [troubleshooting.md](troubleshooting.md) — a server that stays `healthy: false`.

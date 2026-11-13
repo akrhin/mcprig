@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+[EN](../en/install.md) · RU
+
 Файл охватывает релизные архивы, юниты systemd, Docker и состояние на диске.
 
 # Установка
@@ -10,15 +13,21 @@
 | --- | --- |
 | ОС / архитектура | linux, darwin × amd64, arm64 |
 | архив | `mcprig_<version>_<os>_<arch>.tar.gz` |
-| содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig-set@.service`, `deploy/mcprig.service` |
+| содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | контрольная сумма | `checksums.txt` |
-| релиз | черновик на GitHub; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
+| релиз | `goreleaser` собирает архивы, пушит образы `slim`/`full` в реестр и создаёт черновик релиза Gitea, который публикует человек; релиз на GitHub создаёт воркфлоу; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Релиз публикуется на GitHub: `.github/workflows/release.yml` по тегу гоняет
-тесты, `govulncheck` и `goreleaser` и загружает архивы через `gh` в
-<https://github.com/akrhin/mcprig/releases>; любой тег можно выпустить и
-руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Релиз выпускается по тегу `v*` в Gitea CI (`.gitea/workflows/release.yml`): он
+гоняет проверки — `go vet`, тесты с `-race`, `govulncheck`, `gofmt` — а затем
+`goreleaser`, который собирает архивы, пушит образы `slim`/`full` в реестр и
+создаёт черновик релиза в Gitea; черновик публикует человек. Воркфлоу GitHub
+(`.github/workflows/release.yml`) идёт по тому же тегу: пересобирает архивы с
+`goreleaser --skip=publish`, собирает и пушит образы `slim` и `full` в
+`ghcr.io/akrhin/mcprig` и заливает архивы через `gh` в
+<https://github.com/akrhin/mcprig/releases>; тестов и `govulncheck` там нет,
+только `go build ./...`. Тег можно выпустить и руками:
+`gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` на хосте разработки не установлен, архивы собирает CI, а не он.
 Собрать тот же бинарник руками:
@@ -31,12 +40,17 @@ CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(git describe 
 
 ## systemd (пользовательские юниты)
 
-В `deploy/` лежат два юнита:
+В `deploy/` лежат три юнита и таймер:
 
 | юнит | что запускает | конфигурация |
 | --- | --- | --- |
 | `mcprig.service` | `mcprig panel` — реестр, надзор, панель | `~/.config/mcprig/panel.env` |
 | `mcprig-set@.service` | `mcprig serve --config …` — один набор отдельной службой | `~/.config/mcprig/sets/<set>/servers.json` и `env` |
+| `mcprig-warm.service` + `mcprig-warm.timer` | `mcprig warm --set %i` — держит autostart-набор тёплым каждые 10 минут | `~/.config/mcprig/panel.env` и `env` |
+
+`mcprig-warm.*` поставляются шаблонами: ставьте их как `mcprig-warm@.service` и
+`mcprig-warm@.timer` — имя набора несёт `@` — и включайте по таймеру на каждый
+autostart-набор.
 
 `mcprig-set@` — альтернатива панели: набор может работать под systemd без
 менеджера. Наборы, запущенные из панели, — дочерние процессы панели, а не юниты
@@ -60,8 +74,9 @@ systemctl --user daemon-reload
 systemctl --user enable --now mcprig.service
 ```
 
-Оба юнита используют `Restart=on-failure`, `NoNewPrivileges=yes` и
-`PrivateTmp=yes`. Панель останавливается с `TimeoutStopSec=15`, набор — с
+Юниты панели и набора используют `Restart=on-failure`, `NoNewPrivileges=yes` и
+`PrivateTmp=yes`; юнит прогрева — `oneshot`, `Restart` у него нет. Панель
+останавливается с `TimeoutStopSec=15`, набор — с
 `TimeoutStopSec=10`. `systemd-analyze verify` не сообщает ошибок, кроме пути к
 ещё не установленному бинарнику.
 
@@ -107,10 +122,12 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 `MCPRIG_HOST` не задан, и панель остаётся на `127.0.0.1` — не переносите
 контейнерное значение в systemd-юнит хоста.
 
-Healthcheck образа спрашивает набор на `http://127.0.0.1:9100/healthz` и панель
-на `http://127.0.0.1:9091/healthz`, так что контейнер `healthy`, только когда
-отвечают оба; он рассчитан на порты по умолчанию, при другом `transport.port`
-или `MCPRIG_PORT` задай `--health-cmd` или healthcheck в compose.
+Healthcheck образа спрашивает набор на `http://127.0.0.1:9100/healthz`, а если
+тот не отвечает — панель на `http://127.0.0.1:9091/healthz`, так что контейнер
+`healthy`, когда отвечает **любой** из них; второй адрес — запасной для
+контейнера с одной панелью. Проверка рассчитана на порты по умолчанию, при другом
+`transport.port` или `MCPRIG_PORT` задай `--health-cmd` или healthcheck в
+compose.
 
 `deploy/docker-compose.yml` запускает два набора (`demo` на 9100, `ops` на 9101)
 из `ghcr.io/akrhin/mcprig:latest`, монтирует каждый `servers.json` только для
@@ -148,11 +165,14 @@ node/npm и uv: серверу на `npx` или `uvx` нужен `full`. Сер
 | путь | содержимое | режим |
 | --- | --- | --- |
 | `registry.json` | серверы, наборы, ключи, распределитель портов | `0600` |
+| `registry.json.bak` | предыдущий `registry.json`, перезаписывается при каждом сохранении | `0600` |
 | `registry.json.corrupt-<unix>` | реестр, который не разобрался, отложенный в сторону | как записан |
 | `env.json` | переменные под управлением панели (плоские строки) | `0600` |
 | `manager.pid` | pid работающей панели; вторая панель отказывается стартовать | `0600` |
 | `sets/<id>/servers.json` | материализованная конфигурация, которую читает процесс набора | `0600` |
 | `sets/<id>/mcprig.log` | лог набора; ротируется в `.log.1` при 5 МиБ | `0600` |
+| `sets/<id>/stats/` | история вызовов и посуточные `raw-*.jsonl` этого набора | `0600` |
+| `sets/<id>/tool-out/` | тела ответов, вырезанные из ответа, по файлу на каждый | `0600` |
 | `sets/<id>/oauth.json` | токены доступа и обновления для OAuth-нижестоящих этого набора | `0600` |
 | `sets/<id>/oauth-clients.json` | данные динамической регистрации клиентов этого набора | `0600` |
 | `oauth.json` | токены доступа и обновления для OAuth-нижестоящих отдельного процесса `serve`/`stdio` | `0600` |
@@ -162,6 +182,15 @@ node/npm и uv: серверу на `npx` или `uvx` нужен `full`. Сер
 его OAuth-файлы лежат в `sets/<id>/`. Файлы `oauth*.json` в корне относятся к
 процессам `serve`/`stdio`, запущенным с корневым каталогом состояния.
 
-Все записи идут через временный файл и переименование, поэтому падение не
-оставляет полузаписанного файла. Не копируйте `registry.json`, пока панель
-работает.
+`registry.json`, `env.json`, `sets/<id>/servers.json` и OAuth-файлы пишутся
+через временный файл и переименование, поэтому падение не оставляет
+полузаписанного файла. Лог набора и история вызовов дописываются на месте
+(`O_APPEND`, `0600`) и могут кончаться неполной последней строкой. Не копируйте
+`registry.json`, пока панель работает.
+
+## См. также
+
+- [configuration.md](configuration.md) — `servers.json`, из которого живёт набор.
+- [cli.md](cli.md) — `panel`, `doctor`, `warm` и флаги, с которыми юниты запускают бинарник.
+- [dev/release.md](dev/release.md) — как собираются архивы релиза.
+- [troubleshooting.md](troubleshooting.md) — когда юнит не поднимается.

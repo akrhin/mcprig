@@ -1,0 +1,42 @@
+name: Feature request
+description: A capability mcprig does not have yet
+title: "[feat] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        mcprig is a proxy: one binary that puts a whole MCP set behind five
+        meta-tools (`list_servers`, `list_commands`, `describe_commands`,
+        `invoke_command`, `invoke_many`). Start with the problem, not the
+        implementation — the smallest change that solves it is the one that
+        gets built.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do and what blocks it today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would change
+      description: The interface or behaviour you have in mind, as concretely as you can.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do instead now
+      description: A config, a wrapper, a second process — or nothing at all.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - panel
+        - set
+        - stdio
+        - sandbox
+        - config
+        - cli
+        - docs
+        - docker

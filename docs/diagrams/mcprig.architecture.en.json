@@ -4,21 +4,28 @@
   "meta": {
     "title": "mcprig: an MCP set as one server",
     "output": "mcprig.architecture.en.html",
-    "quality_profile": "showcase"
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto"
+    },
+    "viewBox": [
+      548,
+      470
+    ]
   },
   "components": [
     {
       "id": "prompt",
       "type": "external",
       "label": "agent prompt",
-      "sublabel": "the catalog is not in context",
+      "sublabel": "catalog not in context",
       "pos": [
-        40,
-        20
+        12,
+        48
       ],
       "size": [
-        170,
-        64
+        128,
+        56
       ]
     },
     {
@@ -27,12 +34,12 @@
       "label": "MCP client",
       "sublabel": "any harness: tools/call",
       "pos": [
-        40,
-        120
+        12,
+        140
       ],
       "size": [
-        170,
-        68
+        128,
+        56
       ]
     },
     {
@@ -41,28 +48,42 @@
       "label": "second client",
       "sublabel": "its own set and token",
       "pos": [
-        40,
-        300
+        12,
+        220
       ],
       "size": [
-        170,
-        68
+        128,
+        56
       ]
     },
     {
       "id": "setA",
       "type": "backend",
       "label": "set A",
-      "sublabel": "one endpoint · its servers",
+      "sublabel": "one endpoint · own servers",
+      "tag": "5 meta tools",
       "pos": [
-        300,
-        110
+        200,
+        48
       ],
       "size": [
+        128,
+        68
+      ]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "proxy core",
+      "sublabel": "catalog · policies · tools",
+      "pos": [
         200,
-        96
+        140
       ],
-      "tag": "5 meta tools"
+      "size": [
+        128,
+        56
+      ]
     },
     {
       "id": "setB",
@@ -70,84 +91,27 @@
       "label": "set B",
       "sublabel": "separate process and port",
       "pos": [
-        300,
-        410
+        200,
+        220
       ],
       "size": [
-        200,
-        96
+        128,
+        56
       ]
-    },
-    {
-      "id": "core",
-      "type": "backend",
-      "label": "proxy core",
-      "sublabel": "catalog · policies · tool-out",
-      "pos": [
-        300,
-        250
-      ],
-      "size": [
-        200,
-        96
-      ]
-    },
-    {
-      "id": "stdio",
-      "type": "backend",
-      "label": "stdio servers",
-      "sublabel": "one child process each",
-      "pos": [
-        850,
-        70
-      ],
-      "size": [
-        200,
-        96
-      ],
-      "tag": "initialize"
     },
     {
       "id": "http",
       "type": "cloud",
       "label": "HTTP servers",
       "sublabel": "URL · headers · OAuth",
+      "tag": "server/discover",
       "pos": [
-        620,
-        230
+        404,
+        48
       ],
       "size": [
-        200,
-        96
-      ],
-      "tag": "server/discover"
-    },
-    {
-      "id": "panel",
-      "type": "backend",
-      "label": "panel",
-      "sublabel": "sets · keys · logs",
-      "pos": [
-        300,
-        570
-      ],
-      "size": [
-        200,
-        76
-      ]
-    },
-    {
-      "id": "disk",
-      "type": "database",
-      "label": "state files",
-      "sublabel": "config · keys · secrets · tool-out",
-      "pos": [
-        620,
-        570
-      ],
-      "size": [
-        200,
-        76
+        128,
+        68
       ]
     },
     {
@@ -156,12 +120,55 @@
       "label": "bwrap · userns",
       "sublabel": "ro / rw · tmpfs · prlimit",
       "pos": [
-        620,
-        70
+        404,
+        140
       ],
       "size": [
+        128,
+        56
+      ]
+    },
+    {
+      "id": "stdio",
+      "type": "backend",
+      "label": "stdio servers",
+      "sublabel": "one child process each",
+      "tag": "initialize",
+      "pos": [
+        404,
+        220
+      ],
+      "size": [
+        128,
+        68
+      ]
+    },
+    {
+      "id": "panel",
+      "type": "backend",
+      "label": "panel",
+      "sublabel": "sets · keys · logs",
+      "pos": [
+        12,
+        338
+      ],
+      "size": [
+        128,
+        56
+      ]
+    },
+    {
+      "id": "disk",
+      "type": "database",
+      "label": "state files",
+      "sublabel": "config · keys · secrets",
+      "pos": [
         200,
-        96
+        338
+      ],
+      "size": [
+        128,
+        56
       ]
     }
   ],
@@ -169,6 +176,7 @@
     {
       "kind": "security-group",
       "label": "a set = one MCP server · Bearer token",
+      "pad": 30,
       "wraps": [
         "setA",
         "core",
@@ -208,8 +216,7 @@
     {
       "id": "a-http",
       "from": "setA",
-      "to": "http",
-      "label": "url + headers"
+      "to": "http"
     },
     {
       "id": "b-http",
@@ -221,6 +228,10 @@
       "from": "panel",
       "to": "setB",
       "label": "start/stop",
+      "labelAt": [
+        170,
+        309
+      ],
       "variant": "dashed",
       "fromSide": "top",
       "toSide": "bottom"
@@ -229,7 +240,7 @@
       "id": "p-d",
       "from": "panel",
       "to": "disk",
-      "label": "config · env",
+      "label": "config·env",
       "variant": "dashed"
     },
     {
@@ -242,7 +253,11 @@
       "id": "sandbox-stdio",
       "from": "sandbox",
       "to": "stdio",
-      "label": "exec"
+      "label": "exec",
+      "labelAt": [
+        468,
+        208
+      ]
     }
   ],
   "cards": [
@@ -281,12 +296,11 @@
       "dot": "rose",
       "title": "Sandbox",
       "items": [
-        "`untrusted` without `sandbox` does not start: fail-closed, not «we'll see»",
-        "`ro` replaces the defaults entirely — list the paths you need",
-        "`prlimit` comes from the host: on alpine that is util-linux",
-        "Limits AS / NPROC / FSIZE; subtree CPU and RSS are not limited",
-        "node: `memoryMb` ≥ 2048 and `ro` on the node prefix",
-        "Isolation: `/home`, network, `/proc/1`, writes to the root"
+        "untrusted without a sandbox never starts: fail-closed",
+        "ro replaces the defaults entirely — list the paths you need",
+        "prlimit from the host (alpine: util-linux); limits AS/NPROC/FSIZE",
+        "node: memoryMb ≥ 2048 and ro on the node prefix",
+        "Isolation: /home, network, /proc/1, writes to the root"
       ]
     }
   ]
