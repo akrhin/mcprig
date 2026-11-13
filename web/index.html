@@ -27,6 +27,7 @@
     <nav class="rail-sets" id="rail-sets" aria-label="Set list" data-i18n-aria="rail.title"></nav>
     <p class="rail-empty" id="rail-empty" hidden data-i18n="rail.empty">no sets</p>
     <div class="rail-foot">
+      <p class="rail-sum" id="rail-sum" hidden></p>
       <button class="rail-add" type="button" id="add-toggle">
         <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
         <span class="rail-add-txt" data-i18n="rail.add">New set</span>
@@ -139,9 +140,6 @@
         <div class="set-meta">
           <span class="meta-label" data-i18n="head.key">Key</span>
           <code class="mono key-val" id="key">—</code>
-          <button class="ghost-icon" type="button" id="key-open" aria-pressed="false" aria-label="Reveal key" data-i18n-title="head.keyTip" data-i18n-aria="head.keyOpen">
-            <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.8 12S5.5 5.8 12 5.8 22.2 12 22.2 12 18.5 18.2 12 18.2 1.8 12 1.8 12Z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
           <button class="ghost-icon" type="button" id="key-copy" aria-label="Copy key" data-i18n-title="head.copyKey" data-i18n-aria="head.copyKey">
             <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
           </button>
@@ -164,25 +162,6 @@
       </div>
 
       <section id="tab-overview" role="tabpanel" aria-labelledby="tabbtn-overview" tabindex="0">
-        <div class="kpis" id="kpis">
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-calls">—</span>
-            <span class="kpi-label" data-i18n="kpi.calls">calls</span>
-          </div>
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-err">—</span>
-            <span class="kpi-label" data-i18n="kpi.errRate">error rate</span>
-          </div>
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-p50">—</span>
-            <span class="kpi-label" data-i18n="kpi.p50">p50 latency</span>
-          </div>
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-p95">—</span>
-            <span class="kpi-label" data-i18n="kpi.p95">p95 latency</span>
-          </div>
-        </div>
-
         <section class="block" id="set-srv-block" aria-labelledby="set-srv-h">
           <div class="block-head">
             <h2 id="set-srv-h" data-i18n="setSrv.title">Servers</h2>
@@ -197,7 +176,7 @@
                 <th scope="col" data-i18n="setSrv.thState">State</th>
                 <th scope="col" class="num" data-i18n="setSrv.thTools">Tools</th>
                 <th scope="col" class="hide-sm" data-i18n="setSrv.thLast">Last request</th>
-                <th scope="col" class="num"><span class="sr" data-i18n="setSrv.thAct">Actions</span></th>
+                <th scope="col" class="num" data-i18n="setSrv.thAct">Actions</th>
               </tr>
             </thead>
             <tbody id="set-srv-body"></tbody>
@@ -207,6 +186,26 @@
             <p class="empty-text" data-i18n="setSrv.emptyText">Servers live in the host registry; attach one to give this set tools to serve.</p>
           </div>
         </section>
+
+        <!-- сводка за 7 дней: второстепенная, строкой под таблицей серверов -->
+        <div class="kpis" id="kpis">
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-calls">—</span>
+            <span class="kpi-label" data-i18n="kpi.calls">calls</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-err">—</span>
+            <span class="kpi-label" data-i18n="kpi.errRate">error rate</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-p50">—</span>
+            <span class="kpi-label" data-i18n="kpi.p50">p50</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-p95">—</span>
+            <span class="kpi-label" data-i18n="kpi.p95">p95</span>
+          </div>
+        </div>
       </section>
 
       <section id="tab-calls" role="tabpanel" aria-labelledby="tabbtn-calls" tabindex="0" hidden>

@@ -178,6 +178,11 @@ html.rail-compact .rail-collapse { transform: rotate(180deg); }
 .state-failed { color: var(--err); }
 
 .rail-foot { margin-top: auto; padding: var(--sp-2); border-top: 1px solid var(--line-soft); }
+/* итог списка над «Новым набором»: рейл не обрывается пустотой после трёх строк */
+.rail-sum {
+  padding: 0 var(--sp-3); margin-bottom: var(--sp-2);
+  font-size: var(--fs-2); color: var(--text-mute);
+}
 .rail-add {
   display: flex; align-items: center; gap: var(--sp-2); width: 100%;
   padding: 9px var(--sp-3); border: 1px dashed var(--line-strong);
@@ -193,6 +198,7 @@ html.rail-compact .rail-collapse { transform: rotate(180deg); }
 html.rail-compact .rail-head { padding: 0 var(--sp-2); justify-content: center; }
 html.rail-compact .rail-title,
 html.rail-compact .rail-count,
+html.rail-compact .rail-sum,
 html.rail-compact .rail-add-txt { display: none; }
 html.rail-compact .rail-collapse { margin-left: 0; }
 html.rail-compact .rail-sets { padding: var(--sp-2) 6px; }
@@ -348,19 +354,18 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   height: 2px; background: var(--accent);
 }
 
-/* ── KPI-полоса ─────────────────────────────────────────────────────────── */
+/* ── KPI: сводка за 7 дней — строка-подпись, не главный элемент вкладки ──── */
+/* Таблица уже закрыта своей линией: своей у сводки нет, иначе две hairline */
 .kpis {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: var(--sp-5);
-  border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface);
-  overflow: hidden;
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--sp-1) var(--sp-4);
+  margin-top: var(--sp-4);
 }
-.kpi { padding: var(--sp-4) var(--sp-5); }
-.kpi + .kpi { border-left: 1px solid var(--line); }
-.kpi-num { font: 500 clamp(20px, 2.2vw, 30px) / 1.1 var(--font-mono); letter-spacing: -.01em; }
+.kpi { display: inline-flex; align-items: baseline; gap: var(--sp-2); }
+.kpi + .kpi { padding-left: var(--sp-4); border-left: 1px solid var(--line); }
+.kpi-num { font: 500 var(--fs-3) / 1 var(--font-mono); color: var(--text-dim); }
 .kpi-num.is-muted { color: var(--text-mute); }
 .kpi-label {
-  display: block; margin-top: var(--sp-2);
   font-size: var(--fs-1); text-transform: uppercase; letter-spacing: .06em; color: var(--text-mute);
 }
 
@@ -421,6 +426,9 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   transition: background var(--dur-1) linear, color var(--dur-1) linear;
 }
 .ghost-icon:hover { background: var(--surface-2); color: var(--text); }
+/* иконочные кнопки тоже гаснут: у ключа их две, и обе бессмысленны без ключа */
+.ghost-icon:disabled { opacity: .35; cursor: default; }
+.ghost-icon:disabled:hover { background: transparent; color: inherit; }
 .ghost-icon[aria-pressed="true"] { color: var(--accent); }
 
 /* ── таблицы: моноширинные цифры, имена переносятся, не режутся ─────────── */
@@ -764,11 +772,9 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
   .meta-sep { display: none; }
   .set-meta { gap: var(--sp-1) var(--sp-2); }
 
-  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kpi { padding: var(--sp-3); }
-  .kpi:nth-child(odd) { border-left: 0; }
-  .kpi:nth-child(n + 3) { border-top: 1px solid var(--line); }
-  .kpi-num { font-size: var(--fs-6); }
+  /* сводка — обычная строка, на узком экране просто переносится */
+  .kpis { margin-top: var(--sp-4); gap: var(--sp-2) var(--sp-3); }
+  .kpi + .kpi { padding-left: var(--sp-3); }
 
   .filters { gap: var(--sp-2); }
   .segmented { width: 100%; }
@@ -812,12 +818,22 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
 .label-ok { color: var(--ok); }
 
 /* Колонки таблицы набора: имя забирает остаток, остальные — своя ширина,
-   иначе на пустых «—» имя утаскивает всю середину и соседи липнут к правому краю. */
+   иначе на пустых «—» имя утаскивает всю середину и соседи липнут к правому краю.
+   Действия — по содержимому: широкая колонка отрывала кнопки от «последнего вызова». */
 #set-srv-table { table-layout: fixed; }
 #set-srv-table th { white-space: normal; }
-#set-srv-table th:nth-child(1) { width: 24%; }
+#set-srv-table th:nth-child(1) { width: 30%; }
 #set-srv-table th:nth-child(2) { width: 10%; }
 #set-srv-table th:nth-child(3) { width: 14%; }
 #set-srv-table th:nth-child(4) { width: 11%; }
-#set-srv-table th:nth-child(5) { width: 17%; }
-#set-srv-table th:nth-child(6) { width: 24%; text-align: right; }
+#set-srv-table th:nth-child(5) { width: 17%; text-align: right; }
+#set-srv-table td:nth-child(5) { text-align: right; }
+/* Действия — узкая колонка у правого края: «check/edit» стоят рядом с последним
+   вызовом, а не висят в пустой полосе. По-русски «проверить/изменить» шире,
+   поэтому на узком экране колонке отдаётся четверть ширины таблицы. */
+#set-srv-table th:nth-child(6) { width: 18%; text-align: right; }
+@media (max-width: 1100px) {
+  #set-srv-table th:nth-child(1) { width: 23%; }
+  #set-srv-table th:nth-child(6) { width: 26%; }
+  #set-srv-table .cell-actions .btn { padding-inline: 8px; }
+}

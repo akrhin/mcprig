@@ -10,6 +10,12 @@ repository the project is built in.
 
 ### Changed
 
+- The panel's **Overview** tab now leads with the set's servers: the seven-day
+  summary (calls, error rate, p50, p95) moved below the servers table and reads
+  as a one-line caption, the set rail ends with `N sets · K running`, and the
+  action column has an `Actions` header. **Copy key** is disabled while the set
+  is open and has no key prefix, it copies the bare prefix rather than the
+  `prefix…` shown in the panel, and the unused **Reveal key** button is gone.
 - Documentation is restructured: `docs/en/index.md` and `docs/ru/index.md` are
   the entry points, every product page carries a language switch and a "See
   also" block, and plans, decisions, audits, proposals and the TS contract moved

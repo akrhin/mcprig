@@ -20,7 +20,7 @@ CSP: no inline scripts or styles.
 | left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
 | set head | name, port chip, state badge, **Keys**, **Restart**, **Start/Stop**, the key prefix and — right under it — the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
 | tabs | **Overview**, **Calls**, **Statistics** |
-| KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days |
+| KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days, as a one-line summary under the servers table |
 | servers of the set | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check** and **Edit** |
 | calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
 | details drawer | host registry, variables and the set log; opens from the header and covers the panel width on a phone |

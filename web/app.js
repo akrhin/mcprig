@@ -26,7 +26,6 @@
       'top.lang': 'Language',
       'top.theme': 'Color scheme',
       'top.updatedLabel': 'updated',
-      'top.runningW': 'running',
       'rail.title': 'Sets',
       'rail.open': 'Open the set list',
       'rail.collapse': 'Collapse the set list',
@@ -37,6 +36,7 @@
       'rail.port': 'port',
       'rail.create': 'create',
       'rail.item': '{name} · port {port} · {state}',
+      'rail.sum': '{n} {setsW} · {r} running',
       'common.cancel': 'cancel',
       'common.save': 'save',
       'common.close': 'close',
@@ -50,7 +50,6 @@
       'head.copied': 'copied',
       'head.copyFail': 'failed',
       'head.key': 'Key',
-      'head.keyTip': 'only the prefix is shown',
       'head.keyOpen': 'set is open',
       'head.copyKey': 'Copy key',
       'head.noKey': 'no key',
@@ -70,8 +69,8 @@
       'tabs.stats': 'Statistics',
       'kpi.calls': 'calls · 7 days',
       'kpi.errRate': 'error rate',
-      'kpi.p50': 'p50 latency',
-      'kpi.p95': 'p95 latency',
+      'kpi.p50': 'p50',
+      'kpi.p95': 'p95',
       'setSrv.title': 'Servers',
       'setSrv.add': 'Add server',
       'setSrv.note': '{h} healthy · {f} failed · {u} not checked',
@@ -237,7 +236,6 @@
       'top.lang': 'Язык',
       'top.theme': 'Цветовая схема',
       'top.updatedLabel': 'обновлено',
-      'top.runningW': 'запущено',
       'rail.title': 'Наборы',
       'rail.open': 'Открыть список наборов',
       'rail.collapse': 'Свернуть список наборов',
@@ -248,6 +246,7 @@
       'rail.port': 'порт',
       'rail.create': 'создать',
       'rail.item': '{name} · порт {port} · {state}',
+      'rail.sum': '{n} {setsW} · запущено {r}',
       'common.cancel': 'отмена',
       'common.save': 'сохранить',
       'common.close': 'закрыть',
@@ -261,7 +260,6 @@
       'head.copied': 'скопировано',
       'head.copyFail': 'не удалось',
       'head.key': 'Ключ',
-      'head.keyTip': 'показывается только префикс',
       'head.keyOpen': 'набор открыт',
       'head.copyKey': 'Скопировать ключ',
       'head.noKey': 'ключа нет',
@@ -280,9 +278,9 @@
       'tabs.calls': 'Вызовы',
       'tabs.stats': 'Статистика',
       'kpi.calls': 'вызовов · 7 дней',
-      'kpi.errRate': 'доля ошибок',
-      'kpi.p50': 'задержка p50',
-      'kpi.p95': 'задержка p95',
+      'kpi.errRate': 'ошибок',
+      'kpi.p50': 'p50',
+      'kpi.p95': 'p95',
       'setSrv.title': 'Серверы',
       'setSrv.add': 'Добавить сервер',
       'setSrv.note': 'здоровых {h} · со сбоем {f} · без проверки {u}',
@@ -988,15 +986,10 @@
     }).catch(function (e) { fail(e.message, e); });
   }
 
-  // Шапка метрик не несёт: счётчики хоста живут в статусбаре, как в макете.
+  // Шапка метрик не несёт: наборы и запущенные — в рейле, серверы реестра — в статусбаре.
   function renderChrome() {
-    var running = st.sets.filter(function (s) { return s.runtime && s.runtime.running; }).length;
     var none = st.sets.length === 0;
-    $('status-counts').textContent = [
-      fmtN(st.sets.length) + ' ' + word(st.sets.length, 'set'),
-      fmtN(st.servers.length) + ' ' + word(st.servers.length, 'server'),
-      fmtN(running) + ' ' + t('top.runningW')
-    ].join(' · ');
+    $('status-counts').textContent = fmtN(st.servers.length) + ' ' + word(st.servers.length, 'server');
     $('f-updated').textContent = clock();
     $('rail-count').textContent = fmtN(st.sets.length);
     show($('empty-state'), none);
@@ -1037,6 +1030,11 @@
           : state.cls === 'err' ? ' state-failed' : ' state-stopped');
         b.setAttribute('aria-label', t('rail.item', { name: name, port: s.port, state: state.text }));
       });
+    var running = st.sets.filter(function (s) { return s.runtime && s.runtime.running; }).length;
+    $('rail-sum').textContent = t('rail.sum', {
+      n: fmtN(st.sets.length), setsW: word(st.sets.length, 'set'), r: fmtN(running)
+    });
+    show($('rail-sum'), st.sets.length > 0);
   }
 
   function healthy(h) { return !!(h && h.healthy === true && !h.unknown); }
@@ -1245,6 +1243,12 @@
     // только префикс: токена в панели нет и быть не может
     $('key').textContent = set.keyPrefix ? set.keyPrefix + '…'
       : (set.open ? t('head.keyOpen') : t('head.noKey'));
+    // «копировать» работает только когда есть что копировать:
+    // у открытого набора в #key лежит фраза состояния, а не ключ
+    var keyBtn = $('key-copy'), hasKey = !!set.keyPrefix;
+    keyBtn.disabled = !hasKey;
+    keyBtn.dataset.i18nTitle = hasKey ? 'head.copyKey' : 'head.noKey';
+    keyBtn.title = t(keyBtn.dataset.i18nTitle);
     $('keys-count').textContent = fmtN((set.keys || []).length);
     $('meta-servers').textContent = fmtN((set.servers || []).length);
     var schema = (st.calls && st.calls.schema) || null;
@@ -2462,11 +2466,12 @@
 
   var copyTimer = 0;
   function copyText(text, btn, label) {
-    var back = label || btn.textContent;
+    var back = label || btn.innerHTML;
     var done = function (ok) {
       btn.textContent = ok ? t('head.copied') : t('head.copyFail');
       clearTimeout(copyTimer);
-      copyTimer = setTimeout(function () { btn.textContent = back; }, 1200);
+      // кнопки здесь иконочные: текст возвращается разметкой, а не строкой
+      copyTimer = setTimeout(function () { btn.innerHTML = back; }, 1200);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
@@ -2479,10 +2484,10 @@
     copyText($('endpoint').textContent, this);
   });
 
-  // токена в панели нет: копировать можно только префикс, и это честно подписано
+  // токена в панели нет: копируется префикс, без многоточия — так его и вставляют
   $('key-copy').addEventListener('click', function () {
-    var text = $('key').textContent || '';
-    if (!text || text === '—') { return; }
+    var set = current(), text = (set && set.keyPrefix) || '';
+    if (!text) { return; }
     copyText(text, this);
   });
 
