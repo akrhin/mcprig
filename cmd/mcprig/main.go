@@ -136,6 +136,9 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 			return "", nil, err
 		}
 		return "stdio", args[1:], nil
+	case "auth":
+		// Позиционный аргумент — имя сервера, поэтому разбор внутри runAuth.
+		return "auth", args[1:], nil
 	case "init":
 		if len(args) > 1 {
 			return "init", args[1:], nil
@@ -159,7 +162,7 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 		}
 		return "panel", nil, nil
 	}
-	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel, init, doctor, warm", args[0])}
+	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, auth, panel, init, doctor, warm", args[0])}
 }
 
 // tooloutInterval is a variable only so a test can shorten the sweep; serve and
@@ -185,6 +188,8 @@ func run() error {
 	switch mode {
 	case "stdio":
 		return runStdio(rest)
+	case "auth":
+		return runAuth(rest)
 	case "panel":
 		return manager.Run(manager.FromEnv(version))
 	case "init":

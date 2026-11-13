@@ -5,7 +5,7 @@ This file lists every subcommand and flag with real examples and their output.
 
 # CLI
 
-`mcprig` has six subcommands. Running it with no subcommand is the same as
+`mcprig` has seven subcommands. Running it with no subcommand is the same as
 `mcprig serve`; running it with flags only (`mcprig -config …`) is also
 `serve`.
 
@@ -13,6 +13,7 @@ This file lists every subcommand and flag with real examples and their output.
 | --- | --- |
 | `serve` | one set as an HTTP MCP endpoint |
 | `stdio` | one set over stdin/stdout, spawned by the client |
+| `auth` | authorize a server that asks for OAuth; prints the link, saves the token |
 | `panel` | manager and web panel (registry, sets, keys, call tail) |
 | `init` | print a client configuration fragment; writes nothing |
 | `doctor` | one-pass health report: config, sets, keys, secrets, services, sandbox |
@@ -91,6 +92,31 @@ opened, a warning goes to stderr and the proxy keeps serving. Downstream stdio
 servers are opened with the `initialize` handshake
 (protocol `2025-11-25`), which every server understands; HTTP downstreams keep
 the modern `server/discover` handshake.
+
+## auth
+
+```bash
+mcprig auth --set main swaggerhub
+```
+
+Prints the authorization link and waits for the redirect; it never starts a
+browser, so the command works over SSH and from a machine without a graphical
+session. The token is written to the set's `oauth.json` at `<data dir>/sets/<id>/oauth.json`,
+where the set process reads it on its next start — restart the set in the panel
+afterwards.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-set` | | set name: config and token store come from its directory |
+| `-config` | | `servers.json` instead of `-set`; the token then lands in the data dir of the calling process |
+| `-timeout` | `6m` | how long the link may stay unused |
+
+The positional argument is the server name. A server that needs no OAuth
+connects and exits with a line saying so.
+
+The interactive flow does not run inside a client request on purpose: a set's
+health probe allows 15 s, while a person at a browser needs minutes. Without a
+token the set reports the server unhealthy; `auth` is the way past it.
 
 ## panel
 

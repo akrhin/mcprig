@@ -25,6 +25,12 @@ repository the project is built in.
 
 ### Added
 
+- `mcprig auth --set <set> <server>` authorizes a server that asks for OAuth:
+  the command prints the authorization link and waits for the redirect instead
+  of starting a browser, so it works over SSH and on a host without a graphical
+  session. The token goes to the set's `oauth.json` and is picked up on the next
+  set start. The interactive step deliberately lives outside a client request:
+  a set's health probe allows 15 s and a person at a browser needs minutes.
 - The **Calls** tab lists the meta-tools `list_servers`, `list_commands` and
   `describe_commands` (server `mcprig`) and the reason a call failed: the text
   is shortened in the row and shown in full in a tooltip. Previously only calls

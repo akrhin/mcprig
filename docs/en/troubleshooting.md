@@ -84,6 +84,15 @@ authenticating at the same moment, or anything else on that port, collide.
 under the set's data directory and survive a restart, so the browser is needed
 once, not on every start.
 
+**Symptom, second half.** A server that wants OAuth stays `healthy: false`, the
+log carries `требуется авторизация MCP-сервера` with a URL, or the upstream
+answers `401`. The panel has no button for it yet.
+
+**What to do.** Run `mcprig auth --set <set> <server>`: it prints the link,
+waits for the redirect and saves the token; restart the set afterwards. A `403`
+before that is not OAuth but egress — the process cannot reach the server, so
+give it `HTTPS_PROXY`; the link will not help until the request gets through.
+
 ## 7. The sandbox refuses to start a server
 
 **Symptom.** `sandbox unavailable: …`, or the server fails with `sandbox: путь

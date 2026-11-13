@@ -38,6 +38,10 @@ type Connector struct {
 	// снимается, иначе после восстановления bwrap сервер остаётся помеченным.
 	OnSandboxApplied func(*config.Server)
 
+	// Browser показывает URL авторизации. nil — открыть браузер по умолчанию;
+	// консольная команда подставляет печать ссылки, чтобы не звать xdg-open.
+	Browser func(string) error
+
 	// OnToolsChanged вызывается, когда сервер прислал
 	// notifications/tools/list_changed. Набор по ней сбрасывает кэш
 	// tools/list, и новый инструмент виден без refresh: true. SDK подписывается
@@ -213,6 +217,7 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 		Scopes:       block.Scopes,
 		Store:        c.Store,
 		Log:          c.Log,
+		Browser:      c.Browser,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("oauth: %w", err)
