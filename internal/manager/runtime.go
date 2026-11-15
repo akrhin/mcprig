@@ -72,6 +72,7 @@ type Runtime struct {
 	allowedHosts []string
 	sec          *Secrets
 	log          *slog.Logger
+	notify       *notifier
 
 	mu     sync.Mutex
 	procs  map[string]*process
@@ -95,6 +96,7 @@ func NewRuntime(dataDir, cliPath, bindIP string, sec *Secrets, log *slog.Logger)
 		probeAddr: loopbackAddr(bindIP),
 		sec:       sec,
 		log:       log,
+		notify:    newNotifier(log),
 		procs:     map[string]*process{},
 		rings:     map[string]*ring{},
 		locks:     map[string]*sync.Mutex{},
@@ -242,6 +244,8 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		return RuntimeStatus{}, fmt.Errorf("набор %s не поднялся: порт %d не слушает", set.ID, set.Port)
 	}
 	_ = ctx
+	// Набор поднялся: следующий обрыв — новый переход и новое событие.
+	rt.notify.clear(set.ID, "")
 	// Одна строка в stdout: журнал панели читается под логином, а падения и
 	// перезапуски набора должны быть видны в journald.
 	rt.log.Info("набор " + set.ID + ": запущен")
@@ -275,12 +279,17 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 	if err != nil {
 		rt.log.Warn("набор завершился", "set", id, "code", code, "err", err)
 	}
+	webhook := webhookOf(set)
 	if restarts >= maxRestarts {
 		rt.mu.Lock()
 		p.err = fmt.Sprintf("набор падал %d раз, последний код %d", restarts+1, code)
 		rt.mu.Unlock()
+		// Исчерпанный бюджет — отдельное событие, а не второе к падению:
+		// один переход даёт одно уведомление.
+		rt.notify.emit(webhook, id, "", "set.restart_failed", code)
 		return
 	}
+	rt.notify.emit(webhook, id, "", "set.crashed", code)
 	delay := time.Second << restarts
 	if delay > maxBackoff {
 		delay = maxBackoff
@@ -311,6 +320,9 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 		}
 		if _, err := rt.startLocked(context.Background(), rs, fresh); err != nil {
 			rt.log.Warn("перезапуск набора не удался", "set", id, "err", err)
+			// Набор остался лежать: панель увидит это только в журнале, а
+			// вебхук должен узнать, что перезапуск не спас.
+			rt.notify.emit(webhookOf(rs), id, "", "set.restart_failed", code)
 		}
 	}()
 }

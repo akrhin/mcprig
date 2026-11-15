@@ -5,7 +5,12 @@
 // headers accept strings only, and writes are atomic.
 package registry
 
-import "github.com/akrhin/mcprig/internal/config"
+import (
+	"net/url"
+	"strings"
+
+	"github.com/akrhin/mcprig/internal/config"
+)
 
 const (
 	// RegistryFile is the registry file name inside the data directory.
@@ -31,6 +36,25 @@ type Key struct {
 	Note      string `json:"note,omitempty"`
 }
 
+// Notify — куда набор шлёт события своей поломки. Один адрес на набор:
+// события падения относятся ко всему процессу, а не к отдельному серверу.
+type Notify struct {
+	Webhook string `json:"webhook,omitempty"`
+}
+
+// Check возвращает описание дефекта; пустая строка — блок годен. Пустой
+// адрес значит «уведомлений нет» и дефектом не считается.
+func (n *Notify) Check() string {
+	if n == nil || strings.TrimSpace(n.Webhook) == "" {
+		return ""
+	}
+	u, err := url.Parse(strings.TrimSpace(n.Webhook))
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return "notify.webhook: нужен адрес http:// или https:// с хостом"
+	}
+	return ""
+}
+
 // Set is a named group of servers deployed as its own lazy-mcp instance.
 // Token mirrors the active key and is never sent to a client as is.
 type Set struct {
@@ -43,6 +67,7 @@ type Set struct {
 	Token       string   `json:"token"`
 	Autostart   bool     `json:"autostart,omitempty"`
 	Open        bool     `json:"open,omitempty"`
+	Notify      *Notify  `json:"notify,omitempty"`
 }
 
 // Data is registry.json.

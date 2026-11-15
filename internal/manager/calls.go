@@ -62,6 +62,10 @@ type callsResponse struct {
 func (m *Manager) apiCalls(req *request) error {
 	q := req.r.URL.Query()
 	limit := callsLimit(q.Get("limit"))
+	before, after, err := callsWindow(q.Get("before"), q.Get("after"))
+	if err != nil {
+		return err
+	}
 	id := q.Get("set")
 	out := callsResponse{Set: id, Calls: []callRow{}, Counters: []counterRow{}}
 
@@ -114,6 +118,18 @@ func (m *Manager) apiCalls(req *request) error {
 			out.Schema = snap.Schema
 		}
 		for _, c := range snap.Tail {
+			// Окно по времени строки. Набор отдаёт только хвост своего /stats,
+			// поэтому before за его пределы даёт пустой список, а не старые строки.
+			// shortcut: глубина страниц ≤ 512 вызовов набора, глубже — только /api/stats.
+			// shortcut: граница страницы сравнивает только время, при двух вызовах с
+			// одинаковой меткой соседняя строка может потеряться; перейти на курсор
+			// (time, seq), если stats.Call получит seq. Дублей при этом не бывает.
+			if !before.IsZero() && !c.Time.Before(before) {
+				continue
+			}
+			if !after.IsZero() && !c.Time.After(after) {
+				continue
+			}
 			row := callRow{Time: c.Time, Client: c.Client, Server: c.Server, Tool: c.Tool, MS: c.Millis, Failed: c.Failed, Error: c.Message}
 			if id == "" {
 				row.Set = t.set.ID
@@ -191,4 +207,31 @@ func callsLimit(raw string) int {
 		return callsMaxLimit
 	}
 	return n
+}
+
+// callsWindow разбирает окно пагинации: before — строго раньше строки,
+// after — строго позже. Два окна сразу не имеют смысла — это ошибка клиента.
+// Нулевое время значит «границы нет».
+func callsWindow(rawBefore, rawAfter string) (before, after time.Time, err error) {
+	if rawBefore != "" && rawAfter != "" {
+		return before, after, badRequest("before и after сразу не задаются — нужно одно окно")
+	}
+	if before, err = callsTime("before", rawBefore); err != nil {
+		return before, after, err
+	}
+	after, err = callsTime("after", rawAfter)
+	return before, after, err
+}
+
+// callsTime принимает и RFC3339, и RFC3339Nano: наносекундная раскладка
+// переваривает время без дробной части, поэтому одного разбора хватает.
+func callsTime(name, raw string) (time.Time, error) {
+	if raw == "" {
+		return time.Time{}, nil
+	}
+	t, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		return time.Time{}, badRequest(name + ": ожидается время RFC3339, получено " + strconv.Quote(raw))
+	}
+	return t, nil
 }

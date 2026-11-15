@@ -53,6 +53,12 @@ does not validate them itself — it shows what the backend answers, including
 `sandbox: неизвестные поля: …`, `sandbox допустим только для stdio` and
 `тег untrusted требует sandbox: сервер без изоляции не стартует`.
 
+Each server row has a **Log** button: it opens a drawer with the set's log
+filtered by that server's name — a server has no log file of its own. The
+drawer reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the
+lines as text; a name that never appears in the log shows `log is empty`, and a
+failed request keeps the lines already shown and reports the reason above them.
+
 The registry list in the drawer also shows isolation, on the second line of a
 row: `bwrap` when the sandbox is applied, `no isolation` in warning colour when
 the block was requested but bubblewrap did not start (the daemon's full reason
@@ -138,7 +144,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
 | `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
-| `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500; for one set it also carries `schema` |
+| `GET /api/calls?set=<id>&limit=<N>&before=<time>&after=<time>` | merged call tail of running sets; default 50, max 500; `before`/`after` are RFC3339 times bounding a row's `time` (strictly older / strictly newer, one at a time); for one set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; the answer returns at once, sets using the variable restart in the background (60 s budget) and `restarted` lists them; stopping the panel cancels the background restart |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
@@ -165,6 +171,27 @@ text is shown in the set status `error`.
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
 registry key. A set that does not answer is listed in `unreachable` by id; its
 error text is not forwarded.
+
+Pages go by row time: `before=<time>` returns calls strictly older than it,
+`after=<time>` strictly newer. Both at once answer `400`, as does a value that
+is not RFC3339 (nanoseconds are accepted). Send the `time` of the last row of a
+page as `before` to get the next one:
+
+```
+GET /api/calls?set=opencode&limit=100&before=2026-11-08T12:00:03.512Z
+```
+
+The depth is bounded by the set's tail: `/stats` keeps its last 512 calls, so a
+`before` past that answers an empty list instead of older rows — anything
+deeper lives in `/api/stats` only. Two calls with the same `time` at a page
+boundary are a known limit: the next page skips the second one; pages never
+repeat a row.
+
+The calls table loads 100 rows and shows **Show more** under it. The button
+sends the `time` of the last row as `before`, appends the next page and hides
+itself when a page comes back short; after the first press the panel stops its
+5 s refresh, so loaded pages are not overwritten, and shows **resume** next to
+the button — it reloads the first page and brings the refresh back.
 
 An answer with `?set=<id>` carries a `schema` field — what the set's tool list
 costs in context: `schemaBytes` (the length of the JSON `list_commands` returns

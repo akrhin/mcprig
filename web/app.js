@@ -101,6 +101,9 @@
       'calls.bad': 'error',
       'calls.ok': 'ok',
       'calls.emptyText': 'Requests appear here as soon as the set serves.',
+      'calls.more': 'Show more',
+      'calls.paused': 'auto-refresh paused',
+      'calls.resume': 'resume',
       'stats.today': 'Today',
       'stats.7d': '7 days',
       'stats.30d': '30 days',
@@ -183,6 +186,9 @@
       'log.wideTip': 'expand the log panel',
       'log.refresh': 'refresh',
       'log.empty': 'log is empty',
+      'srvlog.sub': 'lines that mention this server — the tail of the set log',
+      'srvlog.title': 'Log · {server} · {set}',
+      'srvlog.fail': 'could not load the log',
       'keys.title': 'Set keys',
       'keys.sub': 'A key authenticates one client. It is shown once, right after it is created.',
       'keys.newLabel': 'New key label',
@@ -214,6 +220,7 @@
       'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
       'srv.edit': 'edit',
       'srv.check': 'check',
+      'srv.log': 'log',
       'srv.probe': 'probe',
       'srv.authorize': 'authorize',
       'auth.title': 'OAuth authorization',
@@ -318,6 +325,9 @@
       'calls.bad': 'ошибка',
       'calls.ok': 'ок',
       'calls.emptyText': 'Вызовы появятся здесь, как только набор начнёт их принимать.',
+      'calls.more': 'Показать ещё',
+      'calls.paused': 'автообновление приостановлено',
+      'calls.resume': 'возобновить',
       'stats.today': 'Сегодня',
       'stats.7d': '7 дней',
       'stats.30d': '30 дней',
@@ -400,6 +410,9 @@
       'log.wideTip': 'развернуть панель лога',
       'log.refresh': 'Обновить',
       'log.empty': 'лог пуст',
+      'srvlog.sub': 'строки, где встречается имя сервера, — хвост лога набора',
+      'srvlog.title': 'Лог · {server} · {set}',
+      'srvlog.fail': 'не удалось получить лог',
       'keys.title': 'Ключи набора',
       'keys.sub': 'Ключ даёт доступ одному клиенту. Он показывается один раз — сразу после создания.',
       'keys.newLabel': 'Подпись нового ключа',
@@ -431,6 +444,7 @@
       'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
       'srv.edit': 'Изменить',
       'srv.check': 'Проверить',
+      'srv.log': 'Лог',
       'srv.probe': 'Проверить',
       'srv.authorize': 'Войти через OAuth',
       'auth.title': 'Войти через OAuth',
@@ -467,7 +481,8 @@
     server: { en: ['server', 'servers'], ru: ['сервер', 'сервера', 'серверов'] },
     call: { en: ['call', 'calls'], ru: ['вызов', 'вызова', 'вызовов'] },
     tool: { en: ['tool', 'tools'], ru: ['инструмент', 'инструмента', 'инструментов'] },
-    client: { en: ['client', 'clients'], ru: ['клиент', 'клиента', 'клиентов'] }
+    client: { en: ['client', 'clients'], ru: ['клиент', 'клиента', 'клиентов'] },
+    line: { en: ['line', 'lines'], ru: ['строка', 'строки', 'строк'] }
   };
 
   function word(n, kind) {
@@ -529,7 +544,11 @@
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
     mock: null, srvEditing: '', srvReturn: null,
-    st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' }
+    st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' },
+    // paged — открыта вторая страница вызовов: тикер её не перезаписывает.
+    // callsSeq — номер загрузки первой страницы: ответ догрузки из прошлого
+    // окна отбрасывается, иначе он допишется в уже заменённый список
+    callsMore: { paged: false, busy: false, full: false }, callsSeq: 0
   };
 
   /* ---------- мелочи ---------- */
@@ -652,6 +671,32 @@
     return 'state';
   }
 
+  // Демо повторяет контракт /api/calls: limit и before (строго раньше). Иначе
+  // «Показать ещё» в демо нечего показать, а адрес запроса расходится с живым.
+  function mockCallsPage(data, path) {
+    var q = new URLSearchParams(path.split('?')[1] || '');
+    var limit = parseInt(q.get('limit'), 10) || 0;
+    var before = q.get('before');
+    var id = q.get('set');
+    var rows = data.calls || [];
+    // демон отдаёт строки одного набора, значит и режем окно после сужения
+    if (id) { rows = rows.filter(function (r) { return !r.set || r.set === id; }); }
+    if (before) {
+      rows = rows.filter(function (r) { return new Date(r.time) < new Date(before); });
+    }
+    data.calls = limit > 0 ? rows.slice(0, limit) : rows;
+  }
+
+  // Демон отдаёт строки, где имя сервера стоит отдельным словом, — мок так же:
+  // граница слова у него wordByte, а точка в ней тоже буква (serena.mcp ≠ serena).
+  function mockServerLog(data, path) {
+    var m = /\/servers\/([^/]+)\/logs(\?|$)/.exec(path);
+    if (!m) { return; }
+    var name = decodeURIComponent(m[1]).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var re = new RegExp('(^|[^A-Za-z0-9_.-])' + name + '([^A-Za-z0-9_.-]|$)');
+    data.logs = (data.logs || []).filter(function (l) { return re.test(l); });
+  }
+
   function get(path) {
     if (MOCK) {
       // реестр в демо-режиме живёт в памяти: правка должна быть видна сразу
@@ -660,7 +705,9 @@
       // в демо не на что влиять и цифры врут
       if (path.indexOf('/api/stats') === 0) { return Promise.resolve(mockStats(path)); }
     }
-    var url = MOCK ? 'mock/' + mockName(path) + '.json' : path;
+    // запрос мока сохраняет query — в сети видно тот же before, что ушёл бы демону
+    var qs = path.indexOf('?') > 0 ? path.slice(path.indexOf('?')) : '';
+    var url = MOCK ? 'mock/' + mockName(path) + '.json' + qs : path;
     return fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .catch(function () { throw new Error(t('err.offline')); })
       .then(function (r) {
@@ -670,6 +717,8 @@
       })
       .then(function (d) {
         if (MOCK && d && path.indexOf('/api/state') === 0 && !st.mock) { st.mock = d; }
+        if (MOCK && d && path.indexOf('/api/calls') === 0) { mockCallsPage(d, path); }
+        if (MOCK && d && /\/servers\/[^/]+\/logs/.test(path)) { mockServerLog(d, path); }
         return d;
       });
   }
@@ -1119,6 +1168,9 @@
         var check = act.appendChild(el('button', 'btn btn-xs'));
         check.type = 'button';
         check.dataset.check = '';
+        var log = act.appendChild(el('button', 'btn btn-xs'));
+        log.type = 'button';
+        log.dataset.log = '';
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
         edit.dataset.edit = '';
@@ -1156,6 +1208,9 @@
         var check = tr.querySelector('[data-check]');
         check.textContent = t('srv.check');
         check.dataset.check = row.name;
+        var log = tr.querySelector('[data-log]');
+        log.textContent = t('srv.log');
+        log.dataset.log = row.name;
         var edit = tr.querySelector('[data-edit]');
         edit.textContent = t('srv.edit');
         edit.dataset.edit = row.name;
@@ -1639,23 +1694,78 @@
       .then(function () { st.busy = false; btn.disabled = false; });
   }
 
+  var CALLS_PAGE = 100;
+
+  // ответ по одному набору строк `set` не несёт; мок отдаёт общий файл — сужаем сами
+  function callsOf(data, id) {
+    if (!data) { return data; }
+    var mine = function (r) { return !r.set || r.set === id; };
+    data.calls = (data.calls || []).filter(mine);
+    data.counters = (data.counters || []).filter(mine);
+    return data;
+  }
+
+  // низ таблицы вызовов: кнопка «ещё» на полной странице, пометка о паузе — после
+  // догрузки. Обе живут в одной строке, поэтому она видна, если видна хоть одна.
+  function syncCallsMore() {
+    var full = st.callsMore.full, paused = st.callsMore.paged;
+    show($('calls-more'), full);
+    show($('calls-pause'), paused);
+    show($('calls-more-row'), full || paused);
+  }
+
   function loadCalls() {
     if (!st.sel) { return; }
-    var id = st.sel;
-    return get('/api/calls?set=' + encodeURIComponent(id) + '&limit=100').then(function (data) {
-      if (id !== st.sel) { return; }
-      // ответ по одному набору строк `set` не несёт; мок отдаёт общий файл — сужаем сами
-      if (data) {
-        var mine = function (r) { return !r.set || r.set === id; };
-        data.calls = (data.calls || []).filter(mine);
-        data.counters = (data.counters || []).filter(mine);
-      }
-      st.calls = data;
+    var id = st.sel, seq = ++st.callsSeq;
+    st.callsMore.paged = false;
+    return get('/api/calls?set=' + encodeURIComponent(id) + '&limit=' + CALLS_PAGE).then(function (data) {
+      if (id !== st.sel || seq !== st.callsSeq) { return; }
+      st.calls = callsOf(data, id);
+      // «Показать ещё» появляется, только если страница пришла полной
+      st.callsMore.full = !!st.calls && st.calls.calls.length >= CALLS_PAGE;
+      syncCallsMore();
       loadKpi();
       renderCalls(st.calls);
       renderHead();
       renderSetServers();
     }).catch(function (e) { fail(e.message, e); });
+  }
+
+  // Следующая страница: before — время последней строки ровно в том виде, в каком
+  // оно пришло, без пересчёта через Date (иначе смещение часового пояса меняет миг).
+  function loadMoreCalls() {
+    var id = st.sel, data = st.calls;
+    if (!id || !data || !data.calls || !data.calls.length || st.callsMore.busy) { return; }
+    var before = data.calls[data.calls.length - 1].time;
+    // seq не растёт: это не новая первая страница. Если тикер успеет её взять,
+    // ответ уйдёт в уже заменённый список — поэтому сверяем номер после ответа
+    var seq = st.callsSeq;
+    var btn = $('calls-more');
+    st.callsMore.busy = true;
+    btn.disabled = true;
+    return get('/api/calls?set=' + encodeURIComponent(id) + '&limit=' + CALLS_PAGE +
+      '&before=' + encodeURIComponent(before)).then(function (page) {
+      if (id !== st.sel || seq !== st.callsSeq) { return; }
+      var rows = page ? callsOf(page, id).calls : [];
+      data.calls = data.calls.concat(rows);
+      st.callsMore.paged = true;
+      st.callsMore.full = rows.length >= CALLS_PAGE;
+      renderCalls(data);
+      syncCallsMore();
+    }).catch(function (e) {
+      if (id !== st.sel || seq !== st.callsSeq) { return; }
+      // загруженное остаётся: плашка говорит о неудаче, а не отменяет список
+      fail(e.message, e);
+    }).then(function () {
+      st.callsMore.busy = false;
+      btn.disabled = false;
+    });
+  }
+
+  // «Возобновить» — тот же первый запрос: догруженное уходит, тикер оживает
+  function resumeCalls() {
+    if (st.callsMore.busy) { return; }
+    loadCalls();
   }
 
   /* ---------- вкладка «Вызовы» ---------- */
@@ -1758,6 +1868,11 @@
     }).catch(function (e) { fail(e.message, e); });
   }
 
+  // тон строки общий у обоих логов: слово-маркер важнее того, кто пишет лог
+  function logClass(line) {
+    return /\b(error|err|fatal|panic)\b/i.test(line) ? 'is-error' : /\bwarn(ing)?\b/i.test(line) ? 'is-warn' : '';
+  }
+
   function renderLog(lines) {
     var key = lines.join('\n');
     if (key === st.logKey) { return; }
@@ -1768,10 +1883,78 @@
     sync($('log'), lines, function (l, i) { return String(i); },
       function () { return el('div', 'logline'); },
       function (row, line) {
-        var cls = /\b(error|err|fatal|panic)\b/i.test(line) ? 'is-error' : /\bwarn(ing)?\b/i.test(line) ? 'is-warn' : '';
+        var cls = logClass(line);
         row.className = 'logline' + (cls ? ' ' + cls : '');
         row.textContent = line;
       });
+  }
+
+  /* ---------- лог одного сервера ----------
+     Отдельного файла у сервера нет: демон отдаёт строки лога набора, где имя
+     сервера встречается отдельным словом, поэтому дровер читает тот же маршрут. */
+
+  var srvLog = { name: '', set: '', seq: 0 };
+
+  function openSrvLog(name) {
+    var set = current();
+    if (!set) { return; }
+    srvLog.name = name;
+    srvLog.set = set.id;
+    srvLog.returnFocus = document.activeElement;
+    $('srvlog-h').textContent = t('srvlog.title', { server: name, set: set.id });
+    $('srvlog-err').hidden = true;
+    var dlg = $('srvlog-dlg');
+    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
+    $('srvlog-refresh').focus();
+    loadSrvLog();
+  }
+
+  function closeSrvLog() {
+    var dlg = $('srvlog-dlg');
+    if (!dlg.open) { return; }
+    dlg.close();
+    srvLog.name = '';
+    srvLog.seq++;
+    var back = srvLog.returnFocus;
+    srvLog.returnFocus = null;
+    if (back && document.contains(back) && back.offsetParent !== null) { back.focus(); }
+  }
+
+  function loadSrvLog() {
+    if (!srvLog.name) { return; }
+    var name = srvLog.name, id = srvLog.set, seq = ++srvLog.seq;
+    var btn = $('srvlog-refresh');
+    btn.disabled = true;
+    $('srvlog-err').hidden = true;
+    return get('/api/sets/' + encodeURIComponent(id) + '/servers/' + encodeURIComponent(name) + '/logs?lines=200')
+      .then(function (data) {
+        if (seq !== srvLog.seq) { return; }
+        renderSrvLog((data && data.logs) || []);
+      })
+      .catch(function (e) {
+        if (seq !== srvLog.seq) { return; }
+        // уже показанные строки остаются: старый хвост полезнее пустого места
+        var box = $('srvlog-err');
+        box.textContent = t('srvlog.fail') + ' · ' + e.message;
+        box.hidden = false;
+      })
+      .then(function () { if (seq === srvLog.seq) { btn.disabled = false; } });
+  }
+
+  function renderSrvLog(lines) {
+    var box = $('srvlog');
+    $('srvlog-count').textContent = cnt(lines.length, 'line');
+    show(box, lines.length > 0);
+    show($('srvlog-empty'), lines.length === 0);
+    // текст лога — только textContent: строки приходят от процессов, не от панели
+    box.replaceChildren();
+    lines.forEach(function (line) {
+      var row = el('div', 'logline', line);
+      var cls = logClass(line);
+      if (cls) { row.className += ' ' + cls; }
+      box.appendChild(row);
+    });
+    box.scrollTop = box.scrollHeight;
   }
 
   /* ---------- статистика ----------
@@ -2414,12 +2597,13 @@
     if (e.key === 'Escape') {
       if ($('theme-menu').hidden === false) { closeThemeMenu(true); return; }
       if ($('srv-dlg').open) { closeSrv(); return; }
+      if ($('srvlog-dlg').open) { closeSrvLog(); return; }
       if (document.body.classList.contains('side-open')) { closeSide(); return; }
       if (document.body.classList.contains('rail-open')) { closeRail(); }
       return;
     }
     if (e.key !== 'Tab') { return; }
-    var root = $('srv-dlg').open ? $('srv-dlg') : null;
+    var root = $('srv-dlg').open ? $('srv-dlg') : $('srvlog-dlg').open ? $('srvlog-dlg') : null;
     if (!root && !document.body.classList.contains('side-open')) { return; }
     root = root || $('side');
     var f = [].slice.call(root.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
@@ -2603,9 +2787,16 @@
   $('set-srv-body').addEventListener('click', function (e) {
     var check = e.target.closest('[data-check]');
     if (check) { probeServer(check.dataset.check, check); return; }
+    var logBtn = e.target.closest('[data-log]');
+    if (logBtn) { openSrvLog(logBtn.dataset.log); return; }
     var edit = e.target.closest('[data-edit]');
     if (edit) { openSrv(edit.dataset.edit); }
   });
+
+  $('srvlog-close').addEventListener('click', closeSrvLog);
+  $('srvlog-refresh').addEventListener('click', loadSrvLog);
+  $('calls-more').addEventListener('click', loadMoreCalls);
+  $('calls-resume').addEventListener('click', resumeCalls);
 
   $('servers').addEventListener('click', function (e) {
     var probe = e.target.closest('[data-probe]');
@@ -2779,7 +2970,12 @@
   loadEnv();
   loadState().then(function () {
     every(5000, loadState);
-    every(5000, function () { if (st.sel) { loadHealth(); loadCalls(); } });
+    every(5000, function () {
+      if (!st.sel) { return; }
+      loadHealth();
+      // пока листают историю, страница не перезаписывается первой
+      if (!st.callsMore.paged) { loadCalls(); }
+    });
     every(10000, function () {
       var set = current();
       if (set && set.runtime && set.runtime.running) { loadLog(); }

@@ -669,6 +669,15 @@ body.side-open #side.drawer { transform: none; }
 }
 body.log-wide #side.drawer { width: min(900px, 100vw); }
 
+/* лог одного сервера: панель держит высоту дровера, прокрутка внутри лога */
+.srvlog-body { display: flex; flex-direction: column; align-content: normal; overflow: hidden; }
+.srvlog-body .od-row { justify-content: space-between; }
+.srvlog { flex: 1 1 auto; min-height: 0; }
+
+/* хвост списка вызовов: кнопка по центру под таблицей */
+.more-row { display: flex; justify-content: center; align-items: center; gap: var(--sp-4); margin-top: var(--sp-5); }
+.more-pause { display: inline-flex; align-items: center; gap: var(--sp-2); }
+
 /* ── статусбар ──────────────────────────────────────────────────────────── */
 .statusbar {
   position: sticky; bottom: 0; z-index: 30;

@@ -407,6 +407,28 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		out.Open = open
 	}
 
+	// notify — три состояния: поля нет — старое значение остаётся; null —
+	// снятие; объект — замена (пустой webhook внутри объекта — тоже снятие,
+	// иначе правка не могла бы убрать блок, не зная про null).
+	if raw, ok := in["notify"]; ok {
+		if isNull(raw) {
+			out.Notify = nil
+		} else {
+			var n Notify
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return nil, errors.New(`notify: ожидался объект {"webhook": "https://…"}`)
+			}
+			if msg := n.Check(); msg != "" {
+				return nil, errors.New(msg)
+			}
+			if strings.TrimSpace(n.Webhook) == "" {
+				out.Notify = nil
+			} else {
+				out.Notify = &n
+			}
+		}
+	}
+
 	out.Token = activeToken(out.Keys)
 	return out, nil
 }

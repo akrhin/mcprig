@@ -19,6 +19,16 @@ repository the project is built in.
   key and last call; `mcprig logs` prints a set's or a server's log tail with
   `-f` and `--json`. Both take `--panel` (default `MCPRIG_PANEL_URL`, else
   `MCPRIG_PORT`) and log in with `MCPRIG_PASSWORD` or the reverse-proxy secret.
+- A set can report failures on its own: `notify: {"webhook": "https://…"}` in the
+  set's record sends `set.crashed`, `set.restart_failed` and
+  `server.unhealthy` as one JSON POST per transition — 5 s timeout, three
+  attempts, and never a token, `env` or command in the body. The address itself
+  never reaches the log, even when it carries a query token.
+- The panel has a **Log** drawer per server and **Show more** under the call
+  history: the drawer reads the set's log filtered by server name, and the
+  button pages `/api/calls` by `before` until a page comes back short. Paging
+  pauses the 5 s refresh and shows **resume** next to it, which returns to the
+  first page.
 
 ### Changed
 

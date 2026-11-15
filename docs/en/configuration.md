@@ -291,6 +291,43 @@ the set-wide value, then to the default. Dynamic client registration, PKCE,
 code exchange and refresh are done by the MCP SDK. Tokens are stored in
 `<data dir>/oauth.json`.
 
+## notify
+
+A set field in `registry.json` — where to report that the set broke:
+
+```json
+{
+  "notify": {"webhook": "https://example.com/mcprig"}
+}
+```
+
+| field | meaning |
+| --- | --- |
+| `webhook` | `http://` or `https://` address with a non-empty host; any other scheme is rejected on write (400). `null`, an empty string or no block means no notifications |
+
+An event is a `POST` with `Content-Type: application/json` and five fields:
+
+| event | when | `server` | `code` |
+| --- | --- | --- | --- |
+| `set.crashed` | the set process exited with a non-zero code | empty | exit code |
+| `set.restart_failed` | all five restart attempts are spent, or a restart after a crash failed (port busy, key revoked) | empty | code of the last exit |
+| `server.unhealthy` | a server of the set stopped answering | server name | none |
+
+```json
+{"event": "set.crashed", "set": "main", "code": 1, "at": "2026-11-15T13:40:00Z"}
+```
+
+One event per transition: while the set is down, further crashes stay silent; a
+successful start and a recovered server open the next transition. A crash and a
+failed restart are two events of one incident: the second arrives when the set
+never came back. Transitions are tracked in process memory, so a panel restart
+sends the event once more. There are three attempts, 100 and 300 ms apart, 5 s
+timeout each; after the third one the journal gets a `вебхук набора не
+отправлен` line with the set id, and the webhook address never appears there.
+Delivery runs in its own goroutine: a crash and a restart never wait for it. The
+body carries identifiers and the exit code only — no token, no `env`, no command;
+the webhook is an external host and must not be trusted.
+
 ## See also
 
 - [install.md](install.md) — where the config and the state directory live.
