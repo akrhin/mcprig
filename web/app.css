@@ -289,6 +289,9 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   border: 1px solid var(--line-strong); border-left: 2px solid var(--warn);
   border-radius: var(--r-2); background: var(--surface); font-size: var(--fs-3);
 }
+/* страница прокручивается, ошибка — нет: иначе она остаётся выше окна и её никто не видит */
+#errbar { position: sticky; top: var(--topbar-h); z-index: 30; }
+#set-del-err { margin-top: var(--sp-2); }
 .alertbar-err { border-left-color: var(--err); margin-bottom: 0; margin-top: var(--sp-4); }
 .alertbar .mono { color: var(--text-dim); font-size: var(--fs-2); overflow-wrap: anywhere; }
 .alertbar .ghost-icon { margin-left: auto; }
@@ -296,7 +299,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .set-head { border-bottom: 1px solid var(--line); padding-bottom: var(--sp-4); }
 .set-head-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
 .set-title { font: 500 var(--fs-7) / 1.1 var(--font-mono); min-width: 0; overflow-wrap: anywhere; }
-.set-actions { display: flex; gap: var(--sp-2); margin-left: auto; }
+.set-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-left: auto; }
 
 .set-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
@@ -391,6 +394,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   border: 1px dashed var(--line-strong); border-radius: var(--r-3);
 }
 .empty-state .empty-text { margin-bottom: var(--sp-4); }
+.empty-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: center; }
 
 /* ── кнопки ─────────────────────────────────────────────────────────────── */
 .btn {
@@ -566,6 +570,18 @@ select.input { padding-right: 6px; }
   border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
   background: color-mix(in srgb, var(--err) 10%, transparent);
   color: var(--err); font-size: var(--fs-2); overflow-wrap: anywhere;
+}
+/* остановленное состояние: предупреждение, а не авария */
+.form-alert-warn {
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+}
+/* импорт прошёл: та же плашка, но зелёная */
+.form-alert-ok {
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  color: var(--ok);
 }
 
 /* ── диалоги ────────────────────────────────────────────────────────────── */

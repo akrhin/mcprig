@@ -123,7 +123,10 @@
       <section class="empty-state" id="empty-state" hidden>
         <p class="empty-title" data-i18n="empty.title">No sets yet</p>
         <p class="empty-text" data-i18n="empty.p">A set is one MCP endpoint with its own port, servers and keys.</p>
-        <button class="btn btn-primary" type="button" id="empty-add" data-i18n="empty.add">Create the first set</button>
+        <div class="empty-actions">
+          <button class="btn btn-primary" type="button" id="empty-add" data-i18n="empty.add">Create the first set</button>
+          <button class="btn" type="button" id="empty-io" data-i18n="io.open">Import / Export</button>
+        </div>
       </section>
 
       <div class="set-head" id="phead" hidden>
@@ -132,9 +135,11 @@
           <span class="chip chip-port mono" id="set-port">:0</span>
           <span class="badge badge-unknown" id="set-state"><span class="dot"></span><span id="set-state-t">—</span></span>
           <div class="set-actions">
+            <button class="btn" type="button" id="io" data-i18n="io.open">Import / Export</button>
             <button class="btn" type="button" id="keys"><span data-i18n="head.keys">Keys</span> <span class="count mono" id="keys-count">0</span></button>
             <button class="btn" type="button" id="restart" hidden data-i18n="head.restart">Restart</button>
             <button class="btn btn-primary" type="button" id="run">—</button>
+            <button class="btn btn-danger" type="button" id="set-del" data-i18n="set.del">Delete set</button>
           </div>
         </div>
         <div class="set-meta">
@@ -150,6 +155,8 @@
           <span class="meta-label" title="tools/list schema of this set" data-i18n-title="head.schemaTip">LIST_COMMANDS</span><code class="mono meta-schema" id="schema" data-i18n-title="head.schemaTip">—</code>
         </div>
       </div>
+
+      <p class="field-error" id="set-del-err" role="alert" tabindex="-1" hidden></p>
 
       <div class="alertbar alertbar-err" id="set-error" hidden>
         <strong id="set-error-h"></strong><span id="set-error-d" class="mono"></span>
@@ -379,6 +386,7 @@
     <footer class="statusbar">
       <span class="mono" id="status-counts">—</span>
       <span class="right">
+        <span class="mono" id="f-version">—</span>
         <span data-i18n="top.updatedLabel">updated</span>
         <span class="mono" id="f-updated">—</span>
       </span>
@@ -412,7 +420,7 @@
       </section>
 
       <section class="pane" data-pane="env" id="pane-env" role="tabpanel" aria-labelledby="sidebtn-env" hidden>
-        <p class="block-meta" data-i18n="env.note">values are supplied by the set process — the panel neither stores nor shows them</p>
+        <p class="block-meta" data-i18n="env.note">values are supplied by the set process — the panel shows names only, never values</p>
         <ul class="varlist" id="env"></ul>
         <p class="empty" id="env-empty" hidden data-i18n="env.empty">no variables</p>
       </section>
@@ -542,7 +550,7 @@
         </div>
       </fieldset>
 
-      <p class="field-error" id="srv-err" role="alert" hidden></p>
+      <p class="field-error" id="srv-err" role="alert" tabindex="-1" hidden></p>
     </div>
     <div class="dialog-foot">
       <button class="btn btn-danger" type="button" id="srv-del" data-i18n="form.delete">delete server</button>
@@ -674,6 +682,59 @@
       <button class="btn" type="button" id="auth-copy" data-i18n="auth.copy" hidden>copy link</button>
       <button class="btn btn-primary" type="button" id="auth-open" data-i18n="auth.open" hidden>open link</button>
       <button class="btn" type="button" id="auth-done" data-i18n="common.done">done</button>
+    </div>
+  </div>
+</dialog>
+<dialog class="dialog modal" id="io-dlg" aria-labelledby="io-h">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <div>
+        <h2 id="io-h" data-i18n="io.title">Import and export</h2>
+        <p class="dialog-sub" data-i18n="io.sub">The host registry as JSON, one set on its own, or servers copied from another client.</p>
+      </div>
+      <button class="ghost-icon" type="button" id="io-x" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <fieldset class="field-group">
+        <legend data-i18n="io.export">Export</legend>
+        <div class="field">
+          <span class="field-label" data-i18n="io.registry">Whole registry</span>
+          <div class="field-row">
+            <button class="btn btn-sm" type="button" id="io-reg-dl" data-i18n="io.download">Download JSON</button>
+            <button class="btn btn-sm" type="button" id="io-reg-copy" data-i18n="io.copy">Copy</button>
+          </div>
+          <p class="field-help" id="io-reg-note">—</p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="io-set" data-i18n="io.set">One set</label>
+          <div class="field-row">
+            <select class="input" id="io-set"></select>
+            <button class="btn btn-sm" type="button" id="io-set-dl" data-i18n="io.download">Download JSON</button>
+          </div>
+          <p class="field-help" data-i18n="io.setHelp">Only the set's servers, in the shape other clients read. Keys and history stay here.</p>
+        </div>
+      </fieldset>
+
+      <fieldset class="field-group">
+        <legend data-i18n="io.importL">Import</legend>
+        <div class="field">
+          <label class="field-label" for="io-file" data-i18n="io.file">JSON file</label>
+          <input class="input" type="file" id="io-file" accept=".json,application/json">
+        </div>
+        <div class="field">
+          <label class="field-label" for="io-text" data-i18n="io.text">or paste the JSON</label>
+          <textarea class="input mono" id="io-text" rows="7" spellcheck="false" autocomplete="off" placeholder='{ "mcpServers": { "x": { "command": "npx", "args": ["-y", "pkg"] } } }' data-i18n-ph="io.ph"></textarea>
+        </div>
+        <p class="field-help" data-i18n="io.importHelp">Servers from Claude Desktop and Cursor go in as they are; a registry file works too. Servers already in the registry stay as they are, sets are not imported.</p>
+        <p class="field-help" id="io-peek" role="status"></p>
+        <p class="field-error" id="io-err" role="alert" tabindex="-1" hidden></p>
+      </fieldset>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn" type="button" id="io-close" data-i18n="common.close">close</button>
+      <button class="btn btn-primary" type="button" id="io-add" disabled data-i18n="io.doImport">import</button>
     </div>
   </div>
 </dialog>
