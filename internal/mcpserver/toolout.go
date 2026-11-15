@@ -62,7 +62,7 @@ func truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult,
 	if res.StructuredContent != nil {
 		// Без этой строки клиент со structured-смыслом (ticktick и подобные)
 		// видит пустой ответ: структура в текстовый срез не попадает.
-		text += "\n[structuredContent не влезает в maxBytes: полный ответ в файле]"
+		text += "\n[structuredContent больше maxBytes: полный ответ в файле]"
 	}
 	return &mcp.CallToolResult{
 		IsError: res.IsError,

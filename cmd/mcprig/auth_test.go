@@ -64,7 +64,7 @@ func TestResolveAuthErrors(t *testing.T) {
 		name, set, cfg, server, want string
 	}{
 		{"нет выбора", "", "", "a", "укажите набор"},
-		{"оба флага", "main", "/tmp/x.json", "a", "взаимоисключающие"},
+		{"оба флага", "main", "/tmp/x.json", "a", "укажите что-то одно"},
 		{"нет набора", "nope", "", "a", "nope"},
 		{"нет сервера", "main", "", "b", "не найден"},
 	}

@@ -119,7 +119,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 	switch srv.Transport {
 	case config.TransportStdio:
 		if len(srv.Command) == 0 {
-			return nil, nil, fmt.Errorf("пустой command")
+			return nil, nil, fmt.Errorf("command пуст — укажите команду запуска")
 		}
 		// Песочница — префикс argv, транспорт не меняется. Ошибка здесь значит
 		// fail-closed: сервер не стартует, а не стартует «как раньше».
@@ -159,7 +159,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		return &mcp.CommandTransport{Command: cmd}, tail, nil
 	case config.TransportHTTP:
 		if srv.URL == "" {
-			return nil, nil, fmt.Errorf("пустой url")
+			return nil, nil, fmt.Errorf("url пуст — укажите адрес сервера")
 		}
 		tr := &mcp.StreamableClientTransport{
 			Endpoint: srv.URL,
@@ -179,7 +179,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		}
 		return tr, nil, nil
 	default:
-		return nil, nil, fmt.Errorf("неизвестный transport %q", srv.Transport)
+		return nil, nil, fmt.Errorf("неизвестный transport %q: допустимо stdio или http", srv.Transport)
 	}
 }
 
@@ -239,7 +239,7 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 // встроенная защита Go здесь не работает.
 func sameHostRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 {
-		return fmt.Errorf("слишком много редиректов")
+		return fmt.Errorf("слишком много редиректов — проверьте url сервера")
 	}
 	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
 		return fmt.Errorf("редирект на другой хост отклонён: %s", req.URL.Host)

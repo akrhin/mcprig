@@ -381,7 +381,7 @@ func TestBodyErrors(t *testing.T) {
 
 	w := e.do(t, http.MethodPost, "/api/servers", "не json")
 	status(t, w, http.StatusBadRequest)
-	if got := decode[map[string]string](t, w)["error"]; got != "ожидался JSON" {
+	if got := decode[map[string]string](t, w)["error"]; got != "тело запроса должно быть JSON" {
 		t.Fatalf("ошибка = %q", got)
 	}
 

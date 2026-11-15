@@ -255,10 +255,10 @@ func TestToolOutLine(t *testing.T) {
 	}
 
 	line := toolOutLine(dataDir)
-	if !line.OK || !strings.Contains(line.Text, "2 файлов") || !strings.Contains(line.Text, "самый старый") || !strings.Contains(line.Text, "ч назад") {
+	if !line.OK || !strings.Contains(line.Text, "2 файла") || !strings.Contains(line.Text, "самый старый") || !strings.Contains(line.Text, "ч назад") {
 		t.Fatalf("строка: %+v", line)
 	}
-	if got := toolOutLine(t.TempDir()); got.Text != "tool-out нет" {
+	if got := toolOutLine(t.TempDir()); got.Text != "tool-out: файлов нет" {
 		t.Fatalf("пустой каталог: %q", got.Text)
 	}
 }

@@ -318,16 +318,16 @@ func TestImport(t *testing.T) {
 	for _, skip := range skipped {
 		reasons[skip.Name] = skip.Reason
 	}
-	if reasons["str"] != "command: передайте массив" {
+	if reasons["str"] != "command: передайте массив строк, а не строку" {
 		t.Errorf("str: %q", reasons["str"])
 	}
 	if !strings.Contains(reasons["num"], "env.A") {
 		t.Errorf("num: %q", reasons["num"])
 	}
-	if reasons["junk"] != "запись не объект" {
+	if reasons["junk"] != "запись должна быть объектом или массивом команд" {
 		t.Errorf("junk: %q", reasons["junk"])
 	}
-	if !strings.Contains(reasons["Upper"], "имя сервера") {
+	if !strings.Contains(reasons["Upper"], "в имени допустимы") {
 		t.Errorf("Upper: %q", reasons["Upper"])
 	}
 	if srv := store.Server("str"); srv != nil {
@@ -397,13 +397,13 @@ func TestServerValidation(t *testing.T) {
 		{"stdio", `{"name":"a","command":["npx","x"]}`, ""},
 		{"command строкой", `{"name":"a","command":"npx -y x"}`, ""},
 		{"http", `{"name":"a","url":"http://127.0.0.1/mcp"}`, ""},
-		{"stdio без command", `{"name":"a","transport":"stdio"}`, "нужен command[] или url"},
-		{"http без url", `{"name":"a","transport":"http","description":"d"}`, "нужен command[] или url"},
-		{"command и url", `{"name":"a","command":["x"],"url":"http://x"}`, "что-то одно"},
+		{"stdio без command", `{"name":"a","transport":"stdio"}`, "нужен ровно один из них: command[] или url"},
+		{"http без url", `{"name":"a","transport":"http","description":"d"}`, "нужен ровно один из них: command[] или url"},
+		{"command и url", `{"name":"a","command":["x"],"url":"http://x"}`, "ровно один из них"},
 		{"cwd на http", `{"name":"a","url":"http://x","cwd":"/tmp"}`, "cwd допустим только"},
 		{"env числом", `{"name":"a","command":["x"],"env":{"A":1}}`, "env.A: ожидалась строка"},
 		{"headers числом", `{"name":"a","url":"http://x","headers":{"A":1}}`, "headers.A: ожидалась строка"},
-		{"имя заглавными", `{"name":"A","command":["x"]}`, "имя сервера"},
+		{"имя заглавными", `{"name":"A","command":["x"]}`, "в имени допустимы"},
 		{"enabled строкой", `{"name":"a","command":["x"],"enabled":"yes"}`, "enabled: ожидалось true или false"},
 	}
 	for _, tc := range cases {
@@ -605,10 +605,10 @@ func TestLoadDropsSetWithBadID(t *testing.T) {
 
 func TestKeyOpsMissingSet(t *testing.T) {
 	store := openStore(t, t.TempDir())
-	if _, err := store.IssueKey("nope"); err == nil || !strings.Contains(err.Error(), "нет набора") {
+	if _, err := store.IssueKey("nope"); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
 		t.Errorf("IssueKey: err = %v", err)
 	}
-	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "нет набора") {
+	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
 		t.Errorf("RevokeKey: err = %v", err)
 	}
 }

@@ -73,7 +73,7 @@ func probe() error {
 func probeRun() error {
 	bwrap, err := exec.LookPath("bwrap")
 	if err != nil {
-		return errors.New("bwrap не найден в PATH")
+		return errors.New("bwrap не найден в PATH — установите bubblewrap")
 	}
 	if _, err := exec.LookPath("prlimit"); err != nil {
 		return errors.New("prlimit не найден в PATH: лимиты песочницы задаёт util-linux — установите пакет util-linux")
@@ -82,7 +82,7 @@ func probeRun() error {
 	// бы как выключенный userns.
 	trueBin, err := exec.LookPath("true")
 	if err != nil {
-		return errors.New("нечем проверить песочницу: true не найден в PATH")
+		return errors.New("нечем проверить песочницу: true не найден в PATH — установите coreutils")
 	}
 	// /bin/true — обычно симлинк в /usr/bin: внутрь привязан только /usr, и
 	// непереход по ссылке давал «exec внутри песочницы не удался» на живом
@@ -105,13 +105,13 @@ func probeRun() error {
 	cmd.Stdout, cmd.Stderr = io.Discard, &stderr
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return fmt.Errorf("bwrap не ответил за %s: проба песочницы прервана", probeTimeout)
+			return fmt.Errorf("bwrap не ответил за %s: проверка песочницы прервана", probeTimeout)
 		}
 		msg := strings.TrimSpace(stderr.String())
 		if strings.Contains(msg, "execvp") {
-			return fmt.Errorf("exec внутри песочницы не удался (%s): %s", trueBin, msg)
+			return fmt.Errorf("запуск внутри песочницы не удался (%s): %s", trueBin, msg)
 		}
-		return fmt.Errorf("bwrap не создаёт namespace (userns выключен?): %v: %s", err, msg)
+		return fmt.Errorf("bwrap не может создать namespace — проверьте, разрешены ли user namespaces: %v: %s", err, msg)
 	}
 	return nil
 }

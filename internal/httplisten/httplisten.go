@@ -27,15 +27,15 @@ const maxBodyBytes = 4 << 20
 // authentication by accident.
 func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recorder) (http.Handler, error) {
 	if cfg == nil || cfg.Transport == nil {
-		return nil, errors.New("httplisten: в конфиге нет transport")
+		return nil, errors.New("httplisten: у набора нет transport — задайте stdio или http")
 	}
 	if srv == nil {
-		return nil, errors.New("httplisten: нет mcp-сервера")
+		return nil, errors.New("httplisten: у набора нет серверов")
 	}
 	token := cfg.Transport.AuthToken
 	allowAnonymous := cfg.Transport.AllowAnonymous
 	if token == "" && !allowAnonymous {
-		return nil, errors.New("httplisten: пустой authToken — без авторизации набор не стартует")
+		return nil, errors.New("httplisten: пустой authToken — выпустите ключ (без авторизации набор не стартует)")
 	}
 	if log == nil {
 		log = slog.Default()
@@ -58,7 +58,7 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 		path = "/mcp"
 	}
 	if !strings.HasPrefix(path, "/") {
-		return nil, errors.New("httplisten: path должен начинаться с /")
+		return nil, errors.New("httplisten: path должен начинаться с «/»: получено " + path)
 	}
 
 	// Stateless 2026-07-28 per SEP-2567: one temporary session per POST. The

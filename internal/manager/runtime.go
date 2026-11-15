@@ -163,7 +163,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	}
 	rt.mu.Unlock()
 	if closed {
-		return RuntimeStatus{}, errors.New("менеджер остановлен")
+		return RuntimeStatus{}, errors.New("менеджер остановлен — перезапустите mcprig")
 	}
 	if cur != nil && !curExited && !curStopping {
 		return rt.status(set), nil
@@ -181,14 +181,14 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	}
 	cfgPath, err := WriteSetConfig(rt.dataDir, set.ID, body)
 	if err != nil {
-		return RuntimeStatus{}, fmt.Errorf("конфиг набора %s: %w", set.ID, err)
+		return RuntimeStatus{}, fmt.Errorf("не удалось собрать конфигурацию набора %s: %w", set.ID, err)
 	}
 
 	logPath := LogPath(rt.dataDir, set.ID)
 	migrateLog(rt.log, rt.dataDir, set.ID)
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return RuntimeStatus{}, fmt.Errorf("лог набора %s: %w", set.ID, err)
+		return RuntimeStatus{}, fmt.Errorf("не удалось открыть лог набора %s: %w", set.ID, err)
 	}
 	ring := rt.ring(set.ID)
 	size := int64(0)
@@ -206,7 +206,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	cmd.Stderr = writer
 	if err := cmd.Start(); err != nil {
 		logFile.Close()
-		return RuntimeStatus{}, fmt.Errorf("набор %s не стартовал: %w", set.ID, err)
+		return RuntimeStatus{}, fmt.Errorf("не удалось запустить набор %s: %w", set.ID, err)
 	}
 
 	p := &process{
@@ -225,7 +225,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		logFile.Close()
 		killGroup(p.pid, syscall.SIGKILL)
 		_ = cmd.Wait()
-		return RuntimeStatus{}, errors.New("менеджер остановлен")
+		return RuntimeStatus{}, errors.New("менеджер остановлен — перезапустите mcprig")
 	}
 	rt.procs[set.ID] = p
 	rt.mu.Unlock()
@@ -235,7 +235,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	if !waitPort(rt.probeAddr, set.Port, readyBudget, p.done) {
 		rt.mu.Lock()
 		p.stopping = true
-		p.err = fmt.Sprintf("порт %d не слушает", set.Port)
+		p.err = fmt.Sprintf("порт %d не слушает — набор не поднялся", set.Port)
 		rt.mu.Unlock()
 		killGroup(p.pid, syscall.SIGKILL)
 		<-p.done
@@ -287,7 +287,7 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 	}
 	rt.mu.Lock()
 	p.restarts++
-	p.err = fmt.Sprintf("упал (код %d), перезапуск %d/%d через %s", code, p.restarts, maxRestarts, delay)
+	p.err = fmt.Sprintf("упал (код %d), перезапуск %d/%d через %s", code, p.restarts, maxRestarts, humanDuration(delay))
 	rt.mu.Unlock()
 
 	go func() {
@@ -616,9 +616,21 @@ func listenHost(bindIP string) string {
 func portFree(host string, port int) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
-		return fmt.Errorf("порт %d занят другим процессом", port)
+		return fmt.Errorf("порт %d занят другим процессом — выберите другой порт", port)
 	}
 	return ln.Close()
+}
+
+// humanDuration — длительность для человека: «6 мин», «5 с» вместо «6m0s».
+func humanDuration(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%d с", int(d.Round(time.Second)/time.Second))
+	case d < time.Hour:
+		return fmt.Sprintf("%d мин", int(d.Round(time.Minute)/time.Minute))
+	default:
+		return fmt.Sprintf("%d ч", int(d.Round(time.Hour)/time.Hour))
+	}
 }
 
 func waitPort(host string, port int, budget time.Duration, done <-chan struct{}) bool {
@@ -728,10 +740,10 @@ func (w *logWriter) Write(p []byte) (int, error) {
 	if w.file == nil {
 		// Файла нет вовсе: строку сохраняет кольцо, а ошибка — в статусе.
 		w.ring.add(string(p))
-		return len(p), errors.New("лог набора недоступен: " + w.err)
+		return len(p), errors.New("не удалось записать лог: " + w.err)
 	}
 	if _, err := w.file.Write(p); err != nil {
-		w.setErr("запись лога: " + err.Error())
+		w.setErr("не удалось записать лог: " + err.Error())
 		return 0, err
 	}
 	w.size += int64(len(p))
@@ -744,12 +756,12 @@ func (w *logWriter) Write(p []byte) (int, error) {
 // уходит в статус набора.
 func (w *logWriter) rotate() {
 	if err := os.Rename(w.path, w.path+".1"); err != nil {
-		w.setErr("ротация лога: " + err.Error())
+		w.setErr("не удалось прокрутить лог: " + err.Error())
 		return
 	}
 	f, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		w.setErr("новый лог не открыт: " + err.Error())
+		w.setErr("не удалось открыть новый лог: " + err.Error())
 		return
 	}
 	if w.file != nil {

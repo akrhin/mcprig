@@ -120,17 +120,17 @@ func (s *Sandbox) validate() string {
 	switch s.Mode {
 	case SandboxModeNone, SandboxModeBwrap:
 	default:
-		return fmt.Sprintf("sandbox.mode: %q, допустимо none|bwrap", s.Mode)
+		return fmt.Sprintf("sandbox.mode: недопустимое значение %q, допустимые: none, bwrap", s.Mode)
 	}
 	switch s.OnUnavailable {
 	case OnUnavailableDeny, OnUnavailableWarn, OnUnavailableAllow:
 	default:
-		return fmt.Sprintf("sandbox.onUnavailable: %q, допустимо deny|warn|allow", s.OnUnavailable)
+		return fmt.Sprintf("sandbox.onUnavailable: недопустимое значение %q, допустимые: deny, warn, allow", s.OnUnavailable)
 	}
 	switch s.Network {
 	case SandboxNetworkNone, SandboxNetworkAllow:
 	default:
-		return fmt.Sprintf("sandbox.network: %q, допустимо none|allow", s.Network)
+		return fmt.Sprintf("sandbox.network: недопустимое значение %q, допустимые: none, allow", s.Network)
 	}
 	for _, field := range []struct {
 		name  string
@@ -195,7 +195,7 @@ func (s *Server) Warnings() []string {
 			break
 		}
 		if !pinned {
-			out = append(out, fmt.Sprintf("%s без пина версии: код подменяется молча", filepath.Base(s.Command[0])))
+			out = append(out, fmt.Sprintf("%s без фиксации версии: код может подмениться", filepath.Base(s.Command[0])))
 		}
 	}
 	return out
@@ -258,10 +258,10 @@ func (o *OAuth) validate(prefix string) string {
 		return ""
 	}
 	if o.CallbackPort < 0 || o.CallbackPort > 65535 {
-		return fmt.Sprintf("%s.callbackPort: ожидался порт 0–65535, получено %d", prefix, o.CallbackPort)
+		return fmt.Sprintf("%s.callbackPort: недопустимое значение %d: порт 0–65535", prefix, o.CallbackPort)
 	}
 	if o.ClientSecret != "" && o.ClientID == "" {
-		return prefix + ".clientSecret без clientId"
+		return prefix + ".clientSecret указан без clientId"
 	}
 	return ""
 }
@@ -333,7 +333,7 @@ func (p *Permissions) validate(prefix string, global bool) string {
 	switch p.Default {
 	case "", PermissionAllow, PermissionDeny:
 	default:
-		return fmt.Sprintf("%s.default: ожидалось allow или deny, получено %q", prefix, p.Default)
+		return fmt.Sprintf("%s.default: недопустимое значение %q: допустимо allow или deny", prefix, p.Default)
 	}
 	for i, r := range p.Rules {
 		rp := fmt.Sprintf("%s.rules[%d]", prefix, i)
@@ -570,7 +570,7 @@ func expandSecrets(value string) (string, error) {
 		name := match[2 : len(match)-1]
 		val, ok := os.LookupEnv(name)
 		if !ok {
-			firstErr = fmt.Errorf("переменная %s не задана", name)
+			firstErr = fmt.Errorf("переменная %s не задана в окружении", name)
 			return match
 		}
 		return val
@@ -626,7 +626,7 @@ func (s *Server) validate() bool {
 // Check проверяет копию, не трогая общий объект реестра.
 func (s *Server) validateSandbox(sandbox *Sandbox) bool {
 	if s.Name == "" {
-		s.ConfigError = "нет имени"
+		s.ConfigError = "у сервера нет имени"
 		return false
 	}
 	if name := reservedEnvName(s); name != "" {
@@ -646,20 +646,20 @@ func (s *Server) validateSandbox(sandbox *Sandbox) bool {
 		}
 	case TransportStdio:
 		if len(s.Command) == 0 {
-			s.ConfigError = "stdio требует command"
+			s.ConfigError = "для stdio нужен command"
 			return false
 		}
 		if s.URL != "" {
-			s.ConfigError = "stdio не может иметь url"
+			s.ConfigError = "у stdio не бывает url"
 			return false
 		}
 	case TransportHTTP:
 		if s.URL == "" {
-			s.ConfigError = "http требует url"
+			s.ConfigError = "для http нужен url"
 			return false
 		}
 		if len(s.Command) > 0 {
-			s.ConfigError = "http не может иметь command"
+			s.ConfigError = "у http не бывает command"
 			return false
 		}
 	default:
@@ -813,7 +813,7 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("%s: сервер #%d без имени", path, i+1)
 		}
 		if seen[srv.Name] {
-			srv.ConfigError = "дубль имени"
+			srv.ConfigError = "имя уже занято другим сервером"
 		}
 		seen[srv.Name] = true
 		srv.expandSecrets()

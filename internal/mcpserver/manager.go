@@ -61,11 +61,11 @@ var (
 )
 
 var (
-	errClosed    = errors.New("менеджер закрыт")
+	errClosed    = errors.New("менеджер остановлен — перезапустите mcprig")
 	errNoTargets = errors.New("нужен параметр server или servers")
 	// errProbeSkipped — проба вообще не началась (не дождалась слота): исход
 	// неизвестен, это не отказ сервера.
-	errProbeSkipped = errors.New("проба не началась: не дождалась свободного слота")
+	errProbeSkipped = errors.New("проверка не началась: не дождалась свободного слота")
 )
 
 // probeSlots bounds how many servers one list_servers probes at once.
@@ -338,7 +338,7 @@ func (m *Manager) Server() *mcp.Server {
 		Name: "invoke_many",
 		Description: "Выполнить до 8 независимых вызовов одним запросом. " +
 			"Каждый вызов — как invoke_command: server, command_name (синоним — command) и parameters. " +
-			"Ответ — массив в порядке calls; ошибка одного вызова не валит остальные.",
+			"Ответ — массив в порядке calls; ошибка одного вызова не отменяет остальные.",
 		InputSchema: objectSchema(map[string]any{
 			"calls": map[string]any{
 				"type":        "array",
@@ -545,7 +545,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 	switch {
 	case in.Server != "" && len(in.Servers) > 0:
-		return errResult(errors.New("укажи server или servers, не оба"))
+		return errResult(errors.New("укажите server или servers, но не оба"))
 	case in.Server != "":
 		cmds, err := m.commandsOf(ctx, in.Server)
 		if err != nil {
@@ -729,13 +729,13 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if in.CommandName == "" {
 		in.CommandName = in.Command
 	} else if in.Command != "" && in.Command != in.CommandName {
-		return errResult(errors.New("укажите одно: command_name или command"))
+		return errResult(errors.New("укажите command_name (или command)"))
 	}
 	if in.Server == "" {
 		return errResult(errors.New("server обязателен"))
 	}
 	if in.CommandName == "" {
-		return errResult(errors.New("укажите command_name или command"))
+		return errResult(errors.New("укажите command_name (или command)"))
 	}
 	maxBytes, err := resolveMaxBytes(in.MaxBytes)
 	if err != nil {
@@ -964,7 +964,7 @@ func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolPa
 			// Зависший вызов остаётся в конвейере сессии — сбрасываем её,
 			// иначе следующий вызов получит ответ от прошлого.
 			m.dropSession(e)
-			return res, fmt.Errorf("%s: таймаут %s (sandbox): %w", e.srv.Name, limit, err)
+			return res, fmt.Errorf("%s: таймаут %s (песочница): %w", e.srv.Name, limit, err)
 		}
 		return res, fmt.Errorf("%s: %w", e.srv.Name, err)
 	}
@@ -1057,7 +1057,7 @@ func serverProblem(srv *config.Server) error {
 	if srv.ConfigError != "" {
 		return fmt.Errorf("%s: %s", srv.Name, srv.ConfigError)
 	}
-	return fmt.Errorf("%s: выключен", srv.Name)
+	return fmt.Errorf("%s: сервер выключен в конфигурации — включите enabled", srv.Name)
 }
 
 func transportType(srv *config.Server) string {
@@ -1216,7 +1216,7 @@ func resultMessage(res *mcp.CallToolResult) string {
 			return t.Text
 		}
 	}
-	return "инструмент вернул ошибку"
+	return "сервер вернул ошибку без текста — смотрите лог набора"
 }
 
 func errResult(err error) (*mcp.CallToolResult, error) {

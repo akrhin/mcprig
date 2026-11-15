@@ -20,7 +20,7 @@ func TestCSRFCookieRequiresOrigin(t *testing.T) {
 
 	w = e.doWithCookieOrigin(t, http.MethodPost, "/api/import", body, cookie, "")
 	status(t, w, http.StatusForbidden)
-	if !strings.Contains(w.Body.String(), "нужен заголовок Origin") {
+	if !strings.Contains(w.Body.String(), "не хватает заголовка Origin") {
 		t.Fatalf("текст отказа: %s", w.Body.String())
 	}
 

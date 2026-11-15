@@ -63,17 +63,17 @@ func (s *Store) Import(entries map[string]json.RawMessage) ([]string, []Skip) {
 func importObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if isNull(trimmed) {
-		return nil, errors.New("запись не объект")
+		return nil, errors.New("запись должна быть объектом или массивом команд")
 	}
 	switch trimmed[0] {
 	case '{':
 		return decodeObject(trimmed)
 	case '"':
-		return nil, errors.New("command: передайте массив")
+		return nil, errors.New("command: передайте массив строк, а не строку")
 	case '[':
 		var argv []string
 		if err := json.Unmarshal(trimmed, &argv); err != nil {
-			return nil, errors.New("command: ожидался массив строк")
+			return nil, errors.New("command должен быть массивом строк")
 		}
 		encoded, err := json.Marshal(argv)
 		if err != nil {
@@ -81,7 +81,7 @@ func importObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 		}
 		return map[string]json.RawMessage{"command": encoded}, nil
 	default:
-		return nil, errors.New("запись не объект")
+		return nil, errors.New("запись должна быть объектом или массивом команд")
 	}
 }
 
@@ -92,7 +92,7 @@ func (s *Store) ExportSet(id string) (map[string]any, error) {
 	defer s.mu.Unlock()
 	set := s.setLocked(id)
 	if set == nil {
-		return nil, fmt.Errorf("нет набора %s", id)
+		return nil, fmt.Errorf("набор %s не найден", id)
 	}
 	servers := make(map[string]any, len(set.Servers))
 	for _, name := range set.Servers {

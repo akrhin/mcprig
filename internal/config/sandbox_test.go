@@ -207,12 +207,12 @@ func TestCheckDoesNotMutate(t *testing.T) {
 
 // Опечатка в поле sandbox не должна молча давать умолчания.
 func TestDecodeSandboxUnknownKeys(t *testing.T) {
-	data := []byte(`{"name":"c","command":["/bin/true"],"sandbox":{"mode":"bwrap","memoryMB":1024}}`)
+	data := []byte(`{"name":"c","command":["/bin/true"],"sandbox":{"mode":"bwrap","memoryMbs":1024}}`)
 	var srv Server
 	if err := srv.UnmarshalJSON(data); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if !strings.Contains(srv.ConfigError, "неизвестные поля: memoryMB") {
+	if !strings.Contains(srv.ConfigError, "неизвестные поля: memoryMbs") {
 		t.Fatalf("ConfigError = %q", srv.ConfigError)
 	}
 	if srv.Sandbox != nil {

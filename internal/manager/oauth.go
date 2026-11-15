@@ -39,11 +39,11 @@ func (m *Manager) apiServerAuthorize(req *request) error {
 	setID, name := req.args[0], req.args[1]
 	set := m.store.Set(setID)
 	if set == nil {
-		return notFound("нет набора " + setID)
+		return notFound("набор " + setID + " не найден")
 	}
 	srv := m.store.Server(name)
 	if srv == nil {
-		return notFound("нет сервера " + name)
+		return notFound("сервер " + name + " не найден")
 	}
 	if req.r.Method == http.MethodGet {
 		writeJSON(req.w, http.StatusOK, m.flowView(authKey(setID, name)))
@@ -59,7 +59,7 @@ func (m *Manager) apiServerAuthorize(req *request) error {
 		return badRequest("сервер " + name + " не входит в набор " + setID)
 	}
 	if srv.URL == "" {
-		return badRequest("OAuth бывает только у удалённого сервера с url")
+		return badRequest("OAuth поддерживается только у удалённого сервера (transport: http)")
 	}
 	if cur := m.flowView(authKey(setID, name)); cur.State == "pending" {
 		writeJSON(req.w, http.StatusAccepted, cur)
@@ -134,7 +134,7 @@ func (m *Manager) authorize(setID string, srv *config.Server, redirect string) {
 func (m *Manager) waitAuthorization(ctx context.Context, key, authURL string) (*oauth.Result, error) {
 	state := authURLState(authURL)
 	if state == "" {
-		return nil, errors.New("в URL авторизации нет state")
+		return nil, errors.New("в URL авторизации нет параметра state")
 	}
 	ch := make(chan authOutcome, 1)
 	m.authMu.Lock()
@@ -143,7 +143,7 @@ func (m *Manager) waitAuthorization(ctx context.Context, key, authURL string) (*
 	}
 	if _, busy := m.authWait[state]; busy {
 		m.authMu.Unlock()
-		return nil, errors.New("этот вход уже ждёт подтверждения")
+		return nil, errors.New("этот вход уже выполняется — дождитесь ответа")
 	}
 	m.authWait[state] = ch
 	if m.authFlows == nil {
@@ -165,7 +165,7 @@ func (m *Manager) waitAuthorization(ctx context.Context, key, authURL string) (*
 	case o := <-ch:
 		return o.res, o.err
 	case <-ctx.Done():
-		return nil, fmt.Errorf("ссылка не использована за %s — код не получен", authFlowTimeout)
+		return nil, fmt.Errorf("ссылка не использована за %s — код не получен; начните вход заново", humanDuration(authFlowTimeout))
 	}
 }
 
@@ -182,7 +182,7 @@ func (m *Manager) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	ch := m.authWait[state]
 	m.authMu.Unlock()
 	if ch == nil {
-		http.Error(w, "неизвестный или уже закрытый вход", http.StatusBadRequest)
+		http.Error(w, "ссылка устарела или вход уже завершён — начните вход заново", http.StatusBadRequest)
 		return
 	}
 	if e := q.Get("error"); e != "" {
@@ -196,8 +196,8 @@ func (m *Manager) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	code := q.Get("code")
 	if code == "" {
-		deliverAuth(ch, authOutcome{err: errors.New("редирект без параметра code")})
-		http.Error(w, "в редиректе нет code", http.StatusBadRequest)
+		deliverAuth(ch, authOutcome{err: errors.New("в ответе сервера нет параметра code")})
+		http.Error(w, "в ответе сервера нет параметра code", http.StatusBadRequest)
 		return
 	}
 	deliverAuth(ch, authOutcome{res: &oauth.Result{Code: code, State: state, Iss: q.Get("iss")}})

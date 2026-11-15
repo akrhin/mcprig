@@ -117,10 +117,10 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 	for i, item := range raw {
 		extra, err := extraKeys(item, "server", "command_name", "command", "parameters")
 		if err != nil {
-			return nil, fmt.Errorf("calls[%d]: ожидался объект", i)
+			return nil, fmt.Errorf("calls[%d]: нужен объект вызова", i)
 		}
 		if len(extra) > 0 {
-			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s — допустимые: server, command_name, command, parameters; аргументы кладутся в parameters", i, strings.Join(extra, ", "))
+			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s. Допустимые: server, command_name, command, parameters. Аргументы кладутся в parameters", i, strings.Join(extra, ", "))
 		}
 		if err := json.Unmarshal(item, &calls[i]); err != nil {
 			if text, ok := typeErrorText(err, fmt.Sprintf("calls[%d]: ", i)); ok {
@@ -129,15 +129,15 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 			return nil, fmt.Errorf("calls[%d]: %w", i, err)
 		}
 		if calls[i].Server == "" {
-			return nil, fmt.Errorf("calls[%d]: server обязателен", i)
+			return nil, fmt.Errorf("calls[%d]: укажите server", i)
 		}
 		if calls[i].CommandName == "" {
 			calls[i].CommandName = calls[i].Command
 		} else if calls[i].Command != "" && calls[i].Command != calls[i].CommandName {
-			return nil, fmt.Errorf("calls[%d]: укажите одно: command_name или command", i)
+			return nil, fmt.Errorf("calls[%d]: укажите command_name (или command)", i)
 		}
 		if calls[i].CommandName == "" {
-			return nil, fmt.Errorf("calls[%d]: укажите command_name или command", i)
+			return nil, fmt.Errorf("calls[%d]: укажите command_name (или command)", i)
 		}
 		if _, err := parametersOf(calls[i].Parameters); err != nil {
 			return nil, fmt.Errorf("calls[%d]: %w", i, err)

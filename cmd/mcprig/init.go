@@ -29,7 +29,7 @@ func newInitFlags() (*flag.FlagSet, *initConfig) {
 	fs.StringVar(&cfg.Remote, "remote", "", "адрес набора, напр. http://127.0.0.1:9100/mcp; пусто — stdio")
 	fs.StringVar(&cfg.Key, "key", "", "bearer-ключ набора (только для --remote); - — читать stdin")
 	fs.StringVar(&cfg.KeyFile, "key-file", "", "файл с bearer-ключом набора (только для --remote)")
-	fs.StringVar(&cfg.Binary, "binary", "mcprig", "путь к бинарю mcprig для stdio-режима")
+	fs.StringVar(&cfg.Binary, "binary", "mcprig", "путь к исполняемому файлу mcprig для stdio-режима")
 	fs.StringVar(&cfg.Config, "config", "", "путь к servers.json для stdio-режима")
 	return fs, cfg
 }
@@ -114,14 +114,14 @@ func initKey(cfg *initConfig) (string, error) {
 	if cfg.KeyFile != "" {
 		body, err := os.ReadFile(cfg.KeyFile)
 		if err != nil {
-			return "", fmt.Errorf("ключ: %w", err)
+			return "", fmt.Errorf("не удалось сохранить ключ: %w", err)
 		}
 		return strings.TrimSpace(string(body)), nil
 	}
 	if cfg.Key == "-" {
 		body, err := io.ReadAll(os.Stdin)
 		if err != nil {
-			return "", fmt.Errorf("ключ: %w", err)
+			return "", fmt.Errorf("не удалось сохранить ключ: %w", err)
 		}
 		return strings.TrimSpace(string(body)), nil
 	}

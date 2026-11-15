@@ -40,7 +40,7 @@ func Open(dir string) (*Store, error) {
 		if uerr := json.Unmarshal(raw, &data); uerr != nil {
 			backup := fmt.Sprintf("%s.corrupt-%d", s.path, time.Now().Unix())
 			if rerr := os.Rename(s.path, backup); rerr != nil {
-				return nil, fmt.Errorf("реестр %s не разобран (%v), отложить не удалось: %w", s.path, uerr, rerr)
+				return nil, fmt.Errorf("реестр %s не разобран: %v. Отложить файл не удалось: %w", s.path, uerr, rerr)
 			}
 		} else {
 			s.data = data
@@ -114,7 +114,7 @@ func (s *Store) normalize() {
 		// id попадает в путь sets/<id>/servers.json: битый id отбрасывает
 		// запись целиком, но не роняет загрузку остальных.
 		if !namePattern.MatchString(set.ID) {
-			s.dropped = append(s.dropped, fmt.Sprintf("набор %q: id не по шаблону [a-z0-9][a-z0-9_-]{0,63}", set.ID))
+			s.dropped = append(s.dropped, fmt.Sprintf("id набора %q не подходит под шаблон [a-z0-9][a-z0-9_-]{0,63}", set.ID))
 			continue
 		}
 		if set.Name == "" {
@@ -316,7 +316,7 @@ func (s *Store) UpdateServer(name string, patch json.RawMessage) (Server, error)
 	defer s.mu.Unlock()
 	cur := s.serverLocked(name)
 	if cur == nil {
-		return nil, fmt.Errorf("нет сервера %s", name)
+		return nil, fmt.Errorf("сервер %s не найден", name)
 	}
 	in, err := decodeObject(patch)
 	if err != nil {
@@ -345,7 +345,7 @@ func (s *Store) DeleteServer(name string) error {
 	defer s.mu.Unlock()
 	idx := s.serverIndexLocked(name)
 	if idx < 0 {
-		return fmt.Errorf("нет сервера %s", name)
+		return fmt.Errorf("сервер %s не найден", name)
 	}
 	next := s.data.clone()
 	next.Servers = removeAt(next.Servers, idx)
@@ -434,7 +434,7 @@ func (s *Store) AddSet(raw json.RawMessage) (*Set, error) {
 	// Явный порт проверяем в системе и при создании: иначе набор запишется и
 	// упадёт на старте.
 	if raw, ok := in["port"]; ok && !isNull(raw) && portBusy(set.Port) {
-		return nil, fmt.Errorf("порт %d занят процессом", set.Port)
+		return nil, fmt.Errorf("порт %d занят процессом — выберите другой", set.Port)
 	}
 	if !set.Open {
 		set.Keys = []Key{newKey(time.Now().UTC().Format(time.RFC3339))}
@@ -456,7 +456,7 @@ func (s *Store) UpdateSet(id string, patch json.RawMessage) (*Set, error) {
 	defer s.mu.Unlock()
 	idx := s.setIndexLocked(id)
 	if idx < 0 {
-		return nil, fmt.Errorf("нет набора %s", id)
+		return nil, fmt.Errorf("набор %s не найден", id)
 	}
 	in, err := decodeObject(patch)
 	if err != nil {
@@ -480,7 +480,7 @@ func (s *Store) DeleteSet(id string) error {
 	defer s.mu.Unlock()
 	idx := s.setIndexLocked(id)
 	if idx < 0 {
-		return fmt.Errorf("нет набора %s", id)
+		return fmt.Errorf("набор %s не найден", id)
 	}
 	next := s.data.clone()
 	next.Sets = removeAt(next.Sets, idx)
@@ -493,7 +493,7 @@ func (s *Store) IssueKey(setID string) (string, error) {
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
-		return "", fmt.Errorf("нет набора %s", setID)
+		return "", fmt.Errorf("набор %s не найден", setID)
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	keys := make([]Key, len(set.Keys), len(set.Keys)+1)
@@ -523,7 +523,7 @@ func (s *Store) RevokeKey(setID, keyID string) (wasActive bool, err error) {
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
-		return false, fmt.Errorf("нет набора %s", setID)
+		return false, fmt.Errorf("набор %s не найден", setID)
 	}
 	idx := -1
 	for i, key := range set.Keys {
@@ -559,7 +559,7 @@ func (s *Store) SetKeyNote(setID, keyID, note string) error {
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
-		return fmt.Errorf("нет набора %s", setID)
+		return fmt.Errorf("набор %s не найден", setID)
 	}
 	idx := -1
 	for i, key := range set.Keys {
@@ -617,7 +617,7 @@ func (s *Store) allocPortLocked() (int, error) {
 			return port, nil
 		}
 	}
-	return 0, fmt.Errorf("свободных портов в диапазоне %d–%d нет", FirstPort, LastPort)
+	return 0, fmt.Errorf("свободных портов в диапазоне %d–%d нет — освободите порт или смените диапазон", FirstPort, LastPort)
 }
 
 // portBusy — порт занят в системе, а не только в реестре. Между проверкой и

@@ -34,7 +34,7 @@ func resolveAuth(setID, cfgPath, dataDir, name string) (*authTarget, error) {
 	case setID == "" && cfgPath == "":
 		return nil, errors.New("укажите набор: mcprig auth -set <набор> <сервер> (или -config <servers.json>)")
 	case setID != "" && cfgPath != "":
-		return nil, errors.New("-set и -config взаимоисключающие")
+		return nil, errors.New("укажите что-то одно: -set или -config")
 	}
 	t := &authTarget{CfgPath: cfgPath, StoreDir: dataDir}
 	if setID != "" {
@@ -53,9 +53,17 @@ func resolveAuth(setID, cfgPath, dataDir, name string) (*authTarget, error) {
 		}
 	}
 	if t.Server == nil {
-		return nil, fmt.Errorf("сервер %q не найден в %s", name, t.CfgPath)
+		return nil, fmt.Errorf("сервер %q не найден в %s — сверьте имя: mcprig doctor", name, t.CfgPath)
 	}
 	return t, nil
+}
+
+// humanWait — длительность ожидания для человека: «6 мин» вместо «6m0s».
+func humanWait(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%d с", int(d.Seconds()))
+	}
+	return fmt.Sprintf("%d мин", int(d.Minutes()))
 }
 
 // runAuth проводит OAuth-вход вне запроса клиента: health-проба набора ждёт
@@ -72,7 +80,7 @@ func runAuth(args []string) error {
 		return &usageError{err.Error()}
 	}
 	if fs.NArg() != 1 {
-		return &usageError{"нужно имя сервера: mcprig auth -set main swaggerhub"}
+		return &usageError{"нужно имя сервера: mcprig auth -set main <сервер>"}
 	}
 
 	t, err := resolveAuth(*setID, *cfgPath, stateDir(), fs.Arg(0))
@@ -105,11 +113,11 @@ func runAuth(args []string) error {
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 
-	fmt.Fprintf(os.Stderr, "авторизация %s (%s), ждём до %s\n", t.Server.Name, t.CfgPath, timeout.String())
+	fmt.Fprintf(os.Stderr, "авторизация %s (%s), ждём до %s\n", t.Server.Name, t.CfgPath, time.Now().Add(*timeout).Format("15:04:05"))
 	sess, err := conn.Connect(ctx, t.Server)
 	if err != nil {
 		if ctx.Err() != nil {
-			return fmt.Errorf("ссылка не использована за %s — токен не сохранён", timeout.String())
+			return fmt.Errorf("ссылка не использована за %s — токен не сохранён; повторите mcprig auth", humanWait(*timeout))
 		}
 		return fmt.Errorf("авторизация %s: %w", t.Server.Name, err)
 	}

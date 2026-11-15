@@ -309,7 +309,7 @@ func TestBrokenServerKeepsNameReserved(t *testing.T) {
 	if got := cfg.Servers[0].ConfigError; !strings.Contains(got, "command") {
 		t.Errorf("битый сервер: %q", got)
 	}
-	if got := cfg.Servers[1].ConfigError; !strings.Contains(got, "дубль имени") {
+	if got := cfg.Servers[1].ConfigError; !strings.Contains(got, "имя уже занято другим сервером") {
 		t.Errorf("здоровый тёзка не помечен дублем: %q", got)
 	}
 	if n := len(cfg.Usable()); n != 0 {

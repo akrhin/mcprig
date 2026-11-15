@@ -71,8 +71,8 @@ func TestCSRFScheme(t *testing.T) {
 		{"tls, origin https", "https://example.com", "", true, http.StatusOK, ""},
 		{"прокси https, origin http", "http://example.com", "https", false, http.StatusForbidden, "origin не совпадает с хостом"},
 		{"http запрос, origin https", "https://example.com", "", false, http.StatusForbidden, "origin не совпадает с хостом"},
-		{"origin null с cookie", "null", "", false, http.StatusForbidden, "нужен заголовок Origin"},
-		{"без origin с cookie", "", "", false, http.StatusForbidden, "нужен заголовок Origin"},
+		{"origin null с cookie", "null", "", false, http.StatusForbidden, "не хватает заголовка Origin"},
+		{"без origin с cookie", "", "", false, http.StatusForbidden, "не хватает заголовка Origin"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

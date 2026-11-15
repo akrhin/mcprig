@@ -81,15 +81,15 @@ func (e *usageError) Error() string { return e.msg }
 // newServeFlags описывает флаги serve один раз: их разбирает и parseArgs, и run.
 func newServeFlags() (fs *flag.FlagSet, cfgPath *string, showVersion *bool, addr *string) {
 	fs = flag.NewFlagSet("serve", flag.ContinueOnError)
-	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
 	showVersion = fs.Bool("version", false, "показать версию и выйти")
-	addr = fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из transport")
+	addr = fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из поля transport конфигурации")
 	return fs, cfgPath, showVersion, addr
 }
 
 func newStdioFlags() (fs *flag.FlagSet, cfgPath *string) {
 	fs = flag.NewFlagSet("stdio", flag.ContinueOnError)
-	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
 	return fs, cfgPath
 }
 
@@ -103,7 +103,7 @@ func parseFlags(fs *flag.FlagSet, args []string) error {
 		return &usageError{err.Error()}
 	}
 	if fs.NArg() > 0 {
-		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		return &usageError{fmt.Sprintf("лишние аргументы: %s; команда принимает: serve|stdio|auth|panel|init|doctor|warm", strings.Join(fs.Args(), ", "))}
 	}
 	return nil
 }

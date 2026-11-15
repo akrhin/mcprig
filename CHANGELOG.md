@@ -10,6 +10,12 @@ repository the project is built in.
 
 ### Changed
 
+- Russian user-facing text is proofread with `ru-text`: panel strings, CLI
+  output and server error messages use sentence case, the «вы» form, one term
+  per concept and the "what — why — what to do" shape of an error. Counts agree
+  with their numeral, percentages print as `4,8%`, `mcprig auth` names the
+  deadline as a clock time, and the schema line shows the tool count it already
+  passed in. The Russian documentation follows the same rules.
 - The panel's **Overview** tab now leads with the set's servers: the seven-day
   summary (calls, error rate, p50, p95) moved below the servers table and reads
   as a one-line caption, the set rail ends with `N sets · K running`, and the
@@ -114,7 +120,7 @@ repository the project is built in.
   `lookup` holds the session by refcount, `close`/`sweep` close it after
   `release`.
 - Expired panel sessions are removed by the health ticker, not only by `get`.
-- A failed log rotation of a set no longer loses output: the old file stays and
+- A failed log rotation loses no output: the old file stays and
   the error is visible in the set status `error` field.
 - The log tail is read from the last kilobytes through `Seek` instead of the
   whole 5 MiB file on every panel poll.

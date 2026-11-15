@@ -78,7 +78,7 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 	for _, name := range set.Servers {
 		srv := byName[name]
 		if srv == nil {
-			return nil, fmt.Errorf("сервер %s исчез из реестра", name)
+			return nil, fmt.Errorf("сервера %s больше нет в реестре — набор не пересобран", name)
 		}
 		cp := *srv
 		out.Servers = append(out.Servers, &cp)

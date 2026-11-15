@@ -329,12 +329,12 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			m.log.Error("паника в обработчике", "path", r.URL.Path, "panic", rec)
-			m.fail(w, r, &httpError{http.StatusInternalServerError, "внутренняя ошибка"})
+			m.fail(w, r, &httpError{http.StatusInternalServerError, "внутренняя ошибка — повторите; если повторяется, смотрите лог панели"})
 		}
 	}()
 
 	if !m.hostAllowed(r) {
-		m.fail(w, r, &httpError{http.StatusForbidden, "хост не разрешён"})
+		m.fail(w, r, &httpError{http.StatusForbidden, fmt.Sprintf("хост %s не разрешён — добавьте его в MCPRIG_ALLOWED_HOSTS", r.Host)})
 		return
 	}
 
@@ -433,7 +433,7 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 	user, password, isForm := "", "", false
 	if ct := r.Header.Get("Content-Type"); strings.HasPrefix(ct, "application/x-www-form-urlencoded") || strings.HasPrefix(ct, "multipart/form-data") {
 		if err := r.ParseForm(); err != nil {
-			m.fail(w, r, &httpError{http.StatusBadRequest, "не удалось разобрать форму"})
+			m.fail(w, r, &httpError{http.StatusBadRequest, "форма входа повреждена — обновите страницу"})
 			return
 		}
 		user, password, isForm = r.PostFormValue("user"), r.PostFormValue("password"), true
@@ -455,7 +455,7 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 			writeHTML(w, http.StatusBadRequest, loginTemplate, loginData{Error: "укажите логин и пароль"})
 			return
 		}
-		m.fail(w, r, &httpError{http.StatusBadRequest, "user и password обязательны"})
+		m.fail(w, r, &httpError{http.StatusBadRequest, "укажите логин и пароль"})
 		return
 	}
 	ok, busy := m.auth.loginCheck(user, password)
@@ -463,19 +463,19 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// Очередь на scrypt заполнена: пароль даже не проверялся.
 		w.Header().Set("Retry-After", "5")
 		if isForm {
-			writeHTML(w, http.StatusTooManyRequests, loginTemplate, loginData{Error: "слишком много попыток входа, повторите позже"})
+			writeHTML(w, http.StatusTooManyRequests, loginTemplate, loginData{Error: "слишком много попыток входа — повторите позже"})
 			return
 		}
-		m.fail(w, r, &httpError{http.StatusTooManyRequests, "слишком много попыток входа, повторите позже"})
+		m.fail(w, r, &httpError{http.StatusTooManyRequests, "слишком много попыток входа — повторите позже"})
 		return
 	}
 	if !ok {
 		m.auth.loginFailed(ip)
 		if isForm {
-			writeHTML(w, http.StatusUnauthorized, loginTemplate, loginData{Error: "неверный логин или пароль"})
+			writeHTML(w, http.StatusUnauthorized, loginTemplate, loginData{Error: "неверный логин или пароль — проверьте раскладку и Caps Lock"})
 			return
 		}
-		m.fail(w, r, &httpError{http.StatusUnauthorized, "неверный логин или пароль"})
+		m.fail(w, r, &httpError{http.StatusUnauthorized, "неверный логин или пароль — проверьте раскладку и Caps Lock"})
 		return
 	}
 	m.auth.loginOK(ip)
@@ -612,7 +612,7 @@ func serverError(msg string) error {
 }
 
 func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
-	status, msg := http.StatusBadRequest, "неверный запрос"
+	status, msg := http.StatusBadRequest, "запрос не разобран"
 	var he *httpError
 	var pathErr *fs.PathError
 	switch {
@@ -621,9 +621,9 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, errBrowseGone):
 		status, msg = http.StatusNotFound, errBrowseGone.Error()
 	case errors.As(err, &pathErr):
-		status, msg = http.StatusInternalServerError, "внутренняя ошибка"
+		status, msg = http.StatusInternalServerError, "внутренняя ошибка — повторите; если повторяется, смотрите лог панели"
 	default:
-		msg = err.Error()
+		msg = "запрос не разобран: " + err.Error()
 	}
 	if status >= 500 {
 		m.log.Error("ошибка API", "method", r.Method, "path", r.URL.Path, "status", status, "err", err)
@@ -642,7 +642,7 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 		return nil
 	}
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
-		return &httpError{http.StatusForbidden, "запрос с чужого сайта"}
+		return &httpError{http.StatusForbidden, "запрос пришёл с чужого сайта — откройте панель по её адресу"}
 	}
 	origin := r.Header.Get("Origin")
 	if origin != "" && origin != "null" {
@@ -657,10 +657,10 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 		// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
 		// сессионной cookie — подделка. Вход сюда не попадает: пароль всё равно
 		// проверяется, а старая cookie не должна превращать вход в 403.
-		return &httpError{http.StatusForbidden, "нужен заголовок Origin"}
+		return &httpError{http.StatusForbidden, "не хватает заголовка Origin"}
 	}
 	if r.ContentLength != 0 && r.URL.Path != "/api/login" && !isJSON(r.Header.Get("Content-Type")) {
-		return badRequest("ожидался JSON")
+		return badRequest("тело запроса должно быть JSON")
 	}
 	return nil
 }
@@ -758,7 +758,7 @@ func readBody(r *http.Request) ([]byte, error) {
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
 	if err != nil {
-		return nil, badRequest("не удалось прочитать тело")
+		return nil, badRequest("не удалось прочитать тело запроса")
 	}
 	if len(body) > maxBody {
 		return nil, badRequest("тело запроса больше 1 МБ")
@@ -772,10 +772,10 @@ func decodeJSON(r *http.Request, v any) error {
 		return err
 	}
 	if len(body) == 0 {
-		return badRequest("ожидался JSON")
+		return badRequest("тело запроса должно быть JSON")
 	}
 	if err := json.Unmarshal(body, v); err != nil {
-		return badRequest("ожидался JSON")
+		return badRequest("тело запроса должно быть JSON")
 	}
 	return nil
 }
@@ -837,7 +837,7 @@ func (m *Manager) apiImport(req *request) error {
 	}
 	if name, found := importRefsReserved(body.MCPServers); found {
 		if strings.HasPrefix(name, "{file:") {
-			return badRequest(name + ": ссылка на файл отклонена, подключите секрет через ${VAR}")
+			return badRequest(name + ": ссылка {file:…} не поддерживается — подключите секрет через ${VAR}")
 		}
 		return reservedRefError(name)
 	}
@@ -894,7 +894,7 @@ func (m *Manager) apiExportSet(req *request) error {
 		return badRequest("нужен параметр set")
 	}
 	if m.store.Set(id) == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	body, err := m.store.ExportSet(id)
 	if err != nil {
@@ -931,7 +931,7 @@ func (m *Manager) apiEnvPut(req *request) error {
 		return err
 	}
 	if body.Value == "" {
-		return badRequest("нужно непустое значение")
+		return badRequest(fmt.Sprintf("поле %s не может быть пустым", name))
 	}
 	source, err := m.sec.Set(name, body.Value, body.Store)
 	if err != nil {
@@ -963,7 +963,7 @@ func (m *Manager) apiProbe(req *request) error {
 	name := req.args[0]
 	srv := m.store.Server(name)
 	if srv == nil {
-		return notFound("нет сервера " + name)
+		return notFound("сервер " + name + " не найден")
 	}
 	writeJSON(req.w, http.StatusOK, m.probeServer(req.r.Context(), srv))
 	return nil
@@ -1150,7 +1150,7 @@ func (m *Manager) apiServerAdd(req *request) error {
 		return err
 	}
 	if len(body) == 0 || !bytes.HasPrefix(bytes.TrimSpace(body), []byte("{")) {
-		return badRequest("ожидался JSON")
+		return badRequest("тело запроса должно быть JSON")
 	}
 	if err := checkReservedRefs(body); err != nil {
 		return err
@@ -1160,7 +1160,7 @@ func (m *Manager) apiServerAdd(req *request) error {
 	}
 	_ = json.Unmarshal(body, &name)
 	if name.Name != "" && m.store.Server(name.Name) != nil {
-		return conflict("сервер " + name.Name + " уже есть")
+		return conflict("сервер " + name.Name + " уже есть в наборе")
 	}
 	srv, err := m.store.AddServer(json.RawMessage(body))
 	if err != nil {
@@ -1176,7 +1176,7 @@ func (m *Manager) apiServerAdd(req *request) error {
 func (m *Manager) apiServerUpdate(req *request) error {
 	name := req.args[0]
 	if m.store.Server(name) == nil {
-		return notFound("нет сервера " + name)
+		return notFound("сервер " + name + " не найден")
 	}
 	body, err := readBody(req.r)
 	if err != nil {
@@ -1206,7 +1206,7 @@ func (m *Manager) apiServerUpdate(req *request) error {
 func (m *Manager) apiServerDelete(req *request) error {
 	name := req.args[0]
 	if m.store.Server(name) == nil {
-		return notFound("нет сервера " + name)
+		return notFound("сервер " + name + " не найден")
 	}
 	// Сначала снимок наборов и запись в реестр: отказ (последний сервер
 	// набора) не должен оставлять наборы остановленными при живом сервере.
@@ -1236,7 +1236,7 @@ func (m *Manager) apiSetAdd(req *request) error {
 	}
 	var obj map[string]json.RawMessage
 	if len(body) == 0 || json.Unmarshal(body, &obj) != nil {
-		return badRequest("ожидался JSON")
+		return badRequest("тело запроса должно быть JSON")
 	}
 	// id и token не принимаются от клиента: и порт, и ключ выдаёт менеджер.
 	delete(obj, "id")
@@ -1266,7 +1266,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	id := req.args[0]
 	old := m.store.Set(id)
 	if old == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	body, err := readBody(req.r)
 	if err != nil {
@@ -1283,7 +1283,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &patch); err != nil {
-			return badRequest("ожидался JSON")
+			return badRequest("тело запроса должно быть JSON")
 		}
 	}
 	if running && patch.Port != nil && *patch.Port != old.Port {
@@ -1311,7 +1311,7 @@ func (m *Manager) apiSetDelete(req *request) error {
 	id := req.args[0]
 	set := m.store.Set(id)
 	if set == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	m.rt.Stop(set)
 	m.health.clear(id)
@@ -1355,7 +1355,7 @@ func (m *Manager) apiSetAction(req *request) error {
 	id, action := req.args[0], req.args[1]
 	set := m.store.Set(id)
 	if set == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	switch action {
 	case "start":
@@ -1381,7 +1381,7 @@ func (m *Manager) apiSetAction(req *request) error {
 func (m *Manager) apiSetLogs(req *request) error {
 	id := req.args[0]
 	if m.store.Set(id) == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	writeJSON(req.w, http.StatusOK, map[string]any{
 		"logs": m.rt.Logs(id, linesParam(req.r, 200)),
@@ -1393,10 +1393,10 @@ func (m *Manager) apiServerLogs(req *request) error {
 	id, name := req.args[0], req.args[1]
 	set := m.store.Set(id)
 	if set == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	if !containsName(set.Servers, name) {
-		return notFound("нет сервера " + name + " в наборе " + id)
+		return notFound("сервер " + name + " не найден в наборе " + id)
 	}
 	writeJSON(req.w, http.StatusOK, map[string]any{
 		"server": name,
@@ -1409,14 +1409,14 @@ func (m *Manager) apiSetServers(req *request) error {
 	id := req.args[0]
 	set := m.store.Set(id)
 	if set == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	names := set.Servers
 	status := m.rt.status(set)
 	if !status.Running {
 		servers := make([]serverHealth, 0, len(names))
 		for _, name := range names {
-			servers = append(servers, serverHealth{Name: name, Error: "набор не запущен"})
+			servers = append(servers, serverHealth{Name: name, Error: "набор не запущен — нажмите «Запустить»"})
 		}
 		writeJSON(req.w, http.StatusOK, setHealth{Running: false, Servers: servers})
 		return nil
@@ -1436,7 +1436,7 @@ func (m *Manager) apiKeyIssue(req *request) error {
 	id := req.args[0]
 	set := m.store.Set(id)
 	if set == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	running := m.rt.status(set).Running
 	token, err := m.store.IssueKey(id)
@@ -1480,7 +1480,7 @@ func (m *Manager) apiKeyNote(req *request) error {
 	note := stats.CleanLabel(strings.TrimSpace(body.Note))
 	set := m.store.Set(id)
 	if set == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	known := false
 	for _, key := range registry.PublicSet(set).Keys {
@@ -1523,7 +1523,7 @@ func (m *Manager) apiKeyRevoke(req *request) error {
 	id, keyID := req.args[0], req.args[1]
 	cur := m.store.Set(id)
 	if cur == nil {
-		return notFound("нет набора " + id)
+		return notFound("набор " + id + " не найден")
 	}
 	known := false
 	for _, key := range registry.PublicSet(cur).Keys {

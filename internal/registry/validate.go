@@ -49,7 +49,7 @@ func requiredString(in map[string]json.RawMessage, key string) (string, error) {
 		return "", err
 	}
 	if v == "" {
-		return "", fmt.Errorf("%s: обязательное поле", key)
+		return "", fmt.Errorf("%s: обязательное поле — заполните его", key)
 	}
 	return v, nil
 }
@@ -117,7 +117,7 @@ func commandOf(in map[string]json.RawMessage) ([]string, error) {
 // and never comes from the body.
 func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if !namePattern.MatchString(name) {
-		return nil, errors.New("имя сервера: строчные латинские буквы, цифры, дефис и подчёркивание")
+		return nil, errors.New("в имени допустимы строчные латинские буквы, цифры, дефис и подчёркивание")
 	}
 	srv := &config.Server{Name: name, Enabled: true}
 
@@ -176,10 +176,10 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 
 	hasCommand, hasURL := len(command) > 0, url != ""
 	if hasCommand && hasURL {
-		return nil, errors.New("укажите что-то одно: command[] или url")
+		return nil, errors.New("нужен ровно один из них: command[] или url")
 	}
 	if !hasCommand && !hasURL {
-		return nil, errors.New("нужен command[] или url")
+		return nil, errors.New("нужен ровно один из них: command[] или url")
 	}
 	if transport == "" {
 		if hasURL {
@@ -191,11 +191,11 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	switch transport {
 	case "stdio":
 		if !hasCommand {
-			return nil, errors.New("транспорт stdio требует command[]")
+			return nil, errors.New("для транспорта stdio нужен command[]")
 		}
 	case "http":
 		if !hasURL {
-			return nil, errors.New("транспорт http требует url")
+			return nil, errors.New("для транспорта http нужен url")
 		}
 		if _, ok := in["cwd"]; ok && !isNull(in["cwd"]) {
 			return nil, errors.New("cwd допустим только для транспорта stdio")
@@ -276,7 +276,7 @@ func slugify(v string) string {
 
 func checkPort(port int) error {
 	if port < FirstPort || port > LastPort {
-		return fmt.Errorf("порт: целое %d–%d", FirstPort, LastPort)
+		return fmt.Errorf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
 	}
 	return nil
 }
@@ -348,7 +348,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 			}
 		}
 		if len(missing) > 0 {
-			return nil, fmt.Errorf("нет в реестре: %s", strings.Join(missing, ", "))
+			return nil, fmt.Errorf("в реестре нет серверов: %s", strings.Join(missing, ", "))
 		}
 		out.Servers = names
 	}
@@ -360,7 +360,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	if raw, ok := in["port"]; ok && !isNull(raw) {
 		var port int
 		if err := json.Unmarshal(raw, &port); err != nil {
-			return nil, fmt.Errorf("порт: целое %d–%d", FirstPort, LastPort)
+			return nil, fmt.Errorf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
 		}
 		out.Port = port
 		explicitPort = true
@@ -383,7 +383,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	// Порт из тела при правке: незанятый в реестре ещё не значит свободный в
 	// системе, иначе рестарт набора упадёт уже после записи.
 	if cur != nil && explicitPort && cur.Port != out.Port && portBusy(out.Port) {
-		return nil, fmt.Errorf("порт %d занят процессом", out.Port)
+		return nil, fmt.Errorf("порт %d занят процессом — выберите другой", out.Port)
 	}
 
 	if autostart, present, err := strictBool(in, "autostart"); err != nil {

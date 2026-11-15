@@ -511,7 +511,7 @@ func TestInvokeCommandAliasConflict(t *testing.T) {
 	if !res.IsError {
 		t.Fatal("расходящиеся имена должны отвергаться")
 	}
-	if text := resultText(t, res); !strings.Contains(text, "укажите одно: command_name или command") {
+	if text := resultText(t, res); !strings.Contains(text, "укажите command_name (или command)") {
 		t.Fatalf("нет подсказки выбрать одно имя: %q", text)
 	}
 	if n := atomic.LoadInt32(&dials); n != 0 {
@@ -549,7 +549,7 @@ func TestInvokeCommandNoName(t *testing.T) {
 	if !res.IsError {
 		t.Fatal("без command_name вызов должен отвергаться")
 	}
-	if text := resultText(t, res); !strings.Contains(text, "укажите command_name или command") {
+	if text := resultText(t, res); !strings.Contains(text, "укажите command_name (или command)") {
 		t.Fatalf("нет требования имени: %q", text)
 	}
 	if n := atomic.LoadInt32(&dials); n != 0 {
@@ -819,7 +819,7 @@ func TestCloseDuringHungConnect(t *testing.T) {
 	}
 	select {
 	case res := <-callDone:
-		if !res.IsError || !strings.Contains(resultText(t, res), "менеджер закрыт") {
+		if !res.IsError || !strings.Contains(resultText(t, res), "менеджер остановлен") {
 			t.Fatalf("a waiting call must be told the manager is closed, got %q", resultText(t, res))
 		}
 	case <-time.After(6 * time.Second):

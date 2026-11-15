@@ -83,7 +83,7 @@ func runWarm(args []string) error {
 	}
 	switch {
 	case o.All && o.Config != "":
-		return &usageError{"--all и --config несовместимы"}
+		return &usageError{"укажите что-то одно: --all или --config"}
 	case o.All && o.Set != "main":
 		return &usageError{"--all и --set несовместимы: прогреваются все наборы"}
 	case o.All && o.URL != "":
@@ -270,7 +270,7 @@ func warmSession(ctx context.Context, cs *mcp.ClientSession) (int, error) {
 	}
 	if len(down) > 0 {
 		sort.Strings(down)
-		return total, fmt.Errorf("не ответили серверы: %s", strings.Join(down, ", "))
+		return total, fmt.Errorf("не ответили серверы: %s — проверьте, что они запущены, или поднимите --timeout", strings.Join(down, ", "))
 	}
 	return total, nil
 }
@@ -333,7 +333,7 @@ func readToken(path string) (string, error) {
 	}
 	tok := strings.TrimSpace(string(body))
 	if tok == "" {
-		return "", fmt.Errorf("файл %s пуст", path)
+		return "", fmt.Errorf("файл %s пуст — передайте токен через --token", path)
 	}
 	return tok, nil
 }
@@ -419,7 +419,8 @@ func fetchPanelSets(ctx context.Context, o *warmConfig) ([]panelSet, error) {
 		raw, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
 		res.Body.Close()
 		if res.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("панель %s: /api/login %d %s", base, res.StatusCode, strings.TrimSpace(string(raw)))
+			fmt.Fprintf(os.Stderr, "ответ панели: %s\n", strings.TrimSpace(string(raw)))
+			return nil, fmt.Errorf("панель %s не приняла вход: HTTP %d", base, res.StatusCode)
 		}
 	}
 
@@ -435,7 +436,8 @@ func fetchPanelSets(ctx context.Context, o *warmConfig) ([]panelSet, error) {
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 8<<20))
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("панель %s: /api/sets %d %s", base, res.StatusCode, strings.TrimSpace(string(raw)))
+		fmt.Fprintf(os.Stderr, "ответ панели: %s\n", strings.TrimSpace(string(raw)))
+		return nil, fmt.Errorf("панель %s не отдала наборы: HTTP %d", base, res.StatusCode)
 	}
 	var sets []panelSet
 	if err := json.Unmarshal(raw, &sets); err != nil {
@@ -492,16 +494,16 @@ func renderWarm(results []warmResult) []byte {
 	for _, r := range results {
 		if r.Error != "" {
 			fails++
-			fmt.Fprintf(&b, "%s: ошибка: %s\n", r.Set, r.Error)
+			fmt.Fprintf(&b, "%s: не ответил: %s\n", r.Set, r.Error)
 			continue
 		}
 		tools += r.Tools
 		ms += r.Ms
-		fmt.Fprintf(&b, "%s: %d %s, %.1f мс\n", r.Set, r.Tools, instrumentWord(r.Tools), r.Ms)
+		fmt.Fprintf(&b, "%s: %d %s, %s мс\n", r.Set, r.Tools, pluralBy(r.Tools, "инструмент", "инструмента", "инструментов"), dec(r.Ms))
 	}
-	fmt.Fprintf(&b, "итог: %d %s, %d %s, %.1f мс", len(results), setWord(len(results)), tools, instrumentWord(tools), ms)
+	fmt.Fprintf(&b, "итог: %d %s, %d %s, %s мс", len(results), pluralBy(len(results), "набор", "набора", "наборов"), tools, pluralBy(tools, "инструмент", "инструмента", "инструментов"), dec(ms))
 	if fails > 0 {
-		fmt.Fprintf(&b, ", %d %s", fails, errorWord(fails))
+		fmt.Fprintf(&b, ", %d %s", fails, pluralBy(fails, "ошибка", "ошибки", "ошибок"))
 	}
 	b.WriteByte('\n')
 	return []byte(b.String())
@@ -511,32 +513,13 @@ func elapsedMs(start time.Time) float64 {
 	return float64(time.Since(start).Microseconds()) / 1000
 }
 
-func instrumentWord(n int) string {
+// pluralBy выбирает форму слова по числу: одна, две–четыре, много.
+func pluralBy(n int, one, few, many string) string {
 	if n%10 == 1 && n%100 != 11 {
-		return "инструмент"
+		return one
 	}
 	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "инструмента"
+		return few
 	}
-	return "инструментов"
-}
-
-func setWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "набор"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "набора"
-	}
-	return "наборов"
-}
-
-func errorWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "ошибка"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "ошибки"
-	}
-	return "ошибок"
+	return many
 }
