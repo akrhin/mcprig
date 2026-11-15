@@ -8,6 +8,8 @@ repository the project is built in.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-15
+
 ### Added
 
 - Downstream resources and prompts reach the MCP client: a server whose config
