@@ -71,7 +71,7 @@ func humanWait(d time.Duration) string {
 func runAuth(args []string) error {
 	fs := flag.NewFlagSet("auth", flag.ContinueOnError)
 	setID := fs.String("set", "", "имя набора: конфиг и хранилище токенов берутся из него")
-	cfgPath := fs.String("config", "", "путь к servers.json вместо -set")
+	cfgPath := fs.String("config", "", "путь к файлу servers.json вместо -set")
 	timeout := fs.Duration("timeout", 6*time.Minute, "сколько ждать входа в браузере")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

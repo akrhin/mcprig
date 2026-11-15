@@ -30,7 +30,7 @@ func newInitFlags() (*flag.FlagSet, *initConfig) {
 	fs.StringVar(&cfg.Key, "key", "", "bearer-ключ набора (только для --remote); - — читать stdin")
 	fs.StringVar(&cfg.KeyFile, "key-file", "", "файл с bearer-ключом набора (только для --remote)")
 	fs.StringVar(&cfg.Binary, "binary", "mcprig", "путь к исполняемому файлу mcprig для stdio-режима")
-	fs.StringVar(&cfg.Config, "config", "", "путь к servers.json для stdio-режима")
+	fs.StringVar(&cfg.Config, "config", "", "путь к файлу servers.json для stdio-режима")
 	return fs, cfg
 }
 
@@ -56,7 +56,7 @@ func runInit(args []string) error {
 		return &usageError{"для --remote нужен ключ: --key, --key-file, --key - или MCPRIG_KEY"}
 	}
 	if cfg.Remote == "" && cfg.Config == "" {
-		return &usageError{"для stdio-режима нужен --config (путь к servers.json набора)"}
+		return &usageError{"для stdio-режима нужен --config (путь к файлу servers.json набора)"}
 	}
 
 	name := "mcprig-" + cfg.Set

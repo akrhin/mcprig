@@ -61,7 +61,7 @@ type doctorOptions struct {
 
 func newDoctorFlags() (fs *flag.FlagSet, cfgPath *string, asJSON *bool) {
 	fs = flag.NewFlagSet("doctor", flag.ContinueOnError)
-	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
 	asJSON = fs.Bool("json", false, "машинный вывод")
 	return fs, cfgPath, asJSON
 }
