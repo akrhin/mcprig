@@ -1,6 +1,8 @@
 package mcpserver
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"sync"
 	"time"
 
@@ -18,17 +20,27 @@ const (
 	bucketIdle = 10 * time.Minute
 	// maxBuckets — потолок карты: ключ строит клиент (имя инструмента в вызове),
 	// и один поток уникальных имён иначе держал бы память до bucketIdle.
-	// shortcut: при переполнении вылетает самая старая корзина, а не самая
-	// дешёвая; менять на LRU-учёт, если какая-то корзина окажется горячей при
-	// потоке мимо неё.
+	// Вытеснение идёт внутри идентичности, которая и вызвала переполнение, —
+	// так чужой поток имён не отбирает квоту у соседа. shortcut: своя же
+	// переполнившая идентичность может потерять свою корзину и получить burst
+	// заново; лимит — тормоз, не граница безопасности.
 	maxBuckets = 4096
 )
 
 // bucket — token bucket одной пары (клиент, server/tool) и метка последнего
-// использования для уборки.
+// использования для уборки. ident лежит рядом, чтобы вытеснять корзины того,
+// кто вызвал переполнение.
 type bucket struct {
-	lim  *rate.Limiter
-	used time.Time
+	ident string
+	lim   *rate.Limiter
+	used  time.Time
+}
+
+// bucketKey hashes the identity with the pair: the tool name comes from the
+// caller, so a raw string would park a megabyte-long key per invented name.
+func bucketKey(ident, server, tool string) string {
+	sum := sha256.Sum256([]byte(ident + "\x00" + server + "/" + tool))
+	return hex.EncodeToString(sum[:8])
 }
 
 // rateLimits держит корзины набора. nil-значение (блока нет или он нулевой) —
@@ -66,7 +78,7 @@ func (l *rateLimits) allow(ident, server, tool string) (ok bool, perMinute int, 
 	if burst <= 0 {
 		burst = perMinute
 	}
-	key := ident + "\x00" + server + "/" + tool
+	key := bucketKey(ident, server, tool)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := time.Now()
@@ -75,10 +87,10 @@ func (l *rateLimits) allow(ident, server, tool string) (ok bool, perMinute int, 
 		if len(l.buckets) >= maxBuckets {
 			l.sweep(now)
 			if len(l.buckets) >= maxBuckets {
-				l.evictOldest()
+				l.evict(ident)
 			}
 		}
-		b = &bucket{lim: rate.NewLimiter(rate.Limit(float64(perMinute)/60), burst)}
+		b = &bucket{ident: ident, lim: rate.NewLimiter(rate.Limit(float64(perMinute)/60), burst)}
 		l.buckets[key] = b
 	}
 	b.used = now
@@ -96,18 +108,26 @@ func (l *rateLimits) allow(ident, server, tool string) (ok bool, perMinute int, 
 	return delay <= 0, perMinute, delay
 }
 
-// evictOldest drops the least recently used bucket when the cap is reached
-// after a sweep. The walk is linear, but it only happens on a flood of distinct
-// names; the ordinary path stays one map lookup.
-func (l *rateLimits) evictOldest() {
-	var oldestKey string
-	var oldest time.Time
+// evict drops the least recently used bucket of ident when the cap is reached
+// after a sweep — the caller that overflowed pays, not its neighbours; only when
+// that identity holds nothing does it fall back to the oldest bucket overall.
+// The walk is linear, but it only happens on a flood of distinct names; the
+// ordinary path stays one map lookup.
+func (l *rateLimits) evict(ident string) {
+	var ownKey, anyKey string
+	var ownUsed, anyUsed time.Time
 	for key, b := range l.buckets {
-		if oldestKey == "" || b.used.Before(oldest) {
-			oldestKey, oldest = key, b.used
+		if anyKey == "" || b.used.Before(anyUsed) {
+			anyKey, anyUsed = key, b.used
+		}
+		if b.ident == ident && (ownKey == "" || b.used.Before(ownUsed)) {
+			ownKey, ownUsed = key, b.used
 		}
 	}
-	delete(l.buckets, oldestKey)
+	if ownKey == "" {
+		ownKey = anyKey
+	}
+	delete(l.buckets, ownKey)
 }
 
 // sweep drops buckets idle for bucketIdle. It runs inline under l.mu every

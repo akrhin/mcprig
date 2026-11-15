@@ -65,3 +65,44 @@ func TestClientKeyReachesHandler(t *testing.T) {
 		t.Fatalf("инструмент не увидел отпечаток ключа (%s): %q", want, raw)
 	}
 }
+
+// An open set has no key, so the caller's address must reach the handler: it is
+// the only thing a rate limit can bucket such a caller by.
+func TestClientAddrReachesHandler(t *testing.T) {
+	srv := mcp.NewServer(&mcp.Implementation{Name: "test-set", Version: "0"}, nil)
+	srv.AddTool(
+		&mcp.Tool{Name: "who", InputSchema: map[string]any{"type": "object"}},
+		func(ctx context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "addr:" + stats.ClientAddr(ctx)}}}, nil
+		},
+	)
+	h, err := New(&config.Config{Transport: &config.HTTPTransport{AllowAnonymous: true}}, srv, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ts := httptest.NewServer(h)
+	defer ts.Close()
+
+	body := `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"_meta":{` +
+		`"io.modelcontextprotocol/protocolVersion":"2026-07-28",` +
+		`"io.modelcontextprotocol/clientInfo":{"name":"test","version":"0"},` +
+		`"io.modelcontextprotocol/clientCapabilities":{}},` +
+		`"name":"who","arguments":{}}}`
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/mcp", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("MCP-Protocol-Version", "2026-07-28")
+	req.Header.Set("Mcp-Method", "tools/call")
+	req.Header.Set("Mcp-Name", "who")
+	res, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	raw := drain(t, res)
+	if !strings.Contains(raw, `addr:127.0.0.1`) {
+		t.Fatalf("инструмент не увидел адрес клиента: %q", raw)
+	}
+}

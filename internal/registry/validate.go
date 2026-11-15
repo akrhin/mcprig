@@ -451,6 +451,21 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		}
 	}
 
+	// profiles — те же три состояния, что у notify: поля нет — блок остаётся,
+	// null — снятие, объект — замена целиком. Ключи, назвавшие снятый профиль,
+	// перестают проходить вызовы: профиль не находится — отказ, а не «всё можно».
+	if raw, ok := in["profiles"]; ok {
+		if isNull(raw) {
+			out.Profiles = nil
+		} else {
+			profiles, err := config.ParseProfiles(raw)
+			if err != nil {
+				return nil, err
+			}
+			out.Profiles = profiles
+		}
+	}
+
 	out.Token = activeToken(out.Keys)
 	return out, nil
 }

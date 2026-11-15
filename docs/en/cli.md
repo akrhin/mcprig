@@ -152,6 +152,11 @@ No flags. Everything is environment:
 | `MCPRIG_ALLOWED_HOSTS` | loopback only | comma-separated `Host` allowlist |
 | `MCPRIG_AUTH` | empty | `off` disables panel auth |
 
+Setting `MCPRIG_PROXY_SECRET` is what makes `X-Forwarded-*` trusted — the peer
+is not verified — so keep the panel port unreachable except through the proxy.
+With an `http` panel behind the secret, browser writes are rejected because the
+request counts as `https`; set `MCPRIG_PUBLIC_URL=https://…` to match.
+
 Auth modes are derived from what is set:
 
 | password | proxy secret | `MCPRIG_AUTH` | mode |

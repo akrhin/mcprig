@@ -581,6 +581,11 @@
     </div>
     <div class="dialog-body">
       <form class="inline-form" id="key-form" novalidate>
+        <div class="field" id="key-profile-field" hidden>
+          <label for="key-profile" data-i18n="keys.profile">Profile</label>
+          <select class="input" id="key-profile"></select>
+          <p class="field-help" data-i18n="keys.profileHelp">A profile limits the key to the rules the set lists under that name.</p>
+        </div>
         <label class="field-label" for="key-label" data-i18n="keys.newLabel">New key label</label>
         <div class="od-row">
           <input class="input od-fill" id="key-label" name="label" autocomplete="off" spellcheck="false" placeholder="ci-runner" data-i18n-ph="keys.notePh">

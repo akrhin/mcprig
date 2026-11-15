@@ -192,6 +192,10 @@
       'keys.title': 'Set keys',
       'keys.sub': 'A key authenticates one client. It is shown once, right after it is created.',
       'keys.newLabel': 'New key label',
+      'keys.profile': 'Profile',
+      'keys.profileNone': 'no profile',
+      'keys.profileHelp': 'A profile limits the key to the rules the set lists under that name.',
+      'keys.profileIs': 'profile: {name}',
       'keys.noteFor': 'Note for key {id}',
       'keys.notePh': 'note',
       'keys.note': 'Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.',
@@ -416,6 +420,10 @@
       'keys.title': 'Ключи набора',
       'keys.sub': 'Ключ даёт доступ одному клиенту. Он показывается один раз — сразу после создания.',
       'keys.newLabel': 'Подпись нового ключа',
+      'keys.profile': 'Профиль',
+      'keys.profileNone': 'без профиля',
+      'keys.profileHelp': 'Профиль ограничивает ключ правилами, которые набор перечисляет под этим именем.',
+      'keys.profileIs': 'профиль: {name}',
       'keys.noteFor': 'Подпись для ключа {id}',
       'keys.notePh': 'подпись',
       'keys.note': 'Токен знает только тот, кто его выпустил: панель показывает первые 8 символов. Отзыв ключа действует без перезапуска набора.',
@@ -782,6 +790,36 @@
   }
 
   function mockSend(method, path, body) {
+    // Выдача ключа: демо проверяет профиль теми же словами, что демон
+    // (internal/manager/api.go, keyProfileOf), и показывает новый ключ сразу.
+    var km = /^\/api\/sets\/([^/]+)\/keys$/.exec(path);
+    if (km && method === 'POST' && st.mock) {
+      var want = String((body && body.profile) || '').trim();
+      var kset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(km[1]); })[0];
+      var names = (kset && kset.profiles) || [];
+      if (want && names.indexOf(want) < 0) {
+        var msg = names.length
+          ? 'неизвестный профиль ' + want + '; доступны: ' + names.slice().sort().join(', ')
+          : 'у набора ' + decodeURIComponent(km[1]) + ' нет профилей — задайте profiles в записи набора';
+        fail(msg);
+        return Promise.reject(new Error(msg));
+      }
+      var fresh = { id: 'k_' + kset.id + '_' + (kset.keys.length + 1), createdAt: new Date().toISOString() };
+      if (want) { fresh.profile = want; }
+      kset.keys.push(fresh);
+      return Promise.resolve({ token: 'demo_' + fresh.id, key: fresh, set: kset });
+    }
+    // Подпись ключа в демо тоже сохраняется: иначе выданный ключ тут же
+    // терял бы метку, которую панель только что отправила.
+    var nm = /^\/api\/sets\/([^/]+)\/keys\/([^/]+)$/.exec(path);
+    if (nm && method === 'PATCH' && st.mock) {
+      var nset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(nm[1]); })[0];
+      var keyID = decodeURIComponent(nm[2]);
+      (nset ? nset.keys : []).forEach(function (k) {
+        if (k.id === keyID) { k.note = String((body && body.note) || ''); }
+      });
+      return Promise.resolve({ ok: true });
+    }
     var m = /^\/api\/servers(?:\/([^/]+))?$/.exec(path);
     if (!m || !st.mock) { return Promise.resolve({ ok: true, ms: 14, tools: [] }); }
     // у POST имя приходит в теле, у PUT/DELETE — в пути
@@ -2450,11 +2488,29 @@
     var set = current();
     if (!set) { return; }
     renderKeys(set);
+    fillKeyProfiles(set);
     show($('new-key-box'), false);
     show($('keys-warn'), false);
     $('key-label').value = '';
     var dlg = $('keys-dlg');
     if (typeof dlg.showModal === 'function') { dlg.showModal(); }
+  }
+
+  // Профиль — сужение прав, записанное в наборе: панель знает только имена,
+  // правила читает демон. Нет профилей — нет и селектора.
+  function fillKeyProfiles(set) {
+    var names = (set && set.profiles) || [];
+    var sel = $('key-profile');
+    sel.textContent = '';
+    if (!names.length) { show($('key-profile-field'), false); return; }
+    var none = sel.appendChild(el('option', '', t('keys.profileNone')));
+    none.value = '';
+    names.forEach(function (name) {
+      var opt = sel.appendChild(el('option', '', name));
+      opt.value = name;
+    });
+    sel.value = '';
+    show($('key-profile-field'), true);
   }
 
   function renderKeys(set) {
@@ -2466,6 +2522,7 @@
         var li = el('li', 'keyitem');
         var head = li.appendChild(el('div'));
         head.appendChild(el('span', 'key-name'));
+        head.appendChild(el('span', 'badge badge-unknown key-badge'));
         head.appendChild(el('span', 'key-sub'));
         var note = li.appendChild(el('div', 'key-note'));
         var input = note.appendChild(el('input', 'input'));
@@ -2485,6 +2542,11 @@
         li.dataset.revoked = String(revoked);
         // имя строки — id ключа: префикс у всех ключей набора один и тот же
         li.querySelector('.key-name').textContent = k.id;
+        var badge = li.querySelector('.key-badge');
+        badge.textContent = k.profile || '';
+        badge.hidden = !k.profile;
+        badge.title = k.profile ? t('keys.profileIs', { name: k.profile }) : '';
+        badge.setAttribute('aria-label', k.profile ? t('keys.profileIs', { name: k.profile }) : '');
         li.querySelector('.key-sub').textContent = revoked
           ? day(k.createdAt) + ' · ' + t('keys.revoked', { date: day(k.revokedAt) })
           : day(k.createdAt) + ' · ' + t('keys.active');
@@ -2540,6 +2602,7 @@
     renderCalls(st.calls);
     renderEnv();
     renderKeys(current() || {});
+    fillKeyProfiles(current());
     fillFilters();
     renderStats(st.st.data);
     applyRail();
@@ -2878,11 +2941,12 @@
     var set = current();
     if (!set || st.busy) { return; }
     var label = $('key-label').value.trim();
+    var profile = $('key-profile').value;
     var btn = this.querySelector('button[type="submit"]');
     st.busy = true;
     btn.disabled = true;
     show($('keys-warn'), false);
-    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', {})
+    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', profile ? { profile: profile } : {})
       .then(function (r) {
         $('key-label').value = '';
         $('new-key').textContent = (r && r.token) || '';
@@ -2900,7 +2964,12 @@
           return loadState().then(function () { renderKeys(current() || set); });
         });
       })
-      .catch(function (err) { fail(err.message, err); })
+      .catch(function (err) {
+        // Отказ демона (400 на неизвестный профиль) — ответ формы, а не сбой
+        // связи: показываем его текст здесь, диалог не закрываем.
+        $('keys-warn').textContent = err.message;
+        show($('keys-warn'), true);
+      })
       .then(function () { st.busy = false; btn.disabled = false; });
   });
 

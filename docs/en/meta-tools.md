@@ -77,6 +77,10 @@ Input is one of two forms:
 `prefix` filters the response after the tool list is read, so the cached schemas
 stay intact and a later call without it sees every command.
 
+A key issued with a profile (see [configuration.md](configuration.md#profiles))
+gets a catalog without the commands the profile refuses — `deny: ["*"]` leaves
+it empty. A key without a profile sees the whole set, as before.
+
 With `servers`, one `requestTimeout` bounds the whole call, not each server.
 Servers are queried in parallel, eight at a time.
 
@@ -189,6 +193,27 @@ call of `invoke_many` is counted on its own and carries the same refusal in its
 `error` field, so one refused entry never hides the others. The check runs before
 the set opens a downstream session: a refused call never reaches a server, and a
 refusal is counted in `/stats` as `throttled`, not as a tool call.
+
+### Profiles
+
+A key issued with a profile (see [configuration.md](configuration.md#profiles))
+is refused what the profile does not allow, in the same shape as a policy
+denial — `isError: true`, `_meta.lazyMcpPolicy: "blocked"`:
+
+```text
+🚫 Blocked by mcprig policy: профиль reader не разрешает serena/find_symbol
+```
+
+The refusal is a tool result, not a broken connection: the MCP call stays up.
+Inside `invoke_many` it lands in that entry's `error`, and the other entries run
+as usual. `permissions` is checked first, so a command denied by a rule reports
+its message rather than the profile. `list_commands` hides such commands
+instead of reporting them. The profile is found by the key's fingerprint, not by
+its note, and a key without a profile is not filtered at all.
+
+`describe_commands` is not filtered: the names are hidden from the catalog, but
+a schema for a guessed name is still served and the call itself is refused, so a
+key learns what it is barred from — knowingly, and nothing more.
 
 An answer longer than `maxBytes` is cut at a UTF-8 boundary; the returned text
 ends with a marker naming the kept and full sizes and the file holding the full

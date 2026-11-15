@@ -172,7 +172,7 @@ func TestKeysSingleActive(t *testing.T) {
 		t.Fatalf("первый ключ: %+v", first)
 	}
 
-	plain, err := store.IssueKey("demo")
+	plain, err := store.IssueKey("demo", "")
 	if err != nil {
 		t.Fatalf("IssueKey: %v", err)
 	}
@@ -634,9 +634,77 @@ func TestLoadDropsSetWithBadID(t *testing.T) {
 	}
 }
 
+// Опознаватель профиля с опечаткой ("denny") не должен тихо стать пустым
+// профилем и разрешить всё: загрузка проверяет блок по сырому файлу, а не по
+// разобранной записи, и отбрасывает его с причиной. Ключ, назвавший профиль,
+// после этого получает отказ, а не свободу.
+func TestLoadDropsBrokenProfiles(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"bad","name":"bad","servers":["fs"],"port":9100,
+		 "profiles":{"reader":{"denny":["*"]}},
+		 "keys":[{"id":"k1","token":"t1","profile":"reader"}]},
+		{"id":"good","name":"good","servers":["fs"],"port":9101,
+		 "profiles":{"reader":{"deny":["*/*_write"]}}}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+
+	bad := store.Set("bad")
+	if bad == nil {
+		t.Fatal("набор bad не загрузился")
+	}
+	if len(bad.Profiles) != 0 {
+		t.Fatalf("битый блок оставлен: %+v", bad.Profiles)
+	}
+	if dropped := store.Dropped(); len(dropped) != 1 || !strings.Contains(dropped[0], "profiles набора \"bad\" отброшены") {
+		t.Fatalf("отчёт о загрузке = %v", dropped)
+	}
+	// Ключ с несуществующим профилем сохранён: отказ даёт гейт, а не загрузка.
+	if len(bad.Keys) != 1 || bad.Keys[0].Profile != "reader" {
+		t.Fatalf("ключ потерял имя профиля: %+v", bad.Keys)
+	}
+
+	if good := store.Set("good"); good == nil || good.Profiles["reader"] == nil {
+		t.Fatal("годный блок соседнего набора пострадал")
+	}
+
+	// Канонический файл больше не несёт опечатку: её не вернуть следующей
+	// записью, а отчёт о потере уже отдан.
+	raw, err := os.ReadFile(filepath.Join(dir, RegistryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "denny") {
+		t.Fatalf("опечатка осталась в registry.json: %s", raw)
+	}
+}
+
+// Отсутствующий блок и null остаются в прежнем смысле: ключ без профиля и
+// набор без профилей.
+func TestLoadKeepsSetsWithoutProfiles(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"none","name":"none","servers":["fs"],"port":9100},
+		{"id":"null","name":"null","servers":["fs"],"port":9101,"profiles":null}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+	if len(store.Sets()) != 2 {
+		t.Fatalf("наборов = %d", len(store.Sets()))
+	}
+	if dropped := store.Dropped(); len(dropped) != 0 {
+		t.Fatalf("отчёт о загрузке = %v", dropped)
+	}
+}
+
 func TestKeyOpsMissingSet(t *testing.T) {
 	store := openStore(t, t.TempDir())
-	if _, err := store.IssueKey("nope"); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
+	if _, err := store.IssueKey("nope", ""); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
 		t.Errorf("IssueKey: err = %v", err)
 	}
 	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {

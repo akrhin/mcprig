@@ -14,7 +14,7 @@ repository the project is built in.
   address (`http(s)://host[:port][/prefix]`), and it becomes the only source of
   the OAuth redirect (`<publicUrl>/oauth/callback`, path prefix kept) and of the
   decision that the session cookie is `Secure`. A bad value — no scheme, no
-  host, query, fragment or a
+  host, credentials, query, fragment or a
   trailing `/` — stops the panel at startup instead of falling back silently.
   Without it the redirect is built from `MCPRIG_HOST` and `MCPRIG_PORT` as
   before. `mcprig doctor` prints the effective redirect and flags one that
@@ -26,7 +26,7 @@ repository the project is built in.
   {"perMinute": 120, "burst": 20, "perTool": {"serena/find_symbol":
   {"perMinute": 10, "burst": 2}}}` in the set's record. Each inner call of
   `invoke_many` counts on its own, a caller is identified by the fingerprint of
-  its key, and a refused call is an ordinary tool error that never reaches a
+  its key (in an open set, by its address), and a refused call is an ordinary tool error that never reaches a
   server — `/stats` reports it as `throttled`. No block, or zeros, means no
   limit. The field is edited in `registry.json` or over the API, as `notify`.
 - A truncated tool answer can be fetched over HTTP: `GET /tool-out/<name>`
@@ -48,6 +48,14 @@ repository the project is built in.
   button pages `/api/calls` by `before` until a page comes back short. Paging
   pauses the 5 s refresh and shows **resume** next to it, which returns to the
   first page.
+- A key can be narrowed to a profile of its set: `profiles: {"reader":
+  {"deny": ["*/*_write"], "allow": ["*"]}}` in the set's record, and a key
+  issued with `{"profile": "reader"}` (a `400` lists the set's profiles, or
+  says the set has none). The profile applies after `permissions` and only
+  narrows — a rule's denial keeps its own message. `list_commands` hides what
+  the profile refuses, `invoke_command` and `invoke_many` refuse it as a tool
+  error naming the profile, and a key without a profile behaves as before.
+  The field is edited in `registry.json` or over the API, as `notify`.
 
 ### Changed
 
@@ -58,6 +66,10 @@ repository the project is built in.
   never depends on them. The session cookie is `Secure`
   whenever the public address is `https` or the panel has its own certificate,
   no longer only when the request itself arrived over TLS.
+- Login failures are counted by the socket address *and* by the address from
+  `X-Forwarded-For`: rotating the header behind a trusted proxy no longer
+  bypasses the five-per-minute limit, and a request is refused when either
+  counter is over it.
 - Browse sessions in the panel now apply the server's `permissions` to tool
   calls, the same gate `invoke_command` uses: a denied call answers `403`
   instead of reaching the server. Resources and prompts are not covered yet.

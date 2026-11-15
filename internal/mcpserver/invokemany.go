@@ -159,7 +159,7 @@ func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c man
 	if !usable(e.srv) {
 		return serverProblem(e.srv)
 	}
-	if message, denied := denyReason(m.cfg.Permissions, e.srv.Permissions, e.srv.Name, c.CommandName); denied {
+	if message, denied := m.gate(ctx, e.srv.Name, c.CommandName, e.srv.Permissions); denied {
 		// Тот же shape, что у invoke_command: маркер в content и Meta с
 		// lazyMcpPolicy — хук-клиент ищет их там, а не в строке error.
 		blocked := blockedResult(e.srv.Name, c.CommandName, message)

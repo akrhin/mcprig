@@ -34,6 +34,9 @@ type Key struct {
 	CreatedAt string `json:"createdAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
 	Note      string `json:"note,omitempty"`
+	// Profile — имя профиля набора (Set.Profiles), который сужает права этого
+	// ключа. Пусто — ключ ограничен только permissions.
+	Profile string `json:"profile,omitempty"`
 }
 
 // Notify — куда набор шлёт события своей поломки. Один адрес на набор:
@@ -70,6 +73,9 @@ type Set struct {
 	Notify      *Notify  `json:"notify,omitempty"`
 	// RateLimit — лимит частоты вызовов набора; нет поля или ноль — без него.
 	RateLimit *config.RateLimit `json:"rateLimit,omitempty"`
+	// Profiles — профили инструментов, на которые ссылаются ключи набора.
+	// Профиль сужает permissions и не может их расширить.
+	Profiles map[string]*config.Profile `json:"profiles,omitempty"`
 }
 
 // Data is registry.json.
@@ -92,6 +98,7 @@ type PublicKey struct {
 	CreatedAt string `json:"createdAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
 	Note      string `json:"note,omitempty"`
+	Profile   string `json:"profile,omitempty"`
 }
 
 // PublicSetEntry is the client-facing view of a set: no raw token, only the
@@ -106,4 +113,7 @@ type PublicSetEntry struct {
 	KeyPrefix   string      `json:"keyPrefix"`
 	Autostart   bool        `json:"autostart,omitempty"`
 	Open        bool        `json:"open,omitempty"`
+	// Profiles — имена профилей набора по алфавиту: панель предлагает их при
+	// выдаче ключа, не читая правила.
+	Profiles []string `json:"profiles,omitempty"`
 }

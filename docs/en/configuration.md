@@ -364,18 +364,60 @@ The caller is identified by the fingerprint of its access key, so one key's
 quota never mixes with another key's. The key's note and the `_meta` clientInfo
 do not touch the bucket: the note only renames the caller in `/stats`, and
 clientInfo is what the caller says about itself — a change there mints no quota.
-A set without keys is open, and its callers are named by the label they send
-themselves (`_meta` clientInfo or User-Agent): such a label is **not** identity —
-it only keeps one caller's traffic out of another's bucket, and anyone can copy
-it.
+A set without keys is open, and there a bucket belongs to the caller's address
+(port stripped), since it presents no key and the label it sends itself is no
+identity. Behind a proxy that address is the proxy's, so the address is a coarse
+divider, not a defence. stdio has no address: one bucket per process.
 
 Every call is counted, including each inner call of `invoke_many`. The check runs
 before the set opens a downstream session, so a refused call never reaches a
 server; [meta-tools.md](meta-tools.md#rate-limit) shows the refusal text.
 `/stats` reports refusals as `throttled`, and `/api/calls` sums them into its
-answer. Buckets are capped at 4096 and dropped after 10 minutes idle: a flood of
-invented tool names evicts the least recently used bucket instead of growing the
-map.
+answer. Buckets are capped at 4096 and dropped after 10 minutes idle; an
+overflow evicts the oldest bucket of the caller that caused it, and only then the
+oldest one overall. Eviction can therefore hand burst back to that caller: the
+limit brakes a runaway fan-out, it does not stop abuse.
+
+## profiles
+
+A set field in `registry.json`, copied into the set's own `servers.json` — a
+named, narrower view of the set's tools for one key:
+
+```json
+{
+  "profiles": {
+    "reader": {"deny": ["*/*_write"], "allow": ["*"]}
+  }
+}
+```
+
+| field | meaning |
+| --- | --- |
+| `deny` | command globs the profile refuses; a pattern containing `/` matches `server/command`, one without it the command name; `*` is any run, `?` one character, matching is case-insensitive |
+| `allow` | command globs the profile permits; empty means every command `deny` did not refuse |
+
+A key takes a profile when it is issued — `profile` in
+`POST /api/sets/<id>/keys`, see [panel.md](panel.md#routes); an unknown name is
+`400` listing the set's profiles. A key without a profile keeps every tool the
+set allows, so a set without a `profiles` block behaves exactly as before.
+
+The profile applies **after** `permissions` and can only narrow: a command
+denied there stays denied and reports the rule's message, never the profile's.
+`allow` cannot lift a rule's denial.
+
+`list_commands` returns only what the profile allows (an empty catalog under
+`deny: ["*"]`), and `invoke_command` / `invoke_many` refuse the rest as a tool
+result, `isError: true`, text
+`🚫 Blocked by mcprig policy: профиль <name> не разрешает <server>/<tool>`;
+[meta-tools.md](meta-tools.md#profiles) has the shape. A key is matched by the
+fingerprint of its token, not by its note. A key whose profile was deleted from
+the set sees nothing and every call is refused: removing a block never widens a
+key that still refers to it.
+
+Editing follows `notify` and `rateLimit`: an absent field keeps the stored
+profiles, `null` removes them, an object replaces them whole; a bad value is
+rejected on write (400) with the field name. The panel has no editor for the
+block yet; a key's profile is chosen when the key is issued.
 
 ## See also
 

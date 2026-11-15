@@ -147,7 +147,7 @@ func TestRateLimitDoesNotLeakBetweenKeys(t *testing.T) {
 	m := fanManager(t, newFanTracker(), &config.Config{RateLimit: rl}, "a")
 	ctxA := stats.WithClientKey(context.Background(), "aaaaaa")
 	ctxB := stats.WithClientKey(context.Background(), "bbbbbb")
-	if got := identityOf(ctxA, nil); got != "key:aaaaaa" {
+	if got := identityOf(ctxA); got != "key:aaaaaa" {
 		t.Fatalf("identityOf = %q, want key:aaaaaa", got)
 	}
 	if err := m.throttle(ctxA, nil, "a", "echo"); err != nil {
@@ -252,5 +252,67 @@ func TestRateLimitBucketCap(t *testing.T) {
 	}
 	if got := len(l.buckets); got > maxBuckets {
 		t.Fatalf("корзин %d, потолок %d", got, maxBuckets)
+	}
+}
+
+// Open set: no key, so the address is the identity. Two clientInfo values from
+// one address share a bucket; another address gets its own.
+func TestRateLimitOpenSetBucketsByAddr(t *testing.T) {
+	rl := &config.RateLimit{PerMinute: 60, Burst: 1}
+	m := fanManager(t, newFanTracker(), &config.Config{RateLimit: rl}, "a")
+	one := stats.WithClientAddr(context.Background(), "10.0.0.7")
+	two := stats.WithClientAddr(context.Background(), "10.0.0.8")
+	if err := m.throttle(one, clientReq("one"), "a", "echo"); err != nil {
+		t.Fatalf("первый вызов с адреса: %v", err)
+	}
+	if err := m.throttle(one, clientReq("two"), "a", "echo"); err == nil {
+		t.Fatal("новая _meta clientInfo с того же адреса дала квоту")
+	}
+	if err := m.throttle(two, clientReq("one"), "a", "echo"); err != nil {
+		t.Fatalf("второй адрес делит корзину с первым: %v", err)
+	}
+	if got := identityOf(context.Background()); got != "stdin" {
+		t.Fatalf("identityOf без ключа и адреса = %q, want stdin", got)
+	}
+}
+
+// A flood of invented names by one identity evicts its own buckets, so another
+// identity keeps an exhausted bucket — its quota does not come back.
+func TestRateLimitEvictKeepsOtherIdentities(t *testing.T) {
+	rl := &config.RateLimit{PerMinute: 60, Burst: 1}
+	m := fanManager(t, newFanTracker(), &config.Config{RateLimit: rl}, "a")
+	victim := stats.WithClientKey(context.Background(), "aaaaaa")
+	flood := stats.WithClientKey(context.Background(), "bbbbbb")
+	if err := m.throttle(victim, nil, "a", "echo"); err != nil {
+		t.Fatalf("первый вызов жертвы: %v", err)
+	}
+	if err := m.throttle(victim, nil, "a", "echo"); err == nil {
+		t.Fatal("второй вызов жертвы прошёл мимо лимита")
+	}
+	for i := 0; i < maxBuckets+1; i++ {
+		m.throttle(flood, nil, "a", "tool"+strconv.Itoa(i))
+	}
+	if err := m.throttle(victim, nil, "a", "echo"); err == nil {
+		t.Fatal("поток чужих имён вернул квоту жертве")
+	}
+	if got := len(m.limits.buckets); got > maxBuckets {
+		t.Fatalf("корзин %d, потолок %d", got, maxBuckets)
+	}
+}
+
+// The bucket key is a fixed-width hash: a tool name the caller invents cannot
+// make one map key long, and two callers never share one.
+func TestRateLimitBucketKeyIsShort(t *testing.T) {
+	l := newRateLimits(&config.RateLimit{PerMinute: 60, Burst: 1})
+	long := strings.Repeat("x", 1<<16)
+	l.allow("key:aaaaaa", "a", long)
+	l.allow("key:bbbbbb", "a", long)
+	if got := len(l.buckets); got != 2 {
+		t.Fatalf("корзин %d, want 2: клиенты не разошлись", got)
+	}
+	for key := range l.buckets {
+		if len(key) != 16 {
+			t.Fatalf("длина ключа корзины %d, want 16", len(key))
+		}
 	}
 }

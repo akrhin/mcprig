@@ -723,6 +723,10 @@ type HTTPTransport struct {
 	// sha256 токена) → подпись. Отпечаток, а не токен: ключ набора в конфиг
 	// набора не попадает, а метка в статистике становится человеческой.
 	ClientNames map[string]string `json:"clientNames,omitempty"`
+	// KeyProfiles — профиль ключа по его отпечатку; ключ без профиля не
+	// ограничен ничем, кроме permissions. Отпечаток, а не метка: метку клиент
+	// называет сам.
+	KeyProfiles map[string]string `json:"keyProfiles,omitempty"`
 }
 
 type HealthMonitor struct {
@@ -740,6 +744,8 @@ type Config struct {
 	OAuth          *OAuth         `json:"oauth,omitempty"`
 	// RateLimit — лимит вызовов на клиента; пустое или нулевое поле — без него.
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
+	// Profiles — профили инструментов на ключ, см. internal/config/profiles.go.
+	Profiles map[string]*Profile `json:"profiles,omitempty"`
 }
 
 // ValidatePublicURL проверяет админский публичный адрес панели: абсолютный
@@ -761,6 +767,9 @@ func ValidatePublicURL(raw string) error {
 	}
 	if u.Host == "" {
 		return fmt.Errorf("publicUrl: пустой хост: %q", raw)
+	}
+	if u.User != nil {
+		return fmt.Errorf("publicUrl: креденшелы в URL не допускаются: %q", raw)
 	}
 	if u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
 		return fmt.Errorf("publicUrl: query и fragment запрещены: %q", raw)
@@ -797,6 +806,7 @@ func Load(path string) (*Config, error) {
 		Permissions    json.RawMessage   `json:"permissions"`
 		OAuth          *OAuth            `json:"oauth"`
 		RateLimit      json.RawMessage   `json:"rateLimit"`
+		Profiles       json.RawMessage   `json:"profiles"`
 	}
 	if err := json.Unmarshal(data, &shape); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -833,6 +843,13 @@ func Load(path string) (*Config, error) {
 	// A broken global OAuth block is dropped too: a typo must not brick the set.
 	if shape.OAuth.validate("oauth") == "" {
 		cfg.OAuth = shape.OAuth
+	}
+	// A broken profiles block is dropped as well: keys that name a profile in
+	// it will be refused, which is the safe side of a typo.
+	if profiles, err := ParseProfiles(shape.Profiles); err != nil {
+		slog.Default().Warn("блок profiles отброшен: ключи, назвавшие профиль, будут отвергаться", "path", path, "err", err)
+	} else {
+		cfg.Profiles = profiles
 	}
 	// A broken global block is dropped, not fatal: a typo must not brick the set.
 	if p := decodeGlobalPermissions(shape.Permissions); p != nil {

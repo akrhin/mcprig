@@ -67,7 +67,12 @@ is in the tooltip), and `config rejected` in error colour for a record with
 value comes from the same `isolation` field MCP clients see in `list_servers`.
 
 The **Keys** dialog lists key ids, creation and revocation dates and notes. It
-shows only the 8-character prefix. The note of an existing key is edited in
+shows only the 8-character prefix. When the set has a `profiles` block, the
+issue form carries a **Profile** select (empty means no profile); the chosen name
+goes to `POST /api/sets/<id>/keys` as `{"profile":…}`, a `400` from the daemon is
+shown in the dialog itself and the dialog stays open, and every key row shows its
+profile as a badge. A set without profiles keeps the form as it was. The note of
+an existing key is edited in
 place: the row has a label field and a **Save** button that appears once the
 value differs from the stored one; the panel sends `PATCH` with `{"note":…}`,
 redraws the list and shows a `restartError` of the set as its own warning rather
@@ -138,7 +143,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/sets/<id>/servers` | per-server health for one set |
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
-| `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token |
+| `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token. An optional `{"profile":"reader"}` narrows the key to that profile of the set — an unknown name is `400` listing the profiles, a set without `profiles` is `400` with a hint to add the block; the answer carries the key, including its `profile`, and the set with sorted `profiles` names |
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key; revoking the active key stops the set and the answer carries `stopped: true` |
 | `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"note":"hermes"}`; the note becomes the client's label in the statistics, an empty string clears it, a running set is restarted |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
@@ -324,7 +329,11 @@ not a list of sources (it names the panel itself). `X-Forwarded-Proto` and
 trusted proxy then makes an `https` request count as secure and a forwarded
 host count as the panel's public name, so an `https` Origin matches. Without the
 secret both headers are ignored — otherwise any client could claim `https` and
-spoof the check.
+spoof the check. Trust is switched on by *setting* `MCPRIG_PROXY_SECRET`, not by
+verifying the peer: keep the panel port unreachable except through the proxy.
+With an `http` panel behind the secret, browser writes are rejected because the
+request counts as `https` — set `MCPRIG_PUBLIC_URL=https://…` to match what the
+browser sees.
 
 The OAuth redirect is taken from `MCPRIG_PUBLIC_URL` alone when set
 (`<publicUrl>/oauth/callback`, path prefix kept); without it the panel builds it

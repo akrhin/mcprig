@@ -399,6 +399,8 @@ func TestPublicURLValidation(t *testing.T) {
 		"https://mcprig.example/prefix#",
 		"https://mcprig.example/prefix/",
 		"https://mcprig.example/?a=1",
+		"https://user:pass@host",
+		"https://panel@evil.example",
 		"https://mcprig.example/#frag",
 	}
 	for _, s := range bad {

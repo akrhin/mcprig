@@ -30,6 +30,9 @@ type setTransport struct {
 	// ClientNames — подпись ключа по отпечатку: набор берёт её в метку
 	// клиента статистики. Отпечаток, а не токен.
 	ClientNames map[string]string `json:"clientNames,omitempty"`
+	// KeyProfiles — профиль ключа по отпечатку: набор находит им профиль
+	// вызывающего. Отпечаток, а не подпись: подпись клиент называет сам.
+	KeyProfiles map[string]string `json:"keyProfiles,omitempty"`
 }
 
 type setHealthMonitor struct {
@@ -44,6 +47,8 @@ type setFile struct {
 	RequestTimeout int              `json:"requestTimeout"`
 	// RateLimit — тот же блок, что в реестре: лимит исполняет сам набор.
 	RateLimit *config.RateLimit `json:"rateLimit,omitempty"`
+	// Profiles — тот же блок, что в реестре: профиль исполняет сам набор.
+	Profiles map[string]*config.Profile `json:"profiles,omitempty"`
 }
 
 // BuildSetConfig собирает конфиг набора из реестра.
@@ -71,10 +76,12 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 			AllowedHosts:   allowedHosts,
 			AllowAnonymous: set.Open && set.Token == "",
 			ClientNames:    clientNames(set.Keys),
+			KeyProfiles:    keyProfiles(set.Keys),
 		},
 		HealthMonitor:  setHealthMonitor{Interval: 60000, Timeout: 120000},
 		RequestTimeout: 120000,
 		RateLimit:      set.RateLimit,
+		Profiles:       set.Profiles,
 	}
 	for _, name := range set.Servers {
 		srv := byName[name]
@@ -101,6 +108,24 @@ func clientNames(keys []registry.Key) map[string]string {
 			continue
 		}
 		out[stats.Fingerprint(key.Token)] = note
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// keyProfiles — профиль каждого ключа под его отпечатком. Ключ без профиля или
+// без токена (история отзыва) в карту не попадает: набор считает его
+// неограниченным по профилю.
+func keyProfiles(keys []registry.Key) map[string]string {
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		profile := strings.TrimSpace(key.Profile)
+		if key.Token == "" || profile == "" {
+			continue
+		}
+		out[stats.Fingerprint(key.Token)] = profile
 	}
 	if len(out) == 0 {
 		return nil

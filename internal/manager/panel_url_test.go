@@ -43,6 +43,8 @@ func TestCallbackURLUnchangedWithoutPublicURL(t *testing.T) {
 
 // TestXFHIgnoredWithoutProxySecret: без MCPRIG_PROXY_SECRET X-Forwarded-Host не
 // публичное имя — он не добавляет authority и не проходит проверку Host.
+// С секретом подделанный заголовок принимается: это и есть цена доверия —
+// порт панели не должен быть доступен в обход прокси.
 func TestXFHIgnoredWithoutProxySecret(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Host = "192.168.1.92:9088"
@@ -64,6 +66,7 @@ func TestXFHIgnoredWithoutProxySecret(t *testing.T) {
 		t.Fatalf("с секретом ожидались Host и X-Forwarded-Host, получено %+v", got)
 	}
 	if !trusted.m.hostAllowed(spoofed) {
+		// Ожидаемо: секрет означает «верю прокси», а не «проверяю прокси».
 		t.Fatal("с секретом публичное имя из X-Forwarded-Host отвергнуто")
 	}
 }

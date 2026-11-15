@@ -9,6 +9,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,6 +46,7 @@ func Open(dir string) (*Store, error) {
 			}
 		} else {
 			s.data = data
+			s.validateProfiles(raw)
 			s.normalize()
 			// Persist normalization once, so a migrated legacy key keeps its
 			// createdAt instead of being rebuilt on every start.
@@ -125,6 +128,40 @@ func (s *Store) normalize() {
 		sets = append(sets, set)
 	}
 	s.data.Sets = sets
+}
+
+// validateProfiles re-checks every set's profiles block against the raw file.
+// The lenient unmarshal into Set loses an unknown key — "denny" leaves a valid
+// empty profile, and normalization would then write that loss back, silently
+// turning a typo into "allow everything". A block that fails strict parsing is
+// dropped whole and reported: keys still naming it are refused, not freed.
+func (s *Store) validateProfiles(raw []byte) {
+	var shape struct {
+		Sets []struct {
+			ID       string          `json:"id"`
+			Profiles json.RawMessage `json:"profiles"`
+		} `json:"sets"`
+	}
+	if err := json.Unmarshal(raw, &shape); err != nil {
+		return
+	}
+	bad := make(map[string]string, len(shape.Sets))
+	for _, one := range shape.Sets {
+		if _, err := config.ParseProfiles(one.Profiles); err != nil {
+			bad[one.ID] = err.Error()
+		}
+	}
+	if len(bad) == 0 {
+		return
+	}
+	for _, set := range s.data.Sets {
+		reason, ok := bad[set.ID]
+		if !ok {
+			continue
+		}
+		set.Profiles = nil
+		s.dropped = append(s.dropped, fmt.Sprintf("profiles набора %q отброшены: %s", set.ID, reason))
+	}
 }
 
 // Dropped возвращает записи, отброшенные при загрузке (битые id наборов),
@@ -488,7 +525,8 @@ func (s *Store) DeleteSet(id string) error {
 }
 
 // IssueKey revokes the current active key and returns the new plaintext token.
-func (s *Store) IssueKey(setID string) (string, error) {
+// profile names one of the set's profiles; empty leaves the key unrestricted.
+func (s *Store) IssueKey(setID, profile string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
@@ -504,6 +542,7 @@ func (s *Store) IssueKey(setID string) (string, error) {
 		}
 	}
 	key := newKey(now)
+	key.Profile = strings.TrimSpace(profile)
 	keys = append(keys, key)
 	cp := *set
 	cp.Keys = keys
@@ -657,7 +696,12 @@ func PublicSet(set *Set) PublicSetEntry {
 			CreatedAt: key.CreatedAt,
 			RevokedAt: key.RevokedAt,
 			Note:      key.Note,
+			Profile:   key.Profile,
 		})
 	}
+	for name := range set.Profiles {
+		out.Profiles = append(out.Profiles, name)
+	}
+	sort.Strings(out.Profiles)
 	return out
 }

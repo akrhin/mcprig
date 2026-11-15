@@ -13,6 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/toolout"
 )
 
@@ -215,6 +216,23 @@ func createToolOut() (*os.File, error) {
 		return nil, fmt.Errorf("усечение: запись полного ответа: %w", err)
 	}
 	return f, nil
+}
+
+// profileCommands keeps only what the caller's profile allows. The profile is
+// read once per list_commands: one key has one profile.
+func profileCommands(name string, profile *config.Profile, cmds []commandInfo) []commandInfo {
+	if name == "" {
+		return cmds
+	}
+	out := make([]commandInfo, 0, len(cmds))
+	for _, cmd := range cmds {
+		// nil-профиль значит, что блока с таким именем нет в наборе: ключ
+		// остаётся запрещённым, а не получает всё.
+		if profile != nil && profile.Allows(cmd.Server, cmd.Name) {
+			out = append(out, cmd)
+		}
+	}
+	return out
 }
 
 // filterCommands keeps names carrying prefix; filtering happens on the way out

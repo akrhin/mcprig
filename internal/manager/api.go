@@ -465,8 +465,8 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		m.methodNotAllowed(w, []string{http.MethodPost})
 		return
 	}
-	ip := m.auth.clientIP(r)
-	if wait, blocked := m.auth.loginBlocked(ip); blocked {
+	ips := m.auth.loginIPs(r)
+	if wait, blocked := m.auth.loginBlocked(ips); blocked {
 		secs := int((wait + time.Second - 1) / time.Second)
 		if secs < 1 {
 			secs = 1
@@ -515,7 +515,7 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !ok {
-		m.auth.loginFailed(ip)
+		m.auth.loginFailed(ips)
 		if isForm {
 			writeHTML(w, http.StatusUnauthorized, loginTemplate, loginData{Error: "неверный логин или пароль — проверьте раскладку и Caps Lock"})
 			return
@@ -523,7 +523,7 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		m.fail(w, r, &httpError{http.StatusUnauthorized, "неверный логин или пароль — проверьте раскладку и Caps Lock"})
 		return
 	}
-	m.auth.loginOK(ip)
+	m.auth.loginOK(ips)
 	name, err := m.auth.startSession(w, r)
 	if err != nil {
 		m.fail(w, r, err)
@@ -1494,8 +1494,12 @@ func (m *Manager) apiKeyIssue(req *request) error {
 	if set == nil {
 		return notFound("набор " + id + " не найден")
 	}
+	profile, err := m.keyProfileOf(set, req)
+	if err != nil {
+		return err
+	}
 	running := m.rt.status(set).Running
-	token, err := m.store.IssueKey(id)
+	token, err := m.store.IssueKey(id, profile)
 	if err != nil {
 		return err
 	}
@@ -1518,6 +1522,40 @@ func (m *Manager) apiKeyIssue(req *request) error {
 	}
 	writeJSON(req.w, http.StatusOK, resp)
 	return nil
+}
+
+// keyProfileOf читает необязательное поле profile из тела выдачи ключа.
+// Неизвестное имя — 400 с перечнем доступных: иначе ключ молча получил бы
+// отказ на каждом вызове, а владелец искал бы причину в правилах.
+func (m *Manager) keyProfileOf(set *registry.Set, req *request) (string, error) {
+	body, err := readBody(req.r)
+	if err != nil {
+		return "", err
+	}
+	var in struct {
+		Profile string `json:"profile"`
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &in); err != nil {
+			return "", badRequest("тело запроса должно быть JSON")
+		}
+	}
+	profile := strings.TrimSpace(in.Profile)
+	if profile == "" {
+		return "", nil
+	}
+	if _, ok := set.Profiles[profile]; !ok {
+		names := make([]string, 0, len(set.Profiles))
+		for name := range set.Profiles {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		if len(names) == 0 {
+			return "", badRequest("у набора " + set.ID + " нет профилей — задайте profiles в записи набора")
+		}
+		return "", badRequest("неизвестный профиль " + profile + "; доступны: " + strings.Join(names, ", "))
+	}
+	return profile, nil
 }
 
 // apiKeyNote подписывает ключ человеческим именем: подпись уходит в метку

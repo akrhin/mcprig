@@ -552,6 +552,8 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 			m.storeTools(e, nil)
 		}
 	}
+	// Профиль читается один раз: у ключа он один на все серверы запроса.
+	profileName, profile := m.callerProfile(ctx)
 	switch {
 	case in.Server != "" && len(in.Servers) > 0:
 		return errResult(errors.New("укажите server или servers, но не оба"))
@@ -560,7 +562,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if err != nil {
 			return errResult(err)
 		}
-		return m.jsonTruncResult(filterCommands(cmds, in.Prefix, in.NamesOnly), maxBytes)
+		return m.jsonTruncResult(filterCommands(profileCommands(profileName, profile, cmds), in.Prefix, in.NamesOnly), maxBytes)
 	case len(in.Servers) > 0:
 		// Ответ остальных не теряется из-за одного упавшего: у него в карте
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
@@ -594,7 +596,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 					}
 					return
 				}
-				out[name] = filterCommands(cmds, in.Prefix, in.NamesOnly)
+				out[name] = filterCommands(profileCommands(profileName, profile, cmds), in.Prefix, in.NamesOnly)
 			}(name)
 		}
 		wg.Wait()
@@ -761,7 +763,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if !usable(e.srv) {
 		return errResult(serverProblem(e.srv))
 	}
-	if message, denied := denyReason(m.cfg.Permissions, e.srv.Permissions, e.srv.Name, in.CommandName); denied {
+	if message, denied := m.gate(ctx, e.srv.Name, in.CommandName, e.srv.Permissions); denied {
 		return blockedResult(e.srv.Name, in.CommandName, message), nil
 	}
 	// Кэш инструментов уже есть — неизвестное имя не идёт в апстрим: иначе
@@ -899,14 +901,18 @@ func clientInfoOf(req *mcp.CallToolRequest) string {
 // identityOf buckets rate limits. Only the key fingerprint identifies a caller:
 // it arrives on the context from the transport (stats.WithClientKey), so neither
 // the _meta clientInfo nor the User-Agent label — both self-declared — can mint
-// fresh quotas or merge two keys into one bucket. An open set sends no key, and
-// there the label is the only thing there is; a note names the key's owner but
-// is not identity, so it is a fallback, not the rule.
-func identityOf(ctx context.Context, req *mcp.CallToolRequest) string {
+// fresh quotas or merge two keys into one bucket. An open set sends no key, so
+// its caller is bucketed by address, the one thing it cannot claim: behind a
+// proxy that address is the proxy's — a coarse divider, not a defence. stdio has
+// no address at all and gets one bucket per process.
+func identityOf(ctx context.Context) string {
 	if fp := stats.ClientKey(ctx); fp != "" {
 		return "key:" + fp
 	}
-	return "label:" + labelOf(ctx, req)
+	if addr := stats.ClientAddr(ctx); addr != "" {
+		return "addr:" + addr
+	}
+	return "stdin"
 }
 
 // throttle refuses a call over the set's rate limit and counts the refusal.
@@ -916,7 +922,7 @@ func (m *Manager) throttle(ctx context.Context, req *mcp.CallToolRequest, server
 	if m.limits == nil {
 		return nil
 	}
-	ok, perMinute, retry := m.limits.allow(identityOf(ctx, req), server, tool)
+	ok, perMinute, retry := m.limits.allow(identityOf(ctx), server, tool)
 	if ok {
 		return nil
 	}

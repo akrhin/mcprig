@@ -211,6 +211,11 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 		if presented, ok := bearerToken(r); ok {
 			r = r.WithContext(stats.WithClientKey(r.Context(), stats.Fingerprint(presented)))
 		}
+		// Адрес — то, чем опознаётся клиент открытого набора: ключа у него нет,
+		// а метка самообъявлена. Порт срезан, иначе одна машина = много корзин.
+		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			r = r.WithContext(stats.WithClientAddr(r.Context(), host))
+		}
 		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r, names)))
 
 		if r.Body != nil {
