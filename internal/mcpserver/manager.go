@@ -121,6 +121,10 @@ type Manager struct {
 	// lockMu сериализует чтение-правку-запись записи карантина: два
 	// одновременных list_commands иначе теряли бы запись друг друга.
 	lockMu sync.Mutex
+	// lockErr — ошибка последней записи tools.lock.json. Пока она есть,
+	// карантин не может ручаться за одобрения, и вызовы отклоняются; успешный
+	// обход каталога её снимает.
+	lockErr error
 
 	// ToolOutURL, when set, names a truncated answer by its /tool-out URL
 	// instead of a path: the caller reached this process over HTTP with a key
@@ -681,7 +685,7 @@ func (m *Manager) recordMeta(name string, fn mcp.ToolHandler) mcp.ToolHandler {
 		if recErr == nil && res != nil && res.IsError {
 			recErr = errors.New(resultMessage(res))
 		}
-		if m.Stats != nil {
+		if m.Stats != nil && !stats.ServiceCall(ctx) {
 			m.Stats.Record(labelOf(ctx, req), "mcprig", name, time.Since(start), recErr)
 		}
 		return res, err
@@ -746,9 +750,11 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 				Enabled:     srv.Enabled,
 				Healthy:     healthy,
 				Unknown:     unknown,
-				Error:       errText,
-				Tags:        srv.Tags,
-				Isolation:   e.isolationNote(),
+				// Текст пробы и заметка об изоляции повторяют ключ апстрима
+				// так же охотно, как ответ вызова: наружу — только маска.
+				Error:     config.ScrubSecrets(errText, e.secrets),
+				Tags:      srv.Tags,
+				Isolation: config.ScrubSecrets(e.isolationNote(), e.secrets),
 			}
 		}()
 	}
@@ -1007,6 +1013,10 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	}); err != nil {
 		return errResult(err)
 	}
+	// Схемы сужает тот же профиль, что каталог: скрытое от ключа в
+	// list_commands имя не должно возвращаться здесь своей схемой.
+	profileName, profile := callerProfile(ctx, m.config())
+	tools = profileTools(profileName, profile, in.Server, tools)
 	byName := make(map[string]*mcp.Tool, len(tools))
 	for _, tool := range tools {
 		byName[tool.Name] = tool
@@ -1104,6 +1114,16 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 
 	callCtx, cancel := m.callCtx(ctx)
 	defer cancel()
+	// Тот же слот, что у invoke_many: без него один клиент держит у апстрима
+	// столько одновременных вызовов, сколько пришлёт, и топит его вместе с
+	// соседями. Ожидание уважает ctx: отмена и таймаут не ждут очереди молча.
+	slot := m.slots.get(srv.Name)
+	select {
+	case slot <- struct{}{}:
+		defer func() { <-slot }()
+	case <-callCtx.Done():
+		return errResult(fmt.Errorf("нет свободного слота для %s/%s: %w", srv.Name, in.CommandName, callCtx.Err()))
+	}
 	res, err := m.callWithRetry(callCtx, labelOf(ctx, req), e, in.CommandName, args)
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {
@@ -1151,7 +1171,7 @@ func (m *Manager) callWithRetry(ctx context.Context, label string, e *entry, nam
 	if recErr == nil && res != nil && res.IsError {
 		recErr = errors.New(resultMessage(res))
 	}
-	if m.Stats != nil && (err == nil || res != nil) {
+	if m.Stats != nil && !stats.ServiceCall(ctx) && (err == nil || res != nil) {
 		m.Stats.Record(label, e.server().Name, name, time.Since(start), recErr)
 	}
 	return res, err

@@ -235,6 +235,30 @@ func profileCommands(name string, profile *config.Profile, cmds []commandInfo) [
 	return out
 }
 
+// profileTools keeps only the tools the caller's profile allows, under the same
+// rule as profileCommands: describe_commands must not hand out a schema for a
+// tool the catalog already hides from this key.
+func profileTools(name string, profile *config.Profile, server string, tools []*mcp.Tool) []*mcp.Tool {
+	if name == "" {
+		return tools
+	}
+	cmds := make([]commandInfo, 0, len(tools))
+	for _, t := range tools {
+		cmds = append(cmds, commandInfo{Server: server, Name: t.Name})
+	}
+	kept := make(map[string]bool, len(cmds))
+	for _, c := range profileCommands(name, profile, cmds) {
+		kept[c.Name] = true
+	}
+	out := make([]*mcp.Tool, 0, len(kept))
+	for _, t := range tools {
+		if kept[t.Name] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 // filterCommands keeps names carrying prefix; filtering happens on the way out
 // so the tool cache and the traversal stay untouched. Empty prefix keeps all.
 func filterCommands(cmds []commandInfo, prefix string, namesOnly bool) any {

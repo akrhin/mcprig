@@ -196,6 +196,47 @@ func TestProfileDeniesInvoke(t *testing.T) {
 	}
 }
 
+// describe_commands подчиняется профилю так же, как list_commands: схема
+// скрытого инструмента не отдаётся, разрешённые остаются, ключ без профиля
+// получает всё.
+func TestProfileFiltersDescribeCommands(t *testing.T) {
+	m := profileManager(t, map[string]*config.Profile{
+		"reader": {Deny: []string{"danger-*"}},
+	}, nil)
+
+	res, err := m.describeCommands(keyCtx(), toolReq("describe_commands",
+		`{"server":"alpha","command_names":["danger-zone","echo"]}`))
+	if err != nil {
+		t.Fatalf("describeCommands: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("describe_commands вернул ошибку: %s", resultText(t, res))
+	}
+	var out describeOut
+	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
+		t.Fatalf("разбор схем: %v", err)
+	}
+	if len(out.Commands) != 1 || out.Commands[0].Name != "echo" {
+		t.Fatalf("профиль отдал не те схемы: %+v", out.Commands)
+	}
+	if len(out.Missing) != 1 || out.Missing[0] != "danger-zone" {
+		t.Fatalf("запрещённая схема не спрятана: %+v", out.Missing)
+	}
+
+	res, err = m.describeCommands(context.Background(), toolReq("describe_commands",
+		`{"server":"alpha","command_names":["danger-zone","echo"]}`))
+	if err != nil {
+		t.Fatalf("describeCommands без профиля: %v", err)
+	}
+	out = describeOut{}
+	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
+		t.Fatalf("разбор схем: %v", err)
+	}
+	if len(out.Commands) != 2 {
+		t.Fatalf("ключ без профиля потерял схемы: %+v", out)
+	}
+}
+
 // Профиль подписанного ключа работает: ключ ищется по отпечатку, подпись
 // (clientNames) на него не влияет.
 func TestProfileWorksForSignedKey(t *testing.T) {

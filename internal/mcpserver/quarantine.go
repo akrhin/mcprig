@@ -7,7 +7,10 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"time"
 
@@ -28,9 +31,11 @@ func (m *Manager) observe(e *entry, tools []*mcp.Tool) {
 	m.lockMu.Lock()
 	defer m.lockMu.Unlock()
 	now := time.Now().UTC().Format(time.RFC3339)
-	// Ошибка записи не рушит каталог: в памяти дескрипторов больше, чем в
-	// файле, а вызов без файла не проверяется — как и до карантина.
-	_ = toollock.Update(m.LockPath, func(f *toollock.File) bool {
+	// Ошибка записи не рушит каталог, но и не проходит молча: пока файл не
+	// записан, карантин не знает, что одобрено, и вызовы не идут (quarantine).
+	// Запись пытается каждый следующий обход каталога: восстановленный файл
+	// снимает запрет без перезапуска.
+	err := toollock.Update(m.LockPath, func(f *toollock.File) bool {
 		dirty := false
 		for _, t := range tools {
 			key := toollock.Key(name, t.Name)
@@ -55,18 +60,39 @@ func (m *Manager) observe(e *entry, tools []*mcp.Tool) {
 		}
 		return dirty
 	})
+	if err != nil {
+		slog.Error("карантин: tools.lock.json не записан — вызовы отклоняются", "path", m.LockPath, "server", name, "err", err)
+	}
+	m.lockErr = err
 }
 
 // quarantine refuses a call whose tool descriptor no longer matches the
 // approved hash. The descriptor comes from the server catalog; see toolForCall.
+//
+// Неизвестное состояние — отказ: файл, который не читается или не записался,
+// не даёт отличить одобренный дескриптор от подменённого, а «наверное, всё в
+// порядке» здесь означает обход карантина. Отсутствующий файл — не ошибка: у
+// нового набора ещё нет записей, и первое появление одобряется само.
 func (m *Manager) quarantine(serverName string, tool *mcp.Tool) (string, bool) {
 	if m.LockPath == "" {
 		return "", false
 	}
+	m.lockMu.Lock()
+	writeErr := m.lockErr
+	m.lockMu.Unlock()
 	// Файл читается на каждый вызов: он мал (запись на инструмент), а вызов
 	// идёт в сеть за десятки миллисекунд. shortcut: кэш по mtime/size — если
 	// файл начнёт измеряться сотнями записей.
-	approved, ok := toollock.Read(m.LockPath).Tools[toollock.Key(serverName, tool.Name)]
+	f, err := toollock.ReadFile(m.LockPath)
+	switch {
+	case err != nil && !errors.Is(err, fs.ErrNotExist):
+		slog.Error("карантин: tools.lock.json не прочитан — вызов отклонён", "path", m.LockPath, "err", err)
+		return lockFailureMessage(serverName, tool.Name, "файл одобрений не прочитан", err), true
+	case writeErr != nil:
+		// Причина уже в логе (observe); повтор на каждый вызов только засорил бы его.
+		return lockFailureMessage(serverName, tool.Name, "файл одобрений не записан", writeErr), true
+	}
+	approved, ok := f.Tools[toollock.Key(serverName, tool.Name)]
 	if !ok {
 		return "", false
 	}
@@ -149,4 +175,10 @@ func quarantineResult(message string) *mcp.CallToolResult {
 
 func quarantineMessage(server, tool, approved, now string) string {
 	return toollock.Message(server, tool, approved, now, os.Getenv("MCPRIG_SET"))
+}
+
+// lockFailureMessage — отказ при неведомом состоянии карантина: он называет
+// причину, чтобы человек мог починить файл, а не искать её в логе прокси.
+func lockFailureMessage(server, tool, what string, err error) string {
+	return fmt.Sprintf("🚫 Карантин неизвестен: %s (%v) — вызов %s/%s отклонён", what, err, server, tool)
 }
