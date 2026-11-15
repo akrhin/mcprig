@@ -32,7 +32,7 @@ bwrap, какие дефекты эталона было решено не пе�
 | документ | дата | статус |
 | --- | --- | --- |
 | [proposals/0001-route-hook.md](proposals/0001-route-hook.md) | 2026-11-09 | предложение: хук маршрута «MCP теперь за mcprig» и очередь улучшений; реализовано частично (плагин `mcprig-route.ts`) |
-| [proposals/0002-proxy-improvements.md](proposals/0002-proxy-improvements.md) | 2026-11-15 | в работе: слой 0 закрыт (`0e65538`), T1+T5 (`9b28b41`), T4+T6 (`b61cdd8`), T2+C (`64f1711`), T3 в дереве; дальше ставки A–F |
+| [proposals/0002-proxy-improvements.md](proposals/0002-proxy-improvements.md) | 2026-11-15 | выполнено: слой 0 (`0e65538`), T1+T5 (`9b28b41`), T4+T6 (`b61cdd8`), T2+C (`64f1711`), T3 (`c4a7632`), A (`70a0783`), B+D+E (`c108d7d`), F (`5a99874`); follow-up — UI для permissions/rateLimit/profiles |
 
 ## Аудиты
 
