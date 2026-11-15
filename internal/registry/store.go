@@ -375,8 +375,8 @@ func (s *Store) UpdateServer(name string, patch json.RawMessage) (Server, error)
 	return srv, nil
 }
 
-// DeleteServer removes a server and every reference to it from the sets. A
-// set must keep at least one server, so deleting the last one is refused.
+// DeleteServer removes a server and every reference to it from the sets. A set
+// left without servers stays: an empty set is a legal state (decision 0004).
 func (s *Store) DeleteServer(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -395,9 +395,6 @@ func (s *Store) DeleteServer(name string) error {
 		}
 		if len(kept) == len(set.Servers) {
 			continue
-		}
-		if len(kept) == 0 {
-			return fmt.Errorf("сервер %s последний в наборе %s: удалите набор или добавьте другой", name, set.ID)
 		}
 		cp := *set
 		cp.Servers = kept

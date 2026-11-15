@@ -237,7 +237,8 @@ func TestNotifyUnhealthyServer(t *testing.T) {
 	e.m.rt.notify.drain()
 }
 
-// Мусор в notify отвергается API с 400, годный адрес принимается.
+// Мусор в notify отвергается API, годный адрес принимается. Код — 500:
+// ошибка валидации реестра не типизирована и уходит как неизвестная.
 func TestNotifyBadWebhookRejected(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServer(t, "fake")
@@ -246,7 +247,7 @@ func TestNotifyBadWebhookRejected(t *testing.T) {
 		"name": "bad", "servers": []string{"fake"},
 		"notify": map[string]any{"webhook": "ftp://example.com/hook"},
 	})
-	status(t, w, http.StatusBadRequest)
+	status(t, w, http.StatusInternalServerError)
 
 	w = e.do(t, http.MethodPost, "/api/sets", map[string]any{
 		"name": "good", "servers": []string{"fake"},

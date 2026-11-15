@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/akrhin/mcprig/internal/config"
 )
@@ -478,11 +479,17 @@ func (s *Secrets) deleteDefault(name string) (bool, string, error) {
 	return source != "", source, nil
 }
 
+// truncate cuts at the last rune that fits, so a multi-byte character is never
+// split in half (the panel renders these strings as UTF-8 JSON).
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return s[:n] + "…"
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
 }
 
 func envOr(v, def string) string {

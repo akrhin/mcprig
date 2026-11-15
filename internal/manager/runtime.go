@@ -148,6 +148,17 @@ func (rt *Runtime) ring(id string) *ring {
 	return r
 }
 
+// conflictErr — отказ по состоянию набора, а не по кривому запросу: порт
+// занят, набор не поднялся, нет активного ключа, не разрешилась ${VAR}.
+// fail отвечает на неё 409 и прежним текстом, чтобы панель читала причину.
+type conflictErr struct{ msg string }
+
+func (e *conflictErr) Error() string { return e.msg }
+
+func conflictf(format string, args ...any) error {
+	return &conflictErr{msg: fmt.Sprintf(format, args...)}
+}
+
 // Start поднимает набор, если он ещё не работает. Явный старт начинает бюджет
 // перезапусков заново.
 func (rt *Runtime) Start(ctx context.Context, set *registry.Set, servers []registry.Server) (RuntimeStatus, error) {
@@ -182,7 +193,16 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		return rt.status(set), nil
 	}
 	if !registry.CanServe(set) {
-		return RuntimeStatus{}, fmt.Errorf("у набора %s нет активного ключа — выдайте новый", set.ID)
+		return RuntimeStatus{}, conflictf("у набора %s нет активного ключа — выдайте новый", set.ID)
+	}
+	// Неразрешённая ${VAR} не выпадает молча: с неполным окружением набор
+	// упал бы позже, в своём логе, а причина — здесь и в статусе запуска.
+	if missing := unresolvedEnvRefs(setServers(set, servers), rt.sec); len(missing) > 0 {
+		msg := "переменная " + strings.Join(missing, ", ") + ": источник не найден (OpenBao, env.json, окружение)"
+		if re := rt.sec.RemoteError(); re != "" {
+			msg += " — " + re
+		}
+		return RuntimeStatus{}, &conflictErr{msg: msg + "; набор " + set.ID + " не запущен"}
 	}
 	if err := portFree(listenHost(rt.bindIP), set.Port); err != nil {
 		return RuntimeStatus{}, err
@@ -257,7 +277,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		rt.mu.Unlock()
 		killGroup(p.pid, syscall.SIGKILL)
 		<-p.done
-		return RuntimeStatus{}, fmt.Errorf("набор %s не поднялся: порт %d не слушает", set.ID, set.Port)
+		return RuntimeStatus{}, conflictf("набор %s не поднялся: порт %d не слушает", set.ID, set.Port)
 	}
 	_ = ctx
 	// Набор поднялся: следующий обрыв — новый переход и новое событие.
@@ -771,6 +791,25 @@ func childEnv(servers []registry.Server, sec *Secrets) []string {
 	return out
 }
 
+// unresolvedEnvRefs — переменные набора, которых нет ни в одном источнике.
+// Пустое значение с известным источником (env.json, окружение) законно:
+// переменную объявили намеренно пустой. Отсутствие — нет: набор получил бы
+// неполное окружение и упал позже, в своём логе. Синтаксиса ${VAR:-дефолт}
+// раскрыватель не знает (envRefRe), поэтому дефолтов здесь тоже нет.
+func unresolvedEnvRefs(servers []registry.Server, sec *Secrets) []string {
+	if sec == nil {
+		return nil
+	}
+	names := envRefs(servers)
+	missing := []string{}
+	for i, v := range sec.Resolve(names) {
+		if v.source == "" {
+			missing = append(missing, names[i])
+		}
+	}
+	return missing
+}
+
 // setEnv — окружение процесса набора: переменные серверов, свой ID и свой
 // каталог состояния (лог и servers.json уже лежат в нём).
 func (rt *Runtime) setEnv(set *registry.Set, servers []registry.Server) []string {
@@ -805,7 +844,7 @@ func listenHost(bindIP string) string {
 func portFree(host string, port int) error {
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
-		return fmt.Errorf("порт %d занят другим процессом — выберите другой порт", port)
+		return &conflictErr{msg: fmt.Sprintf("порт %d занят другим процессом — выберите другой порт", port)}
 	}
 	return ln.Close()
 }

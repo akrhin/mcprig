@@ -663,25 +663,24 @@ func serverError(msg string) error {
 }
 
 func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
-	status, msg := http.StatusBadRequest, "запрос не разобран"
+	// Неизвестная ошибка — не «кривой запрос»: 400 с её текстом отдавал
+	// клиенту внутренности, а в лог не писал ничего.
+	status, msg := http.StatusInternalServerError, "внутренняя ошибка, подробности в логе"
 	var he *httpError
+	var ce *conflictErr
 	var pathErr *fs.PathError
 	switch {
 	case errors.As(err, &he):
 		status, msg = he.status, he.msg
 	case errors.Is(err, errBrowseGone):
 		status, msg = http.StatusNotFound, errBrowseGone.Error()
+	case errors.As(err, &ce):
+		status, msg = http.StatusConflict, ce.msg
 	case errors.As(err, &pathErr):
 		status, msg = http.StatusInternalServerError, "внутренняя ошибка — повторите; если повторяется, смотрите лог панели"
-	default:
-		msg = "запрос не разобран: " + err.Error()
 	}
 	if status >= 500 {
 		m.log.Error("ошибка API", "method", r.Method, "path", r.URL.Path, "status", status, "err", err)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(status)
-		json.NewEncoder(w).Encode(map[string]string{"error": msg})
-		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -883,6 +882,8 @@ func (m *Manager) apiState(req *request) error {
 		"servers":   serversOrEmpty(m.store.Servers()),
 		"sets":      m.setViews(),
 		"firstPort": registry.FirstPort,
+		// версия бинаря: панель печатает её в статусбаре
+		"version": m.version,
 	})
 	return nil
 }
@@ -1290,13 +1291,10 @@ func (m *Manager) apiServerDelete(req *request) error {
 	if m.store.Server(name) == nil {
 		return notFound("сервер " + name + " не найден")
 	}
-	// Сначала снимок наборов и запись в реестр: отказ (последний сервер
-	// набора) не должен оставлять наборы остановленными при живом сервере.
+	// Набор без последнего сервера остаётся жить с пустым составом, поэтому
+	// отказа здесь нет: удаление либо проходит, либо падает на записи реестра.
 	sets := m.setsUsing(name)
 	if err := m.store.DeleteServer(name); err != nil {
-		if strings.Contains(err.Error(), "последний в наборе") {
-			return badRequest(err.Error())
-		}
 		return err
 	}
 	stopped := m.stopSets(sets)
@@ -1517,10 +1515,7 @@ func (m *Manager) apiSetDelete(req *request) error {
 func (m *Manager) startSet(ctx context.Context, set *registry.Set) (RuntimeStatus, error) {
 	status, err := m.rt.Start(ctx, set, m.store.Servers())
 	if err != nil {
-		if strings.Contains(err.Error(), "нет активного ключа") {
-			return status, conflict(err.Error())
-		}
-		return status, serverError(err.Error())
+		return status, err
 	}
 	m.health.clear(set.ID)
 	return status, nil
@@ -1529,10 +1524,7 @@ func (m *Manager) startSet(ctx context.Context, set *registry.Set) (RuntimeStatu
 func (m *Manager) RestartSet(ctx context.Context, set *registry.Set) (RuntimeStatus, error) {
 	status, err := m.rt.Restart(ctx, set, m.store.Servers())
 	if err != nil {
-		if strings.Contains(err.Error(), "нет активного ключа") {
-			return status, conflict(err.Error())
-		}
-		return status, serverError(err.Error())
+		return status, err
 	}
 	m.health.clear(set.ID)
 	return status, nil
@@ -1603,7 +1595,7 @@ func (m *Manager) apiSetServers(req *request) error {
 	if !status.Running {
 		servers := make([]serverHealth, 0, len(names))
 		for _, name := range names {
-			servers = append(servers, serverHealth{Name: name, Error: "набор не запущен — нажмите «Запустить»"})
+			servers = append(servers, serverHealth{Name: name, Error: "набор " + id + " не запущен — нажмите «Запустить»"})
 		}
 		writeJSON(req.w, http.StatusOK, setHealth{Running: false, Servers: servers})
 		return nil

@@ -21,6 +21,9 @@ const (
 	callsMaxLimit     = 500
 	callsTimeout      = 2 * time.Second
 	callsConcurrency  = 4
+	// callsTailDepth — сколько строк истории читается с диска у остановленного
+	// набора: столько же отдаёт кольцо /stats запущенного.
+	callsTailDepth = 512
 )
 
 // callRow — одна строка хвоста для панели. Error всегда в теле, даже пустой:
@@ -61,8 +64,9 @@ type callsResponse struct {
 }
 
 // apiCalls собирает /stats запущенных наборов в один ответ панели.
-// Остановленный набор — пустые массивы, недоступный — только в unreachable:
-// текст ошибки чужого набора клиенту панели не уходит.
+// Остановленный набор отдаёт свой журнал с диска: без каталога истории — пустые
+// массивы, недоступный — только в unreachable: текст ошибки чужого набора
+// клиенту панели не уходит.
 func (m *Manager) apiCalls(req *request) error {
 	q := req.r.URL.Query()
 	limit := callsLimit(q.Get("limit"))
@@ -75,7 +79,7 @@ func (m *Manager) apiCalls(req *request) error {
 
 	type target struct {
 		set  *registry.Set
-		port int
+		port int // 0 — набор остановлен, читаем историю с диска
 	}
 	targets := []target{}
 	if id != "" {
@@ -83,14 +87,12 @@ func (m *Manager) apiCalls(req *request) error {
 		if set == nil {
 			return &httpError{http.StatusNotFound, "набор не найден"}
 		}
-		if port, running := m.runningPort(set); running {
-			targets = append(targets, target{set, port})
-		}
+		port, _ := m.runningPort(set)
+		targets = append(targets, target{set, port})
 	} else {
 		for _, set := range m.store.Sets() {
-			if port, running := m.runningPort(set); running {
-				targets = append(targets, target{set, port})
-			}
+			port, _ := m.runningPort(set)
+			targets = append(targets, target{set, port})
 		}
 	}
 
@@ -106,6 +108,23 @@ func (m *Manager) apiCalls(req *request) error {
 			defer wg.Done()
 			slots <- struct{}{}
 			defer func() { <-slots }()
+			if t.port == 0 {
+				// Остановленный набор: читаем его журнал. Журнала нет — пусто,
+				// и в unreachable набор не идёт: это не недоступность.
+				snaps[i].Tail, snaps[i].Counters = stats.TailFromDir(m.statsDir(t.set.ID), callsTailDepth)
+				// Открытый набор живёт без ключа, поэтому живой /stats отдаёт
+				// редакцию сам; журнал на диске — нет, редактируем здесь.
+				if t.set.Token == "" {
+					for j := range snaps[i].Tail {
+						snaps[i].Tail[j].Client = stats.AnonymousLabel
+						snaps[i].Tail[j].Message = ""
+					}
+					for j := range snaps[i].Counters {
+						snaps[i].Counters[j].Client = stats.AnonymousLabel
+					}
+				}
+				return
+			}
 			snaps[i], errs[i] = m.fetchSetStats(req.r.Context(), t.set, t.port)
 		}(i, t)
 	}

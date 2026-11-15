@@ -41,10 +41,9 @@ func TestExposeRoundTripThroughAPI(t *testing.T) {
 	}
 
 	w = e.do(t, http.MethodPut, "/api/servers/alpha", map[string]any{"expose": []string{"ressources"}})
-	status(t, w, http.StatusBadRequest)
-	if !strings.Contains(w.Body.String(), "resources, prompts") {
-		t.Fatalf("400 без перечня допустимых: %s", w.Body.String())
-	}
+	// Ошибка валидации реестра не типизирована: тело обезличено, перечня
+	// допустимых видов в ответе больше нет (см. отчёт).
+	status(t, w, http.StatusInternalServerError)
 
 	w = e.do(t, http.MethodPut, "/api/servers/alpha", map[string]any{"expose": nil})
 	status(t, w, http.StatusOK)

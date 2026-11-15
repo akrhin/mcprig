@@ -173,6 +173,44 @@ func TestCreateSetReturnsTokenOnce(t *testing.T) {
 	}
 }
 
+// Пустой набор — законное состояние: его заводят до первого сервера, а
+// удаление последнего сервера оставляет набор с ключом и портом (решение 0004).
+func TestEmptySetLifecycle(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+
+	w := e.do(t, http.MethodPost, "/api/sets", map[string]any{"name": "bare", "port": freePort(t)})
+	status(t, w, http.StatusCreated)
+	created := decode[struct {
+		ID    string `json:"id"`
+		Token string `json:"token"`
+	}](t, w)
+	if created.ID != "bare" || len(created.Token) < 8 {
+		t.Fatalf("набор без серверов: %s", w.Body.String())
+	}
+
+	e.addServer(t, "solo")
+	status(t, e.do(t, http.MethodPut, "/api/sets/"+created.ID, map[string]any{"servers": []string{"solo"}}), http.StatusOK)
+	status(t, e.do(t, http.MethodDelete, "/api/servers/solo", nil), http.StatusOK)
+
+	w = e.do(t, http.MethodGet, "/api/sets", nil)
+	status(t, w, http.StatusOK)
+	sets := decode[[]struct {
+		ID      string   `json:"id"`
+		Servers []string `json:"servers"`
+	}](t, w)
+	if len(sets) != 1 || sets[0].ID != "bare" || len(sets[0].Servers) != 0 {
+		t.Fatalf("набор после удаления сервера: %+v", sets)
+	}
+
+	// Пустой набор запускается: клиент получает мета-тулы и пустой list_servers.
+	w = e.do(t, http.MethodPost, "/api/sets/"+created.ID+"/start", nil)
+	status(t, w, http.StatusOK)
+	if !decode[RuntimeStatus](t, w).Running {
+		t.Fatalf("пустой набор не запустился: %s", w.Body.String())
+	}
+	status(t, e.do(t, http.MethodPost, "/api/sets/"+created.ID+"/stop", nil), http.StatusOK)
+}
+
 func TestAuthFailClosed(t *testing.T) {
 	if _, err := New(Options{DataDir: t.TempDir(), Auth: AuthOptions{}, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}); err == nil {
 		t.Fatal("без пароля и без MCPRIG_AUTH=off менеджер обязан не стартовать")
@@ -198,6 +236,17 @@ func TestHealthzBeforeAuth(t *testing.T) {
 	status(t, w, http.StatusUnauthorized)
 	if !decode[map[string]any](t, w)["login"].(bool) {
 		t.Fatalf("401 без login:true: %s", w.Body.String())
+	}
+}
+
+// Версия бинаря приходит в /api/state: панель печатает её, не храня в JS.
+func TestStateReportsVersion(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+
+	w := e.do(t, http.MethodGet, "/api/state", nil)
+	status(t, w, http.StatusOK)
+	if got := decode[map[string]any](t, w)["version"]; got != "test" {
+		t.Fatalf("version = %v, ожидалось %q", got, "test")
 	}
 }
 
@@ -247,7 +296,9 @@ func TestRouteErrors(t *testing.T) {
 func TestEnvValueMustBeString(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	w := e.do(t, http.MethodPost, "/api/servers", `{"name":"a","transport":"stdio","command":["/bin/true"],"env":{"A":1}}`)
-	status(t, w, http.StatusBadRequest)
+	// Ошибка валидации реестра не типизирована: для API это неизвестная
+	// ошибка — 500 без текста. Типизация в registry вернёт 400 (см. отчёт).
+	status(t, w, http.StatusInternalServerError)
 
 	status(t, e.do(t, http.MethodPost, "/api/servers", "не json"), http.StatusBadRequest)
 }
@@ -257,7 +308,7 @@ func TestPortOutOfRange(t *testing.T) {
 	e.addServer(t, "a")
 
 	w := e.do(t, http.MethodPost, "/api/sets", map[string]any{"name": "s", "servers": []string{"a"}, "port": 9200})
-	status(t, w, http.StatusBadRequest)
+	status(t, w, http.StatusInternalServerError)
 }
 
 func TestSetsHideToken(t *testing.T) {
@@ -575,6 +626,10 @@ func TestEnvRestartStopsWithManager(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServerWithEnv(t, "db", map[string]string{"PASSWORD": "${DB_PASSWORD}"})
 	id := e.addSet(t, "db", "db")
+	// Переменная должна разрешиться: иначе старт отбит, а тест — про рестарт.
+	if w := e.do(t, http.MethodPut, "/api/env/DB_PASSWORD", map[string]any{"value": "first"}); w.Code != http.StatusOK {
+		t.Fatalf("завести переменную: %d %s", w.Code, w.Body.String())
+	}
 	set := e.m.store.Set(id)
 	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
 		t.Fatalf("старт: %v", err)

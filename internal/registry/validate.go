@@ -361,9 +361,6 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		if err := json.Unmarshal(raw, &names); err != nil {
 			return nil, errors.New("servers: ожидался массив имён")
 		}
-		if len(names) == 0 {
-			return nil, errors.New("в наборе должен быть хотя бы один сервер")
-		}
 		var missing []string
 		for _, name := range names {
 			if s.serverLocked(name) == nil {
@@ -375,8 +372,11 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		}
 		out.Servers = names
 	}
-	if len(out.Servers) == 0 {
-		return nil, errors.New("в наборе должен быть хотя бы один сервер")
+	// Пустой состав — законное состояние набора (решение 0004): ключ и порт
+	// живут отдельно. nil здесь значит "без серверов", а не "не менять": выше
+	// правка со старым составом уже скопирована из cur.
+	if out.Servers == nil {
+		out.Servers = []string{}
 	}
 
 	explicitPort := false
