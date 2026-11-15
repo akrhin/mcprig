@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -289,6 +290,13 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// SIGHUP перечитывает servers.json на живом процессе: супервизор правит
+	// один сервер и не рвёт набор целиком.
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
+	go reloadLoop(ctx, hup, mgr, *cfgPath, log)
+
 	// Выгрузки усечённых ответов чистятся при старте и дальше периодически.
 	startToolout(ctx, log)
 
@@ -305,6 +313,128 @@ func run() error {
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdown)
+}
+
+// reloadLoop перечитывает servers.json по SIGHUP, пока процесс жив.
+func reloadLoop(ctx context.Context, hup <-chan os.Signal, mgr *mcpserver.Manager, cfgPath string, log *slog.Logger) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-hup:
+		}
+		res := reloadOnce(mgr, cfgPath, log)
+		added, updated, removed, reset := countApplied(res.Applied)
+		log.Info(fmt.Sprintf("reload: применено %d, изменено %d, удалено %d, generation %d",
+			len(res.Applied), updated+reset, removed, res.Generation),
+			"added", added, "updated", updated, "reset", reset, "removed", removed,
+			"restartNeeded", res.RestartNeeded, "err", res.Err)
+	}
+}
+
+// reloadOnce делает одну попытку и пишет ack супервизору. Битый конфиг не
+// роняет набор: прежний конфиг продолжает работать, ошибка уходит в status.
+func reloadOnce(mgr *mcpserver.Manager, cfgPath string, log *slog.Logger) mcpserver.ReloadResult {
+	dir := filepath.Dir(cfgPath)
+	// Метку читаем до работы: пока грузится конфиг, супервизор может начать
+	// следующую попытку, и её nonce не должен достаться нашему ответу.
+	nonce := readReloadNonce(dir)
+	cfg, err := config.Load(cfgPath)
+	var res mcpserver.ReloadResult
+	if err != nil {
+		res = mgr.ReloadFailed(err)
+	} else {
+		res = mgr.Reload(cfg)
+	}
+	if werr := writeReloadStatus(filepath.Join(dir, "reload.status"), res, nonce); werr != nil {
+		log.Warn("reload.status не записан", "err", werr)
+	}
+	return res
+}
+
+// readReloadNonce берёт метку попытки, которую супервизор положил рядом с
+// конфигом до SIGHUP: ack несёт её, и ответ прошлой попытки не сойдёт за новый.
+func readReloadNonce(dir string) string {
+	body, err := os.ReadFile(filepath.Join(dir, "reload.request"))
+	if err != nil {
+		return ""
+	}
+	var req struct {
+		Nonce string `json:"nonce"`
+	}
+	if json.Unmarshal(body, &req) != nil {
+		return ""
+	}
+	return req.Nonce
+}
+
+// countApplied считает записи вида "added:name".
+func countApplied(applied []string) (added, updated, removed, reset int) {
+	for _, item := range applied {
+		switch {
+		case strings.HasPrefix(item, "added:"):
+			added++
+		case strings.HasPrefix(item, "updated:"):
+			updated++
+		case strings.HasPrefix(item, "removed:"):
+			removed++
+		case strings.HasPrefix(item, "reset:"):
+			reset++
+		}
+	}
+	return added, updated, removed, reset
+}
+
+// reloadStatus — единственный ack для супервизора: HTTP для этого не заводим.
+type reloadStatus struct {
+	// Nonce повторяет reload.request: ответ относится ровно к этой попытке.
+	Nonce         string   `json:"nonce,omitempty"`
+	Generation    int      `json:"generation"`
+	At            string   `json:"at"`
+	Applied       []string `json:"applied"`
+	RestartNeeded []string `json:"restartNeeded"`
+	Error         string   `json:"error"`
+}
+
+// writeReloadStatus пишет status атомарно (временный файл + rename), чтобы
+// супервизор не прочитал половину: старый файл остаётся до удачного rename.
+func writeReloadStatus(path string, res mcpserver.ReloadResult, nonce string) error {
+	st := reloadStatus{
+		Nonce:         nonce,
+		Generation:    res.Generation,
+		At:            time.Now().Format(time.RFC3339),
+		Applied:       res.Applied,
+		RestartNeeded: res.RestartNeeded,
+		Error:         res.Err,
+	}
+	if st.Applied == nil {
+		st.Applied = []string{}
+	}
+	if st.RestartNeeded == nil {
+		st.RestartNeeded = []string{}
+	}
+	body, err := json.Marshal(st)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".reload.status-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(body); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func defaultConfigPath() string {

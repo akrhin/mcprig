@@ -22,27 +22,35 @@ func denyReason(global, server *config.Permissions, serverName, command string) 
 // key is found by its fingerprint, not by the display label: a label is a note
 // the owner or the client chose. An empty name means no key (open set, stdio)
 // or a key without a profile, which is unrestricted by profile.
-func (m *Manager) callerProfile(ctx context.Context) (string, *config.Profile) {
+//
+// cfg is the caller's snapshot: a reload between two reads could otherwise
+// answer with one generation's token table and another's profiles.
+func callerProfile(ctx context.Context, cfg *config.Config) (string, *config.Profile) {
 	fp := stats.ClientKey(ctx)
-	if fp == "" || m.cfg.Transport == nil {
+	if fp == "" || cfg.Transport == nil {
 		return "", nil
 	}
-	name := m.cfg.Transport.KeyProfiles[fp]
+	name := cfg.Transport.KeyProfiles[fp]
 	if name == "" {
 		return "", nil
 	}
-	return name, m.cfg.Profiles[name]
+	return name, cfg.Profiles[name]
 }
 
 // gate applies permissions first, then the caller's profile: a profile narrows
 // what permissions allowed and never widens it, so a denied call keeps the
 // permissions message. A name without a matching block denies everything —
 // deleting a profile must not silently widen a key that still refers to it.
+//
+// Одно решение читает один снимок конфига: глобальные правила и профиль идут
+// из него, серверное правило — из снимка самой записи (perms). Два чтения
+// m.config() давали окно, где решение смешивало два поколения.
 func (m *Manager) gate(ctx context.Context, serverName, command string, perms *config.Permissions) (string, bool) {
-	if message, denied := denyReason(m.cfg.Permissions, perms, serverName, command); denied {
+	cfg := m.config()
+	if message, denied := denyReason(cfg.Permissions, perms, serverName, command); denied {
 		return message, true
 	}
-	name, profile := m.callerProfile(ctx)
+	name, profile := callerProfile(ctx, cfg)
 	if name == "" {
 		return "", false
 	}

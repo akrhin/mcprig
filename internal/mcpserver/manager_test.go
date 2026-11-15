@@ -955,7 +955,7 @@ func TestStatsSkipUnknownTool(t *testing.T) {
 
 // Деградация песочницы должна быть видна в list_servers, а не только в логе.
 func TestIsolationNote(t *testing.T) {
-	boxed := &entry{srv: &config.Server{Sandbox: &config.Sandbox{Mode: config.SandboxModeBwrap}}}
+	boxed := newEntry(&config.Server{Sandbox: &config.Sandbox{Mode: config.SandboxModeBwrap}})
 	if got := boxed.isolationNote(); got != "bwrap" {
 		t.Fatalf("изоляция: %q", got)
 	}
@@ -965,7 +965,7 @@ func TestIsolationNote(t *testing.T) {
 	if got := boxed.isolationNote(); !strings.HasPrefix(got, "без изоляции: ") {
 		t.Fatalf("деградация не помечена: %q", got)
 	}
-	if got := (&entry{srv: &config.Server{}}).isolationNote(); got != "" {
+	if got := newEntry(&config.Server{}).isolationNote(); got != "" {
 		t.Fatalf("сервер без песочницы помечен: %q", got)
 	}
 }
@@ -989,7 +989,7 @@ func TestIsolationNoteRejectedConfig(t *testing.T) {
 		if srv.ConfigError == "" {
 			t.Fatalf("%s: конфиг не отвергнут", srv.Name)
 		}
-		if got := (&entry{srv: srv}).isolationNote(); got != "нет: конфиг отвергнут" {
+		if got := newEntry(srv).isolationNote(); got != "нет: конфиг отвергнут" {
 			t.Fatalf("%s: isolation %q обещает изоляцию отвергнутому серверу", srv.Name, got)
 		}
 	}

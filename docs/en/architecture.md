@@ -54,6 +54,37 @@ Restart policy:
 Logs are appended to `sets/<id>/mcprig.log`, rotate to `.log.1` at 5 MiB, and
 the last 2000 lines are kept in memory for `GET /api/sets/<id>/logs`.
 
+## Reload without a restart
+
+`SIGHUP` to a set's `serve` process makes it reread `servers.json` and answer in
+`reload.status` beside the file:
+`{"nonce":"…","generation":N,"at":"RFC3339","applied":[…],"restartNeeded":[…],"error":"…"}`,
+written atomically (`0600`), the generation growing on every attempt — that file
+is the only acknowledgement, there is no HTTP route on the process. The signal
+goes to the `serve` process alone, not to its process group: stdio children have
+no `SIGHUP` handler and must survive an edit of their neighbour. The supervisor
+puts a random `nonce` into `reload.request` before the signal and accepts only an
+ack carrying it, so a late answer to an earlier attempt is never taken for this
+one; a restart removes both files, so the new process starts counting from 1.
+
+What one reload applies:
+
+| change | what happens |
+| --- | --- |
+| server added | record added, nothing connects until its first call |
+| server removed | session closed, tool cache dropped |
+| `command`, `args`, `cwd`, `url`, `headers`, `env`, `envAllow`, `oauth`, `sandbox` | that server's session is closed and reopens with the new fields on the next call; a call in flight to it fails instead of being drained |
+| `permissions`, `enabled`, `description`, `tags` | updated in place, session and tool cache kept |
+| untouched server | same record, same session, same cache |
+| set `rateLimit`, `profiles` | applied in place; `requestTimeout` and `healthMonitor` are constants the manager writes and never change |
+| `authToken`, `host`, `port`, `path`, `type`, `allowAnonymous`, `allowedHosts`, `clientNames` | listed in `restartNeeded`, the old values stay in force |
+
+`keyProfiles` is applied live: the manager reads it per request, unlike the
+listener fields above. A file that does not load at all leaves the process on
+the previous config with the cause in `error` and nothing in `applied`. Every
+attempt writes one log line: `reload: применено N, изменено M, удалено K,
+generation G`.
+
 ## Lazy connections
 
 Nothing is connected at startup. The first tool call that needs a server opens

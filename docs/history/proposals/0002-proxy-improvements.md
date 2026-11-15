@@ -211,6 +211,18 @@ browse-сессии панели профиль не применяют, у ни
 Риск: конфиг сейчас иммутабелен на время жизни процесса; «частично применено» надо
 показывать честно, а не молча.
 
+Сделано (2026-11-15): SIGHUP обрабатывается (`cmd/mcprig/main.go`), процесс
+перечитывает конфиг и публикует ack `reload.status` с `nonce`, `generation`,
+`applied`, `restartNeeded`; сигнал идёт только лидеру процесса набора, stdio-дети
+переживают правку соседа. Диф по имени: добавлен лениво, удалён — сессия
+закрывается, смена launch-полей — новая запись, `permissions`/`rateLimit`/
+`profiles` — на месте. Супервизор шлёт `POST /api/sets/<id>/reload` (`Runtime.Reload`,
+бюджет 3 с), а `PUT /api/servers/<name>` отвечает `reloaded`/`reloadErrors`;
+`sandbox-e2e.sh` и `go test -race` зелёные. Правка `env`/`envAllow` перезапускает
+наборы с этим сервером (окружение процесса набора фиксируется при старте), так же
+поступает смена `authToken`; `path`/`host`/`allowedHosts` из ручной правки
+`servers.json` попадают в `restartNeeded`, перезапуск — вручную.
+
 ### B. Несколько активных ключей на набор (1 неделя, после A)
 
 Сейчас ровно один активный ключ: `normalizeKeys` отзывает остальные
@@ -243,6 +255,13 @@ browse-сессии панели профиль не применяют, у ни
 
 Ворота: `TestCallbackURLFromPublicURL`, `TestXFHIgnoredWithoutProxySecret`,
 `TestSecureCookieBehindProxy`.
+
+Сделано (2026-11-15): `publicUrl` валидируется и попадает в `CallbackURL`
+(префикс пути сохраняется); `tls {cert,key}` поднимает `ListenAndServeTLS`
+(`MinVersion` 1.2), cookie сессии становится `Secure` при https-адресе или TLS;
+`X-Forwarded-*` принимаются только при заданном `MCPRIG_PROXY_SECRET`, и это
+задокументированная цена доверия; `doctor` печатает effective redirect.
+Лимит входа считается по адресу сокета и по `X-Forwarded-For` одновременно.
 
 ### D. Ресурсы и промпты для MCP-клиента (1 неделя)
 

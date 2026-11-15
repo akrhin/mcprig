@@ -138,8 +138,9 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
 | `GET /api/state` | servers, sets, `firstPort` — the first paint |
 | `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
-| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update (restarts a running set) and delete (stops it) |
+| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port` or `open` restarts the set |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
+| `POST /api/sets/<id>/reload` | apply `servers.json` without a restart: `{"reloaded":true,"generation":N,"applied":[…],"restartNeeded":[…],"error":"…"}`. A stopped set answers `{"reloaded":false,"reason":"набор не запущен"}` and the file is written anyway. A non-empty `restartNeeded` or a set `error` gives `reloaded:false` with the cause in `reason`; a write failure is `500` |
 | `GET /api/sets/<id>/servers` | per-server health for one set |
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
@@ -147,7 +148,8 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key; revoking the active key stops the set and the answer carries `stopped: true` |
 | `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"note":"hermes"}`; the note becomes the client's label in the statistics, an empty string clears it, a running set is restarted |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
-| `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
+| `PUT /api/servers/<name>` | update; running sets reload instead of restarting, and the answer carries `reloaded` (set ids, repeated as `restarted` for one release) plus `reloadErrors` (id → cause) when a process did not apply it |
+| `DELETE /api/servers/<name>` | delete; running sets that use it are stopped, because the deleted server's session goes with it. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
 | `GET /api/calls?set=<id>&limit=<N>&before=<time>&after=<time>` | merged call tail of running sets; default 50, max 500; `before`/`after` are RFC3339 times bounding a row's `time` (strictly older / strictly newer, one at a time); for one set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |
@@ -160,6 +162,39 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 
 A browse session obeys the server's `permissions` for tools the same way
 `invoke_command` does; resources and prompts are not covered yet.
+
+### Reload without a restart
+
+`POST /api/sets/<id>/reload` and an edit through `PUT /api/sets/<id>` write
+`servers.json` and send `SIGHUP` to the set process alone — its stdio children
+have no handler and must survive an edit of their neighbour. The process rereads
+the file itself and answers with `reload.status` next to `servers.json` —
+`{"nonce":"…","generation":N,"at":"RFC3339","applied":[…],"restartNeeded":[…],"error":"…"}`,
+the generation growing on every attempt and the nonce repeating the one the
+panel put into `reload.request` before the signal, so a late answer to an
+earlier attempt is never taken for this one. The panel waits up to 3 s and
+returns that answer as it is. Applied without a restart are the set's servers
+and their fields: an added server connects on its first call, a removed one has
+its session closed, unchanged servers keep their sessions, changed `command`,
+`cwd`, `url`, `env` and `sandbox` recreate that server alone, while
+`permissions`, `enabled` and `description` update in place; `rateLimit` and
+`profiles` come from the new file. A call already in flight to the server being
+recreated fails with «сервер изменён перезагрузкой конфига — вызов не выполнен,
+повторите» instead of waiting for its old process. The transport is read only at
+startup. An edit through `PUT /api/sets/<id>` of `port` or `open` — and a new
+active key through the key endpoints — restarts the set; a hand edit of
+`servers.json` touching `path`, `host` or `allowedHosts` comes back in
+`restartNeeded`, and the set then has to be restarted by hand
+(`POST /api/sets/<id>/restart`). `POST /api/sets/<id>/reload` never restarts
+anything itself: a non-empty `restartNeeded` answers `reloaded:false` with that
+reason. A server's `env` and `envAllow` are not reloaded either — the set's
+environment is fixed at its start — so `PUT /api/servers/<name>` that touches
+them restarts the sets using that server, and the answer lists them in
+`reloaded` all the same.
+
+A broken config is not applied: the process
+stays on the previous one, and the cause arrives in `error` and in
+`reload.status`.
 
 Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
 least one existing server; when `port` is not given the manager allocates a free

@@ -242,6 +242,7 @@
       'srv.failed': 'Failed',
       'srv.probeFail': 'probe failed',
       'srv.notFound': 'server {name} is not in the registry',
+      'srv.reloadWarn': 'saved, but running sets did not apply the change: {err}',
       'err.offline': 'no connection to the daemon',
       'err.http': 'HTTP {status} · {path}',
       'add.nameRequired': 'a name is required'
@@ -470,6 +471,7 @@
       'srv.failed': 'Сбой',
       'srv.probeFail': 'проверка не удалась',
       'srv.notFound': 'сервер {name} не найден в реестре',
+      'srv.reloadWarn': 'сохранено, но работающие наборы не применили правку: {err}',
       'err.offline': 'панель не отвечает — проверьте, запущен ли mcprig',
       'err.http': 'HTTP {status} · {path}',
       'add.nameRequired': 'Укажите имя набора'
@@ -1704,10 +1706,24 @@
     srvErr('');
     // текст ошибки даёт бэкенд: он точнее любого предсказания в браузере
     send(editing ? 'PUT' : 'POST', editing ? '/api/servers/' + encodeURIComponent(editing) : '/api/servers', body)
-      .then(function () { return loadState(); })
+      .then(function (r) {
+        st.srvReloadErrors = (r && r.reloadErrors) || null;
+        return loadState();
+      })
       // loadState перерисовывает наборы и шапку, но не список правой панели
       .then(function () { renderServers(st.health); })
-      .then(function () { closeSrv(); })
+      .then(function () {
+        // Правка записана, но работающие наборы её не применили: форма
+        // остаётся открытой с причиной, а не закрывается молча.
+        if (st.srvReloadErrors) {
+          var parts = Object.keys(st.srvReloadErrors).map(function (id) {
+            return id + ': ' + st.srvReloadErrors[id];
+          });
+          srvErr(t('srv.reloadWarn', { err: parts.join('; ') }));
+          return;
+        }
+        closeSrv();
+      })
       .catch(function (err) { srvErr(err.message); })
       .then(function () { st.busy = false; btn.disabled = false; });
   }

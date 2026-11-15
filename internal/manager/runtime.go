@@ -2,6 +2,9 @@ package manager
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +35,10 @@ const (
 	maxLogBytes = 5 << 20
 	ringLines   = 2000
 	partialCap  = 64 << 10
+	// reloadBudget — сколько супервизор ждёт ответа процесса набора на SIGHUP:
+	// набор перечитывает servers.json и пишет reload.status сам.
+	reloadBudget = 3 * time.Second
+	reloadPoll   = 50 * time.Millisecond
 )
 
 // RuntimeStatus — то, что отдаётся клиенту по start/stop/restart.
@@ -74,10 +81,13 @@ type Runtime struct {
 	log          *slog.Logger
 	notify       *notifier
 
-	mu     sync.Mutex
-	procs  map[string]*process
-	rings  map[string]*ring
-	locks  map[string]*sync.Mutex
+	mu    sync.Mutex
+	procs map[string]*process
+	rings map[string]*ring
+	locks map[string]*sync.Mutex
+	// nonces — метка последней попытки перезагрузки набора: по ней отличаем
+	// свой ack от запоздалого ответа прежнего процесса.
+	nonces map[string]string
 	closed bool
 
 	// reload отдаёт актуальные набор и серверы для отложенного перезапуска:
@@ -100,6 +110,7 @@ func NewRuntime(dataDir, cliPath, bindIP string, sec *Secrets, log *slog.Logger)
 		procs:     map[string]*process{},
 		rings:     map[string]*ring{},
 		locks:     map[string]*sync.Mutex{},
+		nonces:    map[string]string{},
 	}
 }
 
@@ -198,6 +209,11 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 		size = info.Size()
 	}
 	writer := &logWriter{file: logFile, path: logPath, size: size, ring: ring}
+
+	// Ack прошлого процесса не должен сойти за ответ нового: у каждого
+	// запуска поколение начинается с 1, а старый файл мог дожить до него.
+	os.Remove(ReloadStatusPath(rt.dataDir, set.ID))
+	os.Remove(ReloadRequestPath(rt.dataDir, set.ID))
 
 	cmd := exec.Command(rt.cliPath, "serve", "--config", cfgPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -364,6 +380,159 @@ func (rt *Runtime) Restart(ctx context.Context, set *registry.Set, servers []reg
 	return rt.startLocked(ctx, set, servers)
 }
 
+// ReloadOutcome — ответ процесса набора на SIGHUP, файл reload.status рядом с
+// servers.json: что применено без перезапуска и что без него не применить.
+type ReloadOutcome struct {
+	// Nonce — метка попытки: процесс копирует её из reload.request, и ответ
+	// прошлой попытки не сойдёт за ответ этой.
+	Nonce         string   `json:"nonce,omitempty"`
+	Generation    int      `json:"generation"`
+	At            string   `json:"at,omitempty"`
+	Applied       []string `json:"applied"`
+	RestartNeeded []string `json:"restartNeeded"`
+	Error         string   `json:"error,omitempty"`
+}
+
+// ReloadStatusPath — <dataDir>/sets/<id>/reload.status.
+func ReloadStatusPath(dataDir, id string) string {
+	return filepath.Join(dataDir, "sets", id, "reload.status")
+}
+
+// ReloadRequestPath — <dataDir>/sets/<id>/reload.request: nonce текущей попытки.
+func ReloadRequestPath(dataDir, id string) string {
+	return filepath.Join(dataDir, "sets", id, "reload.request")
+}
+
+// newReloadNonce — 8 случайных байт в hex.
+func newReloadNonce() (string, error) {
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+// writeReloadRequest кладёт nonce попытки рядом с конфигом до сигнала: процесс
+// копирует его в reload.status, и старый ack не сойдёт за новый.
+func writeReloadRequest(path, nonce string) error {
+	body, err := json.Marshal(struct {
+		Nonce string `json:"nonce"`
+	}{nonce})
+	if err != nil {
+		return err
+	}
+	return writeAtomic(path, append(body, '\n'))
+}
+
+// readReloadStatus читает ответ процесса. Отсутствующий или битый файл — не
+// ошибка: поколение 0 значит «процесс ещё не подтверждал перезагрузку».
+func readReloadStatus(path string) ReloadOutcome {
+	var out ReloadOutcome
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return ReloadOutcome{}
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return ReloadOutcome{}
+	}
+	return out
+}
+
+// Reload применяет правку без перезапуска: пишет servers.json, шлёт процессу
+// набора SIGHUP и ждёт его ответа в reload.status с новым поколением.
+// Умерший процесс не поднимает здесь заново — это делает wait, как при падении.
+func (rt *Runtime) Reload(ctx context.Context, set *registry.Set, servers []registry.Server) (ReloadOutcome, error) {
+	l := rt.setLock(set.ID)
+	l.Lock()
+	defer l.Unlock()
+
+	rt.mu.Lock()
+	p := rt.procs[set.ID]
+	alive := p != nil && !p.exited && !p.stopping
+	closed := rt.closed
+	rt.mu.Unlock()
+	if closed {
+		return ReloadOutcome{}, errors.New("менеджер остановлен — перезапустите mcprig")
+	}
+	if !alive {
+		return ReloadOutcome{}, fmt.Errorf("набор %s не запущен — нажмите «Запустить»", set.ID)
+	}
+
+	body, err := BuildSetConfig(set, setServers(set, servers), rt.bindIP, rt.allowedHosts)
+	if err != nil {
+		return ReloadOutcome{}, err
+	}
+	if _, err := WriteSetConfig(rt.dataDir, set.ID, body); err != nil {
+		return ReloadOutcome{}, fmt.Errorf("не удалось записать конфигурацию набора %s: %w", set.ID, err)
+	}
+
+	statusPath := ReloadStatusPath(rt.dataDir, set.ID)
+	nonce, err := newReloadNonce()
+	if err != nil {
+		return ReloadOutcome{}, fmt.Errorf("не удалось собрать метку перезагрузки набора %s: %w", set.ID, err)
+	}
+	// Поколение сверяем только с нашей прошлой попыткой: запоздалый ответ
+	// прежнего процесса несёт чужую метку и о поколениях этого ничего не
+	// говорит — иначе его большой номер навсегда отбивал бы новые.
+	rt.mu.Lock()
+	prevNonce := rt.nonces[set.ID]
+	rt.nonces[set.ID] = nonce
+	rt.mu.Unlock()
+	prev := 0
+	if st := readReloadStatus(statusPath); prevNonce != "" && st.Nonce == prevNonce {
+		prev = st.Generation
+	}
+	if err := writeReloadRequest(ReloadRequestPath(rt.dataDir, set.ID), nonce); err != nil {
+		return ReloadOutcome{}, fmt.Errorf("не удалось записать запрос перезагрузки набора %s: %w", set.ID, err)
+	}
+	// Сигнал только лидеру: stdio-дети набора наследуют группу и SIGHUP не
+	// переживают, а правка одного сервера не должна рвать соседей. Группу
+	// сигналят Stop и Restart — им нужен весь набор.
+	if err := killPid(p.pid, syscall.SIGHUP); err != nil {
+		out := ReloadOutcome{RestartNeeded: []string{"process"}, Error: "не удалось послать SIGHUP: " + err.Error()}
+		rt.logReload(set.ID, out)
+		return out, nil
+	}
+
+	deadline := time.Now().Add(reloadBudget)
+	for {
+		if out := readReloadStatus(statusPath); out.Nonce == nonce && out.Generation > prev {
+			rt.logReload(set.ID, out)
+			return out, nil
+		}
+		select {
+		case <-p.done:
+			out := ReloadOutcome{
+				RestartNeeded: []string{"process"},
+				Error:         "процесс набора завершился во время перезагрузки",
+			}
+			rt.logReload(set.ID, out)
+			return out, nil
+		case <-ctx.Done():
+			return ReloadOutcome{}, ctx.Err()
+		case <-time.After(reloadPoll):
+		}
+		if time.Now().After(deadline) {
+			out := ReloadOutcome{Error: "набор не подтвердил перезагрузку за " + humanDuration(reloadBudget)}
+			rt.logReload(set.ID, out)
+			return out, nil
+		}
+	}
+}
+
+// logReload — одна строка в лог набора на попытку, без ключей и env.
+func (rt *Runtime) logReload(id string, out ReloadOutcome) {
+	if out.Error != "" {
+		rt.log.Warn("reload: набор " + id + " отклонён: " + out.Error)
+		return
+	}
+	skipped := "ничего"
+	if len(out.RestartNeeded) > 0 {
+		skipped = strings.Join(out.RestartNeeded, ", ")
+	}
+	rt.log.Info(fmt.Sprintf("reload: набор %s применён, generation %d, пропущено: %s", id, out.Generation, skipped))
+}
+
 func (rt *Runtime) proc(id string) *process {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
@@ -400,6 +569,14 @@ func killGroup(pid int, sig syscall.Signal) {
 	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
 		_ = syscall.Kill(pid, sig)
 	}
+}
+
+// killPid сигналит одному процессу и не трогает его группу.
+func killPid(pid int, sig syscall.Signal) error {
+	if pid <= 1 {
+		return errors.New("некорректный pid")
+	}
+	return syscall.Kill(pid, sig)
 }
 
 func (rt *Runtime) status(set *registry.Set) RuntimeStatus {

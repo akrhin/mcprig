@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"os"
 	"reflect"
@@ -16,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -62,6 +64,7 @@ var (
 
 var (
 	errClosed    = errors.New("менеджер остановлен — перезапустите mcprig")
+	errRetired   = errors.New("сервер изменён перезагрузкой конфига — вызов не выполнен, повторите")
 	errNoTargets = errors.New("нужен параметр server или servers")
 	// errProbeSkipped — проба вообще не началась (не дождалась слота): исход
 	// неизвестен, это не отказ сервера.
@@ -76,6 +79,13 @@ type dialer func(context.Context, *config.Server) (*mcp.ClientSession, error)
 
 // Manager owns the downstream sessions of one set.
 type Manager struct {
+	// mu guards cfg, entries and limits: Reload swaps them whole and every
+	// reader takes a snapshot. Ни один сетевой вызов под этим замком не идёт.
+	mu sync.RWMutex
+	// generation растёт на каждой попытке перечитать конфиг, включая
+	// отвергнутую: прежний конфиг остаётся, но попытка видна супервизору.
+	generation int
+
 	cfg     *config.Config
 	version string
 	dial    dialer
@@ -83,6 +93,13 @@ type Manager struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// closed marks a stopped manager: a reload that lands after Close is
+	// refused whole, so it neither swaps entries under Close nor adds to
+	// closing, and closing.Wait cannot race Add.
+	closed bool
+	// closing tracks the goroutines that close dropped sessions after the ack.
+	closing sync.WaitGroup
 
 	// slots bounds simultaneous calls to one downstream inside invoke_many: a
 	// per-request limiter let two parallel fan-outs send twice the limit.
@@ -102,7 +119,11 @@ type Manager struct {
 }
 
 type entry struct {
-	srv  *config.Server
+	// srv меняется на перезагрузке конфига: указатель подменяется целиком,
+	// поэтому читатель под замком не бывает и видит либо старый сервер, либо
+	// новый, но не половину правки. Конфиг сервера неизменяем после Load.
+	srv atomic.Pointer[config.Server]
+
 	conn conn
 
 	// secrets — значения env и заголовков сервера, которые нельзя выпускать
@@ -128,6 +149,17 @@ func (e *entry) cachedTools() []*mcp.Tool {
 	return e.tools
 }
 
+// server is the entry's current server config. Atomic, not locked: the hot path
+// calls it per request, and Reload swaps the pointer whole.
+func (e *entry) server() *config.Server { return e.srv.Load() }
+
+// newEntry builds an entry with its secrets taken from the same config.
+func newEntry(srv *config.Server) *entry {
+	e := &entry{secrets: serverSecrets(srv)}
+	e.srv.Store(srv)
+	return e
+}
+
 // hasTool reports whether the cached list names this tool.
 func hasTool(tools []*mcp.Tool, name string) bool {
 	for _, t := range tools {
@@ -151,6 +183,18 @@ func (m *Manager) dropSession(e *entry) {
 	m.storeTools(e, nil)
 }
 
+// retireSession closes an entry a reload dropped. markRetired comes first: a
+// call that already holds the stale entry must not dial it again with the old
+// config, and retryableCall must not treat the refusal as a dropped connection.
+// A call already past session() keeps running on the old process.
+func (m *Manager) retireSession(e *entry) {
+	e.conn.markRetired()
+	// Ошибку некуда доложить: запись отброшена, а сессию повторно закрывает
+	// Manager.Close.
+	_ = e.conn.close()
+	m.storeTools(e, nil)
+}
+
 // publishSchema pushes the whole-set list_commands weight to the panel's
 // recorder. Bytes are the JSON of the same answer list_commands builds from
 // the cache, so the number costs no downstream call. A server that has no
@@ -159,18 +203,19 @@ func (m *Manager) publishSchema() {
 	if m.Stats == nil {
 		return
 	}
-	out := make(map[string][]commandInfo, len(m.entries))
+	out := make(map[string][]commandInfo)
 	tools := 0
-	for _, e := range m.entries {
+	for _, e := range m.allEntries() {
+		srv := e.server()
 		cached := e.cachedTools()
 		if len(cached) == 0 {
 			continue
 		}
 		cmds := make([]commandInfo, 0, len(cached))
 		for _, tool := range cached {
-			cmds = append(cmds, commandInfo{Server: e.srv.Name, Name: tool.Name, Command: tool.Name, Description: tool.Description})
+			cmds = append(cmds, commandInfo{Server: srv.Name, Name: tool.Name, Command: tool.Name, Description: tool.Description})
 		}
-		out[e.srv.Name] = cmds
+		out[srv.Name] = cmds
 		tools += len(cmds)
 	}
 	raw, err := json.Marshal(out)
@@ -210,7 +255,7 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 	}
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	for _, srv := range cfg.Servers {
-		m.entries = append(m.entries, &entry{srv: srv, secrets: serverSecrets(srv)})
+		m.entries = append(m.entries, newEntry(srv))
 	}
 	// A downstream that gains or drops tools at runtime says so with
 	// notifications/tools/list_changed. Dropping the cached list here makes the
@@ -246,14 +291,21 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 
 // Close cancels in-flight connects and shuts every open downstream session.
 func (m *Manager) Close() error {
+	m.mu.Lock()
+	m.closed = true
+	m.mu.Unlock()
+	entries := m.allEntries()
 	// Mark the conns closed before cancelling the context: a caller released by
 	// the cancel must hear "менеджер закрыт", not "context canceled".
-	for _, e := range m.entries {
+	for _, e := range entries {
 		e.conn.markClosed()
 	}
 	m.cancel()
+	// Сессии, отброшенные перезагрузкой, закрывает своя горутина: без ожидания
+	// тест кончается раньше, чем закрылась сессия, и горутина утекает.
+	m.closing.Wait()
 	var errs []error
-	for _, e := range m.entries {
+	for _, e := range entries {
 		if err := e.conn.close(); err != nil {
 			errs = append(errs, err)
 		}
@@ -261,7 +313,238 @@ func (m *Manager) Close() error {
 	return errors.Join(errs...)
 }
 
-// Server builds the MCP server carrying the meta-tools.
+// ReloadResult reports what one attempt to re-read the config applied, and what
+// it could not. It is the whole answer the supervisor gets: the set's process
+// writes it to reload.status, there is no HTTP route for it.
+type ReloadResult struct {
+	// Generation counts attempts, starting at 1, including a rejected config:
+	// the supervisor sees that its SIGHUP landed even when nothing was applied.
+	Generation int
+	// Applied names what the live process now uses: "added:<server>" (lazy — no
+	// connection until a call), "removed:<server>", "reset:<server>" (session
+	// closed: a field that decides the process or address changed),
+	// "updated:<server>" (applied in place, session kept), and the set-wide
+	// "rateLimit", "permissions", "profiles", "requestTimeout", "healthMonitor".
+	Applied []string
+	// RestartNeeded names the transport fields this process cannot adopt: the
+	// listener was built at startup, so only a restart applies them.
+	RestartNeeded []string
+	// Err is the load error. Applied stays empty and the previous config is
+	// still in force: fail-closed, the process keeps serving.
+	Err string
+}
+
+// Reload applies a freshly loaded config to the running process: new servers
+// join lazily, removed ones lose their session and tool cache, a server whose
+// process or address changed gets a new session on its next call. The previous
+// config stays in force only when the caller could not load one at all.
+func (m *Manager) Reload(next *config.Config) ReloadResult {
+	res := ReloadResult{Applied: []string{}, RestartNeeded: []string{}}
+	var drop []*entry
+
+	m.mu.Lock()
+	if m.closed {
+		// Перезагрузка после Close ничего не применяет: иначе она подменила бы
+		// entries у уже снятого снимка, и отброшенные записи не закрылись бы.
+		generation := m.generation
+		m.mu.Unlock()
+		res.Generation = generation
+		res.Err = errClosed.Error()
+		return res
+	}
+	m.generation++
+	res.Generation = m.generation
+	old := m.cfg
+	// Лимит меняется только правкой rateLimit: иначе перезагрузка обнуляла бы
+	// счётчики, и клиент обходил бы лимит, дёргая reload.
+	limits := m.limits
+	if !reflect.DeepEqual(old.RateLimit, next.RateLimit) {
+		limits = newRateLimits(next.RateLimit)
+	}
+	fresh := make([]*entry, 0, len(next.Servers))
+	// Removals first, in the old order: a deterministic status file matters more
+	// than saving a map.
+	for _, e := range m.entries {
+		if name := e.server().Name; !hasServer(next.Servers, name) {
+			drop = append(drop, e)
+			res.Applied = append(res.Applied, "removed:"+name)
+		}
+	}
+	for _, srv := range next.Servers {
+		name := srv.Name
+		e := findEntry(m.entries, name)
+		switch {
+		case e == nil:
+			fresh = append(fresh, newEntry(srv))
+			res.Applied = append(res.Applied, "added:"+name)
+		case launchChanged(e.server(), srv):
+			// Правка сервера закрывает сессию для новых вызовов; вызовы в
+			// полёте не дренируются — их обрыв ловится обычным правилом
+			// повтора (retryableCall) и уходит на новую сессию.
+			drop = append(drop, e)
+			fresh = append(fresh, newEntry(srv))
+			res.Applied = append(res.Applied, "reset:"+name)
+		case !reflect.DeepEqual(e.server(), srv):
+			e.srv.Store(srv)
+			fresh = append(fresh, e)
+			res.Applied = append(res.Applied, "updated:"+name)
+		default:
+			fresh = append(fresh, e)
+		}
+	}
+	m.entries = fresh
+	m.limits = limits
+	res.RestartNeeded = transportRestart(old, next)
+	changes := setChanges(old, next)
+	if len(res.RestartNeeded) > 0 {
+		// Отвергнутые транспортом поля остаются прежними: иначе менеджер
+		// докладывал бы конфиг, которого на проводе нет. Профили откатываются
+		// вместе с ним, поэтому и в Applied их нет.
+		next = keepLiveTransport(old, next)
+		changes = slices.DeleteFunc(changes, func(name string) bool { return name == "profiles" })
+	}
+	res.Applied = append(res.Applied, changes...)
+	m.cfg = next
+	if len(drop) > 0 {
+		m.closing.Add(1)
+	}
+	m.mu.Unlock()
+
+	// Сессии отброшенных записей закрываются после ответа: супервизор ждёт
+	// reload.status 3 с, а зависшая попытка подключения держит close до
+	// closeWait (5 с). shortcut: окно между ack и закрытием — до closeWait;
+	// Manager.Close ждёт эти горутины.
+	if len(drop) > 0 {
+		go func() {
+			defer m.closing.Done()
+			for _, e := range drop {
+				m.retireSession(e)
+			}
+		}()
+	}
+	m.publishSchema()
+	return res
+}
+
+// ReloadFailed records an attempt whose file did not even load. The running
+// config is untouched; the generation still grows so the supervisor's answer
+// names the try that failed.
+func (m *Manager) ReloadFailed(err error) ReloadResult {
+	m.mu.Lock()
+	m.generation++
+	generation := m.generation
+	m.mu.Unlock()
+	return ReloadResult{Generation: generation, Applied: []string{}, RestartNeeded: []string{}, Err: err.Error()}
+}
+
+func hasServer(servers []*config.Server, name string) bool {
+	for _, srv := range servers {
+		if srv.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func findEntry(entries []*entry, name string) *entry {
+	for _, e := range entries {
+		if e.server().Name == name {
+			return e
+		}
+	}
+	return nil
+}
+
+// launchChanged reports whether a change decides the downstream process or the
+// address it is reached at: such a server needs a fresh session, and its tool
+// list may differ. Permissions, enabled, tags and description do not.
+func launchChanged(a, b *config.Server) bool {
+	return a.Transport != b.Transport || a.URL != b.URL || a.Cwd != b.Cwd ||
+		!slices.Equal(a.Command, b.Command) ||
+		!maps.Equal(a.Env, b.Env) || !slices.Equal(a.EnvAllow, b.EnvAllow) ||
+		!maps.Equal(a.Headers, b.Headers) ||
+		!reflect.DeepEqual(a.OAuth, b.OAuth) || !reflect.DeepEqual(a.Sandbox, b.Sandbox)
+}
+
+// transportRestart names the listener fields that a running process cannot
+// adopt. keyProfiles is absent on purpose: the manager resolves it per request
+// — but see keepLiveTransport: it is reverted along with the rest of the block
+// when any listener field is rejected.
+func transportRestart(old, next *config.Config) []string {
+	out := []string{}
+	o, n := old.Transport, next.Transport
+	switch {
+	case o == nil && n == nil:
+		return out
+	case o == nil || n == nil:
+		return append(out, "transport")
+	}
+	if o.AuthToken != n.AuthToken {
+		out = append(out, "authToken")
+	}
+	if o.Host != n.Host {
+		out = append(out, "host")
+	}
+	if o.Port != n.Port {
+		out = append(out, "port")
+	}
+	if o.Path != n.Path {
+		out = append(out, "path")
+	}
+	if o.Type != n.Type {
+		out = append(out, "type")
+	}
+	if o.AllowAnonymous != n.AllowAnonymous {
+		out = append(out, "allowAnonymous")
+	}
+	if !slices.Equal(o.AllowedHosts, n.AllowedHosts) {
+		out = append(out, "allowedHosts")
+	}
+	// clientNames вшит в страж слушателя при старте, поэтому тоже только с
+	// перезапуском — в отличие от keyProfiles, который менеджер читает на каждый вызов.
+	if !maps.Equal(o.ClientNames, n.ClientNames) {
+		out = append(out, "clientNames")
+	}
+	return out
+}
+
+// keepLiveTransport puts the listener's live transport back wholesale, so the
+// manager's config names what is really in force. keyProfiles goes with it: the
+// listener validates the old token while a new profile table may already be
+// keyed to another fingerprint, and a key that loses its profile entry falls
+// back to global permissions — a fail-open window. A transport block that
+// disappears from the file keeps the live one for the same reason.
+func keepLiveTransport(old, next *config.Config) *config.Config {
+	out := *next
+	out.Transport = old.Transport
+	// Таблица профилей идёт вместе с транспортом: отображение ключ→профиль
+	// осталось прежним, и новая таблица под ним была бы смесью поколений —
+	// ключ прежнего токена получил бы чужие правила.
+	out.Profiles = old.Profiles
+	return &out
+}
+
+// setChanges names the set-wide blocks a reload applied in place.
+func setChanges(old, next *config.Config) []string {
+	var out []string
+	if !reflect.DeepEqual(old.RateLimit, next.RateLimit) {
+		out = append(out, "rateLimit")
+	}
+	if !reflect.DeepEqual(old.Permissions, next.Permissions) {
+		out = append(out, "permissions")
+	}
+	if !reflect.DeepEqual(old.Profiles, next.Profiles) {
+		out = append(out, "profiles")
+	}
+	if old.RequestTimeout != next.RequestTimeout {
+		out = append(out, "requestTimeout")
+	}
+	if !reflect.DeepEqual(old.HealthMonitor, next.HealthMonitor) {
+		out = append(out, "healthMonitor")
+	}
+	return out
+}
+
 func (m *Manager) Server() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "mcprig", Version: m.version}, nil)
 	s.AddTool(&mcp.Tool{
@@ -422,14 +705,15 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 		return errResult(err)
 	}
 	// Filtering happens before any probe: a narrow filter must not dial the set.
-	targets := m.entries
+	targets := m.allEntries()
 	if filter := strings.ToLower(in.Filter); filter != "" {
-		targets = nil
-		for _, e := range m.entries {
-			if matches(e.srv, filter) {
-				targets = append(targets, e)
+		kept := make([]*entry, 0, len(targets))
+		for _, e := range targets {
+			if matches(e.server(), filter) {
+				kept = append(kept, e)
 			}
 		}
+		targets = kept
 	}
 	out := struct {
 		Servers []serverInfo `json:"servers"`
@@ -442,16 +726,17 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			srv := e.server()
 			healthy, errText, unknown := m.status(ctx, e)
 			out.Servers[i] = serverInfo{
-				Name:        e.srv.Name,
-				Description: e.srv.Description,
-				Type:        transportType(e.srv),
-				Enabled:     e.srv.Enabled,
+				Name:        srv.Name,
+				Description: srv.Description,
+				Type:        transportType(srv),
+				Enabled:     srv.Enabled,
 				Healthy:     healthy,
 				Unknown:     unknown,
 				Error:       errText,
-				Tags:        e.srv.Tags,
+				Tags:        srv.Tags,
 				Isolation:   e.isolationNote(),
 			}
 		}()
@@ -470,10 +755,11 @@ func matches(srv *config.Server, lowerFilter string) bool {
 // switched off on purpose is not unhealthy: nothing is dialed for it. Третий
 // результат — unknown: проба не началась, исхода нет ни в кэше, ни из сокета.
 func (m *Manager) status(ctx context.Context, e *entry) (bool, string, bool) {
-	if e.srv.ConfigError != "" {
-		return false, e.srv.ConfigError, false
+	srv := e.server()
+	if srv.ConfigError != "" {
+		return false, srv.ConfigError, false
 	}
-	if !e.srv.Enabled {
+	if !srv.Enabled {
 		return true, "", false
 	}
 	e.healthMu.Lock()
@@ -511,7 +797,7 @@ func (m *Manager) probe(ctx context.Context, e *entry) error {
 	case <-probeCtx.Done():
 		return fmt.Errorf("%w: %w", errProbeSkipped, probeCtx.Err())
 	}
-	_, err := e.conn.session(probeCtx, m.dialFor(e.srv), connectDeadline(e.srv))
+	_, err := e.conn.session(probeCtx, m.dialFor(e.server()), connectDeadline(e.server()))
 	return err
 }
 
@@ -548,12 +834,12 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		}
 	}
 	if in.Refresh {
-		for _, e := range m.entries {
+		for _, e := range m.allEntries() {
 			m.storeTools(e, nil)
 		}
 	}
 	// Профиль читается один раз: у ключа он один на все серверы запроса.
-	profileName, profile := m.callerProfile(ctx)
+	profileName, profile := callerProfile(ctx, m.config())
 	switch {
 	case in.Server != "" && len(in.Servers) > 0:
 		return errResult(errors.New("укажите server или servers, но не оба"))
@@ -615,8 +901,9 @@ func (m *Manager) commandsOf(ctx context.Context, name string) ([]commandInfo, e
 	if e == nil {
 		return nil, fmt.Errorf("неизвестный сервер %q", name)
 	}
-	if !usable(e.srv) {
-		return nil, serverProblem(e.srv)
+	srv := e.server()
+	if !usable(srv) {
+		return nil, serverProblem(srv)
 	}
 	if tools := e.cachedTools(); tools != nil {
 		out := make([]commandInfo, 0, len(tools))
@@ -684,8 +971,8 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	if e == nil {
 		return errResult(fmt.Errorf("неизвестный сервер %q", in.Server))
 	}
-	if !usable(e.srv) {
-		return errResult(serverProblem(e.srv))
+	if srv := e.server(); !usable(srv) {
+		return errResult(serverProblem(srv))
 	}
 	if in.Refresh {
 		m.storeTools(e, nil)
@@ -756,21 +1043,24 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if e == nil {
 		return errResult(fmt.Errorf("неизвестный сервер %q", in.Server))
 	}
+	// Снимок конфига сервера на весь вызов: если перезагрузка подменит его
+	// посередине, вызов дорабатывает по снимку, а не смешивает два конфига.
+	srv := e.server()
 	// Лимит — до открытия сессии набора: отказ не должен поднимать апстрим.
-	if err := m.throttle(ctx, req, e.srv.Name, in.CommandName); err != nil {
+	if err := m.throttle(ctx, req, srv.Name, in.CommandName); err != nil {
 		return errResult(err)
 	}
-	if !usable(e.srv) {
-		return errResult(serverProblem(e.srv))
+	if !usable(srv) {
+		return errResult(serverProblem(srv))
 	}
-	if message, denied := m.gate(ctx, e.srv.Name, in.CommandName, e.srv.Permissions); denied {
-		return blockedResult(e.srv.Name, in.CommandName, message), nil
+	if message, denied := m.gate(ctx, srv.Name, in.CommandName, srv.Permissions); denied {
+		return blockedResult(srv.Name, in.CommandName, message), nil
 	}
 	// Кэш инструментов уже есть — неизвестное имя не идёт в апстрим: иначе
 	// отказ приходит тремя разными текстами (go-sdk, transport, апстрим).
 	// Пустой кэш — первый вызов после старта, проверять не по чему.
 	if cached := e.cachedTools(); cached != nil && !hasTool(cached, in.CommandName) {
-		return errResult(fmt.Errorf("неизвестный инструмент %q у сервера %q", in.CommandName, e.srv.Name))
+		return errResult(fmt.Errorf("неизвестный инструмент %q у сервера %q", in.CommandName, srv.Name))
 	}
 
 	args, err := parametersOf(in.Parameters)
@@ -783,7 +1073,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	res, err := m.callWithRetry(callCtx, labelOf(ctx, req), e, in.CommandName, args)
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {
-			return errResult(fmt.Errorf("таймаут вызова %d мс", m.cfg.RequestTimeout))
+			return errResult(fmt.Errorf("таймаут вызова %d мс", m.config().RequestTimeout))
 		}
 		return errResult(err)
 	}
@@ -826,7 +1116,7 @@ func (m *Manager) callWithRetry(ctx context.Context, label string, e *entry, nam
 		recErr = errors.New(resultMessage(res))
 	}
 	if m.Stats != nil && (err == nil || res != nil) {
-		m.Stats.Record(label, e.srv.Name, name, time.Since(start), recErr)
+		m.Stats.Record(label, e.server().Name, name, time.Since(start), recErr)
 	}
 	return res, err
 }
@@ -919,10 +1209,11 @@ func identityOf(ctx context.Context) string {
 // Nil means the call may proceed; a set without rateLimit never gets past the
 // nil limiter, so today's behaviour is unchanged.
 func (m *Manager) throttle(ctx context.Context, req *mcp.CallToolRequest, server, tool string) error {
-	if m.limits == nil {
+	limits := m.limiter()
+	if limits == nil {
 		return nil
 	}
-	ok, perMinute, retry := m.limits.allow(identityOf(ctx), server, tool)
+	ok, perMinute, retry := limits.allow(identityOf(ctx), server, tool)
 	if ok {
 		return nil
 	}
@@ -933,12 +1224,37 @@ func (m *Manager) throttle(ctx context.Context, req *mcp.CallToolRequest, server
 }
 
 func (m *Manager) find(name string) *entry {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	for _, e := range m.entries {
-		if e.srv.Name == name {
+		if e.server().Name == name {
 			return e
 		}
 	}
 	return nil
+}
+
+// allEntries copies the entry list: a reload may replace the slice while a
+// caller walks it, and the entry pointers themselves stay valid for their
+// already-started calls.
+func (m *Manager) allEntries() []*entry {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return slices.Clone(m.entries)
+}
+
+// config is the set config the hot path reads: reload swaps it whole.
+func (m *Manager) config() *config.Config {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.cfg
+}
+
+// limiter is the set's rate limiter, nil when the set has none.
+func (m *Manager) limiter() *rateLimits {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.limits
 }
 
 // dialFor merges the manager context into the dial so Close aborts a connect
@@ -956,8 +1272,8 @@ func (m *Manager) dialFor(srv *config.Server) func(context.Context) (*mcp.Client
 // callCtx bounds one downstream operation by requestTimeout: a server that
 // accepts the connection and stays silent must not hold the caller forever.
 func (m *Manager) callCtx(ctx context.Context) (context.Context, context.CancelFunc) {
-	if m.cfg.RequestTimeout > 0 {
-		return context.WithTimeout(ctx, time.Duration(m.cfg.RequestTimeout)*time.Millisecond)
+	if timeout := m.config().RequestTimeout; timeout > 0 {
+		return context.WithTimeout(ctx, time.Duration(timeout)*time.Millisecond)
 	}
 	return ctx, func() {}
 }
@@ -966,24 +1282,27 @@ func (m *Manager) callCtx(ctx context.Context) (context.Context, context.CancelF
 // (ErrConnectionClosed) is closed and dialed once more; a second failure is
 // returned with its cause.
 func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.ClientSession) error) error {
-	sess, err := e.conn.session(ctx, m.dialFor(e.srv), connectDeadline(e.srv))
+	name := e.server().Name
+	srv := e.server()
+	sess, err := e.conn.session(ctx, m.dialFor(srv), connectDeadline(srv))
 	if err != nil {
-		return fmt.Errorf("%s: %w", e.srv.Name, err)
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	err = fn(sess)
 	if !errors.Is(err, mcp.ErrConnectionClosed) {
 		if err != nil {
-			return fmt.Errorf("%s: %w", e.srv.Name, err)
+			return fmt.Errorf("%s: %w", name, err)
 		}
 		return nil
 	}
 	m.dropSession(e)
-	sess, err = e.conn.session(ctx, m.dialFor(e.srv), connectDeadline(e.srv))
+	srv = e.server()
+	sess, err = e.conn.session(ctx, m.dialFor(srv), connectDeadline(srv))
 	if err != nil {
-		return fmt.Errorf("%s: переподключение после обрыва: %w", e.srv.Name, err)
+		return fmt.Errorf("%s: переподключение после обрыва: %w", name, err)
 	}
 	if err := fn(sess); err != nil {
-		return fmt.Errorf("%s: после переподключения: %w", e.srv.Name, err)
+		return fmt.Errorf("%s: после переподключения: %w", name, err)
 	}
 	return nil
 }
@@ -991,15 +1310,16 @@ func (m *Manager) withSession(ctx context.Context, e *entry, fn func(*mcp.Client
 // callTool runs one call on the cached session. Unlike withSession it never
 // retries: invokeCommand decides from the outcome whether a repeat is safe.
 func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolParams) (*mcp.CallToolResult, error) {
-	sess, err := e.conn.session(ctx, m.dialFor(e.srv), connectDeadline(e.srv))
+	srv := e.server()
+	sess, err := e.conn.session(ctx, m.dialFor(srv), connectDeadline(srv))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", e.srv.Name, err)
+		return nil, fmt.Errorf("%s: %w", srv.Name, err)
 	}
 	// Сервер в песочнице получает свой, более короткий предел: чужая
 	// песочница не должна держать вызов столько же, сколько свои серверы.
 	parent := ctx
 	var limit time.Duration
-	if l := e.srv.CallTimeout(); l > 0 {
+	if l := srv.CallTimeout(); l > 0 {
 		limit = l
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, l)
@@ -1013,9 +1333,9 @@ func (m *Manager) callTool(ctx context.Context, e *entry, params *mcp.CallToolPa
 			// Зависший вызов остаётся в конвейере сессии — сбрасываем её,
 			// иначе следующий вызов получит ответ от прошлого.
 			m.dropSession(e)
-			return res, fmt.Errorf("%s: таймаут %s (песочница): %w", e.srv.Name, limit, err)
+			return res, fmt.Errorf("%s: таймаут %s (песочница): %w", srv.Name, limit, err)
 		}
-		return res, fmt.Errorf("%s: %w", e.srv.Name, err)
+		return res, fmt.Errorf("%s: %w", srv.Name, err)
 	}
 	return res, nil
 }
@@ -1048,8 +1368,8 @@ func retryableCall(res *mcp.CallToolResult, err error) bool {
 func (m *Manager) Warm(ctx context.Context) {
 	sem := make(chan struct{}, maxProbes)
 	var wg sync.WaitGroup
-	for _, e := range m.entries {
-		if !usable(e.srv) {
+	for _, e := range m.allEntries() {
+		if !usable(e.server()) {
 			continue
 		}
 		wg.Add(1)
@@ -1284,6 +1604,9 @@ type conn struct {
 	sess   *mcp.ClientSession
 	try    *attempt
 	closed bool
+	// retired marks a conn whose entry a reload dropped: the session it holds
+	// belongs to the old config, so no new dial may use it.
+	retired bool
 }
 
 type attempt struct {
@@ -1304,6 +1627,10 @@ func connectDeadline(srv *config.Server) time.Duration {
 
 func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.ClientSession, error), timeout time.Duration) (*mcp.ClientSession, error) {
 	c.mu.Lock()
+	if c.retired {
+		c.mu.Unlock()
+		return nil, errRetired
+	}
 	if c.closed {
 		c.mu.Unlock()
 		return nil, errClosed
@@ -1319,8 +1646,8 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 		case <-a.done:
 			return a.sess, a.err
 		case <-ctx.Done():
-			if c.isClosed() {
-				return nil, errClosed
+			if err := c.stopErr(); err != nil {
+				return nil, err
 			}
 			return nil, ctx.Err()
 		}
@@ -1351,19 +1678,19 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 			err = fmt.Errorf("подключение не уложилось в %s: %w", timeout, err)
 		}
 		c.mu.Lock()
-		if c.closed {
-			a.sess, a.err = nil, errClosed
+		if stop := c.stopErrLocked(); stop != nil {
+			a.sess, a.err = nil, stop
 		} else {
 			a.sess, a.err = sess, err
 			if err == nil {
 				c.sess = sess
 			}
 		}
-		closed := c.closed
+		stop := c.stopErrLocked()
 		c.try = nil
 		c.mu.Unlock()
 		close(a.done)
-		if closed && sess != nil {
+		if stop != nil && sess != nil {
 			_ = sess.Close()
 		}
 	}()
@@ -1371,20 +1698,39 @@ func (c *conn) session(ctx context.Context, dial func(context.Context) (*mcp.Cli
 	select {
 	case <-a.done:
 	case <-ctx.Done():
-		if c.isClosed() {
-			return nil, errClosed
+		if err := c.stopErr(); err != nil {
+			return nil, err
 		}
 		return nil, ctx.Err()
 	}
 	return a.sess, a.err
 }
 
-// isClosed reports whether Close has marked the conn, so a caller woken by the
-// manager's context cancel still learns the real reason.
-func (c *conn) isClosed() bool {
+// stopErr names why the conn refuses work — nil while it is live, errRetired
+// for an entry a reload dropped, errClosed after Close. A caller woken by the
+// manager's context cancel learns the real reason through it.
+func (c *conn) stopErr() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.closed
+	return c.stopErrLocked()
+}
+
+func (c *conn) stopErrLocked() error {
+	switch {
+	case c.retired:
+		return errRetired
+	case c.closed:
+		return errClosed
+	}
+	return nil
+}
+
+// markRetired refuses new work on a dropped entry without touching the session
+// of a call already inside it.
+func (c *conn) markRetired() {
+	c.mu.Lock()
+	c.retired = true
+	c.mu.Unlock()
 }
 
 // markClosed makes new and waiting callers see errClosed. Idempotent.
@@ -1434,7 +1780,8 @@ func (c *conn) close() error {
 // isolationNote описывает состояние изоляции: применённая песочница или
 // причина, по которой сервер работает без неё.
 func (e *entry) isolationNote() string {
-	if e.srv.ConfigError != "" {
+	srv := e.server()
+	if srv.ConfigError != "" {
 		// Отвергнутый конфиг не запускается: обещать ему песочницу нельзя.
 		return "нет: конфиг отвергнут"
 	}
@@ -1444,7 +1791,7 @@ func (e *entry) isolationNote() string {
 	if note != "" {
 		return "без изоляции: " + note
 	}
-	if sb := e.srv.Sandbox; sb != nil && sb.Mode == config.SandboxModeBwrap {
+	if sb := srv.Sandbox; sb != nil && sb.Mode == config.SandboxModeBwrap {
 		return "bwrap"
 	}
 	return ""
