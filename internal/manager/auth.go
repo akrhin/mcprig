@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/akrhin/mcprig/internal/httplisten"
 )
 
 const (
@@ -246,23 +248,10 @@ func (a *auth) loginEnabled() bool {
 	return a.mode == modePassword || a.mode == modeProxyPassword
 }
 
-// hostOK — Host обязан быть в списке. Пустой список значит loopback, как в
-// internal/httplisten: «не настроено» не должно означать «любой хост».
+// hostOK — Host обязан быть в списке. Политика одна на панель и на набор:
+// httplisten.HostAllowed, где пустой список значит loopback, а не «любой хост».
 func (a *auth) hostOK(host string) bool {
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	host = strings.ToLower(strings.Trim(host, "[]"))
-	allowed := a.allowedHosts
-	if len(allowed) == 0 {
-		allowed = []string{"127.0.0.1", "localhost", "::1"}
-	}
-	for _, h := range allowed {
-		if h == "*" || strings.ToLower(h) == host {
-			return true
-		}
-	}
-	return false
+	return httplisten.HostAllowed(host, a.allowedHosts)
 }
 
 func (a *auth) proxyOK(r *http.Request) bool {
@@ -341,18 +330,11 @@ func (a *auth) clientIP(r *http.Request) string {
 // адрес из X-Forwarded-For. Считаем по обоим: подмена заголовка упирается в
 // адрес сокета, а за честным прокси лимит остаётся на реального клиента.
 func (a *auth) loginIPs(r *http.Request) []string {
-	socket := hostOnly(r.RemoteAddr)
+	socket := httplisten.HostOnly(r.RemoteAddr)
 	if ip := a.clientIP(r); ip != socket {
 		return []string{socket, ip}
 	}
 	return []string{socket}
-}
-
-func hostOnly(addr string) string {
-	if h, _, err := net.SplitHostPort(addr); err == nil {
-		return h
-	}
-	return addr
 }
 
 // secureRequest — панель обычно стоит за TLS-прокси, где до Go доходит http.

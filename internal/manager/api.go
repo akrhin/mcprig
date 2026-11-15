@@ -851,13 +851,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 type setView struct {
 	registry.PublicSetEntry
 	Runtime RuntimeStatus `json:"runtime"`
+	// KeyMark — отпечаток основного ключа ровно в той форме, в какой он уходит
+	// в статистику (`key:<mark>`): панель сопоставляет строку статистики с
+	// ключом. Пусто у открытого набора: ключа нет, метки нет.
+	KeyMark string `json:"keyMark"`
 	// ReloadError — правка уже в реестре, но процесс набора не применил её без
 	// перезапуска: ответ 200 отдаёт причину полем, а не теряет правку.
 	ReloadError string `json:"reloadError,omitempty"`
 }
 
 func (m *Manager) setView(set *registry.Set) setView {
-	return setView{PublicSetEntry: registry.PublicSet(set), Runtime: m.rt.status(set)}
+	v := setView{PublicSetEntry: registry.PublicSet(set), Runtime: m.rt.status(set)}
+	if tokens := registry.ActiveTokens(set.Keys); !set.Open && len(tokens) > 0 {
+		v.KeyMark = stats.Fingerprint(tokens[0])
+	}
+	return v
 }
 
 func (m *Manager) setViews() []setView {

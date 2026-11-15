@@ -125,17 +125,16 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	if log == nil {
 		log = slog.Default()
 	}
+	// The SDK's own DNS-rebinding guard is intentionally off, so this list is
+	// the only Host policy: an empty config must not mean "any host". The
+	// guard passes it to HostAllowed, which owns the loopback default.
 	allowed := cfg.Transport.AllowedHosts
 	if len(allowed) == 0 {
-		// The SDK's own DNS-rebinding guard is intentionally off, so this list
-		// is the only Host policy: an empty config must not mean "any host".
-		allowed = []string{"127.0.0.1", "localhost", "::1"}
-		log.Warn("httplisten: allowedHosts пуст — принимаем только loopback", "hosts", allowed)
-	} else {
-		for _, host := range allowed {
-			if host == "*" {
-				log.Warn("httplisten: allowedHosts содержит \"*\" — защита от rebinding отключена для любого Host")
-			}
+		log.Warn("httplisten: allowedHosts пуст — принимаем только loopback", "hosts", loopbackHosts)
+	}
+	for _, host := range allowed {
+		if host == "*" {
+			log.Warn("httplisten: allowedHosts содержит \"*\" — защита от rebinding отключена для любого Host")
 		}
 	}
 	path := cfg.Transport.Path
@@ -258,15 +257,14 @@ func guard(next http.Handler, auth *authSet, openRoute bool, allowed []string) h
 			return
 		}
 
-		host := hostOnly(r.Host)
-		if !hostAllowed(host, allowed) {
+		if !HostAllowed(r.Host, allowed) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 			return
 		}
 
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, err := url.Parse(origin)
-			if err != nil || !hostAllowed(hostOnly(u.Host), allowed) {
+			if err != nil || !HostAllowed(u.Host, allowed) {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
@@ -362,17 +360,28 @@ func bearerOK(r *http.Request, tokens *tokenSet) bool {
 	return tokens.ok(presented)
 }
 
-// hostOnly drops the port: AllowedHosts is a host list, not a listener list.
-func hostOnly(hostport string) string {
+// loopbackHosts is the Host policy when none is configured: one copy for the
+// set endpoint and the panel, so "not set" never comes to mean "any host".
+var loopbackHosts = []string{"127.0.0.1", "localhost", "::1"}
+
+// HostOnly drops the port: AllowedHosts is a host list, not a listener list.
+func HostOnly(hostport string) string {
 	if host, _, err := net.SplitHostPort(hostport); err == nil {
 		return host
 	}
 	return strings.Trim(hostport, "[]")
 }
 
-func hostAllowed(host string, allowed []string) bool {
+// HostAllowed is the one Host/rebinding policy for a set endpoint and for the
+// panel. An empty list means loopback; an entry may carry a port, ignored like
+// the checked host's.
+func HostAllowed(hostport string, allowed []string) bool {
+	if len(allowed) == 0 {
+		allowed = loopbackHosts
+	}
+	host := HostOnly(hostport)
 	for _, a := range allowed {
-		if a == "*" || strings.EqualFold(hostOnly(a), host) {
+		if a == "*" || strings.EqualFold(HostOnly(a), host) {
 			return true
 		}
 	}
