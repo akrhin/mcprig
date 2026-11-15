@@ -25,7 +25,7 @@ bash scripts/docs-check.sh        # ворота документации: сс�
 bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
 ```
 
-Go-тулчейн: локально 1.24.4, модуль требует 1.27.3 — `GOTOOLCHAIN=auto` скачивает нужный тулчейн сам (проверено: `GOTOOLCHAIN=go1.27.3 go version`).
+Go-тулчейн: локально 1.24.4, модуль требует 1.27.4 — `GOTOOLCHAIN=auto` скачивает нужный тулчейн сам (проверено: `GOTOOLCHAIN=go1.27.4 go version`).
 
 ## Ссылки
 
