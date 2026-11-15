@@ -68,6 +68,8 @@ type Set struct {
 	Autostart   bool     `json:"autostart,omitempty"`
 	Open        bool     `json:"open,omitempty"`
 	Notify      *Notify  `json:"notify,omitempty"`
+	// RateLimit — лимит частоты вызовов набора; нет поля или ноль — без него.
+	RateLimit *config.RateLimit `json:"rateLimit,omitempty"`
 }
 
 // Data is registry.json.

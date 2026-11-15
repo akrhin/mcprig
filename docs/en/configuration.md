@@ -291,6 +291,12 @@ the set-wide value, then to the default. Dynamic client registration, PKCE,
 code exchange and refresh are done by the MCP SDK. Tokens are stored in
 `<data dir>/oauth.json`.
 
+The panel has its own OAuth redirect, which is not a `servers.json` field: it is
+pinned by `MCPRIG_PUBLIC_URL` (see [cli.md](cli.md#panel)), so that a panel
+behind a proxy registers the address the provider actually sees. Without it the
+panel builds the address from its listen host and port; `mcprig doctor` prints
+the result and flags one that cannot receive the code.
+
 ## notify
 
 A set field in `registry.json` — where to report that the set broke:
@@ -327,6 +333,49 @@ timeout each; after the third one the journal gets a `вебхук набора 
 Delivery runs in its own goroutine: a crash and a restart never wait for it. The
 body carries identifiers and the exit code only — no token, no `env`, no command;
 the webhook is an external host and must not be trusted.
+
+## rateLimit
+
+A set field in `registry.json`, copied into the set's own `servers.json` — how
+often one caller may call the set's tools:
+
+```json
+{
+  "rateLimit": {
+    "perMinute": 120,
+    "burst": 20,
+    "perTool": {"serena/find_symbol": {"perMinute": 10, "burst": 2}}
+  }
+}
+```
+
+| field | meaning |
+| --- | --- |
+| `perMinute` | the set-wide limit: calls per minute for one caller and one `server/tool` pair |
+| `burst` | how many calls pass at once; `perMinute` when absent, so a bare `perMinute` lets a whole minute's quota through at once |
+| `perTool` | overrides the limit for one `server/tool` pair; `perMinute: 0` lifts the set-wide limit for that tool |
+
+No block, or a block of zeros, means no limit — the behaviour without the field.
+Editing follows `notify`: an absent field keeps the stored block, `null` removes
+it, an object replaces it whole; a bad value is rejected on write (400) with the
+field name. The panel has no field for it.
+
+The caller is identified by the fingerprint of its access key, so one key's
+quota never mixes with another key's. The key's note and the `_meta` clientInfo
+do not touch the bucket: the note only renames the caller in `/stats`, and
+clientInfo is what the caller says about itself — a change there mints no quota.
+A set without keys is open, and its callers are named by the label they send
+themselves (`_meta` clientInfo or User-Agent): such a label is **not** identity —
+it only keeps one caller's traffic out of another's bucket, and anyone can copy
+it.
+
+Every call is counted, including each inner call of `invoke_many`. The check runs
+before the set opens a downstream session, so a refused call never reaches a
+server; [meta-tools.md](meta-tools.md#rate-limit) shows the refusal text.
+`/stats` reports refusals as `throttled`, and `/api/calls` sums them into its
+answer. Buckets are capped at 4096 and dropped after 10 minutes idle: a flood of
+invented tool names evicts the least recently used bucket instead of growing the
+map.
 
 ## See also
 

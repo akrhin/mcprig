@@ -3,6 +3,7 @@ package manager
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,9 +38,16 @@ const restartTimeout = 60 * time.Second
 
 // Options — всё, что нужно менеджеру. FromEnv читает MCPRIG_*.
 type Options struct {
-	DataDir  string
-	Host     string
-	Port     int
+	DataDir string
+	Host    string
+	Port    int
+	// PublicURL — адрес, по которому панель видит внешний мир (за TLS-прокси
+	// или с собственным сертификатом). Задан — единственный источник redirect
+	// OAuth и ссылок; пуст — прежняя сборка из Host и Port.
+	PublicURL string
+	// TLSCert/TLSKey включают https на листенере панели; задавать только парой.
+	TLSCert  string
+	TLSKey   string
 	CLIPath  string // бинарник, который запускается как набор: `serve --config …`
 	BindIP   string // transport.host в servers.json набора
 	SeedFile string
@@ -61,13 +69,16 @@ func FromEnv(version string) Options {
 		}
 	}
 	return Options{
-		DataDir:  envOr(os.Getenv("MCPRIG_DATA_DIR"), defaultDataDir()),
-		Host:     envOr(os.Getenv("MCPRIG_HOST"), "127.0.0.1"),
-		Port:     port,
-		CLIPath:  os.Getenv("MCPRIG_CLI"),
-		BindIP:   envOr(os.Getenv("MCPRIG_BIND_IP"), "0.0.0.0"),
-		SeedFile: os.Getenv("MCPRIG_SEED_FILE"),
-		Version:  version,
+		DataDir:   envOr(os.Getenv("MCPRIG_DATA_DIR"), defaultDataDir()),
+		Host:      envOr(os.Getenv("MCPRIG_HOST"), "127.0.0.1"),
+		Port:      port,
+		PublicURL: strings.TrimSpace(os.Getenv("MCPRIG_PUBLIC_URL")),
+		TLSCert:   os.Getenv("MCPRIG_TLS_CERT"),
+		TLSKey:    os.Getenv("MCPRIG_TLS_KEY"),
+		CLIPath:   os.Getenv("MCPRIG_CLI"),
+		BindIP:    envOr(os.Getenv("MCPRIG_BIND_IP"), "0.0.0.0"),
+		SeedFile:  os.Getenv("MCPRIG_SEED_FILE"),
+		Version:   version,
 		Auth: AuthOptions{
 			Password:     os.Getenv("MCPRIG_PASSWORD"),
 			PasswordHash: os.Getenv("MCPRIG_PASSWORD_HASH"),
@@ -103,6 +114,7 @@ type Manager struct {
 	health  *healthCache
 	browse  *browser
 	routes  []route
+	tls     *tls.Config
 
 	healthStop  chan struct{}
 	healthDone  chan struct{}
@@ -124,6 +136,27 @@ func New(opts Options) (*Manager, error) {
 	if opts.DataDir == "" {
 		return nil, errors.New("менеджер: не задан каталог данных")
 	}
+	// Публичный адрес — контракт наружу: битое значение валит старт, иначе
+	// redirect уводил бы провайдера в пустоту.
+	if opts.PublicURL != "" {
+		if err := config.ValidatePublicURL(opts.PublicURL); err != nil {
+			return nil, err
+		}
+	}
+	var tlsConf *tls.Config
+	if opts.TLSCert != "" || opts.TLSKey != "" {
+		if opts.TLSCert == "" || opts.TLSKey == "" {
+			return nil, errors.New("менеджер: TLS панели требует и cert, и key — задайте оба или ни одного")
+		}
+		pair, err := tls.LoadX509KeyPair(opts.TLSCert, opts.TLSKey)
+		if err != nil {
+			return nil, fmt.Errorf("менеджер: TLS панели: %w", err)
+		}
+		tlsConf = &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}
+	}
+	// Cookie сессии — Secure по публичной схеме, а не по r.TLS: за TLS-прокси
+	// до Go доходит http, и cookie осталась бы незащищённой.
+	opts.Auth.Secure = opts.Auth.Secure || tlsConf != nil || strings.HasPrefix(strings.ToLower(opts.PublicURL), "https://")
 	if err := os.MkdirAll(opts.DataDir, 0o700); err != nil {
 		return nil, err
 	}
@@ -187,6 +220,7 @@ func New(opts Options) (*Manager, error) {
 		auth:    a,
 		log:     log,
 		version: version,
+		tls:     tlsConf,
 		health:  newHealthCache(),
 		browse:  newBrowser(sec, version),
 		ctx:     ctx,
@@ -257,12 +291,23 @@ func Run(opts Options) error {
 	srv := &http.Server{
 		Addr:              net.JoinHostPort(opts.Host, strconv.Itoa(opts.Port)),
 		Handler:           m.Handler(),
+		TLSConfig:         m.tls,
 		ReadHeaderTimeout: 15 * time.Second,
 		IdleTimeout:       60 * time.Second, // WriteTimeout не ставим: SSE-стримы панели живут дольше любого таймаута записи
 	}
 	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
-	m.log.Info("менеджер запущен", "addr", srv.Addr, "data", opts.DataDir, "auth", m.auth.mode)
+	go func() {
+		if m.tls != nil {
+			errc <- srv.ListenAndServeTLS("", "")
+			return
+		}
+		errc <- srv.ListenAndServe()
+	}()
+	scheme := "http"
+	if m.tls != nil {
+		scheme = "https"
+	}
+	m.log.Info("менеджер запущен", "addr", srv.Addr, "scheme", scheme, "publicUrl", opts.PublicURL, "data", opts.DataDir, "auth", m.auth.mode)
 	m.Autostart()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -705,17 +750,20 @@ func (m *Manager) originMatches(u *url.URL, r *http.Request) bool {
 
 // requestAuthorities — origin'ы, которыми клиент видит запрос: сам Host и
 // публичное имя прокси. За TLS-прокси до Go доходит http, поэтому https-схема
-// считается своей при X-Forwarded-Proto (secureRequest), X-Forwarded-Host или
-// настроенном секрете прокси; иначе https-Origin на http-запросе — отказ.
+// считается своей при доверенном прокси (задан MCPRIG_PROXY_SECRET) либо при
+// собственном TLS панели; иначе https-Origin на http-запросе — отказ.
+// X-Forwarded-* без доверенного прокси игнорируются: иначе любой клиент
+// подделал бы публичное имя и снял проверку Origin.
 // Как только https признан своим, http-Origin отбрасывается целиком.
 func (m *Manager) requestAuthorities(r *http.Request) []originAuthority {
+	trustProxy := m.auth.proxySecret != ""
 	scheme := "http"
-	if secureRequest(r) || m.auth.proxySecret != "" || r.Header.Get("X-Forwarded-Host") != "" {
+	if secureRequest(r, trustProxy) || trustProxy {
 		scheme = "https"
 	}
 	host, port := splitAuthority(r.Host, scheme)
 	out := []originAuthority{{scheme: scheme, host: host, port: port}}
-	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {
+	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" && trustProxy {
 		fwdHost, fwdPort := splitAuthority(fwd, "https")
 		if p := r.Header.Get("X-Forwarded-Port"); p != "" && !hasPort(fwd) {
 			fwdPort = p
@@ -731,10 +779,15 @@ func hasPort(hostport string) bool {
 }
 
 // hostAllowed — то же послабление для самого Host: прокси переписывает его на
-// внутренний адрес, а публичное имя приходит в X-Forwarded-Host.
+// внутренний адрес, а публичное имя приходит в X-Forwarded-Host. Заголовку
+// верим только при доверенном прокси (MCPRIG_PROXY_SECRET): без него Host
+// проверяется как есть, иначе подделанный заголовок снял бы защиту от rebinding.
 func (m *Manager) hostAllowed(r *http.Request) bool {
 	if m.auth.hostOK(r.Host) {
 		return true
+	}
+	if m.auth.proxySecret == "" {
+		return false
 	}
 	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {
 		return m.auth.hostOK(fwd)

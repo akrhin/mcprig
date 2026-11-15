@@ -206,6 +206,11 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 			return
 		}
 
+		// Отпечаток ключа едет отдельно от метки: подпись ключа и _meta
+		// clientInfo — не идентичность, а лимит частоты корзинит по ключу.
+		if presented, ok := bearerToken(r); ok {
+			r = r.WithContext(stats.WithClientKey(r.Context(), stats.Fingerprint(presented)))
+		}
 		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r, names)))
 
 		if r.Body != nil {

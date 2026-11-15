@@ -138,6 +138,9 @@ No flags. Everything is environment:
 | `MCPRIG_DATA_DIR` | `$XDG_STATE_HOME/mcprig`, else `~/.local/state/mcprig` | registry, keys, logs, OAuth tokens |
 | `MCPRIG_HOST` | `127.0.0.1` | panel listen address |
 | `MCPRIG_PORT` | `9091` | panel port |
+| `MCPRIG_PUBLIC_URL` | empty | public address of the panel, `http(s)://host[:port][/prefix]`; when set it is the only source of the OAuth redirect and of the `Secure` cookie decision. Validated at startup: scheme, host, no query/fragment, no trailing `/` |
+| `MCPRIG_TLS_CERT` | empty | certificate for the panel listener; set together with `MCPRIG_TLS_KEY` — one without the other refuses to start, and an unreadable file fails startup |
+| `MCPRIG_TLS_KEY` | empty | private key for the panel listener |
 | `MCPRIG_CLI` | the running executable | binary spawned for each set (`serve --config …`) |
 | `MCPRIG_BIND_IP` | `0.0.0.0` | `transport.host` written into every set's `servers.json` |
 | `MCPRIG_SEED_FILE` | empty | JSON with `servers[]` and `sets[]`; used only when the registry is empty; new keys are generated for closed sets |
@@ -167,8 +170,23 @@ loopback unless `MCPRIG_HOST` says otherwise.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
-2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 data=/var/lib/mcprig auth=none
+2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 scheme=http publicUrl= data=/var/lib/mcprig auth=none
 ```
+
+`MCPRIG_PUBLIC_URL` is the address the panel is reached at from outside. It is
+the only source of the OAuth redirect (`<publicUrl>/oauth/callback`, the path
+prefix kept) and decides that the session cookie is `Secure`; without it the
+panel keeps building the redirect from `MCPRIG_HOST` and `MCPRIG_PORT`. A value
+that does not parse, has no host, carries a query or fragment, or ends with `/`
+stops the panel at startup.
+
+With `MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` the panel serves https itself; the
+session cookie is `Secure` whenever the public address is `https` or the panel
+has its own certificate, even though a TLS reverse proxy hands the process plain
+http. `X-Forwarded-Proto` and `X-Forwarded-Host` are trusted only when
+`MCPRIG_PROXY_SECRET` is set — without it they are ignored: they neither mark a
+request `https` nor name the panel for the Host and Origin checks, and the OAuth
+redirect never depends on them.
 
 A second panel on the same data directory refuses to start because of
 `manager.pid`.
@@ -195,7 +213,7 @@ autostart, listener, `/healthz` status); keys (count and the active key's
 8-character `keyPrefix`); `${VAR}` secrets (names only, with the source —
 OpenBao, `env.json` or the environment — never values); services (foreign
 listeners in `9100–9199`, `sets/*/oauth.json` size, `tool-out/` size, panel
-`/healthz`). The version and binary path line is printed above the first
+`/healthz`, and the effective OAuth redirect). The version and binary path line is printed above the first
 heading. The sandbox is a line inside the services section: it runs `bwrap`
 with a user namespace and reports `песочница: bwrap запускается, userns
 разрешён`, or a problem when a config actually asks for isolation and bwrap or
@@ -204,7 +222,10 @@ userns is missing — exit code 1.
 Exit code: `0` when every line is `ok`, `1` otherwise; the last line is
 `итог: N проблем`. Set listeners are dialled through `MCPRIG_BIND_IP` (a
 wildcard resolves to loopback); the panel address comes from `MCPRIG_HOST` and
-`MCPRIG_PORT`.
+`MCPRIG_PORT`. The same section prints the effective OAuth redirect built from
+`MCPRIG_PUBLIC_URL` (or the panel address): no host, port `0` or a loopback host
+behind `https` is a problem, because an identity provider cannot send the code
+there.
 
 ```text
 mcprig doctor, версия dev (/usr/local/bin/mcprig)
@@ -226,6 +247,7 @@ ok: чужие порты в диапазоне 9100–9199: 9119 (выдача 
 ok: sets/*/oauth.json нет
 ok: tool-out нет
 ok: панель 127.0.0.1:9091: /healthz 200
+ok: redirect OAuth: http://127.0.0.1:9091/oauth/callback
 
 итог: 0 проблем
 ```

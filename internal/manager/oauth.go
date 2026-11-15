@@ -212,17 +212,25 @@ func deliverAuth(ch chan authOutcome, o authOutcome) {
 	}
 }
 
-// callbackURL — адрес приёма кода: тот же хост и порт, по которым открыта
-// панель, поэтому человеку не нужно ничего пробрасывать.
-func (m *Manager) callbackURL() (string, error) {
-	host := m.opts.Host
+// CallbackURL — адрес приёма кода. Заданный publicUrl — единственный источник
+// (префикс пути сохраняется: https://host/prefix → https://host/prefix/oauth/
+// callback). Без него берётся хост и порт панели, по которым её и открыли,
+// чтобы человеку не пробрасывать порты.
+func CallbackURL(publicURL, host string, port int) (string, error) {
+	if publicURL != "" {
+		return publicURL + "/oauth/callback", nil
+	}
 	if host == "" || host == "0.0.0.0" || host == "::" {
 		host = lanIPv4()
 	}
 	if host == "" {
 		return "", errors.New("не удалось определить адрес панели для приёма кода: задайте host в настройках")
 	}
-	return fmt.Sprintf("http://%s:%d/oauth/callback", host, m.opts.Port), nil
+	return fmt.Sprintf("http://%s:%d/oauth/callback", host, port), nil
+}
+
+func (m *Manager) callbackURL() (string, error) {
+	return CallbackURL(m.opts.PublicURL, m.opts.Host, m.opts.Port)
 }
 
 func lanIPv4() string {

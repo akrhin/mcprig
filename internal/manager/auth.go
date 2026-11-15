@@ -36,6 +36,9 @@ type AuthOptions struct {
 	UserHeader   string
 	AllowedHosts []string
 	Off          bool
+	// Secure ставит cookie Secure независимо от r.TLS: панель за TLS-прокси
+	// видит http, а публичный адрес (или собственный TLS) говорит https.
+	Secure bool
 }
 
 type scryptHash struct {
@@ -164,6 +167,7 @@ type auth struct {
 	password     string
 	hash         *scryptHash
 	proxySecret  string
+	secure       bool
 	user         string
 	userHeader   string
 	allowedHosts []string
@@ -195,6 +199,7 @@ func newAuth(o AuthOptions) (*auth, error) {
 	a := &auth{
 		password:     o.Password,
 		proxySecret:  o.ProxySecret,
+		secure:       o.Secure,
 		user:         o.User,
 		userHeader:   o.UserHeader,
 		allowedHosts: o.AllowedHosts,
@@ -334,8 +339,10 @@ func (a *auth) clientIP(r *http.Request) string {
 }
 
 // secureRequest — панель обычно стоит за TLS-прокси, где до Go доходит http.
-func secureRequest(r *http.Request) bool {
-	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+// X-Forwarded-Proto верим только доверенному прокси (задан
+// MCPRIG_PROXY_SECRET): иначе любой клиент пометил бы свой http-запрос https.
+func secureRequest(r *http.Request, trustProxy bool) bool {
+	return r.TLS != nil || (trustProxy && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"))
 }
 
 // loginBlocked — попытки с этого IP исчерпаны; возвращает остаток окна.
@@ -413,7 +420,7 @@ func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, err
 		MaxAge:   int(sessionTTL / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   secureRequest(r),
+		Secure:   a.secure || secureRequest(r, a.proxySecret != ""),
 	})
 	return a.user, nil
 }
@@ -429,6 +436,6 @@ func (a *auth) clearSession(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   secureRequest(r),
+		Secure:   a.secure || secureRequest(r, a.proxySecret != ""),
 	})
 }

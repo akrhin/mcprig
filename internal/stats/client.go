@@ -37,6 +37,27 @@ func Fingerprint(token string) string {
 	return hex.EncodeToString(sum[:])[:6]
 }
 
+type clientFPKey struct{}
+
+// WithClientKey carries the access key's fingerprint down the request. It is
+// separate from the display label on purpose: the label can be a note the owner
+// gave the key or a clientInfo the caller sends, and neither identifies a key.
+// The rate limiter buckets by this value, so a caller cannot mint quotas by
+// changing what it calls itself.
+func WithClientKey(ctx context.Context, fp string) context.Context {
+	if fp == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, clientFPKey{}, fp)
+}
+
+// ClientKey reports the fingerprint set by the transport; empty for a request
+// that carried no key (an open set, or stdio).
+func ClientKey(ctx context.Context) string {
+	v, _ := ctx.Value(clientFPKey{}).(string)
+	return v
+}
+
 // Label builds the HTTP client label: "key:<id>" plus the User-Agent product
 // token, so two harnesses sharing one key stay distinguishable.
 func Label(keyID, userAgent string) string {

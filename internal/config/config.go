@@ -5,7 +5,10 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -735,6 +738,37 @@ type Config struct {
 	RequestTimeout int            `json:"requestTimeout,omitempty"` // ms
 	Permissions    *Permissions   `json:"permissions,omitempty"`
 	OAuth          *OAuth         `json:"oauth,omitempty"`
+	// RateLimit — лимит вызовов на клиента; пустое или нулевое поле — без него.
+	RateLimit *RateLimit `json:"rateLimit,omitempty"`
+}
+
+// ValidatePublicURL проверяет админский публичный адрес панели: абсолютный
+// http(s) с хостом, без query/fragment и без хвостового «/». Адрес становится
+// единственным источником OAuth-redirect, поэтому битое значение — отказ
+// конфигурации, а не тихий дефолт.
+func ValidatePublicURL(raw string) error {
+	// По сырой строке: url.Parse("https://host#") даёт пустой Fragment, и
+	// значение прошло бы.
+	if strings.ContainsAny(raw, "?#") {
+		return fmt.Errorf("publicUrl: query и fragment запрещены: %q", raw)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("publicUrl: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("publicUrl: нужна схема http или https: %q", raw)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("publicUrl: пустой хост: %q", raw)
+	}
+	if u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
+		return fmt.Errorf("publicUrl: query и fragment запрещены: %q", raw)
+	}
+	if strings.HasSuffix(u.Path, "/") {
+		return fmt.Errorf("publicUrl: хвостовой «/» запрещён: %q", raw)
+	}
+	return nil
 }
 
 // OAuthFor returns the effective OAuth settings for one server, set-wide block
@@ -762,6 +796,7 @@ func Load(path string) (*Config, error) {
 		RequestTimeout int               `json:"requestTimeout"`
 		Permissions    json.RawMessage   `json:"permissions"`
 		OAuth          *OAuth            `json:"oauth"`
+		RateLimit      json.RawMessage   `json:"rateLimit"`
 	}
 	if err := json.Unmarshal(data, &shape); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -777,6 +812,24 @@ func Load(path string) (*Config, error) {
 		shape.Transport.AuthToken = token
 	}
 	cfg := &Config{Transport: shape.Transport, HealthMonitor: shape.HealthMonitor, RequestTimeout: shape.RequestTimeout}
+	// Битый блок лимита отбрасывается, как и битый глобальный OAuth: опечатка
+	// не должна валить набор, а «нет лимита» — сегодняшнее поведение. Молча —
+	// нет: владелец должен увидеть, что лимита, на который он рассчитывал, нет.
+	if len(shape.RateLimit) > 0 {
+		var rl RateLimit
+		err := rl.Decode(shape.RateLimit)
+		if err == nil {
+			if msg := rl.Check(); msg != "" {
+				err = errors.New(msg)
+			}
+		}
+		switch {
+		case err != nil:
+			slog.Default().Warn("rateLimit отброшен: набор работает без лимита", "path", path, "err", err)
+		case !rl.Empty():
+			cfg.RateLimit = &rl
+		}
+	}
 	// A broken global OAuth block is dropped too: a typo must not brick the set.
 	if shape.OAuth.validate("oauth") == "" {
 		cfg.OAuth = shape.OAuth

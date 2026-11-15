@@ -54,6 +54,10 @@ type callsResponse struct {
 	Counters    []counterRow  `json:"counters"`
 	Schema      *stats.Schema `json:"schema,omitempty"`
 	Unreachable []string      `json:"unreachable,omitempty"`
+	// Отказы лимита частоты: сумма по наборам ответа. В Calls и Counters их нет
+	// — до нижестоящего сервера такой вызов не дошёл.
+	Throttled      int64            `json:"throttled,omitempty"`
+	ThrottledTools map[string]int64 `json:"throttledTools,omitempty"`
 }
 
 // apiCalls собирает /stats запущенных наборов в один ответ панели.
@@ -116,6 +120,13 @@ func (m *Manager) apiCalls(req *request) error {
 		// Вес схем — свойство одного набора: в объединённом ответе молчим.
 		if id != "" && snap.Schema != nil {
 			out.Schema = snap.Schema
+		}
+		out.Throttled += snap.Throttled
+		for tool, n := range snap.ThrottledTools {
+			if out.ThrottledTools == nil {
+				out.ThrottledTools = make(map[string]int64, len(snap.ThrottledTools))
+			}
+			out.ThrottledTools[tool] += n
 		}
 		for _, c := range snap.Tail {
 			// Окно по времени строки. Набор отдаёт только хвост своего /stats,

@@ -375,3 +375,35 @@ func TestReservedEnvRejected(t *testing.T) {
 		t.Errorf("резервные серверы пригодны: %d", n)
 	}
 }
+
+// TestPublicURLValidation: публичный адрес панели становится redirect, поэтому
+// битое значение — отказ, а не тихий дефолт.
+func TestPublicURLValidation(t *testing.T) {
+	good := []string{
+		"https://mcprig.example",
+		"http://192.168.1.92:9088",
+		"https://mcprig.example/mcprig",
+	}
+	for _, s := range good {
+		if err := ValidatePublicURL(s); err != nil {
+			t.Fatalf("%q отвергнут: %v", s, err)
+		}
+	}
+	bad := []string{
+		"",
+		"mcprig.example",
+		"ftp://mcprig.example",
+		"https://",
+		"https://mcprig.example/",
+		"https://mcprig.example/#",
+		"https://mcprig.example/prefix#",
+		"https://mcprig.example/prefix/",
+		"https://mcprig.example/?a=1",
+		"https://mcprig.example/#frag",
+	}
+	for _, s := range bad {
+		if err := ValidatePublicURL(s); err == nil {
+			t.Fatalf("%q принят", s)
+		}
+	}
+}

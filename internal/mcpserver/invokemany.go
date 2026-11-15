@@ -92,6 +92,13 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 				out[i] = ans
 				return
 			}
+			// Лимит считается на каждый внутренний вызов, как у invoke_command.
+			if err := m.throttle(ctx, req, e.srv.Name, c.CommandName); err != nil {
+				ans.Error = err.Error()
+				ans.MS = time.Since(start).Milliseconds()
+				out[i] = ans
+				return
+			}
 			slot := slots.get(e)
 			select {
 			case slot <- struct{}{}:

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -53,6 +54,7 @@ type doctorOptions struct {
 	BindIP     string
 	PanelHost  string
 	PanelPort  int
+	PublicURL  string
 	FirstPort  int
 	LastPort   int
 	Version    string
@@ -81,6 +83,7 @@ func runDoctor(args []string) error {
 		BindIP:     envDefault("MCPRIG_BIND_IP", "0.0.0.0"),
 		PanelHost:  envDefault("MCPRIG_HOST", "127.0.0.1"),
 		PanelPort:  envPort("MCPRIG_PORT", 9091),
+		PublicURL:  strings.TrimSpace(os.Getenv("MCPRIG_PUBLIC_URL")),
 		FirstPort:  registry.FirstPort,
 		LastPort:   registry.LastPort,
 		Version:    version,
@@ -123,6 +126,7 @@ func buildDoctorReport(o doctorOptions, envLine doctorLine, haveEnv bool) doctor
 		rep.Secrets = checkSecrets(scanRaw, o.DataDir)
 	}
 	rep.Services = append(checkSandbox(cfg), checkServices(o, reg, regErr)...)
+	rep.Services = append([]doctorLine{checkRedirect(o)}, rep.Services...)
 
 	for _, lines := range [][]doctorLine{rep.Version, rep.Config, rep.Sets, rep.Keys, rep.Secrets, rep.Services} {
 		for _, line := range lines {
@@ -437,6 +441,34 @@ func checkSandbox(cfg *config.Config) []doctorLine {
 		return []doctorLine{{true, fmt.Sprintf("песочница: %v", err)}}
 	}
 	return []doctorLine{{true, "песочница: bwrap запускается, userns разрешён"}}
+}
+
+// checkRedirect печатает эффективный адрес приёма кода и ругается, когда он
+// ведёт в пустоту: провайдер отвергнет регистрацию, а человек — ссылку.
+func checkRedirect(o doctorOptions) doctorLine {
+	if o.PublicURL != "" {
+		if err := config.ValidatePublicURL(o.PublicURL); err != nil {
+			return doctorLine{false, fmt.Sprintf("redirect OAuth: %v", err)}
+		}
+	}
+	redirect, err := manager.CallbackURL(o.PublicURL, o.PanelHost, o.PanelPort)
+	if err != nil {
+		return doctorLine{false, fmt.Sprintf("redirect OAuth: %v", err)}
+	}
+	u, err := url.Parse(redirect)
+	if err != nil {
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %q: %v", redirect, err)}
+	}
+	host := u.Hostname()
+	switch {
+	case host == "":
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %s: нет хоста", redirect)}
+	case u.Port() == "0":
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %s: порт 0", redirect)}
+	case u.Scheme == "https" && (strings.EqualFold(host, "localhost") || (net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback())):
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %s: loopback при https недостижим снаружи", redirect)}
+	}
+	return doctorLine{true, "redirect OAuth: " + redirect}
 }
 
 func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLine {

@@ -10,6 +10,25 @@ repository the project is built in.
 
 ### Added
 
+- The panel states where it is reachable: `MCPRIG_PUBLIC_URL` sets the public
+  address (`http(s)://host[:port][/prefix]`), and it becomes the only source of
+  the OAuth redirect (`<publicUrl>/oauth/callback`, path prefix kept) and of the
+  decision that the session cookie is `Secure`. A bad value — no scheme, no
+  host, query, fragment or a
+  trailing `/` — stops the panel at startup instead of falling back silently.
+  Without it the redirect is built from `MCPRIG_HOST` and `MCPRIG_PORT` as
+  before. `mcprig doctor` prints the effective redirect and flags one that
+  cannot receive the code (no host, port `0`, loopback behind `https`).
+- The panel can serve TLS itself: `MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` make it
+  listen over https. Both are required together, and an unreadable file fails
+  startup loudly instead of quietly dropping to http.
+- A set can cap how often a caller calls its tools: `rateLimit:
+  {"perMinute": 120, "burst": 20, "perTool": {"serena/find_symbol":
+  {"perMinute": 10, "burst": 2}}}` in the set's record. Each inner call of
+  `invoke_many` counts on its own, a caller is identified by the fingerprint of
+  its key, and a refused call is an ordinary tool error that never reaches a
+  server — `/stats` reports it as `throttled`. No block, or zeros, means no
+  limit. The field is edited in `registry.json` or over the API, as `notify`.
 - A truncated tool answer can be fetched over HTTP: `GET /tool-out/<name>`
   serves the saved file behind the same guard as `/mcp` — bearer key,
   `allowedHosts`, Origin — and the truncation marker names that URL when the set
@@ -32,6 +51,13 @@ repository the project is built in.
 
 ### Changed
 
+- `X-Forwarded-Proto` and `X-Forwarded-Host` are trusted only when
+  `MCPRIG_PROXY_SECRET` is set. Without it both are ignored for the Host and
+  Origin checks and for the `https` mark, so a client can no longer claim
+  `https` or a different public host by sending a header; the OAuth redirect
+  never depends on them. The session cookie is `Secure`
+  whenever the public address is `https` or the panel has its own certificate,
+  no longer only when the request itself arrived over TLS.
 - Browse sessions in the panel now apply the server's `permissions` to tool
   calls, the same gate `invoke_command` uses: a denied call answers `403`
   instead of reaching the server. Resources and prompts are not covered yet.

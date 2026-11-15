@@ -88,6 +88,9 @@ type Manager struct {
 	// per-request limiter let two parallel fan-outs send twice the limit.
 	slots *serverSlots
 
+	// limits is the set's call rate limiter; nil when the set has no rateLimit.
+	limits *rateLimits
+
 	// Stats, when set, counts every downstream invocation per client and
 	// tool. The panel reads the recorder; the proxy works without it.
 	Stats *stats.Recorder
@@ -200,6 +203,7 @@ func New(cfg *config.Config, version string, conn *downstream.Connector) *Manage
 		cfg:     cfg,
 		version: version,
 		slots:   newServerSlots(maxPerServer),
+		limits:  newRateLimits(cfg.RateLimit),
 		dial: func(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
 			return conn.Connect(ctx, srv)
 		},
@@ -750,6 +754,10 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if e == nil {
 		return errResult(fmt.Errorf("неизвестный сервер %q", in.Server))
 	}
+	// Лимит — до открытия сессии набора: отказ не должен поднимать апстрим.
+	if err := m.throttle(ctx, req, e.srv.Name, in.CommandName); err != nil {
+		return errResult(err)
+	}
 	if !usable(e.srv) {
 		return errResult(serverProblem(e.srv))
 	}
@@ -886,6 +894,36 @@ func clientInfoOf(req *mcp.CallToolRequest) string {
 		return info.Name + "/" + info.Version
 	}
 	return info.Name
+}
+
+// identityOf buckets rate limits. Only the key fingerprint identifies a caller:
+// it arrives on the context from the transport (stats.WithClientKey), so neither
+// the _meta clientInfo nor the User-Agent label — both self-declared — can mint
+// fresh quotas or merge two keys into one bucket. An open set sends no key, and
+// there the label is the only thing there is; a note names the key's owner but
+// is not identity, so it is a fallback, not the rule.
+func identityOf(ctx context.Context, req *mcp.CallToolRequest) string {
+	if fp := stats.ClientKey(ctx); fp != "" {
+		return "key:" + fp
+	}
+	return "label:" + labelOf(ctx, req)
+}
+
+// throttle refuses a call over the set's rate limit and counts the refusal.
+// Nil means the call may proceed; a set without rateLimit never gets past the
+// nil limiter, so today's behaviour is unchanged.
+func (m *Manager) throttle(ctx context.Context, req *mcp.CallToolRequest, server, tool string) error {
+	if m.limits == nil {
+		return nil
+	}
+	ok, perMinute, retry := m.limits.allow(identityOf(ctx, req), server, tool)
+	if ok {
+		return nil
+	}
+	if m.Stats != nil {
+		m.Stats.RecordThrottled(server, tool)
+	}
+	return fmt.Errorf("лимит %d вызовов в минуту для %s/%s, повторите через %d мс", perMinute, server, tool, retry.Milliseconds())
 }
 
 func (m *Manager) find(name string) *entry {

@@ -429,6 +429,28 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		}
 	}
 
+	// rateLimit — те же три состояния, что у notify: поля нет — значение
+	// остаётся; null — снятие; объект — замена. Нулевой блок значит «без
+	// лимита» и хранится как отсутствие поля.
+	if raw, ok := in["rateLimit"]; ok {
+		if isNull(raw) {
+			out.RateLimit = nil
+		} else {
+			var rl config.RateLimit
+			if err := rl.Decode(raw); err != nil {
+				return nil, fmt.Errorf(`rateLimit: ожидался объект {"perMinute": 120, "burst": 20, "perTool": {"server/tool": {"perMinute": 10, "burst": 2}}}: %w`, err)
+			}
+			if msg := rl.Check(); msg != "" {
+				return nil, errors.New(msg)
+			}
+			if rl.Empty() {
+				out.RateLimit = nil
+			} else {
+				out.RateLimit = &rl
+			}
+		}
+	}
+
 	out.Token = activeToken(out.Keys)
 	return out, nil
 }

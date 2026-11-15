@@ -42,6 +42,8 @@ type setFile struct {
 	Transport      setTransport     `json:"transport"`
 	HealthMonitor  setHealthMonitor `json:"healthMonitor"`
 	RequestTimeout int              `json:"requestTimeout"`
+	// RateLimit — тот же блок, что в реестре: лимит исполняет сам набор.
+	RateLimit *config.RateLimit `json:"rateLimit,omitempty"`
 }
 
 // BuildSetConfig собирает конфиг набора из реестра.
@@ -72,6 +74,7 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 		},
 		HealthMonitor:  setHealthMonitor{Interval: 60000, Timeout: 120000},
 		RequestTimeout: 120000,
+		RateLimit:      set.RateLimit,
 	}
 	for _, name := range set.Servers {
 		srv := byName[name]

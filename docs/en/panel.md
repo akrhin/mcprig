@@ -172,6 +172,11 @@ text is shown in the set status `error`.
 registry key. A set that does not answer is listed in `unreachable` by id; its
 error text is not forwarded.
 
+Calls refused by a set's `rateLimit` are not in `calls` or `counters` — no
+downstream call happened. The answer carries them separately: `throttled` (the
+sum over the sets in the answer) and `throttledTools` (`server/tool` → count).
+Both are absent until something is refused.
+
 Pages go by row time: `before=<time>` returns calls strictly older than it,
 `after=<time>` strictly newer. Both at once answer `400`, as does a value that
 is not RFC3339 (nanoseconds are accepted). Send the `time` of the last row of a
@@ -279,7 +284,8 @@ open.
 ## Access
 
 Modes come from `MCPRIG_PASSWORD`, `MCPRIG_PROXY_SECRET` and `MCPRIG_AUTH=off`;
-see [cli.md](cli.md#panel). There is no built-in TLS: put the panel behind a
+see [cli.md](cli.md#panel). The panel serves https itself when
+`MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` are set; otherwise put it behind a
 reverse proxy, or keep it on loopback.
 
 ```text
@@ -290,7 +296,10 @@ both      password and proxy secret
 ```
 
 With password auth the panel sets `mcp_session` (HMAC-SHA256, 12 h, `HttpOnly`,
-`SameSite=Lax`, `Secure` over TLS) and keeps sessions in memory. Login is
+`SameSite=Lax`, `Secure` over TLS) and keeps sessions in memory. The cookie is
+`Secure` whenever `MCPRIG_PUBLIC_URL` is `https` or the panel has its own
+certificate, not only when the request arrived over TLS — a TLS reverse proxy
+hands the process plain http, and the cookie must not leak then. Login is
 limited to 5 failures per minute per IP and runs at most two scrypt hashes at a
 time (the rest wait; past 8 pending the login answers `429`).
 `POST /api/login` answers `400` when `user` or `password` is empty (`401` is
@@ -310,11 +319,18 @@ request, a forged one from another site does not. Header-based proxy auth and
 login (`POST /api/login`, no cookie yet) are exempt.
 
 `Origin` is compared in full — scheme, host and port; `MCPRIG_ALLOWED_HOSTS` is
-not a list of sources (it names the panel itself). Behind a TLS proxy send
-`X-Forwarded-Proto: https` or `X-Forwarded-Host` (plus `X-Forwarded-Port` when
-the public port differs): otherwise the request looks like plain http and the
-panel rejects an `https` Origin on writes. A configured `MCPRIG_PROXY_SECRET`
-(trusted proxy) has the same effect; an `http` Origin is still rejected then.
+not a list of sources (it names the panel itself). `X-Forwarded-Proto` and
+`X-Forwarded-Host` are trusted only when `MCPRIG_PROXY_SECRET` is set: a
+trusted proxy then makes an `https` request count as secure and a forwarded
+host count as the panel's public name, so an `https` Origin matches. Without the
+secret both headers are ignored — otherwise any client could claim `https` and
+spoof the check.
+
+The OAuth redirect is taken from `MCPRIG_PUBLIC_URL` alone when set
+(`<publicUrl>/oauth/callback`, path prefix kept); without it the panel builds it
+from `MCPRIG_HOST` and `MCPRIG_PORT`, and the forwarded headers play no part.
+Register the redirect with your identity provider as the panel prints it —
+`mcprig doctor` shows the effective value.
 
 `Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.
 

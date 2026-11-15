@@ -173,6 +173,23 @@ so a side effect is never performed twice. `list_commands` and
 `describe_commands` are never repeated: they have their own timeouts.
 `requestTimeout`, when set, applies to one call.
 
+### Rate limit
+
+A set may carry `rateLimit` (see
+[configuration.md](configuration.md#ratelimit)). A call over the limit is
+refused as an ordinary tool error — `isError: true`, text starting `Error: ` —
+and the MCP call itself stays up:
+
+```text
+Error: лимит 60 вызовов в минуту для serena/find_symbol, повторите через 980 мс
+```
+
+The delay comes from the same token bucket that refused the call. Each inner
+call of `invoke_many` is counted on its own and carries the same refusal in its
+`error` field, so one refused entry never hides the others. The check runs before
+the set opens a downstream session: a refused call never reaches a server, and a
+refusal is counted in `/stats` as `throttled`, not as a tool call.
+
 An answer longer than `maxBytes` is cut at a UTF-8 boundary; the returned text
 ends with a marker naming the kept and full sizes and the file holding the full
 answer:

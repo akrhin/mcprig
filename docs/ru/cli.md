@@ -136,6 +136,9 @@ MCPRIG_PASSWORD='change-me' mcprig panel
 | `MCPRIG_DATA_DIR` | `$XDG_STATE_HOME/mcprig`, иначе `~/.local/state/mcprig` | реестр, ключи, логи, токены OAuth |
 | `MCPRIG_HOST` | `127.0.0.1` | адрес прослушивания панели |
 | `MCPRIG_PORT` | `9091` | порт панели |
+| `MCPRIG_PUBLIC_URL` | пусто | публичный адрес панели, `http(s)://host[:port][/prefix]`; когда задан — единственный источник redirect OAuth и решения о `Secure`-cookie. Проверяется на старте: схема, хост, без query/fragment, без хвостового `/` |
+| `MCPRIG_TLS_CERT` | пусто | сертификат слушателя панели; задаётся вместе с `MCPRIG_TLS_KEY` — одно поле без другого отбивает старт, нечитаемый файл тоже |
+| `MCPRIG_TLS_KEY` | пусто | ключ слушателя панели |
 | `MCPRIG_CLI` | запущенный исполняемый файл | бинарник, запускаемый для каждого набора (`serve --config …`) |
 | `MCPRIG_BIND_IP` | `0.0.0.0` | `transport.host`, записываемый в `servers.json` каждого набора |
 | `MCPRIG_SEED_FILE` | пусто | JSON с `servers[]` и `sets[]`; используется, только когда реестр пуст; для закрытых наборов генерируются новые ключи |
@@ -165,8 +168,22 @@ loopback, если `MCPRIG_HOST` не говорит иного.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
-2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 data=/var/lib/mcprig auth=none
+2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 scheme=http publicUrl= data=/var/lib/mcprig auth=none
 ```
+
+`MCPRIG_PUBLIC_URL` — адрес, по которому панель доступна снаружи. Это
+единственный источник redirect OAuth (`<publicUrl>/oauth/callback`, префикс пути
+сохраняется), и он же решает, что cookie сессии получает `Secure`; без него
+redirect по-прежнему собирается из `MCPRIG_HOST` и `MCPRIG_PORT`. Значение,
+которое не разбирается, без хоста, с query или fragment, с хвостовым `/`
+останавливает панель на старте.
+
+С `MCPRIG_TLS_CERT` и `MCPRIG_TLS_KEY` панель сама слушает https; cookie сессии
+получает `Secure` всегда, когда публичный адрес `https` или у панели свой
+сертификат, — хотя TLS-прокси отдаёт процессу открытый http. `X-Forwarded-Proto`
+и `X-Forwarded-Host` доверяются только при заданном `MCPRIG_PROXY_SECRET`: без
+него они игнорируются — не делают запрос `https` и не называют панель для
+проверок Host и Origin, а redirect OAuth от них не зависит никогда.
 
 Вторая панель на том же каталоге данных отказывается стартовать из-за
 `manager.pid`.
@@ -196,7 +213,7 @@ MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9091 mcprig doctor
 4. секреты `${VAR}` — только имена и источник (OpenBao, `env.json` или
    окружение), никогда значения;
 5. служебные — чужие слушатели в `9100–9199`, размер `sets/*/oauth.json`,
-   размер `tool-out/`, `/healthz` панели.
+   размер `tool-out/`, `/healthz` панели, эффективный redirect OAuth.
 
 Строка с версией и путём к бинарю печатается над первым заголовком.
 Песочница — строка внутри «служебных»: она запускает `bwrap` с user-namespace и
@@ -206,6 +223,10 @@ MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9091 mcprig doctor
 Код возврата: `0`, когда каждая строка `ok`, иначе `1`; последняя строка —
 `итог: N проблем`. Порты наборов проверяются через `MCPRIG_BIND_IP` (wildcard
 сводится к loopback); адрес панели берётся из `MCPRIG_HOST` и `MCPRIG_PORT`.
+
+Там же печатается эффективный redirect OAuth, собранный из `MCPRIG_PUBLIC_URL`
+(или адреса панели): нет хоста, порт `0` или loopback за `https` — проблема,
+потому что провайдер не сможет прислать туда код.
 
 ```text
 mcprig doctor, версия dev (/usr/local/bin/mcprig)
@@ -227,6 +248,7 @@ ok: чужие порты в диапазоне 9100–9199: 9119 (выдача 
 ok: sets/*/oauth.json нет
 ok: tool-out нет
 ok: панель 127.0.0.1:9091: /healthz 200
+ok: redirect OAuth: http://127.0.0.1:9091/oauth/callback
 
 итог: 0 проблем
 ```

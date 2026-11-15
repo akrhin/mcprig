@@ -7,11 +7,15 @@ import (
 
 func TestSecureRequestSeesProxyTLS(t *testing.T) {
 	r := httptest.NewRequest("GET", "/", nil)
-	if secureRequest(r) {
+	if secureRequest(r, false) {
 		t.Fatalf("без TLS и без заголовка cookie не Secure")
 	}
 	r.Header.Set("X-Forwarded-Proto", "https")
-	if !secureRequest(r) {
+	// Без MCPRIG_PROXY_SECRET заголовок не доверяется: клиент подделал бы https.
+	if secureRequest(r, false) {
+		t.Fatalf("X-Forwarded-Proto без доверенного прокси принят")
+	}
+	if !secureRequest(r, true) {
 		t.Fatalf("прокси сообщил https — cookie обязана быть Secure")
 	}
 }
