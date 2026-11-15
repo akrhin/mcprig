@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -233,6 +235,109 @@ func TestRenderDoctorPrefixes(t *testing.T) {
 	}
 	if strings.Contains(out, "ok: предупреждение:") {
 		t.Fatalf("предупреждение выдано за успех:\n%s", out)
+	}
+}
+
+// Пустая установка — не поломка: одна строка про init, ноль проблем.
+// Панель при этом не щупается: недостижимый порт панели в опциях не должен
+// превращаться в проблему на установке, которой ещё нет.
+func TestDoctorEmptyInstall(t *testing.T) {
+	rep := buildDoctorReport(doctorOptions{
+		ConfigPath: filepath.Join(t.TempDir(), "servers.json"),
+		DataDir:    t.TempDir(),
+		BindIP:     "0.0.0.0",
+		PanelHost:  "127.0.0.1",
+		PanelPort:  1,
+		FirstPort:  registry.FirstPort,
+		LastPort:   registry.LastPort,
+		Version:    "test",
+		Executable: "/bin/mcprig",
+	}, doctorLine{}, false)
+	if !rep.OK || rep.Problems != 0 {
+		t.Fatalf("пустая установка: проблем %d\n%s", rep.Problems, renderDoctor(rep))
+	}
+	out := string(renderDoctor(rep))
+	if !strings.Contains(out, "mcprig init") || !strings.Contains(out, "итог: 0 проблем") {
+		t.Fatalf("нет строки про init:\n%s", out)
+	}
+	if strings.Contains(out, "панель") {
+		t.Fatalf("пустая установка трогала панель:\n%s", out)
+	}
+
+	body, err := json.MarshalIndent(rep, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{`"sets": []`, `"keys": []`, `"secrets": []`, `"services": []`} {
+		if !strings.Contains(string(body), key) {
+			t.Fatalf("в JSON нет %s:\n%s", key, body)
+		}
+	}
+}
+
+// Битый реестр называет путь один раз: readRegistry уже обернул ошибку.
+// Строка повторяется в двух разделах (наборы и ключи) — итого два раза.
+func TestDoctorBrokenRegistryNamesPathOnce(t *testing.T) {
+	dataDir := t.TempDir()
+	writeDoctorFile(t, filepath.Join(dataDir, registry.RegistryFile), `{"sets": [`)
+	rep := buildDoctorReport(doctorOptions{
+		ConfigPath: filepath.Join(t.TempDir(), "servers.json"),
+		DataDir:    dataDir,
+		BindIP:     "0.0.0.0",
+		PanelHost:  "127.0.0.1",
+		PanelPort:  1,
+		FirstPort:  registry.FirstPort,
+		LastPort:   registry.LastPort,
+		Version:    "test",
+		Executable: "/bin/mcprig",
+	}, doctorLine{}, false)
+	if rep.OK || rep.Problems == 0 {
+		t.Fatalf("битый реестр — не проблема:\n%s", renderDoctor(rep))
+	}
+	out := string(renderDoctor(rep))
+	named := "реестр " + filepath.Join(dataDir, registry.RegistryFile)
+	if got := strings.Count(out, named); got != 2 {
+		t.Fatalf("путь назван %d раз, ожидалось 2:\n%s", got, out)
+	}
+}
+
+// Пустой каталог даёт exit 0, битый реестр — прежний код 1.
+func TestDoctorExitCode(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "servers.json")
+	t.Setenv("MCPRIG_DATA_DIR", t.TempDir())
+	if err := runDoctor([]string{"-config", configPath}); err != nil {
+		t.Fatalf("пустая установка: %v", err)
+	}
+
+	dir := t.TempDir()
+	writeDoctorFile(t, filepath.Join(dir, registry.RegistryFile), `{"sets": [`)
+	t.Setenv("MCPRIG_DATA_DIR", dir)
+	if err := runDoctor([]string{"-config", configPath}); !errors.Is(err, errDoctorProblems) {
+		t.Fatalf("битый реестр: want errDoctorProblems, got %v", err)
+	}
+}
+
+// Конфиг есть, реестра нет — прежнее поведение: проблема, а не «пусто».
+func TestDoctorConfigWithoutRegistry(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "servers.json")
+	writeDoctorFile(t, configPath, `{"servers":[{"name":"a","command":["x"],"enabled":true}]}`)
+	dataDir := t.TempDir()
+	rep := buildDoctorReport(doctorOptions{
+		ConfigPath: configPath,
+		DataDir:    dataDir,
+		BindIP:     "0.0.0.0",
+		PanelHost:  "127.0.0.1",
+		PanelPort:  1,
+		FirstPort:  registry.FirstPort,
+		LastPort:   registry.LastPort,
+		Version:    "test",
+		Executable: "/bin/mcprig",
+	}, doctorLine{}, false)
+	if rep.OK || rep.Problems == 0 {
+		t.Fatalf("ожидалась проблема:\n%s", renderDoctor(rep))
+	}
+	if out := string(renderDoctor(rep)); !strings.Contains(out, filepath.Join(dataDir, registry.RegistryFile)) {
+		t.Fatalf("нет упоминания реестра:\n%s", out)
 	}
 }
 
