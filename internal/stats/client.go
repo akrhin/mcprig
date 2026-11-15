@@ -76,6 +76,30 @@ func ClientAddr(ctx context.Context) string {
 	return v
 }
 
+// ServiceCallHeader marks a request the panel makes to its own set (health
+// probe, catalog load): such a call is counted nowhere — no counters, no tail,
+// no history.
+const ServiceCallHeader = "X-MCPRig-Caller"
+
+// ServiceCallerPanel is the value the manager sends on its own set requests.
+const ServiceCallerPanel = "panel"
+
+type serviceCallKey struct{}
+
+// WithServiceCall marks the request as the panel's own.
+//
+// shortcut: держатель ключа набора может послать этот заголовок и скрыть свои
+// вызовы из статистики; подписанный маркер, если это станет важно.
+func WithServiceCall(ctx context.Context) context.Context {
+	return context.WithValue(ctx, serviceCallKey{}, true)
+}
+
+// ServiceCall reports whether the transport marked this request as the panel's.
+func ServiceCall(ctx context.Context) bool {
+	v, _ := ctx.Value(serviceCallKey{}).(bool)
+	return v
+}
+
 // Label builds the HTTP client label: "key:<id>" plus the User-Agent product
 // token, so two harnesses sharing one key stay distinguishable.
 func Label(keyID, userAgent string) string {

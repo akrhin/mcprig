@@ -382,6 +382,51 @@ func readRawTriples(path string) ([]Triple, error) {
 	return out, nil
 }
 
+// TailFromDir читает сырой журнал каталога и отдаёт хвост вызовов и счётчики
+// по тройкам — для панели, когда процесс набора остановлен.
+//
+// Окно — сегодня и RawDays-1 предыдущих суток, ровно как period=7d у
+// /api/stats. Строки идут по убыванию времени и не длиннее limit; счётчики —
+// агрегат по всему окну, процентили точные, как у запроса за 7 суток. Каталога
+// нет — пустые срезы: недоступное чтение не ошибка, а битая строка журнала
+// пропускается так же, как при свёртке.
+//
+// shortcut: читает всё окно ради 512 строк, резать по дням от новых к старым, если панель начнёт греться.
+func TailFromDir(dir string, limit int) (tail []Call, counters []Counter) {
+	tail, counters = []Call{}, []Counter{}
+	groups := map[[3]string]*acc{}
+	today := startOfDay(time.Now())
+	for i := 0; i < RawDays; i++ {
+		path := filepath.Join(dir, "raw-"+today.AddDate(0, 0, -i).Format(dayLayout)+".jsonl")
+		for _, l := range loadRaw(path) {
+			k := [3]string{l.Client, l.Server, l.Tool}
+			a := groups[k]
+			if a == nil {
+				a = &acc{exact: map[int64]int64{}}
+				groups[k] = a
+			}
+			a.addCall(l.MS, l.Failed)
+			tail = append(tail, Call{
+				Time: l.Time, Client: l.Client, Server: l.Server,
+				Tool: l.Tool, Millis: l.MS, Failed: l.Failed, Message: l.Err,
+			})
+		}
+	}
+	sort.Slice(tail, func(i, j int) bool { return tail[i].Time.After(tail[j].Time) })
+	if limit > 0 && len(tail) > limit {
+		tail = tail[:limit]
+	}
+	for k, a := range groups {
+		p50, p95 := a.percentiles(false)
+		counters = append(counters, Counter{
+			Client: k[0], Server: k[1], Tool: k[2],
+			Calls: a.calls, Failures: a.failures, TotalMs: a.totalMs, P50Ms: p50, P95Ms: p95,
+		})
+	}
+	sortCounters(counters)
+	return tail, counters
+}
+
 func readDayFile(path string) (dayFile, error) {
 	var df dayFile
 	b, err := readHistoryFile(path)

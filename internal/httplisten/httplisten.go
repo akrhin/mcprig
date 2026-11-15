@@ -296,6 +296,11 @@ func guard(next http.Handler, auth *authSet, openRoute bool, allowed []string) h
 		if presented, ok := bearerToken(r); ok {
 			r = r.WithContext(stats.WithClientKey(r.Context(), stats.Fingerprint(presented)))
 		}
+		// Служебный вызов панели (проба здоровья, каталог) — не клиентский
+		// трафик: он не попадает ни в счётчики, ни в хвост, ни в историю.
+		if r.Header.Get(stats.ServiceCallHeader) == stats.ServiceCallerPanel {
+			r = r.WithContext(stats.WithServiceCall(r.Context()))
+		}
 		// Адрес — то, чем опознаётся клиент открытого набора: ключа у него нет,
 		// а метка самообъявлена. Порт срезан, иначе одна машина = много корзин.
 		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
