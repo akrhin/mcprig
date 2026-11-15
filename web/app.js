@@ -54,6 +54,7 @@
       'head.copyKey': 'Copy key',
       'head.noKey': 'no key',
       'head.schemaTip': "how much context the set's tool list costs",
+      'head.keyMarkTip': 'the mark this key shows up under in the statistics — the part after key:',
       'head.servers': 'Servers',
       'head.tools': 'Tools',
       'head.keys': 'Keys',
@@ -85,6 +86,14 @@
       'setSrv.lastTip': 'from the last 100 calls',
       'setSrv.emptyTitle': 'This set has no servers',
       'setSrv.emptyText': 'Servers live in the host registry; attach one to give this set tools to serve.',
+      'setSrv.attachLabel': 'Add a registry server to this set',
+      'setSrv.attach': 'add to set',
+      'setSrv.attachNone': 'every server in the registry is already in this set',
+      'setSrv.composeHelp': 'The list is saved at once. A running set applies the change without a restart, and a removed server loses its session. An empty set starts and serves no tools.',
+      'setSrv.remove': 'remove',
+      'setSrv.removeTip': 'detach {name} from the set — the server stays in the registry',
+      'setSrv.emptyWarn': 'the set has no servers now: it starts, but serves no tools',
+      'setSrv.reloadWarn': 'saved, but the running set did not apply it: {err}',
       'tail.thTime': 'Time',
       'tail.thServer': 'Server',
       'tail.thTool': 'Tool',
@@ -296,6 +305,24 @@
       'io.noNew': 'nothing new: every server is already in the registry',
       'io.fail': 'import failed: {msg}',
       'io.noData': 'the panel returned no registry',
+      'prompt.open': 'Prompt',
+      'prompt.title': 'Prompt for an agent',
+      'prompt.sub': 'One text — an introduction, the set’s tools with their schemas and the task. Copy it to the agent.',
+      'prompt.parts': 'Parts',
+      'prompt.task': 'Task',
+      'prompt.taskPh': 'what the agent has to do with these tools',
+      'prompt.intro': 'Introduction · optional',
+      'prompt.introPh': 'who the agent is and how it should behave',
+      'prompt.introHelp': 'Empty — a short default paragraph about the set is used.',
+      'prompt.servers': 'Servers · all when none is chosen',
+      'prompt.noServers': 'The set has no servers — the text will list no tools.',
+      'prompt.build': 'Build',
+      'prompt.result': 'Ready text',
+      'prompt.copy': 'copy',
+      'prompt.download': 'download .md',
+      'prompt.stopped': 'The set is not running: the text gets tool names from the saved list only, without schemas.',
+      'prompt.notesLabel': 'notes',
+      'prompt.fail': 'could not build the prompt: {msg}',
       'err.offline': 'no connection to the daemon',
       'err.http': 'HTTP {status} · {path}',
       'add.nameRequired': 'a name is required'
@@ -336,6 +363,7 @@
       'head.copyKey': 'Скопировать ключ',
       'head.noKey': 'ключа нет',
       'head.schemaTip': 'сколько контекста стоит перечень инструментов набора',
+      'head.keyMarkTip': 'метка ключа набора в статистике — то, что стоит после key:',
       'head.servers': 'Серверов',
       'head.tools': 'Инструментов',
       'head.keys': 'Ключи',
@@ -367,6 +395,14 @@
       'setSrv.lastTip': 'по последним 100 вызовам',
       'setSrv.emptyTitle': 'В наборе нет серверов',
       'setSrv.emptyText': 'Серверы живут в реестре хоста; подключите один, чтобы у набора появились инструменты.',
+      'setSrv.attachLabel': 'добавить в набор сервер из реестра',
+      'setSrv.attach': 'добавить в набор',
+      'setSrv.attachNone': 'все серверы реестра уже в наборе',
+      'setSrv.composeHelp': 'Состав сохраняется сразу. Запущенный набор применит правку без перезапуска, снятый сервер потеряет соединение. Пустой набор стартует, но инструментов не отдаёт.',
+      'setSrv.remove': 'убрать',
+      'setSrv.removeTip': 'убрать {name} из набора — сервер останется в реестре',
+      'setSrv.emptyWarn': 'набор остался без серверов: стартует, но инструментов не отдаёт',
+      'setSrv.reloadWarn': 'сохранено, но работающий набор не применил правку: {err}',
       'tail.thTime': 'Время',
       'tail.thServer': 'Сервер',
       'tail.thTool': 'Инструмент',
@@ -578,6 +614,24 @@
       'io.noNew': 'нового нет: все эти серверы уже в реестре',
       'io.fail': 'импорт не удался: {msg}',
       'io.noData': 'панель не отдала реестр',
+      'prompt.open': 'Промт',
+      'prompt.title': 'Промт для агента',
+      'prompt.sub': 'Один текст: вводная, инструменты набора со схемами и задача. Скопируйте его агенту.',
+      'prompt.parts': 'Части',
+      'prompt.task': 'Задача',
+      'prompt.taskPh': 'что агент должен сделать этими инструментами',
+      'prompt.intro': 'Вводная · необязательно',
+      'prompt.introPh': 'кто агент и как себя вести',
+      'prompt.introHelp': 'Пусто — подставится короткий вводный абзац о наборе.',
+      'prompt.servers': 'Серверы · без выбора — все',
+      'prompt.noServers': 'В наборе нет серверов — в тексте не будет инструментов.',
+      'prompt.build': 'Собрать',
+      'prompt.result': 'Готовый текст',
+      'prompt.copy': 'копировать',
+      'prompt.download': 'скачать .md',
+      'prompt.stopped': 'Набор остановлен: в текст попадут только имена инструментов из сохранённого списка, без схем.',
+      'prompt.notesLabel': 'примечания',
+      'prompt.fail': 'не удалось собрать промт: {msg}',
       'err.offline': 'панель не отвечает — проверьте, запущен ли mcprig',
       'err.http': 'HTTP {status} · {path}',
       'add.nameRequired': 'Укажите имя набора'
@@ -937,6 +991,25 @@
         });
         return { approved: approved };
       });
+    }
+    // Состав набора: демо тоже правит его, иначе правка в панели ничем бы не
+    // отличалась от сохранённой и таблица врала бы о наборе.
+    var tm = /^\/api\/sets\/([^/]+)$/.exec(path);
+    if (tm && method === 'PUT' && st.mock) {
+      var tset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(tm[1]); })[0];
+      if (tset && body && Array.isArray(body.servers)) { tset.servers = body.servers.slice(); }
+      return Promise.resolve(tset || {});
+    }
+    // Промт собирается и в демо: пустой ответ показал бы в диалоге «undefined».
+    var pm = /^\/api\/sets\/([^/]+)\/prompt$/.exec(path);
+    if (pm && method === 'POST' && st.mock) {
+      var pset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(pm[1]); })[0];
+      var use = (body && body.servers && body.servers.length ? body.servers : (pset && pset.servers) || []);
+      var head = ((body && body.intro) || 'Ты работаешь с MCP-набором ' + decodeURIComponent(pm[1]) + ' (mcprig).') +
+        '\n\n## Инструменты\n';
+      var tools = use.map(function (n) { return '\n### ' + n + '\n\n(демо: инструменты не запрошены)\n'; }).join('');
+      var out = head + (use.length ? tools : '\n(серверов нет)\n') + '\n## Задача\n\n' + ((body && body.task) || '') + '\n';
+      return Promise.resolve({ prompt: out, notes: ['демо: схемы инструментов не запрашиваются'] });
     }
     // Выдача ключа: демо проверяет профиль теми же словами, что демон
     // (internal/manager/api.go, keyProfileOf), и показывает новый ключ сразу.
@@ -1380,6 +1453,10 @@
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
         edit.dataset.edit = '';
+        var del = act.appendChild(el('button', 'ghost-icon icon-xs'));
+        del.type = 'button';
+        del.dataset.del = '';
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
         return tr;
       },
       function (tr, row) {
@@ -1428,7 +1505,57 @@
         var edit = tr.querySelector('[data-edit]');
         edit.textContent = t('srv.edit');
         edit.dataset.edit = row.name;
+        var del = tr.querySelector('[data-del]');
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+        del.dataset.del = row.name;
+        del.title = t('setSrv.removeTip', { name: row.name });
+        del.setAttribute('aria-label', del.title);
       });
+    fillAttach();
+  }
+
+  // Свободные серверы реестра — те, кого в наборе ещё нет: чужое имя демон
+  // отверг бы, а список из одного набора в другой не переносится.
+  function fillAttach() {
+    var set = current();
+    var inSet = (set && set.servers) || [];
+    var sel = $('srv-attach');
+    var keep = sel.value;
+    sel.replaceChildren();
+    var free = st.servers.filter(function (s) { return inSet.indexOf(s.name) < 0; });
+    free.forEach(function (s) {
+      var opt = sel.appendChild(el('option', '', s.name));
+      opt.value = s.name;
+    });
+    if (free.some(function (s) { return s.name === keep; })) { sel.value = keep; }
+    show($('srv-compose'), free.length > 0);
+    show($('srv-attach-none'), free.length === 0);
+  }
+
+  function setSrvErr(msg) {
+    var box = $('srv-compose-err');
+    box.textContent = msg || '';
+    show(box, !!msg);
+  }
+
+  // Состав уходит полным списком: демон разбирает тело как patch, и именно
+  // полное поле делает правку одной операцией, без чтения текущего состава.
+  function saveSetServers(btn, names) {
+    var set = current();
+    if (!set || st.busy) { return; }
+    st.busy = true;
+    if (btn) { btn.disabled = true; }
+    setSrvErr('');
+    send('PUT', '/api/sets/' + encodeURIComponent(set.id), { servers: names }, true)
+      .then(function (r) {
+        return loadState().then(function () {
+          if (r && r.reloadError) { setSrvErr(t('setSrv.reloadWarn', { err: r.reloadError })); }
+          // пустой набор законен, но «нет инструментов» — не то, что видно по таблице
+          else if (!names.length) { setSrvErr(t('setSrv.emptyWarn')); }
+        });
+      })
+      .catch(function (e) { setSrvErr(e.message); })
+      .then(function () { st.busy = false; if (btn) { btn.disabled = false; } });
   }
 
   // Одна проба на оба списка: из неё же берётся число инструментов строки.
@@ -1513,6 +1640,7 @@
       $('k-calls').textContent = $('k-err').textContent = $('k-p50').textContent = $('k-p95').textContent = '—';
       $('schema').textContent = '—';
       $('meta-tools').textContent = '—';
+      show($('key-mark'), false);
       return;
     }
     var state = setState(set);
@@ -1534,6 +1662,10 @@
     keyBtn.dataset.i18nTitle = hasKey ? 'head.copyKey' : 'head.noKey';
     keyBtn.title = t(keyBtn.dataset.i18nTitle);
     $('keys-count').textContent = fmtN((set.keys || []).length);
+    // отпечаток основного ключа — ровно та метка, что печатает статистика
+    var mark = $('key-mark');
+    show(mark, !!set.keyMark);
+    mark.textContent = set.keyMark ? 'key:' + set.keyMark : '';
     $('meta-servers').textContent = fmtN((set.servers || []).length);
     var schema = (st.calls && st.calls.schema) || null;
     $('meta-tools').textContent = schema ? fmtN(schema.tools) : '—';
@@ -2185,8 +2317,10 @@
     if (dlg.open) { dlg.close(); }
   }
 
-  function download(name, data) {
-    var url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  // mime нужен промту: это .md, а не JSON
+  function download(name, data, mime) {
+    var body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    var url = URL.createObjectURL(new Blob([body], { type: mime || 'application/json' }));
     var a = el('a');
     a.href = url;
     a.download = name;
@@ -2195,6 +2329,94 @@
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
+
+  /* ---------- промт для агента ----------
+     Текст собирает демон (internal/manager/prompt.go): каталог со схемами и
+     маска секретов живут у него, а браузер показал бы половину. */
+
+  var promptText = '', promptNotes = [];
+
+  function promptErr(msg) {
+    var box = $('prompt-err');
+    box.textContent = msg || '';
+    show(box, !!msg);
+  }
+
+  function promptWarn() {
+    var set = current();
+    var off = !set || !(set.runtime && set.runtime.running);
+    $('prompt-warn').textContent = off ? t('prompt.stopped') : '';
+    show($('prompt-warn'), off);
+  }
+
+  function promptNote() {
+    $('prompt-notes').textContent = promptNotes.length
+      ? t('prompt.notesLabel') + ': ' + promptNotes.join(' · ') : '';
+    show($('prompt-notes'), promptNotes.length > 0);
+  }
+
+  function openPrompt() {
+    var set = current();
+    if (!set) { return; }
+    promptText = '';
+    promptNotes = [];
+    $('prompt-set').textContent = set.name || set.id;
+    $('prompt-task').value = '';
+    $('prompt-intro').value = '';
+    promptErr('');
+    promptWarn();
+    promptNote();
+    show($('prompt-result'), false);
+    var box = $('prompt-servers');
+    var names = set.servers || [];
+    box.replaceChildren();
+    names.forEach(function (name) {
+      var lab = el('label', 'check');
+      var cb = lab.appendChild(el('input'));
+      cb.type = 'checkbox';
+      cb.value = name;
+      lab.appendChild(document.createTextNode(name));
+      box.appendChild(lab);
+    });
+    show($('prompt-srv-field'), names.length > 0);
+    show($('prompt-nosrv'), names.length === 0);
+    var dlg = $('prompt-dlg');
+    if (!dlg.open) { dlg.showModal(); }
+    $('prompt-task').focus();
+  }
+
+  function buildPrompt() {
+    var set = current();
+    if (!set || st.busy) { return; }
+    var task = $('prompt-task').value.trim();
+    // задача обязательна: демон ответил бы 400, но кнопка не должна обещать
+    // сборку, которой не будет
+    if (!task) { $('prompt-task').focus(); return; }
+    var chosen = [].map.call($('prompt-servers').querySelectorAll('input:checked'),
+      function (i) { return i.value; });
+    var body = { task: task, intro: $('prompt-intro').value.trim() };
+    if (chosen.length) { body.servers = chosen; }
+    var btn = $('prompt-build');
+    st.busy = true;
+    btn.disabled = true;
+    promptErr('');
+    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/prompt', body, true)
+      .then(function (r) {
+        promptText = (r && r.prompt) || '';
+        promptNotes = (r && r.notes) || [];
+        $('prompt-out').textContent = promptText;
+        promptNote();
+        show($('prompt-result'), !!promptText);
+      })
+      .catch(function (e) { promptErr(t('prompt.fail', { msg: e.message })); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  function closePrompt() {
+    var dlg = $('prompt-dlg');
+    if (dlg.open) { dlg.close(); }
+  }
+
 
   function ioImport() {
     var p = ioPreview();
@@ -3134,6 +3356,7 @@
     applyThemeMenu();
     // у диалога импорта текст собирается кодом, а title его не перерисует
     if ($('io-dlg').open) { ioNote(); ioPreview(); }
+    if ($('prompt-dlg').open) { promptWarn(); promptNote(); }
   };
 
   /* ---------- привязки ---------- */
@@ -3377,6 +3600,20 @@
   $('io-add').addEventListener('click', ioImport);
   $('io-text').addEventListener('input', ioPreview);
 
+  /* ---------- промт для агента ---------- */
+
+  $('prompt-open').addEventListener('click', openPrompt);
+  $('prompt-x').addEventListener('click', closePrompt);
+  $('prompt-close').addEventListener('click', closePrompt);
+  $('prompt-build').addEventListener('click', buildPrompt);
+  $('prompt-copy').addEventListener('click', function () {
+    if (promptText) { copyText(promptText, this, t('prompt.copy')); }
+  });
+  $('prompt-dl').addEventListener('click', function () {
+    var set = current();
+    if (promptText && set) { download('mcprig-prompt-' + set.id + '.md', promptText, 'text/markdown'); }
+  });
+
   // файл — только источник текста: предпросмотр и отправка идут тем же путём
   $('io-file').addEventListener('change', function () {
     var file = this.files && this.files[0];
@@ -3424,7 +3661,20 @@
     var toolsBtn = e.target.closest('[data-tools]');
     if (toolsBtn) { openTools(toolsBtn.dataset.tools); return; }
     var edit = e.target.closest('[data-edit]');
-    if (edit) { openSrv(edit.dataset.edit); }
+    if (edit) { openSrv(edit.dataset.edit); return; }
+    var del = e.target.closest('[data-del]');
+    if (del) {
+      var set = current();
+      if (!set) { return; }
+      saveSetServers(del, (set.servers || []).filter(function (n) { return n !== del.dataset.del; }));
+    }
+  });
+
+  $('srv-attach-add').addEventListener('click', function () {
+    var set = current();
+    var name = $('srv-attach').value;
+    if (!set || !name) { return; }
+    saveSetServers(this, (set.servers || []).concat([name]));
   });
 
   $('srvlog-close').addEventListener('click', closeSrvLog);

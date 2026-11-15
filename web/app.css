@@ -317,6 +317,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .meta-schema { font-size: var(--fs-1); color: var(--text-dim); }
+.meta-mark { font-size: var(--fs-1); color: var(--text-mute); }
 
 .chip {
   display: inline-flex; align-items: center; flex: none;
@@ -564,6 +565,16 @@ select.input { padding-right: 6px; }
 
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-3); color: var(--text-dim); }
 .check input { accent-color: var(--accent); }
+.checklist { display: grid; gap: var(--sp-1); }
+/* состав набора: подпись своей строкой, селект и кнопка рядом — иначе
+   select.input растягивается на всю ширину и кнопка уезжает вниз */
+.srv-compose { flex-wrap: wrap; margin-top: var(--sp-3); }
+.srv-compose > .field-help { flex-basis: 100%; }
+#srv-attach { width: auto; min-width: 200px; max-width: 320px; flex: 0 1 320px; }
+/* «убрать» в строке сервера — иконка: пятая текстовая кнопка не влезает
+   в колонку действий и обрезается */
+.icon-xs { width: 24px; height: 24px; }
+.icon-xs:hover { color: var(--err); }
 
 .form-alert {
   padding: var(--sp-2) var(--sp-3); border-radius: var(--r-2);
@@ -685,6 +696,8 @@ body.side-open #side.drawer { transform: none; }
   overflow: auto;
 }
 body.log-wide #side.drawer { width: min(900px, 100vw); }
+/* промт целиком бывает длинным: в диалоге он прокручивается сам */
+.prompt-out { max-height: 40vh; min-height: 120px; }
 
 /* лог одного сервера: панель держит высоту дровера, прокрутка внутри лога */
 .srvlog-body { display: flex; flex-direction: column; align-content: normal; overflow: hidden; }
@@ -779,7 +792,7 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
     font-size: var(--fs-5); text-align: left;
   }
   .rtable td.cell-name::before { display: none; }
-  .rtable td.cell-actions { justify-content: flex-end; padding-top: var(--sp-2); }
+  .rtable td.cell-actions { justify-content: flex-end; padding-top: var(--sp-2); flex-wrap: wrap; }
   .rtable td.cell-actions::before { display: none; }
   .rtable td.num { text-align: right; }
   .rtable td .share { flex: 1 1 auto; }
@@ -853,18 +866,21 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
    Действия — по содержимому: широкая колонка отрывала кнопки от «последнего вызова». */
 #set-srv-table { table-layout: fixed; }
 #set-srv-table th { white-space: normal; }
-#set-srv-table th:nth-child(1) { width: 30%; }
-#set-srv-table th:nth-child(2) { width: 10%; }
-#set-srv-table th:nth-child(3) { width: 14%; }
-#set-srv-table th:nth-child(4) { width: 11%; }
-#set-srv-table th:nth-child(5) { width: 17%; text-align: right; }
+#set-srv-table th:nth-child(1) { width: 26%; }
+#set-srv-table th:nth-child(2) { width: 9%; }
+#set-srv-table th:nth-child(3) { width: 12%; }
+#set-srv-table th:nth-child(4) { width: 10%; }
+#set-srv-table th:nth-child(5) { width: 15%; text-align: right; }
 #set-srv-table td:nth-child(5) { text-align: right; }
 /* Действия — узкая колонка у правого края: «check/edit» стоят рядом с последним
-   вызовом, а не висят в пустой полосе. По-русски «проверить/изменить» шире,
-   поэтому на узком экране колонке отдаётся четверть ширины таблицы. */
-#set-srv-table th:nth-child(6) { width: 18%; text-align: right; }
+   вызовом, а не висят в пустой полосе. По-русски «проверить/инструменты/
+   изменить» шире, и пятая кнопка «убрать» в строку уже не влезала — от неё
+   осталась иконка, а колонке отдана четверть ширины таблицы. Всё равно тесно —
+   кнопки переносятся на вторую строку, а не уезжают за край. */
+#set-srv-table th:nth-child(6) { width: 28%; text-align: right; }
 @media (max-width: 1100px) {
-  #set-srv-table th:nth-child(1) { width: 23%; }
-  #set-srv-table th:nth-child(6) { width: 26%; }
+  #set-srv-table th:nth-child(1) { width: 22%; }
+  #set-srv-table th:nth-child(6) { width: 34%; }
   #set-srv-table .cell-actions .btn { padding-inline: 8px; }
+  #set-srv-table td.cell-actions { white-space: normal; }
 }

@@ -137,6 +137,7 @@
           <div class="set-actions">
             <button class="btn" type="button" id="io" data-i18n="io.open">Import / Export</button>
             <button class="btn" type="button" id="keys"><span data-i18n="head.keys">Keys</span> <span class="count mono" id="keys-count">0</span></button>
+            <button class="btn" type="button" id="prompt-open" data-i18n="prompt.open">Prompt</button>
             <button class="btn" type="button" id="restart" hidden data-i18n="head.restart">Restart</button>
             <button class="btn btn-primary" type="button" id="run">—</button>
             <button class="btn btn-danger" type="button" id="set-del" data-i18n="set.del">Delete set</button>
@@ -148,6 +149,7 @@
           <button class="ghost-icon" type="button" id="key-copy" aria-label="Copy key" data-i18n-title="head.copyKey" data-i18n-aria="head.copyKey">
             <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
           </button>
+          <code class="mono meta-mark" id="key-mark" hidden data-i18n-title="head.keyMarkTip">—</code>
           <span class="meta-sep" aria-hidden="true"></span>
           <span class="meta-label" data-i18n="head.servers">Servers</span><span class="mono" id="meta-servers">0</span>
           <span class="meta-label" data-i18n="head.tools">Tools</span><span class="mono" id="meta-tools">—</span>
@@ -192,6 +194,14 @@
             <p class="empty-title" data-i18n="setSrv.emptyTitle">This set has no servers</p>
             <p class="empty-text" data-i18n="setSrv.emptyText">Servers live in the host registry; attach one to give this set tools to serve.</p>
           </div>
+          <div class="od-row srv-compose" id="srv-compose">
+            <label class="field-help" for="srv-attach" data-i18n="setSrv.attachLabel">Add a registry server to this set</label>
+            <select class="input" id="srv-attach"></select>
+            <button class="btn btn-sm" type="button" id="srv-attach-add" data-i18n="setSrv.attach">add to set</button>
+          </div>
+          <p class="field-help" id="srv-attach-none" hidden data-i18n="setSrv.attachNone">every server in the registry is already in this set</p>
+          <p class="field-help" id="srv-compose-help" data-i18n="setSrv.composeHelp">The list is saved at once. A running set applies the change without a restart, and a removed server loses its session. An empty set starts and serves no tools.</p>
+          <p class="field-error" id="srv-compose-err" role="alert" tabindex="-1" hidden></p>
         </section>
 
         <!-- сводка за 7 дней: второстепенная, строкой под таблицей серверов -->
@@ -735,6 +745,55 @@
     <div class="dialog-foot">
       <button class="btn" type="button" id="io-close" data-i18n="common.close">close</button>
       <button class="btn btn-primary" type="button" id="io-add" disabled data-i18n="io.doImport">import</button>
+    </div>
+  </div>
+</dialog>
+<dialog class="dialog modal" id="prompt-dlg" aria-labelledby="prompt-h">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <div>
+        <h2 id="prompt-h"><span data-i18n="prompt.title">Prompt for an agent</span> <span class="mono" id="prompt-set">—</span></h2>
+        <p class="dialog-sub" data-i18n="prompt.sub">One text — an introduction, the set’s tools with their schemas and the task. Copy it to the agent.</p>
+      </div>
+      <button class="ghost-icon" type="button" id="prompt-x" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <fieldset class="field-group">
+        <legend data-i18n="prompt.parts">Parts</legend>
+        <div class="field">
+          <label class="field-label" for="prompt-task" data-i18n="prompt.task">Task</label>
+          <textarea class="input" id="prompt-task" rows="4" spellcheck="false" placeholder="what the agent has to do with these tools" data-i18n-ph="prompt.taskPh"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label" for="prompt-intro" data-i18n="prompt.intro">Introduction · optional</label>
+          <textarea class="input" id="prompt-intro" rows="2" spellcheck="false" placeholder="who the agent is and how to behave" data-i18n-ph="prompt.introPh"></textarea>
+          <p class="field-help" data-i18n="prompt.introHelp">Empty — a short default paragraph about the set is used.</p>
+        </div>
+        <div class="field" id="prompt-srv-field">
+          <span class="field-label" data-i18n="prompt.servers">Servers · all when none is chosen</span>
+          <div class="checklist" id="prompt-servers"></div>
+          <p class="field-help" id="prompt-nosrv" hidden data-i18n="prompt.noServers">The set has no servers — the text will list no tools.</p>
+        </div>
+        <p class="field-help" id="prompt-warn" hidden></p>
+        <p class="field-error" id="prompt-err" role="alert" tabindex="-1" hidden></p>
+        <div class="od-row">
+          <button class="btn btn-primary" type="button" id="prompt-build" data-i18n="prompt.build">Build</button>
+        </div>
+      </fieldset>
+      <div id="prompt-result" hidden>
+        <div class="od-row">
+          <span class="field-label od-fill" data-i18n="prompt.result">Ready text</span>
+          <button class="btn btn-sm" type="button" id="prompt-copy" data-i18n="prompt.copy">copy</button>
+          <button class="btn btn-sm" type="button" id="prompt-dl" data-i18n="prompt.download">download .md</button>
+        </div>
+        <p class="field-help" id="prompt-notes" role="status" hidden></p>
+        <pre class="log prompt-out" id="prompt-out"></pre>
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn" type="button" id="prompt-close" data-i18n="common.close">close</button>
     </div>
   </div>
 </dialog>
