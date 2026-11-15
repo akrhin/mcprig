@@ -8,6 +8,16 @@ repository the project is built in.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-15
+
+### Fixed
+
+- `TestEnvPutRestartsOnlySetsUsingVar` stops the restarted set and waits for it
+  to exit before the temp directory is removed; the race used to fail the
+  verify job on CI.
+- Builds move to Go 1.27.4 and `golang.org/x/net` v0.62.0: govulncheck reports
+  no reachable vulnerabilities (GO-2026-6859 and the x/net advisories).
+
 ## [0.5.0] - 2026-11-15
 
 ### Added

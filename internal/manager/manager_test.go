@@ -537,23 +537,35 @@ func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
 	w := e.do(t, http.MethodPut, "/api/env/DB_PASSWORD", map[string]any{"value": "s3cret"})
 	status(t, w, http.StatusOK)
 
-	// Перезапуск после ответа — в горутине: ждём замену процесса.
+	// Перезапуск после ответа — в горутине: ждём замену процесса. Во время
+	// рестарта запись набора на мгновение отсутствует, поэтому ждём непустой.
 	deadline := time.Now().Add(5 * time.Second)
 	var gotDB, gotOther *process
 	for {
 		e.m.rt.mu.Lock()
 		gotDB, gotOther = e.m.rt.procs[dbSet], e.m.rt.procs[otherSet]
 		e.m.rt.mu.Unlock()
-		if gotDB != dbProc || time.Now().After(deadline) {
+		if (gotDB != nil && gotDB != dbProc) || time.Now().After(deadline) {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if gotDB == dbProc {
+	if gotDB == nil || gotDB == dbProc {
 		t.Fatal("набор со ссылкой на переменную не перезапускался")
 	}
 	if gotOther != otherProc {
 		t.Fatal("набор без ссылки на переменную перезапущен")
+	}
+	// Перезапущенный процесс пишет лог внутрь TempDir: гасим его и ждём выхода
+	// до уборки каталога, иначе RemoveAll падает на «directory not empty».
+	done := gotDB.done
+	if w := e.do(t, http.MethodPost, "/api/sets/"+dbSet+"/stop", nil); w.Code != http.StatusOK {
+		t.Fatalf("остановка набора: %d %s", w.Code, w.Body.String())
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("перезапущенный набор не завершился после остановки")
 	}
 }
 
