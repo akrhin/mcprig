@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -147,6 +148,9 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		}
 		cmd := exec.Command(res.Argv[0], res.Argv[1:]...)
 		cmd.Dir = srv.Cwd
+		// Своя группа: иначе гасится только прямой ребёнок, а внуки сервера
+		// остаются в системе (см. groupTransport).
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		tail := &stderrTail{}
 		cmd.Stderr = tail
 		// A set runs with an env already narrowed by the manager; the server's
@@ -156,7 +160,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 			base = c.Env(srv)
 		}
 		cmd.Env = append(withoutReserved(base), flatten(srv.Env)...)
-		return &mcp.CommandTransport{Command: cmd}, tail, nil
+		return &groupTransport{CommandTransport: mcp.CommandTransport{Command: cmd}}, tail, nil
 	case config.TransportHTTP:
 		if srv.URL == "" {
 			return nil, nil, fmt.Errorf("url пуст — укажите адрес сервера")

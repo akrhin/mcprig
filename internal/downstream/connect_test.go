@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-
 	"github.com/akrhin/mcprig/internal/config"
 )
 
@@ -90,7 +88,7 @@ func TestConnectorEnvHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := tr.(*mcp.CommandTransport).Command
+	cmd := tr.(*groupTransport).Command
 	got := map[string]bool{}
 	for _, kv := range cmd.Env {
 		got[kv] = true
