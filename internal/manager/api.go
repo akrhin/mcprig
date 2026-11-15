@@ -122,6 +122,10 @@ type Manager struct {
 	healthOnce  sync.Once
 	healthEvery time.Duration
 	probe       func(context.Context, *registry.Set) setHealth
+	// catalog — живой каталог набора для промта агента; running — запущен ли
+	// он. Оба поля — дырки для тестов, как probe у здоровья.
+	catalog func(context.Context, *registry.Set, []string) promptCatalog
+	running func(*registry.Set) bool
 
 	// вход по OAuth: состояние по серверу набора и ожидающие приёмники по state
 	authMu    sync.Mutex
@@ -247,6 +251,11 @@ func New(opts Options) (*Manager, error) {
 			return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, set.Servers, m.version)
 		}
 	}
+	// Поле, а не прямой вызов: тест подставляет каталог без запуска набора.
+	m.catalog = func(ctx context.Context, set *registry.Set, names []string) promptCatalog {
+		return fetchSetCatalog(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, names, m.version)
+	}
+	m.running = func(set *registry.Set) bool { return m.rt.status(set).Running }
 	m.startHealthLoop()
 	return m, nil
 }
@@ -604,6 +613,7 @@ func (m *Manager) buildRoutes() []route {
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiServerLogs}),
 		mk(`^/api/sets/`+setPattern+`/tools$`, map[string]handlerFunc{http.MethodGet: m.apiSetTools}),
 		mk(`^/api/sets/`+setPattern+`/tools/approve$`, map[string]handlerFunc{http.MethodPost: m.apiSetToolsApprove}),
+		mk(`^/api/sets/`+setPattern+`/prompt$`, map[string]handlerFunc{http.MethodPost: m.apiSetPrompt}),
 		mk(`^/api/sets/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiSetLogs}),
 		mk(`^/api/sets/`+setPattern+`/reload$`, map[string]handlerFunc{http.MethodPost: m.apiSetReload}),
 		mk(`^/api/sets/`+setPattern+`/(start|stop|restart)$`, map[string]handlerFunc{http.MethodPost: m.apiSetAction}),
