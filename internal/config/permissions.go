@@ -68,8 +68,10 @@ func lastMatch(rules []Rule, match func(Rule) bool) *Rule {
 	return found
 }
 
-// globMatch is case-insensitive; `*` is any run of characters, `?` exactly one.
-// Runs of `*` collapse first, which defuses the backtracking blow-up.
+// globMatch is case-insensitive; `*` is any run of characters, `?` exactly one,
+// and a newline counts as a character: an upstream that hands over a name with
+// a line break must not slip past a deny rule. Runs of `*` collapse first, which
+// defuses the backtracking blow-up.
 func globMatch(pattern, value string) bool {
 	re := compiledGlob(pattern)
 	return re != nil && re.MatchString(value)
@@ -91,7 +93,7 @@ func compiledGlob(pattern string) *regexp.Regexp {
 		return re
 	}
 	var b strings.Builder
-	b.WriteString("(?i)^")
+	b.WriteString("(?is)^") // s: `.` matches "\n", so `*`/`?` span a line break too
 	for _, r := range pattern {
 		switch r {
 		case '*':
