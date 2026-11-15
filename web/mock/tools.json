@@ -1,0 +1,15 @@
+{
+  "tools": [
+    { "server": "serena", "tool": "find_symbol", "hash": "6f1c2b0e9a4d", "approvedHash": "6f1c2b0e9a4d", "state": "ok" },
+    { "server": "serena", "tool": "replace_symbol_body", "hash": "9b7a10c3f25e", "approvedHash": "4c8d2e71ab90", "state": "changed" },
+    { "server": "serena", "tool": "activate_project", "hash": "21de8fa4c703", "approvedHash": "21de8fa4c703", "state": "ok" },
+    { "server": "socraticode", "tool": "codebase_search", "hash": "a4b91cd70f12", "approvedHash": "a4b91cd70f12", "state": "ok" },
+    { "server": "socraticode", "tool": "codebase_status", "hash": "3e17c0b95d48", "approvedHash": "3e17c0b95d48", "state": "ok" },
+    { "server": "xerj", "tool": "xerj_search", "hash": "77c0aa31e6b9", "approvedHash": "77c0aa31e6b9", "state": "ok" },
+    { "server": "xerj", "tool": "xerj_index", "hash": "b0d5f83a21c6", "approvedHash": "b0d5f83a21c6", "state": "ok" },
+    { "server": "context7", "tool": "query-docs", "hash": "e91a6d07f3b2", "approvedHash": "e91a6d07f3b2", "state": "ok" },
+    { "server": "tavily", "tool": "tavily_search", "hash": "5c3f9b21a8d7", "approvedHash": "5c3f9b21a8d7", "state": "ok" },
+    { "server": "gitea", "tool": "list_issues", "hash": "0ab7e2c91f4d", "approvedHash": "0ab7e2c91f4d", "state": "ok" },
+    { "server": "gitea", "tool": "create_pull_request", "hash": "f2d81a05bc63", "approvedHash": "1d9c74e0aa28", "state": "changed" }
+  ]
+}

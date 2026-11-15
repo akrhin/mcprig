@@ -14,6 +14,7 @@ import (
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/toollock"
 )
 
 // Формат servers.json — вход lazy-mcp `serve`. ${VAR} остаются нераскрытыми:
@@ -151,7 +152,35 @@ func WriteSetConfig(dataDir, id string, body []byte) (string, error) {
 	if err := writeAtomic(path, body); err != nil {
 		return "", err
 	}
+	pruneLock(dataDir, id, body)
 	return path, nil
+}
+
+// pruneLock снимает записи карантина у серверов, которых в наборе больше нет:
+// файл лежит в каталоге набора, и сам он не уменьшится.
+func pruneLock(dataDir, id string, body []byte) {
+	var cfg struct {
+		Servers []struct {
+			Name string `json:"name"`
+		} `json:"servers"`
+	}
+	if err := json.Unmarshal(body, &cfg); err != nil {
+		return
+	}
+	keep := make(map[string]bool, len(cfg.Servers))
+	for _, srv := range cfg.Servers {
+		keep[srv.Name] = true
+	}
+	_ = toollock.Update(toollock.Path(dataDir, id), func(lock *toollock.File) bool {
+		dirty := false
+		for key := range lock.Tools {
+			if server, _ := toollock.Split(key); !keep[server] {
+				delete(lock.Tools, key)
+				dirty = true
+			}
+		}
+		return dirty
+	})
 }
 
 // LogPath — <dataDir>/sets/<id>/mcprig.log.

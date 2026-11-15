@@ -193,6 +193,18 @@
       'srvlog.sub': 'lines that mention this server — the tail of the set log',
       'srvlog.title': 'Log · {server} · {set}',
       'srvlog.fail': 'could not load the log',
+      'srv.tools': 'tools',
+      'tools.title': 'Tools · {server} · {set}',
+      'tools.sub': 'descriptors the proxy remembers — a changed one waits for your approval',
+      'tools.thTool': 'Tool',
+      'tools.thState': 'State',
+      'tools.thAct': 'Actions',
+      'tools.empty': 'this set has not listed any tools yet',
+      'tools.ok': 'approved',
+      'tools.changed': 'changed',
+      'tools.approve': 'approve',
+      'tools.fail': 'could not load the tool list',
+      'tools.approveFail': 'could not approve the tool',
       'keys.title': 'Set keys',
       'keys.sub': 'A key authenticates one client. It is shown once, right after it is created.',
       'keys.newLabel': 'New key label',
@@ -426,6 +438,18 @@
       'srvlog.sub': 'строки, где встречается имя сервера, — хвост лога набора',
       'srvlog.title': 'Лог · {server} · {set}',
       'srvlog.fail': 'не удалось получить лог',
+      'srv.tools': 'Инструменты',
+      'tools.title': 'Инструменты · {server} · {set}',
+      'tools.sub': 'дескрипторы, которые помнит прокси, — изменившийся ждёт вашего одобрения',
+      'tools.thTool': 'Инструмент',
+      'tools.thState': 'Состояние',
+      'tools.thAct': 'Действия',
+      'tools.empty': 'набор ещё не показывал инструментов',
+      'tools.ok': 'одобрен',
+      'tools.changed': 'изменился',
+      'tools.approve': 'Одобрить',
+      'tools.fail': 'не удалось получить список инструментов',
+      'tools.approveFail': 'не удалось одобрить инструмент',
       'keys.title': 'Ключи набора',
       'keys.sub': 'Ключ даёт доступ одному клиенту. Он показывается один раз — сразу после создания.',
       'keys.newLabel': 'Подпись нового ключа',
@@ -689,6 +713,16 @@
     return 'state';
   }
 
+  // Карантин в демо: файл читается один раз, дальше состояние живёт в st.mockTools,
+  // иначе кнопка «Одобрить» в демо ничего бы не меняла.
+  function mockTools() {
+    if (!st.mockTools) {
+      st.mockTools = fetch('mock/tools.json', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); });
+    }
+    return st.mockTools.then(function (d) { return { tools: d.tools || [] }; });
+  }
+
   // Демо повторяет контракт /api/calls: limit и before (строго раньше). Иначе
   // «Показать ещё» в демо нечего показать, а адрес запроса расходится с живым.
   function mockCallsPage(data, path) {
@@ -719,6 +753,8 @@
     if (MOCK) {
       // реестр в демо-режиме живёт в памяти: правка должна быть видна сразу
       if (st.mock && path.indexOf('/api/state') === 0) { return Promise.resolve(st.mock); }
+      // список карантина в демо живёт в памяти: одобрение должно быть видно сразу
+      if (/^\/api\/sets\/[^/]+\/tools$/.test(path)) { return mockTools(); }
       // срезы считаются из строк, а не читаются готовым файлом: иначе фильтры
       // в демо не на что влиять и цифры врут
       if (path.indexOf('/api/stats') === 0) { return Promise.resolve(mockStats(path)); }
@@ -807,6 +843,23 @@
   }
 
   function mockSend(method, path, body) {
+    // Одобрение в демо пишет текущий хэш в запись — как демон, только в памяти.
+    var am = /^\/api\/sets\/([^/]+)\/tools\/approve$/.exec(path);
+    if (am && method === 'POST' && st.mockTools) {
+      return st.mockTools.then(function (d) {
+        var rows = (d && d.tools) || [];
+        var approved = [];
+        rows.forEach(function (row) {
+          var one = body && body.server && row.server === body.server && row.tool === body.tool;
+          if (!one && !(body && body.all)) { return; }
+          if (row.state !== 'changed') { return; }
+          row.approvedHash = row.hash;
+          row.state = 'ok';
+          approved.push(row.server + '/' + row.tool);
+        });
+        return { approved: approved };
+      });
+    }
     // Выдача ключа: демо проверяет профиль теми же словами, что демон
     // (internal/manager/api.go, keyProfileOf), и показывает новый ключ сразу.
     var km = /^\/api\/sets\/([^/]+)\/keys$/.exec(path);
@@ -1231,6 +1284,9 @@
         var log = act.appendChild(el('button', 'btn btn-xs'));
         log.type = 'button';
         log.dataset.log = '';
+        var toolsBtn = act.appendChild(el('button', 'btn btn-xs'));
+        toolsBtn.type = 'button';
+        toolsBtn.dataset.tools = '';
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
         edit.dataset.edit = '';
@@ -1271,6 +1327,9 @@
         var log = tr.querySelector('[data-log]');
         log.textContent = t('srv.log');
         log.dataset.log = row.name;
+        var toolsBtn = tr.querySelector('[data-tools]');
+        toolsBtn.textContent = t('srv.tools');
+        toolsBtn.dataset.tools = row.name;
         var edit = tr.querySelector('[data-edit]');
         edit.textContent = t('srv.edit');
         edit.dataset.edit = row.name;
@@ -2040,6 +2099,106 @@
     box.scrollTop = box.scrollHeight;
   }
 
+  /* ---------- карантин дескрипторов ----------
+     Панель показывает то, что помнит прокси: новый инструмент одобрен сам,
+     изменившийся ждёт человека, иначе вызов нижестоящего сервера отбит. */
+
+  var toolLock = { set: '', server: '', seq: 0, rows: [] };
+
+  function openTools(server) {
+    var set = current();
+    if (!set) { return; }
+    toolLock.set = set.id;
+    toolLock.server = server;
+    toolLock.returnFocus = document.activeElement;
+    $('tools-h').textContent = t('tools.title', { server: server, set: set.id });
+    $('tools-err').hidden = true;
+    var dlg = $('tools-dlg');
+    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
+    $('tools-refresh').focus();
+    loadTools();
+  }
+
+  function closeTools() {
+    var dlg = $('tools-dlg');
+    if (!dlg.open) { return; }
+    dlg.close();
+    toolLock.server = '';
+    toolLock.seq++;
+    var back = toolLock.returnFocus;
+    toolLock.returnFocus = null;
+    if (back && document.contains(back) && back.offsetParent !== null) { back.focus(); }
+  }
+
+  function loadTools() {
+    if (!toolLock.server) { return; }
+    var id = toolLock.set, seq = ++toolLock.seq;
+    var btn = $('tools-refresh');
+    btn.disabled = true;
+    $('tools-err').hidden = true;
+    return get('/api/sets/' + encodeURIComponent(id) + '/tools')
+      .then(function (data) {
+        if (seq !== toolLock.seq) { return; }
+        // демон отдаёт весь набор, дровер показывает один сервер
+        renderTools(((data && data.tools) || []).filter(function (x) { return x.server === toolLock.server; }));
+      })
+      .catch(function (e) {
+        if (seq !== toolLock.seq) { return; }
+        var box = $('tools-err');
+        box.textContent = t('tools.fail') + ' · ' + e.message;
+        box.hidden = false;
+      })
+      .then(function () { if (seq === toolLock.seq) { btn.disabled = false; } });
+  }
+
+  function renderTools(rows) {
+    toolLock.rows = rows;
+    $('tools-count').textContent = cnt(rows.length, 'tool');
+    show($('tools-empty'), rows.length === 0);
+    sync($('lock-body'), rows, function (r) { return r.tool; },
+      function () {
+        var tr = el('tr');
+        var nm = tr.appendChild(el('td', 'cell-name'));
+        nm.dataset.label = t('tools.thTool');
+        var stateCell = tr.appendChild(el('td'));
+        stateCell.dataset.label = t('tools.thState');
+        stateCell.appendChild(el('span', 'badge'));
+        var act = tr.appendChild(el('td', 'cell-actions'));
+        var btn = act.appendChild(el('button', 'btn btn-xs'));
+        btn.type = 'button';
+        btn.dataset.approve = '';
+        return tr;
+      },
+      function (tr, row) {
+        tr.dataset.tool = row.tool;
+        var nm = tr.querySelector('.cell-name');
+        nm.textContent = row.tool;
+        nm.title = row.tool;
+        var changed = row.state === 'changed';
+        var badge = tr.querySelector('.badge');
+        badge.className = 'badge ' + (changed ? 'badge-warn' : 'badge-ok');
+        badge.textContent = changed ? t('tools.changed') : t('tools.ok');
+        var btn = tr.querySelector('[data-approve]');
+        btn.textContent = t('tools.approve');
+        btn.dataset.approve = row.tool;
+        // одобрять нечего у одобренного: кнопка остаётся, но не жмётся вслепую
+        btn.hidden = !changed;
+        btn.title = changed ? t('tools.approve') : '';
+      });
+  }
+
+  function approveTool(tool, btn) {
+    if (!toolLock.server) { return; }
+    if (btn) { btn.disabled = true; }
+    return send('POST', '/api/sets/' + encodeURIComponent(toolLock.set) + '/tools/approve',
+      { server: toolLock.server, tool: tool })
+      .then(function () { return loadTools(); })
+      .catch(function (e) {
+        fail(t('tools.approveFail') + ' · ' + e.message, e);
+      })
+      .then(function () { if (btn) { btn.disabled = false; } });
+  }
+
   /* ---------- статистика ----------
      Считает бэкенд (/api/stats), панель только просит срез и рисует его.
      Период живёт в адресе (#/stats/7d), поэтому срез можно переслать ссылкой. */
@@ -2207,7 +2366,7 @@
     $('s-clients-count').textContent = cnt((d.clients || []).length, 'client');
     $('s-byset-count').textContent = Array.isArray(d.bySet) ? cnt(d.bySet.length, 'set') : '';
 
-    renderBreakdown($('tools-body'), d.tools, 'tool', t('stats.thTool'), 'server', $('tools-empty'), 11);
+    renderBreakdown($('tools-body'), d.tools, 'tool', t('stats.thTool'), 'server', $('stats-tools-empty'), 11);
     renderBreakdown($('byserver-body'), d.servers, 'server', t('stats.thServer'), '', $('byserver-empty'), 11);
     renderClients(d.clients || []);
     renderSets(d.bySet);
@@ -2706,12 +2865,13 @@
       if ($('theme-menu').hidden === false) { closeThemeMenu(true); return; }
       if ($('srv-dlg').open) { closeSrv(); return; }
       if ($('srvlog-dlg').open) { closeSrvLog(); return; }
+      if ($('tools-dlg').open) { closeTools(); return; }
       if (document.body.classList.contains('side-open')) { closeSide(); return; }
       if (document.body.classList.contains('rail-open')) { closeRail(); }
       return;
     }
     if (e.key !== 'Tab') { return; }
-    var root = $('srv-dlg').open ? $('srv-dlg') : $('srvlog-dlg').open ? $('srvlog-dlg') : null;
+    var root = $('srv-dlg').open ? $('srv-dlg') : $('srvlog-dlg').open ? $('srvlog-dlg') : $('tools-dlg').open ? $('tools-dlg') : null;
     if (!root && !document.body.classList.contains('side-open')) { return; }
     root = root || $('side');
     var f = [].slice.call(root.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
@@ -2897,12 +3057,20 @@
     if (check) { probeServer(check.dataset.check, check); return; }
     var logBtn = e.target.closest('[data-log]');
     if (logBtn) { openSrvLog(logBtn.dataset.log); return; }
+    var toolsBtn = e.target.closest('[data-tools]');
+    if (toolsBtn) { openTools(toolsBtn.dataset.tools); return; }
     var edit = e.target.closest('[data-edit]');
     if (edit) { openSrv(edit.dataset.edit); }
   });
 
   $('srvlog-close').addEventListener('click', closeSrvLog);
   $('srvlog-refresh').addEventListener('click', loadSrvLog);
+  $('tools-close').addEventListener('click', closeTools);
+  $('tools-refresh').addEventListener('click', loadTools);
+  $('lock-body').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-approve]');
+    if (btn) { approveTool(btn.dataset.approve, btn); }
+  });
   $('calls-more').addEventListener('click', loadMoreCalls);
   $('calls-resume').addEventListener('click', resumeCalls);
 

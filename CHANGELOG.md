@@ -115,6 +115,27 @@ repository the project is built in.
   OTLP/HTTP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, and cost nothing (no
   recording, no network) when it is not.
 
+- A changed tool descriptor is quarantined: the set remembers `name`,
+  `description`, `inputSchema`, `outputSchema` and `annotations` hashed into
+  `sets/<id>/tools.lock.json`, approves a tool the first time it appears
+  (`approvedBy: "auto"`) and refuses `invoke_command` and `invoke_many` for that
+  tool once the descriptor differs — `isError`, `_meta.lazyMcpPolicy:
+  "quarantine"` and a message with the old and new hash and the command that
+  lifts the block. Neighbours on the same server and other calls of the same
+  batch run as usual; `list_commands` marks the tool `changed: true`.
+  A person approves the new descriptor from the **Tools** drawer of the panel
+  (`GET /api/sets/<id>/tools`, `POST /api/sets/<id>/tools/approve`, `{"all":
+  true}` included) or with the new `mcprig approve --set <id> <server/tool>…`/`--all`,
+  which talks to the same routes. The check does not depend on a warm
+  catalogue: a cold cache is filled first, and a catalogue that cannot be read
+  refuses the call (`list_commands {refresh:true}` no longer empties the
+  neighbours' caches either). The panel's **browse** session applies the same
+  record — a changed tool is marked in its listing and refused with `403`
+  before the downstream sees the call. The record survives a set restart, and
+  entries of a server removed from a set are pruned when the set config is
+  rebuilt. Without a set data directory (`MCPRIG_DATA_DIR`) there is no record
+  and no quarantine.
+
 ### Changed
 
 - `X-Forwarded-Proto` and `X-Forwarded-Host` are trusted only when

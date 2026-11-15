@@ -49,7 +49,7 @@ func browseCallFixture(t *testing.T, perms *config.Permissions) *browser {
 		t.Fatalf("connect client: %v", err)
 	}
 	t.Cleanup(func() { _ = sess.Close() })
-	b := newBrowser(nil, "test")
+	b := newBrowser(nil, "test", "")
 	b.items["s1"] = &browseSession{view: &browseView{ID: "s1"}, sess: sess, used: time.Now(), server: "alpha", perms: perms}
 	return b
 }

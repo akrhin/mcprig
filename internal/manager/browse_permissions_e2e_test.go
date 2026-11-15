@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/akrhin/mcprig/internal/toollock"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -32,7 +34,13 @@ func browseUpstream() {
 		_ = f.Close()
 	}
 	srv := mcp.NewServer(&mcp.Implementation{Name: "browse-fixture", Version: "0"}, nil)
-	mcp.AddTool(srv, &mcp.Tool{Name: "read_all", Description: "Allowed by permission rules."},
+	// BROWSE_TOOL_VERSION меняет дескриптор: так тест карантина изображает
+	// обновление сервера, не пересобирая фикстуру.
+	desc := "Allowed by permission rules."
+	if v := os.Getenv("BROWSE_TOOL_VERSION"); v != "" {
+		desc += " " + v
+	}
+	mcp.AddTool(srv, &mcp.Tool{Name: "read_all", Description: desc},
 		func(context.Context, *mcp.CallToolRequest, browseFixtureIn) (*mcp.CallToolResult, any, error) {
 			record("read_all")
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "read_all ok"}}}, nil, nil
@@ -168,4 +176,86 @@ func readCalls(t *testing.T, path string) []string {
 		}
 	}
 	return out
+}
+
+// fixtureTool — дескриптор инструмента из фикстуры такой, каким его видит
+// клиент; нужен, чтобы записать в файл настоящий хэш одобренной версии.
+func fixtureTool(t *testing.T, exe, version, name string) *mcp.Tool {
+	t.Helper()
+	cmd := exec.Command(exe, "-test.run=TestBrowseBlocksChangedDescriptor$")
+	cmd.Env = append(os.Environ(), "BROWSE_UPSTREAM=1", "BROWSE_TOOL_VERSION="+version)
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "probe", Version: "0"}, nil).
+		Connect(context.Background(), &mcp.CommandTransport{Command: cmd}, nil)
+	if err != nil {
+		t.Fatalf("фикстура %s: %v", version, err)
+	}
+	defer cs.Close()
+	tools, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("список инструментов фикстуры: %v", err)
+	}
+	for _, tool := range tools.Tools {
+		if tool.Name == name {
+			return tool
+		}
+	}
+	t.Fatalf("в фикстуре нет %q", name)
+	return nil
+}
+
+// Browse обязан уважать карантин: дескриптор в открытой сессии разошёлся с
+// одобренным — вызов не доходит до апстрима и получает 403, а листинг помечает
+// инструмент changed.
+func TestBrowseBlocksChangedDescriptor(t *testing.T) {
+	if os.Getenv("BROWSE_UPSTREAM") == "1" {
+		browseUpstream()
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	callLog := filepath.Join(t.TempDir(), "calls.log")
+	approved := toollock.Hash(fixtureTool(t, exe, "v1", "read_all"))
+
+	e := newEnv(t, AuthOptions{Off: true})
+	w := e.do(t, http.MethodPost, "/api/servers", map[string]any{
+		"name":    "alpha",
+		"command": []string{exe, "-test.run=TestBrowseBlocksChangedDescriptor$"},
+		"env": map[string]string{
+			"BROWSE_UPSTREAM": "1", "BROWSE_CALL_LOG": callLog, "BROWSE_TOOL_VERSION": "v2",
+		},
+	})
+	status(t, w, http.StatusCreated)
+	id := e.addSet(t, "quar", "alpha")
+	if err := toollock.Write(toollock.Path(e.dir, id), toollock.File{Tools: map[string]toollock.Entry{
+		"alpha/read_all": {Hash: approved, ApprovedAt: "2026-11-15T00:00:00Z", ApprovedBy: "auto"},
+	}}); err != nil {
+		t.Fatalf("запись карантина: %v", err)
+	}
+
+	w = e.do(t, http.MethodPost, "/api/browse", map[string]any{"server": "alpha"})
+	status(t, w, http.StatusOK)
+	var view browseView
+	if err := json.Unmarshal(w.Body.Bytes(), &view); err != nil {
+		t.Fatalf("ответ browse: %v (%s)", err, w.Body.String())
+	}
+	changed := false
+	for _, tool := range view.Tools {
+		if tool.Name == "read_all" && tool.Changed {
+			changed = true
+		}
+	}
+	if !changed {
+		t.Fatalf("изменившийся инструмент не помечен: %+v", view.Tools)
+	}
+
+	w = e.do(t, http.MethodPost, "/api/browse/"+view.ID+"/tool", map[string]any{"name": "read_all"})
+	status(t, w, http.StatusForbidden)
+	if !strings.Contains(w.Body.String(), "изменился") {
+		t.Fatalf("отказ без пометки о смене: %s", w.Body.String())
+	}
+	if raw, err := os.ReadFile(callLog); err == nil && strings.Contains(string(raw), "read_all") {
+		t.Fatalf("вызов дошёл до апстрима: %s", raw)
+	}
 }

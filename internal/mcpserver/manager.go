@@ -115,6 +115,13 @@ type Manager struct {
 	// tool. The panel reads the recorder; the proxy works without it.
 	Stats *stats.Recorder
 
+	// LockPath names the set's approved-descriptor record. Empty disables the
+	// quarantine: a manager without a data dir has nowhere to keep approvals.
+	LockPath string
+	// lockMu сериализует чтение-правку-запись записи карантина: два
+	// одновременных list_commands иначе теряли бы запись друг друга.
+	lockMu sync.Mutex
+
 	// ToolOutURL, when set, names a truncated answer by its /tool-out URL
 	// instead of a path: the caller reached this process over HTTP with a key
 	// and fetches the file under the same guard as /mcp. stdio leaves it false.
@@ -163,20 +170,21 @@ func newEntry(srv *config.Server) *entry {
 	return e
 }
 
-// hasTool reports whether the cached list names this tool.
-func hasTool(tools []*mcp.Tool, name string) bool {
+// findTool returns the named tool, or nil when the list does not have it.
+func findTool(tools []*mcp.Tool, name string) *mcp.Tool {
 	for _, t := range tools {
 		if t.Name == name {
-			return true
+			return t
 		}
 	}
-	return false
+	return nil
 }
 
 func (m *Manager) storeTools(e *entry, tools []*mcp.Tool) {
 	e.toolsMu.Lock()
 	e.tools = tools
 	e.toolsMu.Unlock()
+	m.observe(e, tools)
 	m.publishSchema()
 }
 
@@ -820,6 +828,19 @@ type commandInfo struct {
 	Name        string `json:"name"`
 	Command     string `json:"command"` // kept for older callers; same as name
 	Description string `json:"description,omitempty"`
+	// Changed marks a tool whose descriptor no longer matches the approved
+	// hash: it is listed and described, but invoke refuses it until approved.
+	Changed bool `json:"changed,omitempty"`
+}
+
+// refreshNames — серверы, чей кэш обновляется по refresh. Без имён чистить
+// нечего: запрос без server/servers ниже всё равно кончается errNoTargets.
+func (in listCommandsInput) refreshNames() []string {
+	names := make([]string, 0, len(in.Servers)+1)
+	if in.Server != "" {
+		names = append(names, in.Server)
+	}
+	return append(names, in.Servers...)
 }
 
 func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -837,8 +858,12 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		}
 	}
 	if in.Refresh {
-		for _, e := range m.allEntries() {
-			m.storeTools(e, nil)
+		// Только запрошенные серверы: refresh одного не должен опустошать кэш
+		// остальных — по нему сверяется карантин, и пустой кэш открывал обход.
+		for _, name := range in.refreshNames() {
+			if e := m.find(name); e != nil {
+				m.storeTools(e, nil)
+			}
 		}
 	}
 	// Профиль читается один раз: у ключа он один на все серверы запроса.
@@ -909,11 +934,7 @@ func (m *Manager) commandsOf(ctx context.Context, name string) ([]commandInfo, e
 		return nil, serverProblem(srv)
 	}
 	if tools := e.cachedTools(); tools != nil {
-		out := make([]commandInfo, 0, len(tools))
-		for _, tool := range tools {
-			out = append(out, commandInfo{Server: name, Name: tool.Name, Command: tool.Name, Description: tool.Description})
-		}
-		return out, nil
+		return m.commandList(name, tools), nil
 	}
 	var tools []*mcp.Tool
 	err := m.withSession(ctx, e, func(sess *mcp.ClientSession) error {
@@ -924,11 +945,7 @@ func (m *Manager) commandsOf(ctx context.Context, name string) ([]commandInfo, e
 	if err != nil {
 		return nil, err
 	}
-	out := make([]commandInfo, 0, len(tools))
-	for _, tool := range tools {
-		out = append(out, commandInfo{Server: name, Name: tool.Name, Command: tool.Name, Description: tool.Description})
-	}
-	return out, nil
+	return m.commandList(name, tools), nil
 }
 
 // ─── describe_commands ────────────────────────────────────────────────────────
@@ -1066,11 +1083,18 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if message, denied := m.gate(ctx, srv.Name, in.CommandName, srv.Permissions); denied {
 		return blockedResult(srv.Name, in.CommandName, message), nil
 	}
-	// Кэш инструментов уже есть — неизвестное имя не идёт в апстрим: иначе
-	// отказ приходит тремя разными текстами (go-sdk, transport, апстрим).
-	// Пустой кэш — первый вызов после старта, проверять не по чему.
-	if cached := e.cachedTools(); cached != nil && !hasTool(cached, in.CommandName) {
-		return errResult(fmt.Errorf("неизвестный инструмент %q у сервера %q", in.CommandName, srv.Name))
+	// Каталог нужен до вызова: по нему сверяется карантин и отбивается
+	// неизвестное имя. Пустой кэш его не отменяет — см. toolForCall.
+	tool, err := m.toolForCall(ctx, e, srv, in.CommandName)
+	if err != nil {
+		return errResult(err)
+	}
+	// Карантин — после политики и профиля, но до вызова вниз: изменившийся
+	// дескриптор не должен дойти до апстрима без одобрения человека.
+	if tool != nil {
+		if message, changed := m.quarantine(srv.Name, tool); changed {
+			return quarantineResult(message), nil
+		}
 	}
 
 	args, err := parametersOf(in.Parameters)

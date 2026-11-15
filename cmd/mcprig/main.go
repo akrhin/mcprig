@@ -104,7 +104,7 @@ func parseFlags(fs *flag.FlagSet, args []string) error {
 		return &usageError{err.Error()}
 	}
 	if fs.NArg() > 0 {
-		return &usageError{fmt.Sprintf("лишние аргументы: %s; команда принимает: serve|stdio|auth|panel|init|doctor|warm|status|logs", strings.Join(fs.Args(), ", "))}
+		return &usageError{fmt.Sprintf("лишние аргументы: %s; команда принимает: serve|stdio|auth|approve|panel|init|doctor|warm|status|logs", strings.Join(fs.Args(), ", "))}
 	}
 	return nil
 }
@@ -140,6 +140,9 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 	case "auth":
 		// Позиционный аргумент — имя сервера, поэтому разбор внутри runAuth.
 		return "auth", args[1:], nil
+	case "approve":
+		// Позиционные server/tool, поэтому разбор внутри runApprove.
+		return "approve", args[1:], nil
 	case "init":
 		if len(args) > 1 {
 			return "init", args[1:], nil
@@ -175,7 +178,7 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 		}
 		return "panel", nil, nil
 	}
-	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, auth, panel, init, doctor, warm, status, logs", args[0])}
+	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, auth, approve, panel, init, doctor, warm, status, logs", args[0])}
 }
 
 // tooloutInterval is a variable only so a test can shorten the sweep; serve and
@@ -211,6 +214,8 @@ func run() error {
 		return runDoctor(rest)
 	case "warm":
 		return runWarm(rest)
+	case "approve":
+		return runApprove(rest)
 	case "status":
 		return runStatus(rest)
 	case "logs":
@@ -248,6 +253,7 @@ func run() error {
 			log.Warn("закрытие менеджера", "err", err)
 		}
 	}()
+	mgr.LockPath = lockPath()
 
 	rec := stats.NewRecorder(os.Getenv("MCPRIG_SET"), 0)
 	// Recorder до прогрева: прогрев наполняет кэш инструментов и публикует
@@ -497,6 +503,7 @@ func runStdio(args []string) error {
 			log.Warn("закрытие менеджера", "err", err)
 		}
 	}()
+	mgr.LockPath = lockPath()
 
 	// История вызовов: у stdio нет панели над процессом, но разрез по
 	// периодам читается с диска так же, как у набора. Без неё прокси работает
@@ -552,4 +559,15 @@ func stateDir() string {
 		return ".mcprig"
 	}
 	return filepath.Join(home, ".local", "state", "mcprig")
+}
+
+// lockPath names the approved-descriptor record. A set process gets its own
+// directory in MCPRIG_DATA_DIR (internal/manager/runtime.go, setEnv), so the
+// file sits right there — the same path the panel reads and approves. A manual
+// serve without a set has nobody to approve, and the quarantine stays off.
+func lockPath() string {
+	if dir := os.Getenv("MCPRIG_DATA_DIR"); dir != "" {
+		return filepath.Join(dir, "tools.lock.json")
+	}
+	return ""
 }

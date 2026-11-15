@@ -165,7 +165,7 @@ func TestSessionStoreGCRemovesExpired(t *testing.T) {
 
 // Сессию просмотра в работе close не закрывает: рефкаунт держит её до release.
 func TestBrowseCloseWaitsForRefs(t *testing.T) {
-	b := newBrowser(nil, "test")
+	b := newBrowser(nil, "test", "")
 	b.items["x"] = &browseSession{view: &browseView{ID: "x"}, used: time.Now()}
 	s, err := b.lookup("x")
 	if err != nil {

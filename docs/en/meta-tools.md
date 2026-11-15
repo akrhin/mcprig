@@ -224,6 +224,45 @@ its note, and a key without a profile is not filtered at all.
 a schema for a guessed name is still served and the call itself is refused, so a
 key learns what it is barred from — knowingly, and nothing more.
 
+### Descriptor quarantine
+
+A tool's descriptor is its `name`, `description`, `inputSchema`,
+`outputSchema` and `annotations`. The first time a set sees a tool, the proxy
+approves that descriptor itself (`approvedBy: "auto"` in
+`<data>/sets/<id>/tools.lock.json`) and the call goes through. A descriptor
+that differs from the approved one later — a new version, a swapped
+implementation — is quarantined: the call is refused before anything reaches
+the downstream, with `isError: true` and `_meta.lazyMcpPolicy: "quarantine"`:
+
+```text
+🚫 Инструмент изменился: serena/find_symbol (одобрен 6f1c2b0e9a4d, сейчас 9b7a10c3f25e); одобрите: mcprig approve --set main serena/find_symbol
+```
+
+The hash is sha256 over the canonical record as `json.Marshal` writes it, not
+over the raw answer bytes: a server that reorders keys does not trip it. The
+policy is one and has no switch. Exactly those five fields are hashed:
+`title` and `icons` are decoration and do not trip it. Quarantine needs the set's
+data directory (`MCPRIG_DATA_DIR`, which the panel gives the set process): a
+hand-run `mcprig serve --config …` keeps no record and therefore no quarantine.
+Only the changed tool is refused — its
+neighbours on the same server keep working, and inside `invoke_many` the other
+calls run while that entry carries the message in `error`.
+
+`list_commands` shows a quarantined tool rather than hiding it, marked
+`"changed": true`. `permissions` and profiles are checked first, so their
+message wins when both apply.
+
+The second approval is a person's: from the panel (`Tools` button on the server
+row) or from the CLI:
+
+```bash
+mcprig approve --set main serena/find_symbol   # one tool
+mcprig approve --set main --all                # everything currently changed
+```
+
+Quarantine survives a set restart; entries of a server removed from the set are
+pruned when the set config is rebuilt.
+
 An answer longer than `maxBytes` is cut at a UTF-8 boundary; the returned text
 ends with a marker naming the kept and full sizes and the file holding the full
 answer:

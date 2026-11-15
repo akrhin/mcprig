@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -92,6 +93,7 @@ func panelDo(ctx context.Context, client *http.Client, base string, c panelCreds
 		return nil, 0, err
 	}
 	panelHeaders(req, c)
+	req.Header.Set("Origin", panelOrigin(base))
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("панель %s: %w", base, err)
@@ -99,6 +101,45 @@ func panelDo(ctx context.Context, client *http.Client, base string, c panelCreds
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 8<<20))
 	return raw, res.StatusCode, nil
+}
+
+// panelPost — POST панели с JSON-телом. Не-200 — ошибка с ответом панели:
+// молчащий отказ здесь значил бы «одобрено», которого не было.
+func panelPost(ctx context.Context, client *http.Client, base string, c panelCreds, path string, body any) ([]byte, error) {
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+path, strings.NewReader(string(raw)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	panelHeaders(req, c)
+	// checkCSRF отбивает POST с сессионной cookie без Origin: браузер шлёт его
+	// всегда, и CLI обязан вести себя как браузер.
+	req.Header.Set("Origin", panelOrigin(base))
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("панель %s: %w", base, err)
+	}
+	defer res.Body.Close()
+	answer, _ := io.ReadAll(io.LimitReader(res.Body, 8<<20))
+	if res.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "ответ панели: %s\n", strings.TrimSpace(string(answer)))
+		return nil, fmt.Errorf("панель %s не приняла %s: HTTP %d", base, path, res.StatusCode)
+	}
+	return answer, nil
+}
+
+// panelOrigin — Origin запроса к панели: схема и хост её адреса. Панель
+// сверяет его со своим хостом, поэтому подставить адрес из флага мало — нужен
+// именно источник запроса.
+func panelOrigin(base string) string {
+	if u, err := url.Parse(base); err == nil && u.Host != "" {
+		return u.Scheme + "://" + u.Host
+	}
+	return base
 }
 
 // panelHeaders — вход через обратный прокси: секрет и имя пользователя.

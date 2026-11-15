@@ -5,7 +5,7 @@ This file lists every subcommand and flag with real examples and their output.
 
 # CLI
 
-`mcprig` has nine subcommands. Running it with no subcommand is the same as
+`mcprig` has ten subcommands. Running it with no subcommand is the same as
 `mcprig serve`; running it with flags only (`mcprig -config …`) is also
 `serve`.
 
@@ -18,6 +18,7 @@ This file lists every subcommand and flag with real examples and their output.
 | `init` | print a client configuration fragment; writes nothing |
 | `doctor` | one-pass health report: config, sets, keys, secrets, services, sandbox |
 | `warm` | load a set's tool cache so the first client call is fast |
+| `approve` | approve a tool descriptor that changed under quarantine |
 | `status` | panel health and set state in the terminal |
 | `logs` | tail of a set's or a server's log, with `-f` |
 
@@ -311,6 +312,55 @@ Exit code: `0` when every set warmed, `1` when any set failed (panel
 unreachable, missing key, timeout); the failing line carries the reason.
 `deploy/mcprig-warm.timer` repeats this every ten minutes — see
 `deploy/README.md`.
+
+## approve
+
+```bash
+mcprig approve --set main serena/find_symbol
+mcprig approve --set main serena/find_symbol gitea/create_pull_request
+mcprig approve --set main --all
+```
+
+A tool whose descriptor changed after it was approved is quarantined: the proxy
+refuses its calls until a person approves the new descriptor
+([meta-tools.md](meta-tools.md#descriptor-quarantine)). The refusal names this
+command. The first appearance of a tool is approved automatically, so `approve`
+only ever deals with a genuine change.
+
+The panel owns the record: the command reads and writes it through the panel
+API, the same two routes the **Tools** drawer uses. `--all` takes every tool
+that is currently changed; without it each argument is one `server/tool`.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-set` | `main` | set name |
+| `-all` | | approve every changed tool of the set |
+| `-panel` | `MCPRIG_PANEL_URL`, else `http://127.0.0.1:$MCPRIG_PORT` | panel address |
+| `-password` | `MCPRIG_PASSWORD` | panel password |
+| `-secret` | `MCPRIG_PROXY_SECRET` | panel proxy secret |
+| `-user` | `admin` | panel login name |
+
+```text
+набор main: одобрен serena/find_symbol
+```
+
+`--all` lists what it approved:
+
+```text
+набор main: одобрено 2
+  gitea/create_pull_request
+  serena/replace_symbol_body
+```
+
+A tool that did not change is refused by the panel — `нечего одобрять:
+serena/find_symbol не менялся или неизвестен` — and the command exits `1`.
+
+The panel writes the record with `approvedBy: "panel"`: the drawer and this
+command are one client of one API, and the CLI has no identity of its own.
+Exit code: `0` when everything asked for was approved — `--all` with nothing
+changed is also `0`; `1` when the panel refused a tool (unchanged or unknown)
+or the request failed; `2` on a command-line error (both `--all` and a list, or
+neither).
 
 ## status
 

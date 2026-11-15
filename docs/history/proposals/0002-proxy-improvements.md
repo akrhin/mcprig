@@ -307,8 +307,11 @@ MCP-клиент видит только tools: пять `AddTool` в
 потолок и выгрузка `/tool-out/<name>`, тот же гейт разрешений — правила адресуют
 ресурсы и промпты префиксами `resource:<uri>`/`prompt:<name>`, отдельного вида в
 схеме не появилось. Лимит частоты считается по мета-тулу, а не по URI.
-Проверка `expose` доступна реестру через `Server.Check()`; разбор поля в
-`internal/registry/validate.go` — следующим шагом вместе с панелью.
+Реестр читает поле в `internal/registry/validate.go:189-198` (нет поля или `null` —
+прежнее поведение, `mergeServer` снимает `null`), `expose` правится в панели:
+две галочки в форме сервера, неизвестное значение — `400` с перечнем.
+Листинги `list_resources`/`list_prompts` подчиняются тем же правилам и профилю
+ключа, а не только чтение.
 
 ### E. OTel: `traceparent` вниз (1 неделя)
 
@@ -318,6 +321,17 @@ MCP-клиент видит только tools: пять `AddTool` в
 - Трасса от клиента помечается источником: доказательством для аудита не считается.
 
 Ворота: `TestTraceparentValidated`, `TestMetaNotForwardedWholesale`.
+
+Сделано (2026-11-15): `internal/mcpserver/trace.go` — `spanContextOf` проверяет
+W3C (версия `00`, нулевой и `ff` trace-id отбиты), `traceMeta` кладёт вниз
+единственный ключ `traceparent`, `traceCalls` оборачивает `tools/call`; без
+`OTEL_EXPORTER_OTLP_ENDPOINT` — no-op, с переменной поднимается
+`otlptracehttp` с батчером (`OTEL_SERVICE_NAME`, дефолт `mcprig`), Shutdown с
+пятисекундным потолком. Спаны `mcp.tool.call`, `mcp.server.connect`,
+`mcp.reload`; в атрибуты и статус не попадают ни аргументы, ни текст ошибки,
+только её тип. Ворота зелёные: `TestTraceparentValidated`,
+`TestTraceparentReachesUpstream`, `TestMetaNotForwardedWholesale`,
+`TestNoExporterMeansNoop`, `TestSpanAttributesHaveNoSecrets`.
 
 ### F. Quarantine и смена дескриптора (1 неделя)
 
@@ -331,6 +345,47 @@ MCP-клиент видит только tools: пять `AddTool` в
 - Честная граница: смена поведения при том же дескрипторе не детектируется.
 
 Ворота: `TestChangedDescriptorBlockedUntilApprove`, `TestApproveBindsToHash`.
+
+Сделано (2026-11-15): `internal/toollock` — `sets/<id>/tools.lock.json`
+(`hash`, `seen`, `approvedAt`, `approvedBy`), хэш sha256 по канонической записи
+через `json.Marshal` анонимной структуры, запись `atomicfile`. Первое появление
+инструмента — `approvedBy: "auto"`, смена — блок: `internal/mcpserver/quarantine.go`
+(`observe` при `storeTools`, `quarantine` в `invokeCommand` и `runManyCall`),
+отказ `🚫 Инструмент изменился: … одобрите: mcprig approve …` с
+`_meta.lazyMcpPolicy: "quarantine"`, `changed: true` в `list_commands`. Одобрение
+— `GET /api/sets/<id>/tools` и `POST /api/sets/<id>/tools/approve`
+(`{"all":true}` тоже) в `internal/manager/tools.go`, CLI `mcprig approve`
+(`cmd/mcprig/approve.go`, через панель) и дровер **Инструменты** в панели.
+Записи удалённого сервера чистит `pruneLock` из `WriteSetConfig`. Политика одна,
+настройки нет. Ворота зелёные: `TestFirstSightIsAutoApproved`,
+`TestChangedDescriptorBlocksInvoke`, `TestApproveAllowsChangedTool`,
+`TestInvokeManyBlocksQuarantined`, `TestLockFilePersistsAcrossRestart`,
+`TestListShowsChanged`, `TestRemovedServerLeavesNoLockEntries`,
+`TestToolsApproveEndpoint`. Мутация (снятая проверка хэша в `invokeCommand`) роняет
+`TestChangedDescriptorBlocksInvoke`.
+
+После разбора арбитром (2026-11-15): карантин перестал зависеть от прогретого
+каталога — `list_commands {refresh:true}` чистит только запрошенный сервер, а
+пустой кэш перед проверкой наполняется через `toolForCall` (нечитаемый каталог
+— отказ, fail-closed). `seen` снимается, когда дескриптор вернулся к
+одобренному, а одобрение пишет наблюдённый хэш. Файл пишется единым писателем
+`toollock.Update` под flock (`<path>.lock`, `syscall.Flock`), поэтому панель и
+процесс набора не теряют чужих одобрений. Панель не принимает `approvedBy` из
+тела (`panel` — и для дровера, и для CLI). Сессия **browse** сверяет хэш из
+`sets/*/tools.lock.json` всех наборов и отбивает изменившийся инструмент `403`
+до вызова вниз, помечая его `changed: true`. CLI ставит `Origin` (иначе CSRF
+панели отбивает POST) и разбирает позиционные аргументы как `runAuth`.
+Ворота добавленные: `TestRefreshLeavesOtherServerCache`,
+`TestQuarantineHoldsWithoutCatalog`, `TestQuarantineFailsClosedWhenCatalogUnavailable`,
+`TestSeenClearsWhenDescriptorReverts`, `TestUpdateSerialisesParallelApprovals`,
+`TestBrowseBlocksChangedDescriptor`, `TestToolsApproveWithAuth`,
+`TestApprovePositionalTargets`, `TestApproveAllSendsOneRequest`,
+`TestApproveThroughPanelWithAuth`. Мутации: без чтения каталога при пустом кэше
+падают `TestQuarantineHoldsWithoutCatalog` и
+`TestQuarantineFailsClosedWhenCatalogUnavailable`; без снятия `seen` — 
+`TestSeenClearsWhenDescriptorReverts`; без `Origin` в CLI — 
+`TestApproveAllSendsOneRequest`, `TestApproveAllWithNothingToDo`,
+`TestApproveThroughPanelWithAuth`.
 
 ## Порядок и сумма
 

@@ -223,7 +223,7 @@ func New(opts Options) (*Manager, error) {
 		version: version,
 		tls:     tlsConf,
 		health:  newHealthCache(),
-		browse:  newBrowser(sec, version),
+		browse:  newBrowser(sec, version, opts.DataDir),
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -602,6 +602,8 @@ func (m *Manager) buildRoutes() []route {
 			http.MethodPost: m.apiServerAuthorize, http.MethodGet: m.apiServerAuthorize,
 		}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiServerLogs}),
+		mk(`^/api/sets/`+setPattern+`/tools$`, map[string]handlerFunc{http.MethodGet: m.apiSetTools}),
+		mk(`^/api/sets/`+setPattern+`/tools/approve$`, map[string]handlerFunc{http.MethodPost: m.apiSetToolsApprove}),
 		mk(`^/api/sets/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiSetLogs}),
 		mk(`^/api/sets/`+setPattern+`/reload$`, map[string]handlerFunc{http.MethodPost: m.apiSetReload}),
 		mk(`^/api/sets/`+setPattern+`/(start|stop|restart)$`, map[string]handlerFunc{http.MethodPost: m.apiSetAction}),
@@ -1124,7 +1126,7 @@ func (m *Manager) apiBrowseCall(req *request) error {
 		if errors.Is(err, errBrowseGone) {
 			return err
 		}
-		if errors.Is(err, errBrowseDenied) {
+		if errors.Is(err, errBrowseDenied) || errors.Is(err, errBrowseQuarantined) {
 			return &httpError{http.StatusForbidden, truncate(err.Error(), 800)}
 		}
 		return &httpError{http.StatusBadGateway, truncate(err.Error(), 800)}

@@ -675,6 +675,11 @@ body.log-wide #side.drawer { width: min(900px, 100vw); }
 .srvlog-body .od-row { justify-content: space-between; }
 .srvlog { flex: 1 1 auto; min-height: 0; }
 
+/* карантин дескрипторов: таблица инструментов прокручивается внутри дровера */
+.tools-body { display: flex; flex-direction: column; align-content: normal; overflow: hidden; }
+.tools-body .od-row { justify-content: space-between; }
+.tools-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+
 /* хвост списка вызовов: кнопка по центру под таблицей */
 .more-row { display: flex; justify-content: center; align-items: center; gap: var(--sp-4); margin-top: var(--sp-5); }
 .more-pause { display: inline-flex; align-items: center; gap: var(--sp-2); }

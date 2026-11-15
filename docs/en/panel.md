@@ -66,6 +66,16 @@ drawer reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the
 lines as text; a name that never appears in the log shows `log is empty`, and a
 failed request keeps the lines already shown and reports the reason above them.
 
+The **Tools** button of a row opens the descriptor drawer for that server
+([meta-tools.md](meta-tools.md#descriptor-quarantine)): one line per tool with
+its state — `approved`, or `changed` in warning colour with an **approve**
+button. It reads `GET /api/sets/<id>/tools` and keeps the server's entries;
+**approve** sends `POST /api/sets/<id>/tools/approve` and the list is read
+again, so the row turns `approved` on the spot. Until then the proxy refuses
+that tool's calls. The drawer shows what the set process wrote, so without a set
+data directory (`MCPRIG_DATA_DIR`) every tool reads `approved`; entries of a
+server removed from the set are pruned when the set config is rebuilt.
+
 The registry list in the drawer also shows isolation, on the second line of a
 row: `bwrap` when the sandbox is applied, `no isolation` in warning colour when
 the block was requested but bubblewrap did not start (the daemon's full reason
@@ -152,6 +162,8 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/sets/<id>/servers` | per-server health for one set |
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
+| `GET /api/sets/<id>/tools` | `{"tools":[…]}` — the set's descriptor records: `server`, `tool`, `hash` (as the catalog serves it now), `approvedHash` and `state` (`ok`, `changed`) |
+| `POST /api/sets/<id>/tools/approve` | approve the current descriptor: `{"server":"serena","tool":"find_symbol"}`, or `{"all":true}` for everything currently changed; answers `{"approved":["serena/find_symbol"]}`, empty when nothing needed it. The record is written with `approvedBy: "panel"` |
 | `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token. Earlier keys stay active, so issuing does not revoke the old one; the set serves up to 8 active keys, the ninth answers `409`. An optional `{"label":"hermes","profile":"reader"}` names and narrows the key to that profile of the set — an unknown name is `400` listing the profiles, a set without `profiles` is `400` with a hint to add the block. A running set gets the new key by reloading, not restarting; when the process did not apply it, the answer carries `reloadError` (and `restartError`, its older name) |
 | `GET /api/sets/<id>/keys` | `{"keys":[…]}` — `id`, `label`, `profile`, `createdAt`, `revokedAt` of every key, revoked ones included; never a token or a hash |
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke one key; the rest keep working. Revoking the last active key stops the set and the answer carries `stopped: true` and `activeKeys: 0` |

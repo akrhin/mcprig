@@ -170,9 +170,20 @@ func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c man
 		return nil
 	}
 	// Та же сверка, что у invoke_command: неизвестное имя не идёт в апстрим,
-	// иначе отказ приходит тремя разными текстами. Пустой кэш — как раньше.
-	if cached := e.cachedTools(); cached != nil && !hasTool(cached, c.CommandName) {
-		return fmt.Errorf("неизвестный инструмент %q у сервера %q", c.CommandName, srv.Name)
+	// иначе отказ приходит тремя разными текстами. Пустой кэш каталог не
+	// отменяет — см. toolForCall.
+	tool, err := m.toolForCall(ctx, e, srv, c.CommandName)
+	if err != nil {
+		return err
+	}
+	if tool != nil {
+		// Один изменившийся инструмент не тянет за собой соседние: отбит
+		// только он, остальные вызовы пачки идут как обычно.
+		if message, changed := m.quarantine(srv.Name, tool); changed {
+			ans.Result = quarantineResult(message)
+			ans.Error = message
+			return nil
+		}
 	}
 	args, err := parametersOf(c.Parameters)
 	if err != nil {
