@@ -90,6 +90,8 @@ func (c *healthCache) get(ctx context.Context, id string, load func(context.Cont
 			case <-wait:
 				continue
 			case <-ctx.Done():
+				// Пустой вид — сигнал «ответа нет»: обработчик решает,
+				// молчать (клиент ушёл) или отдать серверы с ошибкой.
 				return setHealth{}
 			}
 		}

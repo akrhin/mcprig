@@ -23,6 +23,9 @@ func denyReason(global, server *config.Permissions, serverName, command string) 
 // the owner or the client chose. An empty name means no key (open set, stdio)
 // or a key without a profile, which is unrestricted by profile.
 //
+// Отсутствие записи — это ключ без профиля (keyProfiles их не пишет), а не
+// устаревшая строка: keepLiveTransport откатывает таблицу вместе с транспортом.
+//
 // cfg is the caller's snapshot: a reload between two reads could otherwise
 // answer with one generation's token table and another's profiles.
 func callerProfile(ctx context.Context, cfg *config.Config) (string, *config.Profile) {

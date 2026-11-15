@@ -83,7 +83,16 @@ func (n *notifier) emit(webhook, setID, server, event string, code int) {
 	n.wg.Add(1)
 	go func() {
 		defer n.wg.Done()
-		n.send(webhook, ev)
+		if err := n.send(webhook, ev); err != nil {
+			// Не доставлено — переход не считается отправленным: следующее то
+			// же событие уйдёт снова. Метку снимаем, только если её не
+			// переписал более новый переход.
+			n.mu.Lock()
+			if n.last[key] == event {
+				delete(n.last, key)
+			}
+			n.mu.Unlock()
+		}
 	}()
 }
 
@@ -105,10 +114,10 @@ func (n *notifier) drain() {
 	}
 }
 
-func (n *notifier) send(webhook string, ev notifyEvent) {
+func (n *notifier) send(webhook string, ev notifyEvent) error {
 	body, err := json.Marshal(ev)
 	if err != nil {
-		return
+		return err
 	}
 	var lastErr error
 	for attempt := 0; attempt < notifyAttempts; attempt++ {
@@ -116,12 +125,13 @@ func (n *notifier) send(webhook string, ev notifyEvent) {
 			time.Sleep(notifyBackoff[attempt-1])
 		}
 		if lastErr = n.post(webhook, body); lastErr == nil {
-			return
+			return nil
 		}
 	}
 	// Адрес вебхука в лог не идёт: в нём бывает собственный токен, а post
 	// уже снял адрес с ошибки транспорта.
 	n.log.Warn("вебхук набора не отправлен", "set", ev.Set, "event", ev.Event, "err", lastErr)
+	return lastErr
 }
 
 // redactURL снимает адрес с ошибки транспорта: *url.Error печатает полный

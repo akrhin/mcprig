@@ -631,6 +631,25 @@ func TestSetSnapshots(t *testing.T) {
 	if kept.Name != "demo" || kept.Servers[0] != "fs" || kept.Token == "leak" {
 		t.Fatalf("запись через снапшот изменила реестр: %+v", kept)
 	}
+	if kept.Keys[0].Token == "leak" {
+		t.Fatal("ключ в снапшоте тот же массив, что в реестре")
+	}
+
+	// Метаданные набора — тоже копия: карта профилей, лимит и notify не
+	// должны меняться через снапшот в обход блокировки.
+	addSet(t, store, `{"name":"rich","servers":["fs"],"port":`+strconv.Itoa(freePort(t, store.Set("demo").Port))+`,
+		"profiles":{"p":{"deny":["alpha/*"]}},"rateLimit":{"perMinute":10},
+		"notify":{"webhook":"http://127.0.0.1/hook"}}`)
+	rich := store.Set("rich")
+	rich.Profiles["p"].Deny[0] = "*"
+	rich.Profiles["new"] = &config.Profile{Deny: []string{"*"}}
+	rich.RateLimit.PerMinute = 999
+	rich.Notify.Webhook = "http://evil.example/hook"
+	if kept := store.Set("rich"); kept.Profiles["p"].Deny[0] != "alpha/*" ||
+		len(kept.Profiles) != 1 || kept.RateLimit.PerMinute != 10 ||
+		kept.Notify.Webhook != "http://127.0.0.1/hook" {
+		t.Fatalf("метаданные набора изменены через снапшот: %+v", kept)
+	}
 }
 
 func TestSetValidation(t *testing.T) {

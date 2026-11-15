@@ -270,16 +270,23 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 
 	go rt.wait(set.ID, set, servers, p, logFile)
 
-	if !waitPort(rt.probeAddr, set.Port, readyBudget, p.done) {
+	if !waitPort(ctx, rt.probeAddr, set.Port, readyBudget, p.done) {
+		canceled := ctx.Err() != nil
 		rt.mu.Lock()
 		p.stopping = true
-		p.err = fmt.Sprintf("порт %d не слушает — набор не поднялся", set.Port)
+		if !canceled {
+			p.err = fmt.Sprintf("порт %d не слушает — набор не поднялся", set.Port)
+		}
 		rt.mu.Unlock()
 		killGroup(p.pid, syscall.SIGKILL)
 		<-p.done
+		if canceled {
+			// Клиент ушёл — ответа ему не нужно, а процесс, которого никто не
+			// ждёт, остался бы сиротой и удержал порт набора.
+			return RuntimeStatus{}, ctx.Err()
+		}
 		return RuntimeStatus{}, conflictf("набор %s не поднялся: порт %d не слушает", set.ID, set.Port)
 	}
-	_ = ctx
 	// Набор поднялся: следующий обрыв — новый переход и новое событие.
 	rt.notify.clear(set.ID, "")
 	// Одна строка в stdout: журнал панели читается под логином, а падения и
@@ -710,8 +717,10 @@ func (rt *Runtime) ServerLogs(id, server string, lines int) []string {
 	return out
 }
 
-// Close гасит все наборы, по 3 с на процесс. Блокировку набора ждёт, а не
-// пропускает: иначе набор, который в этот момент стартует, остался бы сиротой.
+// Close гасит все наборы параллельно в общем бюджете: последовательное ожидание
+// давало readyBudget+stopGrace на каждый, и десяток наборов держал панель до
+// минуты. Блокировку набора ждёт, а не пропускает: иначе стартующий набор
+// остался бы сиротой.
 func (rt *Runtime) Close() {
 	rt.mu.Lock()
 	rt.closed = true
@@ -721,36 +730,55 @@ func (rt *Runtime) Close() {
 	}
 	rt.mu.Unlock()
 	sort.Strings(ids)
+	deadline := time.Now().Add(readyBudget + stopGrace)
+	var wg sync.WaitGroup
 	for _, id := range ids {
-		l := rt.setLock(id)
-		acquired := make(chan struct{})
-		go func() {
-			l.Lock()
-			close(acquired)
-		}()
-		timedOut := false
-		select {
-		case <-acquired:
-		case <-time.After(readyBudget + stopGrace):
-			timedOut = true
-			rt.log.Warn("набор не отдал блокировку при остановке — гашу по известному pid", "set", id)
-		}
-		if p := rt.proc(id); p != nil {
-			rt.kill(p, closeGrace)
-			rt.mu.Lock()
-			delete(rt.procs, id)
-			rt.mu.Unlock()
-		}
-		if timedOut {
-			// Старт ещё держит лок: отпустим его из горутины, когда закончит.
-			go func() {
-				<-acquired
-				l.Unlock()
-			}()
-			continue
-		}
-		l.Unlock()
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			rt.closeSet(id, deadline)
+		}(id)
 	}
+	wg.Wait()
+	// События в полёте дописываются: вебхук — единственный след падения, и
+	// обрывать его на выходе значит потерять уведомление.
+	rt.notify.drain()
+}
+
+// closeSet гасит один набор в остатке общего бюджета deadline.
+func (rt *Runtime) closeSet(id string, deadline time.Time) {
+	l := rt.setLock(id)
+	acquired := make(chan struct{})
+	go func() {
+		l.Lock()
+		close(acquired)
+	}()
+	wait := time.Until(deadline)
+	if wait < 0 {
+		wait = 0
+	}
+	timedOut := false
+	select {
+	case <-acquired:
+	case <-time.After(wait):
+		timedOut = true
+		rt.log.Warn("набор не отдал блокировку при остановке — гашу по известному pid", "set", id)
+	}
+	if p := rt.proc(id); p != nil {
+		rt.kill(p, closeGrace)
+		rt.mu.Lock()
+		delete(rt.procs, id)
+		rt.mu.Unlock()
+	}
+	if timedOut {
+		// Старт ещё держит лок: отпустим его из горутины, когда закончит.
+		go func() {
+			<-acquired
+			l.Unlock()
+		}()
+		return
+	}
+	l.Unlock()
 }
 
 // childEnv — whitelist плюс только те ${VAR}, на которые ссылается набор.
@@ -861,16 +889,25 @@ func humanDuration(d time.Duration) string {
 	}
 }
 
-func waitPort(host string, port int, budget time.Duration, done <-chan struct{}) bool {
+func waitPort(ctx context.Context, host string, port int, budget time.Duration, done <-chan struct{}) bool {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	deadline := time.Now().Add(budget)
 	for {
+		// Отмена проверяется до подсоединения: порт, успевший открыться,
+		// не должен превращать отменённый старт в успешный.
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+		}
 		conn, err := net.DialTimeout("tcp", addr, time.Second)
 		if err == nil {
 			conn.Close()
 			return true
 		}
 		select {
+		case <-ctx.Done():
+			return false
 		case <-done:
 			return false
 		default:

@@ -688,6 +688,10 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status, msg = http.StatusConflict, ce.msg
 	case errors.As(err, &pathErr):
 		status, msg = http.StatusInternalServerError, "внутренняя ошибка — повторите; если повторяется, смотрите лог панели"
+	case errors.Is(err, context.Canceled):
+		// Клиент ушёл посреди запроса: ответа ждать некому, а недоставка —
+		// не ошибка сервера и в журнал не идёт.
+		return
 	}
 	if status >= 500 {
 		m.log.Error("ошибка API", "method", r.Method, "path", r.URL.Path, "status", status, "err", err)
@@ -1621,10 +1625,33 @@ func (m *Manager) apiSetServers(req *request) error {
 	view := m.health.get(req.r.Context(), id, func(ctx context.Context) setHealth {
 		return m.probe(ctx, set)
 	})
+	if view.Servers == nil {
+		// Клиент ушёл — ответа ему не нужно: пустой 200 он не прочтёт, а в
+		// журнал недоставка не идёт.
+		if req.r.Context().Err() != nil {
+			return nil
+		}
+		// Проба не дала ответа: серверы остаются в списке с ошибкой, а не
+		// исчезают из ответа (200 с servers: null панель читает как «их нет»).
+		view = m.unprobedHealth(set)
+	}
 	view.Running = status.Running
 	m.noteHealth(id, view)
 	writeJSON(req.w, http.StatusOK, view)
 	return nil
+}
+
+// unprobedHealth — состав набора с ошибкой пробы: проба не ответила за свой
+// бюджет, но панель должна видеть серверы, а не пустой список.
+func (m *Manager) unprobedHealth(set *registry.Set) setHealth {
+	servers := make([]serverHealth, 0, len(set.Servers))
+	for _, name := range set.Servers {
+		servers = append(servers, serverHealth{
+			Name:  name,
+			Error: "проба набора не ответила за " + humanDuration(healthLoadTimeout),
+		})
+	}
+	return setHealth{Servers: servers}
 }
 
 // ─── keys ────────────────────────────────────────────────────────────────────
@@ -1738,8 +1765,8 @@ func (m *Manager) keyIssueInput(set *registry.Set, req *request) (profile, label
 }
 
 // apiKeyNote подписывает ключ человеческим именем: подпись уходит в метку
-// клиента статистики, поэтому работающий набор перезапускается — listener
-// читает clientNames из servers.json при старте.
+// клиента статистики через clientNames, а их доставляет reload — набор
+// остаётся тем же процессом, как и при выдаче ключа.
 func (m *Manager) apiKeyNote(req *request) error {
 	id, keyID := req.args[0], req.args[1]
 	var body struct {
@@ -1775,23 +1802,19 @@ func (m *Manager) apiKeyNote(req *request) error {
 		return err
 	}
 	set = m.store.Set(id)
-	var restartErr string
-	if running {
-		if _, err := m.RestartSet(context.Background(), set); err != nil {
-			m.log.Warn("перезапуск набора после подписи ключа не удался", "set", id, "err", err)
-			restartErr = err.Error()
-		}
-	}
+	view, reloadErr := m.deliverKeys(set, running)
 	var signed registry.PublicKey
 	for _, key := range registry.PublicSet(set).Keys {
 		if key.ID == keyID {
 			signed = key
 		}
 	}
-	resp := map[string]any{"key": signed}
-	// Подпись уже сохранена: ошибку рестарта отдаём полем, а не кодом.
-	if restartErr != "" {
-		resp["restartError"] = restartErr
+	resp := map[string]any{"key": signed, "set": view}
+	// Подпись уже сохранена: ошибку доставки отдаём полем, а не кодом.
+	// restartError — прежнее имя того же поля для панели.
+	if reloadErr != "" {
+		resp["reloadError"] = reloadErr
+		resp["restartError"] = reloadErr
 	}
 	writeJSON(req.w, http.StatusOK, resp)
 	return nil

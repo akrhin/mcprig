@@ -425,11 +425,40 @@ func (s *Store) Set(id string) *Set {
 }
 
 // snapshot copies the mutable parts of a set, so a caller cannot write back
-// into registry state through the returned pointer.
+// into registry state through the returned pointer. Profiles, the rate limit
+// and Notify are maps or pointers: a shallow copy would let a handler edit the
+// store's state past the lock.
 func (set *Set) snapshot() *Set {
 	cp := *set
 	cp.Servers = append([]string(nil), set.Servers...)
 	cp.Keys = append([]Key(nil), set.Keys...)
+	if set.Notify != nil {
+		n := *set.Notify
+		cp.Notify = &n
+	}
+	if set.RateLimit != nil {
+		rl := *set.RateLimit
+		if set.RateLimit.PerTool != nil {
+			rl.PerTool = make(map[string]config.RateLimit, len(set.RateLimit.PerTool))
+			for name, limit := range set.RateLimit.PerTool {
+				rl.PerTool[name] = limit
+			}
+		}
+		cp.RateLimit = &rl
+	}
+	if set.Profiles != nil {
+		cp.Profiles = make(map[string]*config.Profile, len(set.Profiles))
+		for name, profile := range set.Profiles {
+			if profile == nil {
+				cp.Profiles[name] = nil
+				continue
+			}
+			p := *profile
+			p.Deny = append([]string(nil), profile.Deny...)
+			p.Allow = append([]string(nil), profile.Allow...)
+			cp.Profiles[name] = &p
+		}
+	}
 	return &cp
 }
 

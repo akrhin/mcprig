@@ -209,6 +209,18 @@ func TestNotifyDeadWebhookLogsAndStops(t *testing.T) {
 	}
 }
 
+// Недоставленное событие не считается отправленным: следующее то же событие
+// уходит снова, а не подавляется меткой (§C9).
+func TestNotifyRetriesAfterFailedDelivery(t *testing.T) {
+	h := newHook(t, 0)
+	rt := quietRuntime(t)
+
+	rt.notify.emit("http://127.0.0.1:1/hook", "again", "", "set.crashed", 1)
+	rt.notify.drain()
+	rt.notify.emit(h.srv.URL, "again", "", "set.crashed", 1)
+	h.want(t, 1)
+}
+
 // Неисправный сервер набора шлёт server.unhealthy один раз на переход, а
 // выздоровление открывает следующий.
 func TestNotifyUnhealthyServer(t *testing.T) {
@@ -286,7 +298,7 @@ func waitRestart(t *testing.T, rt *Runtime, id string, old *process, port int) *
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
-		if !waitPort(rt.probeAddr, port, 10*time.Second, p.done) {
+		if !waitPort(context.Background(), rt.probeAddr, port, 10*time.Second, p.done) {
 			t.Fatal("набор перезапустился, но порт молчит")
 		}
 		for time.Now().Before(deadline) {
