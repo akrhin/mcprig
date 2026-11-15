@@ -8,6 +8,18 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Added
+
+- A truncated tool answer can be fetched over HTTP: `GET /tool-out/<name>`
+  serves the saved file behind the same guard as `/mcp` — bearer key,
+  `allowedHosts`, Origin — and the truncation marker names that URL when the set
+  runs over HTTP with a key. The file is never served anonymously, even in an
+  open set, and a name past `MCPRIG_TOOLOUT_TTL` (24h by default) answers `410`.
+- `mcprig status` shows panel health and, per set, its state, port, tool count,
+  key and last call; `mcprig logs` prints a set's or a server's log tail with
+  `-f` and `--json`. Both take `--panel` (default `MCPRIG_PANEL_URL`, else
+  `MCPRIG_PORT`) and log in with `MCPRIG_PASSWORD` or the reverse-proxy secret.
+
 ### Changed
 
 - Browse sessions in the panel now apply the server's `permissions` to tool

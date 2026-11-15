@@ -184,7 +184,7 @@ func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c man
 	if res.IsError {
 		return errors.New(resultMessage(res))
 	}
-	value, err := truncateValue(res, maxBytes)
+	value, err := m.truncateValue(res, maxBytes)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,7 @@ This file lists every subcommand and flag with real examples and their output.
 
 # CLI
 
-`mcprig` has seven subcommands. Running it with no subcommand is the same as
+`mcprig` has nine subcommands. Running it with no subcommand is the same as
 `mcprig serve`; running it with flags only (`mcprig -config …`) is also
 `serve`.
 
@@ -18,6 +18,8 @@ This file lists every subcommand and flag with real examples and their output.
 | `init` | print a client configuration fragment; writes nothing |
 | `doctor` | one-pass health report: config, sets, keys, secrets, services, sandbox |
 | `warm` | load a set's tool cache so the first client call is fast |
+| `status` | panel health and set state in the terminal |
+| `logs` | tail of a set's or a server's log, with `-f` |
 
 Exit codes: `0` after help, `2` for a command-line error (unknown subcommand,
 extra positional argument, unknown client), `1` for a runtime error (config
@@ -282,6 +284,77 @@ Exit code: `0` when every set warmed, `1` when any set failed (panel
 unreachable, missing key, timeout); the failing line carries the reason.
 `deploy/mcprig-warm.timer` repeats this every ten minutes — see
 `deploy/README.md`.
+
+## status
+
+```bash
+mcprig status
+mcprig status --panel http://127.0.0.1:9091 --json
+mcprig status --set example
+```
+
+One shot of what the panel shows: `/healthz` (public, so a dead panel is an
+error naming the address rather than a stack trace) and `/api/state` (every set
+with its port, state, key and runtime error). The tool count and the last call
+time come from `/api/calls`: `0` and `—` mean the set is stopped or that request
+did not answer — it is best-effort and never fails the command.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-panel` | `MCPRIG_PANEL_URL`, else `http://127.0.0.1:$MCPRIG_PORT` | panel address |
+| `-set` | empty: every set | one set, by id |
+| `-json` | | `{panel, health, sets: [{id, name, state, port, tools, key, lastCall, error}]}` |
+| `-timeout` | `10s` | budget for the whole report |
+| `-password` | `MCPRIG_PASSWORD` | panel password (kept out of the output) |
+| `-secret` | `MCPRIG_PROXY_SECRET` | reverse-proxy secret |
+| `-user` | `admin` | panel login name |
+
+```text
+mcprig status, панель http://127.0.0.1:9091
+здоровье: ok
+
+набор    состояние   порт  инструментов  ключ  последний вызов
+example  запущен     9101  12            есть  2026-11-15 13:00:11
+lab      остановлен  9102  —             нет   —
+
+итог: 2 набора
+```
+
+Exit code: `0` when the panel answered; `1` otherwise (unreachable, `401` — add
+`-password` or `-secret`, unknown `-set`).
+
+## logs
+
+```bash
+mcprig logs --set example
+mcprig logs --set example --server context7 -n 50
+mcprig logs --set example -f --json
+```
+
+`logs` reads `/api/sets/<id>/logs`, or `/api/sets/<id>/servers/<name>/logs` with
+`-server`, passing the same `lines` parameter the panel uses. With `-f` it polls
+once a second and prints only lines it has not printed yet; Ctrl-C exits with
+code `0`. A repeating log is the one exception: when the whole answer is a tail
+of the previous one and is not identical to it, `logs` prints the answer again
+instead of staying silent — the panel tail carries no cursor.
+`-json` prints one object per line: `{"set","server","line","ts"}` when
+the panel returns structured lines, `{"line":"…"}` while it returns plain
+strings.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-panel` | `MCPRIG_PANEL_URL`, else `http://127.0.0.1:$MCPRIG_PORT` | panel address |
+| `-set` | required | set whose log is read |
+| `-server` | empty: the whole set | one server's log |
+| `-n` | `200` | how many last lines to take |
+| `-f` | | follow: poll once a second, print only new lines |
+| `-json` | | one object per line |
+| `-password` | `MCPRIG_PASSWORD` | panel password (kept out of the output) |
+| `-secret` | `MCPRIG_PROXY_SECRET` | reverse-proxy secret |
+| `-user` | `admin` | panel login name |
+
+Exit code: `0` at EOF and on Ctrl-C, `1` when the panel refuses (unknown set or
+server, `401`, unreachable).
 
 ## init
 

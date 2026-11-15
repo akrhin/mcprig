@@ -191,6 +191,36 @@ structured data has nothing to read otherwise. An answer within the cap is
 returned untouched — no file, no marker. A non-numeric or negative `maxBytes`, or one above 1048576, is an
 error like any other bad argument.
 
+### Fetching the full answer over HTTP
+
+A set served over HTTP hands the file out instead of a path: over the same
+listener, under the same guard as `/mcp` — the set's bearer key, `allowedHosts`
+and the `Origin` check. The marker then reads:
+
+```text
+[обрезано: 32768 из 149873 байт, полный ответ — /tool-out/1f3c9a2b7d4e5f60 (тот же ключ, что у /mcp)]
+```
+
+`GET /tool-out/<name>` returns the whole answer: `text/plain; charset=utf-8`,
+`no-store`, byte ranges honoured (`Range: bytes=0-9` is a `206`), `HEAD` answering
+the length without the body. The name is the file name without `.txt`, sixteen
+hex characters; anything else is `404`, and so is a name whose file is gone.
+
+A dump older than the retention TTL is `410 Gone` — the marker's promise has run
+out. The endpoint reads the TTL of its own process, once at start, from
+`MCPRIG_TOOLOUT_TTL` (default `24h`). A set started by the panel does not get that
+variable — `MCPRIG_` is a reserved prefix there — so it keeps the default `24h`,
+and a shorter panel retention may delete the file first; then the endpoint
+answers `404`, not `410`.
+
+The name is a capability, not a session: any holder of the set's key fetches any
+dump whose name it knows, whoever produced it.
+
+The endpoint is never anonymous, not even on an open set: `/mcp` may admit a
+request without a key, the dump does not. A set over stdio keeps the path in the
+marker — its file is on the caller's own filesystem, and there is no listener to
+ask.
+
 ## invoke_many
 
 Input: `{"calls": [{"server": "echo", "command_name": "echo", "parameters": {"text": "a"}}, …], "maxBytes": 4096}`

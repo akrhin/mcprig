@@ -44,18 +44,23 @@ MCP-шлюзов и проверке безопасности восьми из�
    (`internal/manager/api.go:660`): `docs/en/panel.md:278`,
    `docs/en/troubleshooting.md:131`, `docs/ru/panel.md:278`,
    `docs/ru/troubleshooting.md:130`.
+   Сделано: точный текст цитируется в четырёх страницах.
 3. **`docs/CURRENT-GOAL.md:31-34`** («Остаток» v0.3.4): оба пункта закрыты —
    Origin проверяется при пустом заголовке (`api.go:650-660`), journald получает
    строки о падении и перезапуске.
+   Сделано: «Остаток» переписан как закрытый, с настоящими номерами строк.
 4. **Мёртвое:** `Secrets.OpenBao()` без вызовов (`internal/manager/secrets.go:247`);
    `Logging` пишется в `servers.json`, поля в конфиге нет
    (`internal/manager/setconfig.go:43,74`).
+   Сделано: удалены, `configuration.md` больше не обещает блок `logging`.
 5. **`_configError` с json-тегом** (`internal/config/config.go:43`): попав в
    `registry.json`, сервер навсегда считается битым
    (`internal/mcpserver/manager.go:1054`). Снять тег или чистить поле при записи.
+   Сделано: тег `json:"-"`, тест на заражённый файл, ключ убран из мока панели.
 
 Ворота: `go build ./... && go vet ./... && go test ./... -race -count=1 -p 1`,
-`bash scripts/docs-check.sh`.
+`bash scripts/docs-check.sh`. Пройдены 2026-11-15: 434 теста в 15 пакетах,
+docs-check 5/5; коммит `0e65538`.
 
 ## Слой 1. Быстрые победы прокси (3–4 дня)
 
@@ -79,6 +84,12 @@ MCP-шлюзов и проверке безопасности восьми из�
 
 Тесты: `TestToolOutServedWithBearer`, `TestToolOutRefusedOnOpenSetWithoutBearer`,
 `TestToolOutRejectsTraversal`.
+
+Сделано (2026-11-15): маршрут в `internal/httplisten/httplisten.go` (имя без
+`.txt`, `allowAnonymous=false` жёстко), заголовки и Range — через
+`http.ServeContent`, `404`/`410` по mtime, маркер называет URL при HTTP+ключе.
+Открытый набор файл не отдаёт вовсе: маркер там остаётся путём — это не дыра, а
+осознанная граница.
 
 ### T2. Лимиты по ключу и инструменту (1 день)
 
@@ -134,6 +145,13 @@ MCP-шлюзов и проверке безопасности восьми из�
 - Вход — тем же способом, что у `warm` (`cmd/mcprig/warm.go:61-77`).
 
 Тесты: `TestStatusJSONShape`, `TestLogsFollow`.
+
+Сделано (2026-11-15): `status` (состояние, порт, инструменты, ключ, последний
+вызов) и `logs` (`--set`, `--server`, `-n`, `-f`, `--json`), вход вынесен в
+`cmd/mcprig/panel.go` и общий с `warm`. Сокращено осознанно: **версии нет** —
+`/api/state` её не отдаёт; счётчики вызовов не печатаются, хватает последнего
+вызова, полные числа доступны через `/api/stats`. Версию добавить вместе с E
+(OTel), где `/api/state` всё равно расширяется.
 
 ### T6. UI для существующих маршрутов и пагинация вызовов (1 день)
 

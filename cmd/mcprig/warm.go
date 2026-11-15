@@ -6,11 +6,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -356,18 +354,6 @@ type panelSet struct {
 	Open      bool   `json:"open"`
 }
 
-// panelBaseURL: --panel, иначе MCPRIG_PANEL_URL, иначе локальная панель на
-// MCPRIG_PORT (9091 по умолчанию, как в deploy/mcprig.service).
-func panelBaseURL(o *warmConfig) string {
-	if o.Panel != "" {
-		return o.Panel
-	}
-	if v := os.Getenv("MCPRIG_PANEL_URL"); v != "" {
-		return v
-	}
-	return "http://127.0.0.1:" + envDefault("MCPRIG_PORT", "9091")
-}
-
 func endpointFor(ctx context.Context, o *warmConfig, set string) (string, error) {
 	sets, err := fetchPanelSets(ctx, o)
 	if err != nil {
@@ -378,10 +364,10 @@ func endpointFor(ctx context.Context, o *warmConfig, set string) (string, error)
 			// открытый набор в панели виден как Open: без ключа он всё равно
 			// прогревается, поэтому warmEndpoint не считает это ошибкой.
 			o.setOpen = s.Open
-			return setEndpoint(panelBaseURL(o), s.Port), nil
+			return setEndpoint(panelBaseURL(o.Panel), s.Port), nil
 		}
 	}
-	return "", fmt.Errorf("набор %q не найден в панели %s", set, panelBaseURL(o))
+	return "", fmt.Errorf("набор %q не найден в панели %s", set, panelBaseURL(o.Panel))
 }
 
 func setEndpoint(panelURL string, port int) string {
@@ -393,74 +379,21 @@ func setEndpoint(panelURL string, port int) string {
 }
 
 func fetchPanelSets(ctx context.Context, o *warmConfig) ([]panelSet, error) {
-	base := strings.TrimRight(panelBaseURL(o), "/")
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: jar, Timeout: 10 * time.Second}
-	password := o.Password
-	if password == "" {
-		password = os.Getenv("MCPRIG_PASSWORD")
-	}
-	if password != "" {
-		user := o.User
-		if user == "" {
-			user = "admin"
-		}
-		body, _ := json.Marshal(map[string]string{"user": user, "password": password})
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/login", strings.NewReader(string(body)))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		panelHeaders(req, o)
-		res, err := client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("панель %s: %w", base, err)
-		}
-		raw, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-		res.Body.Close()
-		if res.StatusCode != http.StatusOK {
-			fmt.Fprintf(os.Stderr, "ответ панели: %s\n", strings.TrimSpace(string(raw)))
-			return nil, fmt.Errorf("панель %s не приняла вход: HTTP %d", base, res.StatusCode)
-		}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/sets", nil)
+	base := strings.TrimRight(panelBaseURL(o.Panel), "/")
+	creds := panelCreds{Password: o.Password, Secret: o.Secret, User: o.User}
+	client, err := newPanelClient(ctx, base, creds)
 	if err != nil {
 		return nil, err
 	}
-	panelHeaders(req, o)
-	res, err := client.Do(req)
+	raw, err := panelGet(ctx, client, base, creds, "/api/sets", "наборы")
 	if err != nil {
-		return nil, fmt.Errorf("панель %s: %w", base, err)
-	}
-	defer res.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(res.Body, 8<<20))
-	if res.StatusCode != http.StatusOK {
-		fmt.Fprintf(os.Stderr, "ответ панели: %s\n", strings.TrimSpace(string(raw)))
-		return nil, fmt.Errorf("панель %s не отдала наборы: HTTP %d", base, res.StatusCode)
+		return nil, err
 	}
 	var sets []panelSet
 	if err := json.Unmarshal(raw, &sets); err != nil {
 		return nil, fmt.Errorf("панель %s: /api/sets: %w", base, err)
 	}
 	return sets, nil
-}
-
-// panelHeaders — вход через обратный прокси: секрет и имя пользователя.
-func panelHeaders(req *http.Request, o *warmConfig) {
-	secret := o.Secret
-	if secret == "" {
-		secret = os.Getenv("MCPRIG_PROXY_SECRET")
-	}
-	if secret == "" {
-		return
-	}
-	req.Header.Set("x-mcp-proxy-secret", secret)
-	user := o.User
-	if user == "" {
-		user = "admin"
-	}
-	req.Header.Set(envDefault("MCPRIG_USER_HEADER", "Remote-User"), user)
 }
 
 func warmAll(o *warmConfig) []warmResult {
@@ -473,7 +406,7 @@ func warmAll(o *warmConfig) []warmResult {
 	if len(sets) == 0 {
 		return []warmResult{{Set: "panel", Error: "в панели нет наборов"}}
 	}
-	base := panelBaseURL(o)
+	base := panelBaseURL(o.Panel)
 	results := make([]warmResult, 0, len(sets))
 	for _, s := range sets {
 		one := *o

@@ -91,6 +91,11 @@ type Manager struct {
 	// Stats, when set, counts every downstream invocation per client and
 	// tool. The panel reads the recorder; the proxy works without it.
 	Stats *stats.Recorder
+
+	// ToolOutURL, when set, names a truncated answer by its /tool-out URL
+	// instead of a path: the caller reached this process over HTTP with a key
+	// and fetches the file under the same guard as /mcp. stdio leaves it false.
+	ToolOutURL bool
 }
 
 type entry struct {
@@ -551,7 +556,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if err != nil {
 			return errResult(err)
 		}
-		return jsonTruncResult(filterCommands(cmds, in.Prefix, in.NamesOnly), maxBytes)
+		return m.jsonTruncResult(filterCommands(cmds, in.Prefix, in.NamesOnly), maxBytes)
 	case len(in.Servers) > 0:
 		// Ответ остальных не теряется из-за одного упавшего: у него в карте
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
@@ -592,7 +597,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if failed == len(in.Servers) {
 			return errResult(firstErr)
 		}
-		return jsonTruncResult(out, maxBytes)
+		return m.jsonTruncResult(out, maxBytes)
 	}
 	return errResult(errNoTargets)
 }
@@ -708,7 +713,7 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 			OutputSchema: tool.OutputSchema,
 		})
 	}
-	return jsonTruncResult(out, maxBytes)
+	return m.jsonTruncResult(out, maxBytes)
 }
 
 // ─── invoke_command ───────────────────────────────────────────────────────────
@@ -775,7 +780,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if res == nil {
 		return res, nil
 	}
-	return truncateResult(res, maxBytes)
+	return m.truncateResult(res, maxBytes)
 }
 
 // callWithRetry runs one downstream call under invoke_command's retry rule and
@@ -1201,12 +1206,12 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 // jsonTruncResult is jsonResult under maxBytes when the caller asked for a cap:
 // a cut JSON catalog is not valid JSON, so an absent or zero maxBytes means no
 // cap at all, exactly as the tool behaved before the parameter existed.
-func jsonTruncResult(v any, maxBytes int) (*mcp.CallToolResult, error) {
+func (m *Manager) jsonTruncResult(v any, maxBytes int) (*mcp.CallToolResult, error) {
 	res, err := jsonResult(v)
 	if err != nil || maxBytes <= 0 {
 		return res, err
 	}
-	return truncateResult(res, maxBytes)
+	return m.truncateResult(res, maxBytes)
 }
 
 // resultMessage берёт текст ошибки из ответа инструмента.

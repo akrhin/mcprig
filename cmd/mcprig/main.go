@@ -103,7 +103,7 @@ func parseFlags(fs *flag.FlagSet, args []string) error {
 		return &usageError{err.Error()}
 	}
 	if fs.NArg() > 0 {
-		return &usageError{fmt.Sprintf("лишние аргументы: %s; команда принимает: serve|stdio|auth|panel|init|doctor|warm", strings.Join(fs.Args(), ", "))}
+		return &usageError{fmt.Sprintf("лишние аргументы: %s; команда принимает: serve|stdio|auth|panel|init|doctor|warm|status|logs", strings.Join(fs.Args(), ", "))}
 	}
 	return nil
 }
@@ -156,13 +156,25 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 			return "", nil, err
 		}
 		return "warm", args[1:], nil
+	case "status":
+		fs, _ := newStatusFlags()
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
+		}
+		return "status", args[1:], nil
+	case "logs":
+		fs, _ := newLogsFlags()
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
+		}
+		return "logs", args[1:], nil
 	case "panel":
 		if len(args) > 1 {
 			return "", nil, &usageError{fmt.Sprintf("panel не принимает аргументов: %q", args[1:])}
 		}
 		return "panel", nil, nil
 	}
-	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, auth, panel, init, doctor, warm", args[0])}
+	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, auth, panel, init, doctor, warm, status, logs", args[0])}
 }
 
 // tooloutInterval is a variable only so a test can shorten the sweep; serve and
@@ -198,6 +210,10 @@ func run() error {
 		return runDoctor(rest)
 	case "warm":
 		return runWarm(rest)
+	case "status":
+		return runStatus(rest)
+	case "logs":
+		return runLogs(rest)
 	}
 	args := rest
 
@@ -247,6 +263,9 @@ func run() error {
 	// Прогрев в фоне: иначе первый list_commands ждёт, пока поднимутся все
 	// npx/uvx-серверы (на одиннадцати это ~11 с).
 	go mgr.Warm(context.Background())
+	// Маркер усечения называет /tool-out, только когда файл можно забрать: у
+	// открытого набора ключа нет, и подсказка вела бы в 401.
+	mgr.ToolOutURL = cfg.Transport != nil && cfg.Transport.AuthToken != ""
 	handler, err := httplisten.New(cfg, mgr.Server(), log, rec)
 	if err != nil {
 		return err

@@ -11,11 +11,15 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/toolout"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -61,6 +65,13 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 		return nil, errors.New("httplisten: path должен начинаться с «/»: получено " + path)
 	}
 
+	// Срок жизни выгрузки читается один раз: маркер обещает файл, и отдавать
+	// его дольше этого срока нельзя, даже если чистка до файла не дошла.
+	retention, warns := toolout.FromEnv()
+	for _, w := range warns {
+		log.Warn("httplisten: tool-out", "warn", w)
+	}
+
 	// Stateless 2026-07-28 per SEP-2567: one temporary session per POST. The
 	// same handler still serves 2025-era protocol versions (the SDK
 	// synthesizes their initialization state), so old clients work unchanged.
@@ -81,6 +92,10 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 		_, _ = w.Write([]byte("ok"))
 	})
 	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed, cfg.Transport.ClientNames))
+	// Усечённый ответ лежит файлом рядом с этим процессом; клиент забирает его
+	// тем же путём, что и /mcp. Послабления открытому набору нет: файл не
+	// отдаётся анонимно никогда, даже когда /mcp пускает без ключа.
+	mux.Handle("GET /tool-out/{name}", guard(toolOutHandler(toolout.Dir(toolout.Base()), retention.TTL), token, false, allowed, cfg.Transport.ClientNames))
 	if rec != nil {
 		// The panel polls this endpoint; it carries the same bearer as /mcp.
 		// У открытого набора bearer нет ни у кого, поэтому анонимный снимок
@@ -102,14 +117,60 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	return logRequests(mux, log), nil
 }
 
+// toolOutName is the shape createToolOut gives a dump. Anything else is 404,
+// not 400: a wrong name must not confirm that a tool-out directory exists.
+var toolOutName = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// toolOutHandler serves one saved answer from this process's tool-out. A name
+// past its TTL is 410: the file was there and the marker's promise ran out.
+//
+// shortcut: имя выгрузки — 64-битный capability без привязки к клиенту: любой
+// держатель ключа набора заберёт чужую выгрузку, если знает имя
+// (docs/history/proposals/0002-proxy-improvements.md).
+// shortcut: TTL конечной точки не прокидывается в набор под панелью, прокинуть
+// вместе с профилями/лимитами (T2/T3).
+func toolOutHandler(dir string, ttl time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		if !toolOutName.MatchString(name) {
+			http.NotFound(w, r)
+			return
+		}
+		f, err := os.Open(filepath.Join(dir, name+".txt"))
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer func() { _ = f.Close() }()
+		info, err := f.Stat()
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if time.Since(info.ModTime()) > ttl {
+			http.Error(w, "полный ответ больше не хранится", http.StatusGone)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "no-store")
+		// Имя ведёт на выгрузку внутри эндпоинта набора: реферер наружу не нужен.
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		// ServeContent режет Range и ставит Last-Modified по mtime.
+		http.ServeContent(w, r, "", info.ModTime(), f)
+	}
+}
+
 // guard is the per-request policy in front of the MCP handler: method, Host,
 // Origin, bearer token, body cap.
 func guard(next http.Handler, token string, allowAnonymous bool, allowed []string, names map[string]string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
-		case http.MethodGet, http.MethodPost, http.MethodDelete:
+		// HEAD бесплатен и у /mcp (тело не отдаётся), а /tool-out по нему
+		// говорит длину выгрузки, не скачивая её.
+		case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodDelete:
 		default:
-			w.Header().Set("Allow", "GET, POST, DELETE")
+			w.Header().Set("Allow", "GET, HEAD, POST, DELETE")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}

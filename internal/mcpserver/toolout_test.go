@@ -48,7 +48,7 @@ func TestTruncateResultWritesWholeAnswer(t *testing.T) {
 	const payload = 6*1024*1024 + 12345
 	const tail = "zeta"
 	body := strings.Repeat("x", payload-len(tail)) + tail
-	res, err := truncateResult(&mcp.CallToolResult{
+	res, err := (&Manager{}).truncateResult(&mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: body}},
 	}, defaultMaxBytes)
 	if err != nil {
@@ -79,7 +79,7 @@ func TestTruncateResultLeavesNoFileOnWriteError(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
-	if _, err := truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes); err == nil {
+	if _, err := (&Manager{}).truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes); err == nil {
 		t.Fatal("ожидалась ошибка записи полного ответа")
 	}
 	entries, err := os.ReadDir(dir)
@@ -97,9 +97,51 @@ func TestTruncateResultReportsDumpDirError(t *testing.T) {
 	}
 	dumpDir(t, filepath.Join(blocker, "sub"))
 
-	_, err := truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes)
+	_, err := (&Manager{}).truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes)
 	if err == nil || !strings.Contains(err.Error(), "каталог выгрузки") {
 		t.Fatalf("ожидалась ошибка каталога выгрузки, получено %v", err)
+	}
+}
+
+// Over HTTP with a key the marker names the /tool-out URL: a path on the
+// server's disk is unreachable for the client that was told it.
+func TestTruncateMarkerNamesToolOutURL(t *testing.T) {
+	dir := t.TempDir()
+	dumpDir(t, dir)
+
+	m := &Manager{ToolOutURL: true}
+	res, err := m.truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes)
+	if err != nil {
+		t.Fatalf("truncateResult: %v", err)
+	}
+	text := res.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "/tool-out/") || !strings.Contains(text, "тот же ключ, что у /mcp") {
+		t.Fatalf("в маркере нет адреса: %q", text)
+	}
+	if strings.Contains(text, dir) {
+		t.Errorf("в маркере остался путь на диске: %q", text)
+	}
+	name := dumpPath(t, text)
+	if head, _, _ := strings.Cut(name, " "); len(head) != len("/tool-out/")+16 {
+		t.Errorf("адрес в маркере: %q", name)
+	}
+}
+
+// stdio keeps the path: that file is on the caller's own filesystem.
+func TestTruncateMarkerKeepsPathWithoutHTTP(t *testing.T) {
+	dir := t.TempDir()
+	dumpDir(t, dir)
+
+	res, err := (&Manager{}).truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes)
+	if err != nil {
+		t.Fatalf("truncateResult: %v", err)
+	}
+	text := res.Content[0].(*mcp.TextContent).Text
+	if strings.Contains(text, "/tool-out/") {
+		t.Fatalf("stdio-маркер обещает HTTP-адрес: %q", text)
+	}
+	if got := dumpPath(t, text); !strings.HasPrefix(got, dir) {
+		t.Errorf("путь в маркере %q, ожидался под %q", got, dir)
 	}
 }
 
