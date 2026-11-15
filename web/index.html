@@ -489,6 +489,13 @@
       </div>
       <label class="check"><input type="checkbox" name="enabled"> <span data-i18n="form.enabled">enabled</span></label>
 
+      <fieldset class="field-group">
+        <legend data-i18n="form.expose">expose</legend>
+        <p class="field-help" data-i18n="form.exposeHint">Surfaces the MCP client may read. Without them the client sees the server's tools only.</p>
+        <label class="check"><input type="checkbox" name="exposeResources"> <span data-i18n="form.exposeResources">expose resources</span></label>
+        <label class="check"><input type="checkbox" name="exposePrompts"> <span data-i18n="form.exposePrompts">expose prompts</span></label>
+      </fieldset>
+
       <fieldset class="field-group" data-when="stdio">
         <legend data-i18n="form.sandbox">sandbox</legend>
         <p class="field-help" data-i18n="form.sandboxHint">mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · empty means the default</p>

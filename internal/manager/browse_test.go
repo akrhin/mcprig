@@ -88,11 +88,11 @@ func TestBrowseCallToolHonoursPermissions(t *testing.T) {
 // ничего не запрещает.
 func TestBrowseDenyToolMessage(t *testing.T) {
 	s := &browseSession{server: "alpha", perms: &config.Permissions{Default: config.PermissionDeny}}
-	err := s.denyTool("anything")
+	err := s.deny("anything")
 	if !errors.Is(err, errBrowseDenied) || err.Error() != errBrowseDenied.Error() {
-		t.Fatalf("denyTool = %v", err)
+		t.Fatalf("deny = %v", err)
 	}
-	if err := (&browseSession{server: "alpha"}).denyTool("anything"); err != nil {
+	if err := (&browseSession{server: "alpha"}).deny("anything"); err != nil {
 		t.Fatalf("без политики инструмент отвергнут: %v", err)
 	}
 }

@@ -10,6 +10,20 @@ repository the project is built in.
 
 ### Added
 
+- Downstream resources and prompts reach the MCP client: a server whose config
+  names them in `expose` (`["resources"]`, `["prompts"]`, or both) contributes
+  them through the new `list_resources`, `read_resource`, `list_prompts` and
+  `get_prompt` tools. Without `expose` the client still sees tools alone, and an
+  unknown value is a config error — the server does not start. Permissions
+  address them as `resource:<uri>` and `prompt:<name>`, so the existing rules
+  and profiles apply unchanged; answers are cut at `maxBytes` (32768 by default
+  for a read) and the full one lands in `tool-out`. The listings honour the same
+  rules: a `default: deny` keeps a resource out of `list_resources` until a rule
+  allows it.
+- `expose` is editable from the panel: the server form carries two checkboxes
+  (resources, prompts), the registry reads and validates the field on `POST
+  /api/servers` and `PUT /api/servers/<name>`, and an unknown value is a `400`
+  that names what is allowed. Unchecking both removes the field.
 - An edit no longer restarts a whole set: `PUT /api/sets/<id>`, `PUT
   /api/servers/<name>` and the new `POST /api/sets/<id>/reload` write
   `servers.json` and send `SIGHUP` to the set process alone — its stdio children
@@ -18,9 +32,9 @@ repository the project is built in.
   `error`); the nonce the panel puts into `reload.request` before the signal
   keeps a late answer to an earlier attempt from being taken for this one. Calls
   in flight to the other servers keep their sessions, and the set's pid and
-  restart counter stay put. A transport change (`port`, `token`, `open`, `path`,
+  restart counter stay put. A transport change (`port`, `open`, `path`,
   `host`, `allowedHosts`) is still applied by a restart and lands in
-  `restartNeeded`; `path`, `host` and `allowedHosts` in a hand-edited
+  `restartNeeded`; keys are the exception and travel by reload (below); `path`, `host` and `allowedHosts` in a hand-edited
   `servers.json` land there too and the set is restarted by hand. A server's
   `env` and `envAllow` are not reloadable either, so an edit of them restarts
   the sets using that server. A broken config leaves the process on the previous one and
@@ -30,6 +44,22 @@ repository the project is built in.
   instead of `restarted`; `restarted` still carries the same list for one
   release.
 
+- A set serves several keys at once. Every key carries `id`, its token,
+  `createdAt`, `revokedAt`, `profile` and `label`; the token never leaves the
+  server and the hash lives only in the listener's memory. Issuing a key no
+  longer revokes the previous one, and revoking one key no longer stops the
+  set — only the last active key does. A set keeps up to 8 active keys and the
+  ninth answers `409`. The routes are `GET /api/sets/<id>/keys` (ids, labels,
+  profiles and dates, never a token), `POST /api/sets/<id>/keys` with an optional
+  `{"label":…,"profile":…}` (the token is in that answer only) and `DELETE
+  /api/sets/<id>/keys/<keyID>`; `PUT /api/sets/<id>` with `token` still replaces
+  the primary key, and creates one when the set has no active key. A new key
+  reaches a running set by reload, not by restart: the transport takes the whole
+  `authTokens` list, compares the presented token with every active key's
+  sha256 in constant time per element, and takes the caller's fingerprint — and
+  so its profile and rate limit — from the token that matched. Keys issued
+  before this release read as a one-element list, and a `note` becomes the key's
+  `label`.
 - The panel states where it is reachable: `MCPRIG_PUBLIC_URL` sets the public
   address (`http(s)://host[:port][/prefix]`), and it becomes the only source of
   the OAuth redirect (`<publicUrl>/oauth/callback`, path prefix kept) and of the
@@ -76,6 +106,14 @@ repository the project is built in.
   the profile refuses, `invoke_command` and `invoke_many` refuse it as a tool
   error naming the profile, and a key without a profile behaves as before.
   The field is edited in `registry.json` or over the API, as `notify`.
+- Tracing crosses the proxy: a client's W3C `traceparent` in `_meta` (SEP-414)
+  is validated (version `00`, non-zero ids, no `ff`), becomes the parent of the
+  call's span and goes down to the upstream in the `_meta` of `invoke_command`,
+  `read_resource` and `get_prompt`; nothing else from the client's `_meta` is
+  forwarded. Spans — `mcp.tool.call`, `mcp.server.connect`, `mcp.reload`, with
+  names and outcome only, never a key or its fingerprint — are exported over
+  OTLP/HTTP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, and cost nothing (no
+  recording, no network) when it is not.
 
 ### Changed
 

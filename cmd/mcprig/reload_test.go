@@ -64,7 +64,7 @@ func TestReloadOnceWritesStatus(t *testing.T) {
 	mgr := mcpserver.New(cfg, "test", nil)
 	defer mgr.Close()
 
-	if res := reloadOnce(mgr, path, quietLog()); res.Generation != 1 || len(res.Applied) != 0 {
+	if res := reloadOnce(mgr, nil, path, quietLog()); res.Generation != 1 || len(res.Applied) != 0 {
 		t.Fatalf("первая попытка без правок: %+v", res)
 	}
 	st := readStatus(t, statusPath)
@@ -82,7 +82,7 @@ func TestReloadOnceWritesStatus(t *testing.T) {
 		{"name": "alpha", "command": ["downstream"], "enabled": true},
 		{"name": "beta", "command": ["downstream"], "enabled": true}
 	]}`)
-	res := reloadOnce(mgr, path, quietLog())
+	res := reloadOnce(mgr, nil, path, quietLog())
 	if res.Generation != 2 || len(res.Applied) != 1 || res.Applied[0] != "added:beta" {
 		t.Fatalf("добавление beta: %+v", res)
 	}
@@ -91,7 +91,7 @@ func TestReloadOnceWritesStatus(t *testing.T) {
 	}
 
 	writeServers(t, path, `{"servers": [`)
-	res = reloadOnce(mgr, path, quietLog())
+	res = reloadOnce(mgr, nil, path, quietLog())
 	if res.Generation != 3 || res.Err == "" || len(res.Applied) != 0 {
 		t.Fatalf("битый файл: %+v", res)
 	}
@@ -103,7 +103,7 @@ func TestReloadOnceWritesStatus(t *testing.T) {
 		{"name": "alpha", "command": ["downstream"], "enabled": true},
 		{"name": "beta", "command": ["downstream"], "enabled": true}
 	]}`)
-	if res := reloadOnce(mgr, path, quietLog()); len(res.Applied) != 0 || res.Generation != 4 {
+	if res := reloadOnce(mgr, nil, path, quietLog()); len(res.Applied) != 0 || res.Generation != 4 {
 		t.Fatalf("после битого файла живой конфиг не сохранился: %+v", res)
 	}
 }

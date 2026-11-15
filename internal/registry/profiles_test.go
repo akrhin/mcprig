@@ -27,7 +27,7 @@ func TestProfilesSurviveSetUpdate(t *testing.T) {
 	}
 
 	// Ключ с профилем переживает правку набора: профиль хранится на ключе.
-	if _, err := store.IssueKey("demo", "reader"); err != nil {
+	if _, err := store.IssueKey("demo", "reader", ""); err != nil {
 		t.Fatalf("IssueKey: %v", err)
 	}
 	set, err = store.UpdateSet("demo", json.RawMessage(`{"description":"e"}`))
@@ -36,9 +36,6 @@ func TestProfilesSurviveSetUpdate(t *testing.T) {
 	}
 	var found bool
 	for _, key := range set.Keys {
-		if key.RevokedAt == "" && key.Profile != "reader" {
-			t.Fatalf("ключ потерял профиль: %+v", key)
-		}
 		found = found || (key.RevokedAt == "" && key.Profile == "reader")
 	}
 	if !found {
@@ -81,7 +78,7 @@ func TestIssueKeyStoresProfile(t *testing.T) {
 	addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(freePort(t))+
 		`,"profiles":{"reader":{"deny":["*"]}}}`)
 
-	if _, err := store.IssueKey("demo", " reader "); err != nil {
+	if _, err := store.IssueKey("demo", " reader ", ""); err != nil {
 		t.Fatalf("IssueKey: %v", err)
 	}
 	set := store.Set("demo")

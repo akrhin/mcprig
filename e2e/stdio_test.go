@@ -114,8 +114,8 @@ func TestStdioModeIsClientOwned(t *testing.T) {
 	msg := read(2)
 	result, _ := msg["result"].(map[string]any)
 	tools, _ := result["tools"].([]any)
-	if len(tools) != 5 {
-		t.Fatalf("ожидалось 5 мета-тулов, получено %d: %v", len(tools), result)
+	if len(tools) != 9 {
+		t.Fatalf("ожидалось 9 мета-тулов, получено %d: %v", len(tools), result)
 	}
 
 	// stdio ведёт историю вызовов, как и набор под serve: разрез по периодам

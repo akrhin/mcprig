@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
 )
@@ -183,6 +184,17 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 		}
 		perms = p
 	}
+	// expose читается тем же разбором, что и config.Load: без него сервер из
+	// панели не отдавал клиенту ни ресурсов, ни промптов, и включить это было
+	// неоткуда. Неизвестный вид ловит Check ниже — одним списком допустимых.
+	var expose []string
+	if raw, ok := in["expose"]; ok && !isNull(raw) {
+		list, msg := config.ParseExpose(raw)
+		if msg != "" {
+			return nil, errors.New(msg)
+		}
+		expose = list
+	}
 
 	hasCommand, hasURL := len(command) > 0, url != ""
 	if hasCommand && hasURL {
@@ -231,6 +243,7 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	srv.Enabled = enabled
 	srv.Sandbox = sandbox
 	srv.Permissions = perms
+	srv.Expose = expose
 	// Те же правила, что у config.Load, включая запрет untrusted без песочницы:
 	// иначе API отвечает 200 и сервер живёт без изоляции.
 	if msg := srv.Check(); msg != "" {
@@ -466,6 +479,35 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		}
 	}
 
+	// token — совместимость: PUT с "token" назначает токен основному ключу,
+	// а если действующих ключей нет — заводит ключ с новым id. Токены
+	// остальных ключей это не трогает: их выдаёт и отзывает /keys.
+	if raw, ok := in["token"]; ok && !isNull(raw) {
+		var token string
+		if err := json.Unmarshal(raw, &token); err != nil {
+			return nil, fmt.Errorf("token: ожидался токен строкой")
+		}
+		token = strings.TrimSpace(token)
+		if token != "" {
+			primary := -1
+			for i, key := range out.Keys {
+				if key.RevokedAt == "" {
+					primary = i
+					break
+				}
+			}
+			if primary < 0 {
+				out.Keys = append(out.Keys, Key{ID: freshKeyID(out.Keys), Token: token, CreatedAt: time.Now().UTC().Format(time.RFC3339)})
+			} else {
+				out.Keys[primary].Token = token
+			}
+		}
+	}
+
+	// normalizeKeys до записи: фиксированный id нового ключа столкнулся бы с
+	// отозванным ключом той же истории, и загрузка оставила бы отозванный —
+	// показанный владельцу токен молча перестал бы работать после перезапуска.
+	out.Keys = normalizeKeys(out.Keys, "", time.Now().UTC().Format(time.RFC3339))
 	out.Token = activeToken(out.Keys)
 	return out, nil
 }

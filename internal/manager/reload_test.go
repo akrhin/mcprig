@@ -236,9 +236,10 @@ func TestReloadTransportChangeNeedsRestart(t *testing.T) {
 	status(t, w, http.StatusOK)
 	started := decode[RuntimeStatus](t, w)
 
-	// Токен через PUT не меняется (он выводится из ключей), поэтому транспорт
-	// здесь — открытость набора; порт и ключ проверяет сам needsRestart.
-	w = e.do(t, http.MethodPut, "/api/sets/"+id, map[string]any{"open": true})
+	// Открытость теперь применяется живьём (SetAuth слушателя), поэтому
+	// перезапуска требует порт — единственное поле, которое процесс читает
+	// только при старте.
+	w = e.do(t, http.MethodPut, "/api/sets/"+id, map[string]any{"port": freePort(t)})
 	status(t, w, http.StatusOK)
 
 	after := e.m.rt.status(e.m.store.Set(id))
@@ -376,10 +377,14 @@ func TestNeedsRestart(t *testing.T) {
 	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9102, Token: "t"}); !restart || why != "порт" {
 		t.Fatalf("порт: %v %q", restart, why)
 	}
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "u"}); !restart || why != "ключ" {
+	// Смена ключа больше не требует перезапуска: список токенов доезжает
+	// reload'ом, поэтому решение о перезапуске его не трогает.
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "u"}); restart {
 		t.Fatalf("ключ: %v %q", restart, why)
 	}
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t", Open: true}); !restart || why != "открытость" {
+	// Открытость перезапуска не требует: слушатель меняет её живьём
+	// (SetAuth), как и список ключей.
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t", Open: true}); restart {
 		t.Fatalf("открытость: %v %q", restart, why)
 	}
 }

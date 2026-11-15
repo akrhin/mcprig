@@ -75,12 +75,24 @@ get zero.
 | `tags` | array of strings | empty | labels for `list_servers` and `filter` |
 | `sandbox` | object | absent — no isolation | bubblewrap block for a stdio server, see below. A server tagged `untrusted` must have it: without one the loader keeps it in the list as unhealthy and the panel API rejects such a record with 400 |
 | `enabled` | bool | `true` | disabled servers are listed but never connected |
+| `expose` | array of `resources` / `prompts` | empty — neither | downstream surfaces the MCP client may reach, through `list_resources`, `read_resource`, `list_prompts`, `get_prompt`; an unknown value is a config error and the server does not start; a reload applies the change without a restart |
 | `permissions` | object | | per-server allow/deny block |
 | `oauth` | object | | per-server OAuth settings |
 
 A defect never becomes a field of the file: the loader keeps the error in
 memory and `list_servers` reports that server as `healthy: false` with the
 text. Hand-editing the file cannot pin a server to a broken state.
+
+### expose
+
+`"expose": ["resources", "prompts"]` names the surfaces of a downstream server
+that the MCP client may reach through `list_resources`, `read_resource`,
+`list_prompts` and `get_prompt` ([meta-tools.md](meta-tools.md#resources-and-prompts)).
+Absent or empty means neither: the client sees the server's tools only. The
+value list is a whitelist — an unknown entry (`"ressources"`) is a config error,
+the server stays in the list as unhealthy and is never connected. A reload
+applies a change to the field in place, without dropping the session. The panel
+edits it with two checkboxes in the server form ([panel.md](panel.md#server-editor)).
 
 ### Sandbox
 
@@ -216,7 +228,8 @@ chain (OpenBao → `env.json` → process environment; `MCPRIG_*`, `BAO_*` and
 | `host` | `127.0.0.1` in `serve` | bind address |
 | `port` | `9100` in `serve` | bind port; the manager allocates 9100–9199 |
 | `path` | `/mcp` | endpoint path; must start with `/` |
-| `authToken` | | bearer token; empty refuses to start unless `allowAnonymous` |
+| `authTokens` | | every active key of the set: any of them is accepted. The panel writes it, and it takes priority over `authToken` |
+| `authToken` | | single-key compatibility: one bearer token, used only when `authTokens` is empty |
 | `allowAnonymous` | `false` | open set: no `Authorization` header is allowed |
 | `allowedHosts` | loopback | `Host` and `Origin` allowlist |
 | `clientNames` | | key fingerprint (6 hex) → key note: the client's label in the statistics |
@@ -228,9 +241,12 @@ key with a note is counted under that note instead of
 the token.
 
 `allowAnonymous` does not make a wrong token acceptable: a request that
-presents `Authorization` must still match `authToken`, and an open set has no
-token, so any presented token gets 401. Clients of an open set must omit the
-header.
+presents `Authorization` must still match one of `authTokens`, and an open set
+has no token, so any presented token gets 401. Clients of an open set must omit
+the header.
+
+A set with neither `authTokens` nor `authToken` refuses to start unless
+`allowAnonymous` is set.
 
 An empty `allowedHosts` means `127.0.0.1`, `localhost`, `::1`. `"*"` disables
 the check and logs a warning. The same list checks `Origin` when the header is
@@ -418,6 +434,21 @@ Editing follows `notify` and `rateLimit`: an absent field keeps the stored
 profiles, `null` removes them, an object replaces them whole; a bad value is
 rejected on write (400) with the field name. The panel has no editor for the
 block yet; a key's profile is chosen when the key is issued.
+
+## Tracing
+
+Off by default: without the endpoint the process records nothing and opens no
+connection, while still forwarding the client's `traceparent`.
+
+| variable | meaning |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`; its presence turns tracing on |
+| `OTEL_SERVICE_NAME` | `service.name` of the resource, `mcprig` by default |
+| `OTEL_RESOURCE_ATTRIBUTES` | standard `key=value,key=value` pairs; if the value does not parse, the default resource is used |
+| `OTEL_EXPORTER_OTLP_HEADERS` | standard OTLP headers, e.g. a collector's authorization token |
+
+The variables are read once at start; a change needs a restart. What is traced
+and which attributes a span carries — [architecture.md](architecture.md#tracing).
 
 ## See also
 

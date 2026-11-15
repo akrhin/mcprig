@@ -35,15 +35,19 @@ type Server struct {
 	Env         map[string]string `json:"env,omitempty"`
 	// EnvAllow — имена переменных окружения владельца, которые сервер получает
 	// вдобавок к whitelist. Больше ничего из os.Environ() вниз не уходит.
-	EnvAllow    []string          `json:"envAllow,omitempty"`
-	URL         string            `json:"url,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
-	Enabled     bool              `json:"enabled"`
-	Permissions *Permissions      `json:"permissions,omitempty"`
-	OAuth       *OAuth            `json:"oauth,omitempty"`
-	Sandbox     *Sandbox          `json:"sandbox,omitempty"`
-	ConfigError string            `json:"-"`
+	EnvAllow []string          `json:"envAllow,omitempty"`
+	URL      string            `json:"url,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Tags     []string          `json:"tags,omitempty"`
+	Enabled  bool              `json:"enabled"`
+	// Expose — какие поверхности сервера прокси отдаёт клиенту: "resources"
+	// и/или "prompts". Пусто — ни одной: без явного разрешения клиент видит
+	// только инструменты.
+	Expose      []string     `json:"expose,omitempty"`
+	Permissions *Permissions `json:"permissions,omitempty"`
+	OAuth       *OAuth       `json:"oauth,omitempty"`
+	Sandbox     *Sandbox     `json:"sandbox,omitempty"`
+	ConfigError string       `json:"-"`
 }
 
 // Sandbox — изоляция stdio-сервера. Пустой блок означает умолчания: bwrap,
@@ -374,6 +378,7 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 		OAuth       *OAuth          `json:"oauth"`
 		Sandbox     json.RawMessage `json:"sandbox"`
 		EnvAllow    []string        `json:"envAllow"`
+		Expose      json.RawMessage `json:"expose"`
 	}
 	var r raw
 	if err := json.Unmarshal(data, &r); err != nil {
@@ -399,6 +404,7 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 	s.Headers = stringMap(r.Headers, &s.ConfigError, "headers")
 	s.decodeSandbox(r.Sandbox)
 	s.decodePermissions(r.Permissions)
+	s.decodeExpose(r.Expose)
 	if msg := r.OAuth.validate("oauth"); msg != "" {
 		if s.ConfigError == "" {
 			s.ConfigError = msg
@@ -444,6 +450,39 @@ func (s *Server) decodeSandbox(data json.RawMessage) {
 		return
 	}
 	s.Sandbox = &sb
+}
+
+// Exposed surfaces a server may contribute to the proxy.
+const (
+	ExposeResources = "resources"
+	ExposePrompts   = "prompts"
+)
+
+// ParseExpose reads the expose block: absent or null is no surfaces at all.
+// The kinds themselves are checked by validateSandbox, so Load, Check and the
+// registry agree on what a valid list is.
+func ParseExpose(data json.RawMessage) ([]string, string) {
+	if len(data) == 0 || string(data) == "null" {
+		return nil, ""
+	}
+	var list []string
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil, "expose: ожидался массив строк: " + err.Error()
+	}
+	return list, ""
+}
+
+// decodeExpose soft-fails a broken block onto the server; the allowed values are
+// checked in validateSandbox, so Check and Load agree.
+func (s *Server) decodeExpose(data json.RawMessage) {
+	list, msg := ParseExpose(data)
+	if msg != "" {
+		if s.ConfigError == "" {
+			s.ConfigError = msg
+		}
+		return
+	}
+	s.Expose = list
 }
 
 // sandboxFields — единственные имена, которые понимает Sandbox.
@@ -629,6 +668,14 @@ func (s *Server) validateSandbox(sandbox *Sandbox) bool {
 		s.ConfigError = name
 		return false
 	}
+	// Неизвестный вид — ошибка, а не тихое «ничего не отдаём»: опечатка в
+	// "ressources" иначе выглядела бы как сознательный запрет.
+	for _, kind := range s.Expose {
+		if kind != ExposeResources && kind != ExposePrompts {
+			s.ConfigError = fmt.Sprintf("expose: неизвестный вид %q (допустимо resources, prompts)", kind)
+			return false
+		}
+	}
 	switch s.Transport {
 	case "":
 		switch {
@@ -714,6 +761,10 @@ type HTTPTransport struct {
 	Port      int    `json:"port,omitempty"`
 	Path      string `json:"path,omitempty"`
 	AuthToken string `json:"authToken,omitempty"`
+	// AuthTokens — все действующие ключи набора: принимается любой из них.
+	// authToken остаётся ради файлов с одним ключом; пустой список означает
+	// «смотреть на authToken».
+	AuthTokens []string `json:"authTokens,omitempty"`
 	// AllowAnonymous lets the listener start without an authToken and accepts
 	// requests carrying no Authorization header; a presented token is still
 	// checked. Set only for an open set.
@@ -820,6 +871,15 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("%s: transport.authToken: %w", path, err)
 		}
 		shape.Transport.AuthToken = token
+	}
+	// authTokens — список из реестра, а не написанный руками: ${VAR} в нём не
+	// раскрываем, но и резервный префикс не пропускаем.
+	if shape.Transport != nil {
+		for i, token := range shape.Transport.AuthTokens {
+			if name, ok := reservedRef(token); ok {
+				return nil, fmt.Errorf("%s: transport.authTokens[%d]: переменная ${%s} — резервный префикс, передача вниз запрещена", path, i, name)
+			}
+		}
 	}
 	cfg := &Config{Transport: shape.Transport, HealthMonitor: shape.HealthMonitor, RequestTimeout: shape.RequestTimeout}
 	// Битый блок лимита отбрасывается, как и битый глобальный OAuth: опечатка

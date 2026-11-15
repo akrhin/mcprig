@@ -220,7 +220,8 @@ browse-сессии панели профиль не применяют, у ни
 бюджет 3 с), а `PUT /api/servers/<name>` отвечает `reloaded`/`reloadErrors`;
 `sandbox-e2e.sh` и `go test -race` зелёные. Правка `env`/`envAllow` перезапускает
 наборы с этим сервером (окружение процесса набора фиксируется при старте), так же
-поступает смена `authToken`; `path`/`host`/`allowedHosts` из ручной правки
+поступает смена `authToken` — до ставки B, которая переводит ключи на reload;
+`path`/`host`/`allowedHosts` из ручной правки
 `servers.json` попадают в `restartNeeded`, перезапуск — вручную.
 
 ### B. Несколько активных ключей на набор (1 неделя, после A)
@@ -240,6 +241,24 @@ browse-сессии панели профиль не применяют, у ни
 
 Ворота: `TestRevokeOneKeyKeepsOthers`, `TestTokenListAppliedWithoutRestart`,
 `TestLastKeyRevokeStopsSet`.
+
+Сделано (2026-11-15): у набора список действующих ключей, лимит
+`registry.MaxActiveKeys = 8` (`internal/registry/keys.go`); `IssueKey` добавляет
+ключ, не отзывая прежние, `RevokeKey(setID, keyID) (remaining int, err)` отзывает
+один, и только отзыв последнего (`!registry.CanServe`) останавливает набор
+(`internal/manager/api.go`). Транспорт принимает список: `config.HTTPTransport.AuthTokens`,
+`setconfig` пишет `authTokens` рядом с `authToken`, `httplisten.tokenSet` хранит
+sha256 каждого токена и сверяет предъявленный за постоянное число операций на
+элемент, а отпечаток клиента берётся из совпавшего токена — профиль и лимит
+частоты остаются по ключу (`TestProfilePerKeyAfterReload`). Доставка — reload:
+`cmd/mcprig` `reloadOnce` зовёт `handler.SetTokens`, `needsRestart` больше не
+смотрит на токен, а набор, ответивший `restartNeeded: authToken`, даёт честный
+`reloadError`. Маршруты `GET /api/sets/<id>/keys`, `POST` (лимит — `409`) и
+`DELETE /api/sets/<id>/keys/<keyID>`; старый `registry.json` с одним токеном
+читается как список из одного, `note` становится `label`. Ворота зелёные:
+`TestRevokeOneKeyKeepsOthers`, `TestTokenListAppliedWithoutRestart` (оба токена
+работают, pid набора тот же), `TestLastKeyRevokeStopsSet`, `TestKeyLimit`,
+`TestProfilePerKeyAfterReload`, `TestOldRegistrySingleKeyUpgrades`.
 
 ### C. TLS и явный `publicUrl` (3 дня)
 
@@ -279,6 +298,17 @@ MCP-клиент видит только tools: пять `AddTool` в
 
 Ворота: `TestResourceReadRequiresExpose`, `TestResourceTruncatedAndSpilled`,
 `TestPermissionsApplyToResources`.
+
+Сделано (2026-11-15): поле сервера `expose: ["resources","prompts"]` (инструменты
+всегда включены — список называет только дополнительные виды; пусто или нет поля —
+прежнее поведение, неизвестное значение — ошибка конфига, сервер не поднимается).
+Четыре мета-тула `list_resources`/`read_resource`/`list_prompts`/`get_prompt`
+(`internal/mcpserver/resources.go`), привязка явным параметром `server`, тот же
+потолок и выгрузка `/tool-out/<name>`, тот же гейт разрешений — правила адресуют
+ресурсы и промпты префиксами `resource:<uri>`/`prompt:<name>`, отдельного вида в
+схеме не появилось. Лимит частоты считается по мета-тулу, а не по URI.
+Проверка `expose` доступна реестру через `Server.Check()`; разбор поля в
+`internal/registry/validate.go` — следующим шагом вместе с панелью.
 
 ### E. OTel: `traceparent` вниз (1 неделя)
 

@@ -207,45 +207,44 @@ func TestSetConfigIsOwnerOnly(t *testing.T) {
 	}
 }
 
-// Отзыв активного ключа останавливает набор и говорит об этом в ответе.
-func TestRevokeActiveKeyStopsSet(t *testing.T) {
+// Отзыв последнего действующего ключа останавливает набор и говорит об этом в
+// ответе; отзыв одного из нескольких набор не трогает.
+func TestLastKeyRevokeStopsSet(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServer(t, "a")
 	id := e.addSet(t, "s", "a")
 	status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/start", nil), http.StatusOK)
 
-	view := decode[struct {
-		Keys []struct {
-			ID        string `json:"id"`
-			RevokedAt string `json:"revokedAt"`
-		} `json:"keys"`
-	}](t, e.do(t, http.MethodGet, "/api/sets/"+id, nil))
-	keyID := ""
-	for _, k := range view.Keys {
-		if k.RevokedAt == "" {
-			keyID = k.ID
-		}
-	}
-	if keyID == "" {
-		// Набор без ключей (auth выключен): выдаём ключ — он станет активным.
-		issued := decode[struct {
-			Key struct {
-				ID string `json:"id"`
-			} `json:"key"`
-		}](t, e.do(t, http.MethodPost, "/api/sets/"+id+"/keys", nil))
-		keyID = issued.Key.ID
-	}
-	if keyID == "" {
-		t.Fatal("активного ключа нет")
-	}
+	w := e.do(t, http.MethodPost, "/api/sets/"+id+"/keys", map[string]any{"label": "ci"})
+	status(t, w, http.StatusOK)
+	second := decode[struct {
+		Key struct {
+			ID string `json:"id"`
+		} `json:"key"`
+	}](t, w).Key.ID
 
-	w := e.do(t, http.MethodDelete, "/api/sets/"+id+"/keys/"+keyID, nil)
+	w = e.do(t, http.MethodDelete, "/api/sets/"+id+"/keys/"+second, nil)
 	status(t, w, http.StatusOK)
 	got := decode[struct {
-		Stopped bool `json:"stopped"`
+		Stopped    bool `json:"stopped"`
+		ActiveKeys int  `json:"activeKeys"`
 	}](t, w)
-	if !got.Stopped {
-		t.Fatal("ответ не сказал об остановке набора")
+	if got.Stopped || got.ActiveKeys != 1 {
+		t.Fatalf("отзыв одного из двух ключей: stopped=%v activeKeys=%d", got.Stopped, got.ActiveKeys)
+	}
+	if !e.m.rt.status(e.m.store.Set(id)).Running {
+		t.Fatal("набор остановлен, хотя действующий ключ остался")
+	}
+
+	last := e.m.store.Set(id).Keys[0].ID
+	w = e.do(t, http.MethodDelete, "/api/sets/"+id+"/keys/"+last, nil)
+	status(t, w, http.StatusOK)
+	got = decode[struct {
+		Stopped    bool `json:"stopped"`
+		ActiveKeys int  `json:"activeKeys"`
+	}](t, w)
+	if !got.Stopped || got.ActiveKeys != 0 {
+		t.Fatalf("отзыв последнего ключа: stopped=%v activeKeys=%d: %s", got.Stopped, got.ActiveKeys, w.Body.String())
 	}
 	if e.m.rt.status(e.m.store.Set(id)).Running {
 		t.Fatal("набор работает без активного ключа")

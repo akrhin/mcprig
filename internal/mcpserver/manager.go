@@ -21,6 +21,9 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/downstream"
@@ -339,6 +342,8 @@ type ReloadResult struct {
 // process or address changed gets a new session on its next call. The previous
 // config stays in force only when the caller could not load one at all.
 func (m *Manager) Reload(next *config.Config) ReloadResult {
+	_, span := otel.Tracer(tracerName).Start(m.ctx, reloadSpan)
+	defer span.End()
 	res := ReloadResult{Applied: []string{}, RestartNeeded: []string{}}
 	var drop []*entry
 
@@ -423,6 +428,12 @@ func (m *Manager) Reload(next *config.Config) ReloadResult {
 		}()
 	}
 	m.publishSchema()
+	if span.IsRecording() {
+		span.SetAttributes(
+			attribute.Int("mcprig.reload.generation", res.Generation),
+			attribute.StringSlice("mcprig.reload.applied", res.Applied),
+		)
+	}
 	return res
 }
 
@@ -467,9 +478,10 @@ func launchChanged(a, b *config.Server) bool {
 }
 
 // transportRestart names the listener fields that a running process cannot
-// adopt. keyProfiles is absent on purpose: the manager resolves it per request
-// — but see keepLiveTransport: it is reverted along with the rest of the block
-// when any listener field is rejected.
+// adopt: bind address, port, path, protocol and the Host list are fixed at
+// start. Tokens, openness, clientNames and keyProfiles are absent on purpose:
+// reloadOnce hands all of them to the live listener (SetAuth), and the manager
+// resolves the profile per request — so a key rotation needs no restart.
 func transportRestart(old, next *config.Config) []string {
 	out := []string{}
 	o, n := old.Transport, next.Transport
@@ -478,9 +490,6 @@ func transportRestart(old, next *config.Config) []string {
 		return out
 	case o == nil || n == nil:
 		return append(out, "transport")
-	}
-	if o.AuthToken != n.AuthToken {
-		out = append(out, "authToken")
 	}
 	if o.Host != n.Host {
 		out = append(out, "host")
@@ -494,26 +503,18 @@ func transportRestart(old, next *config.Config) []string {
 	if o.Type != n.Type {
 		out = append(out, "type")
 	}
-	if o.AllowAnonymous != n.AllowAnonymous {
-		out = append(out, "allowAnonymous")
-	}
 	if !slices.Equal(o.AllowedHosts, n.AllowedHosts) {
 		out = append(out, "allowedHosts")
-	}
-	// clientNames вшит в страж слушателя при старте, поэтому тоже только с
-	// перезапуском — в отличие от keyProfiles, который менеджер читает на каждый вызов.
-	if !maps.Equal(o.ClientNames, n.ClientNames) {
-		out = append(out, "clientNames")
 	}
 	return out
 }
 
 // keepLiveTransport puts the listener's live transport back wholesale, so the
 // manager's config names what is really in force. keyProfiles goes with it: the
-// listener validates the old token while a new profile table may already be
-// keyed to another fingerprint, and a key that loses its profile entry falls
-// back to global permissions — a fail-open window. A transport block that
-// disappears from the file keeps the live one for the same reason.
+// profile table is derived from the same keys as the token list, and a table
+// from one generation under another is a mix — a key could get its peer's
+// rules. A transport block that disappears from the file keeps the live one for
+// the same reason.
 func keepLiveTransport(old, next *config.Config) *config.Config {
 	out := *next
 	out.Transport = old.Transport
@@ -547,6 +548,7 @@ func setChanges(old, next *config.Config) []string {
 
 func (m *Manager) Server() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "mcprig", Version: m.version}, nil)
+	s.AddReceivingMiddleware(traceCalls)
 	s.AddTool(&mcp.Tool{
 		Name: "list_servers",
 		Description: "List all available MCP servers with their capabilities and tags. " +
@@ -655,6 +657,7 @@ func (m *Manager) Server() *mcp.Server {
 			},
 		}, "calls"),
 	}, m.invokeMany)
+	m.addResourceTools(s)
 	return s
 }
 
@@ -1046,6 +1049,13 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	// Снимок конфига сервера на весь вызов: если перезагрузка подменит его
 	// посередине, вызов дорабатывает по снимку, а не смешивает два конфига.
 	srv := e.server()
+	// В спане — только имена: ни ключ набора, ни отпечаток ключа.
+	if span := spanOf(ctx); span != nil {
+		span.SetAttributes(
+			attribute.String("mcp.server.name", srv.Name),
+			attribute.String("mcp.command.name", in.CommandName),
+		)
+	}
 	// Лимит — до открытия сессии набора: отказ не должен поднимать апстрим.
 	if err := m.throttle(ctx, req, srv.Name, in.CommandName); err != nil {
 		return errResult(err)
@@ -1087,7 +1097,9 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 // counts the outcome. Only a drop before the first response byte is repeated,
 // so a side effect is never performed twice.
 func (m *Manager) callWithRetry(ctx context.Context, label string, e *entry, name string, args any) (*mcp.CallToolResult, error) {
-	params := &mcp.CallToolParams{Name: name, Arguments: args}
+	// Трасса родителя уходит вниз только как traceparent: прочие ключи _meta
+	// принадлежат клиенту, а не апстриму.
+	params := &mcp.CallToolParams{Name: name, Arguments: args, Meta: traceMeta(ctx)}
 	start := time.Now()
 	res, err := m.callTool(ctx, e, params)
 	if retryableCall(res, err) {
@@ -1261,11 +1273,21 @@ func (m *Manager) limiter() *rateLimits {
 // that has not finished yet.
 func (m *Manager) dialFor(srv *config.Server) func(context.Context) (*mcp.ClientSession, error) {
 	return func(ctx context.Context) (*mcp.ClientSession, error) {
+		ctx, span := otel.Tracer(tracerName).Start(ctx, connectSpan)
+		defer span.End()
+		if span.IsRecording() {
+			span.SetAttributes(attribute.String("mcp.server.name", srv.Name))
+		}
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		stop := context.AfterFunc(m.ctx, cancel)
 		defer stop()
-		return m.dial(ctx, srv)
+		sess, err := m.dial(ctx, srv)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		return sess, err
 	}
 }
 

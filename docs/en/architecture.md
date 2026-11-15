@@ -77,7 +77,8 @@ What one reload applies:
 | `permissions`, `enabled`, `description`, `tags` | updated in place, session and tool cache kept |
 | untouched server | same record, same session, same cache |
 | set `rateLimit`, `profiles` | applied in place; `requestTimeout` and `healthMonitor` are constants the manager writes and never change |
-| `authToken`, `host`, `port`, `path`, `type`, `allowAnonymous`, `allowedHosts`, `clientNames` | listed in `restartNeeded`, the old values stay in force |
+| `authToken`, `authTokens` | applied live: the panel swaps the listener's token set on reload, so a key issued or revoked arrives without a restart. A changed single `authToken` — the set's primary key — still lands in `restartNeeded` for older processes, and the panel then reports `reloadError` instead of claiming the change applied |
+| `host`, `port`, `path`, `type`, `allowAnonymous`, `allowedHosts`, `clientNames` | listed in `restartNeeded`, the old values stay in force |
 
 `keyProfiles` is applied live: the manager reads it per request, unlike the
 listener fields above. A file that does not load at all leaves the process on
@@ -138,7 +139,10 @@ Each set serves one stateless endpoint:
   versions;
 - `GET`, `POST`, `DELETE` on `transport.path` (default `/mcp`);
 - `Host` and `Origin` checked against `allowedHosts`;
-- bearer token compared in constant time;
+- bearer token compared with every active key's sha256 in constant time per
+  element; a set serves its whole list of active keys, and the caller's
+  fingerprint — hence its profile and limits — comes from the token that
+  matched;
 - 4 MiB request body cap;
 - no read timeout (an SSE stream must not be cut), 60 s idle timeout;
 - `GET /healthz` public, `GET /stats` protected by the same bearer.
@@ -165,6 +169,33 @@ because a running process reads its token at start.
 
 The listener binds nothing until a token is actually needed. Tokens survive a
 restart, so a refresh does not require the browser again.
+
+## Tracing
+
+A client may send a W3C `traceparent` in the `_meta` of its request (SEP-414).
+It is accepted only if it validates: version `00`, 32 hex trace-id, 16 hex
+parent-id, 2 hex flags with no `ff`, non-zero ids. A malformed one is dropped
+silently: the call runs without a trace, because a broken header is not a
+client error.
+
+One `tools/call` makes one span, `mcp.tool.call`, carrying `mcp.tool.name`,
+`mcp.server.name`, `mcp.command.name`, `mcp.tool.outcome` (`ok`, `error`,
+`blocked` by policy) and `mcp.trace.source` — `client` when the caller's trace
+was continued, `proxy` when it starts here. A downstream connection is
+`mcp.server.connect`, a config reload `mcp.reload`. Spans hold names only: a
+key, its fingerprint and its token never reach a span, so a client-sent trace
+is not audit evidence.
+
+The client's `traceparent` becomes the parent of that span, and the span's own
+id goes down to the upstream in the `_meta` of every `invoke_command`,
+`read_resource` and `get_prompt`: the caller's trace continues through the
+proxy into the server. Nothing else from the client's `_meta` is forwarded — it
+belongs to the caller, not to the upstream.
+
+Spans are exported over OTLP/HTTP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+Without it no provider is installed: nothing is recorded, no connection is
+made, and only the `traceparent` forwarding stays, on ids minted for it. The
+environment is in [configuration.md](configuration.md#tracing).
 
 ## See also
 

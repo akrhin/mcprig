@@ -309,6 +309,9 @@
         "-y",
         "@modelcontextprotocol/server-filesystem"
       ],
+      "expose": [
+        "resources"
+      ],
       "enabled": true
     }
   ],

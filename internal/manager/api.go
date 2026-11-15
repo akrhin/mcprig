@@ -591,7 +591,9 @@ func (m *Manager) buildRoutes() []route {
 		mk(`^/api/servers/`+setPattern+`$`, map[string]handlerFunc{
 			http.MethodPut: m.apiServerUpdate, http.MethodDelete: m.apiServerDelete,
 		}),
-		mk(`^/api/sets/`+setPattern+`/keys$`, map[string]handlerFunc{http.MethodPost: m.apiKeyIssue}),
+		mk(`^/api/sets/`+setPattern+`/keys$`, map[string]handlerFunc{
+			http.MethodGet: m.apiKeys, http.MethodPost: m.apiKeyIssue,
+		}),
 		mk(`^/api/sets/`+setPattern+`/keys/([A-Za-z0-9_-]{1,32})$`, map[string]handlerFunc{
 			http.MethodPatch: m.apiKeyNote, http.MethodDelete: m.apiKeyRevoke,
 		}),
@@ -1377,8 +1379,8 @@ func (m *Manager) apiSetUpdate(req *request) error {
 		return err
 	}
 	if running {
-		// Транспорт (порт, ключ, открытость) набор читает только при старте —
-		// остальное применяется без перезапуска, по SIGHUP.
+		// Порт набор читает только при старте; ключи, открытость и правила
+		// применяются живьём, по SIGHUP.
 		if restart, why := needsRestart(old, set); restart {
 			m.log.Info("набор "+id+": правка транспорта — перезапуск", "причина", why)
 			if _, err := m.RestartSet(context.Background(), set); err != nil {
@@ -1398,15 +1400,12 @@ func (m *Manager) apiSetUpdate(req *request) error {
 }
 
 // needsRestart — меняется ли в наборе то, что процесс применяет только при
-// старте: транспорт (порт, ключ, открытость). Причина — для журнала.
+// старте: порт. Список ключей и открытость сюда не входят: их доставляет
+// reload (ключи и открытость — SetAuth живого слушателя), поэтому выдача,
+// отзыв ключа и переход «открытый набор ± ключ» набор не перезапускают.
 func needsRestart(old, new *registry.Set) (bool, string) {
-	switch {
-	case old.Port != new.Port:
+	if old.Port != new.Port {
 		return true, "порт"
-	case old.Token != new.Token:
-		return true, "ключ"
-	case old.Open != new.Open:
-		return true, "открытость"
 	}
 	return false, ""
 }
@@ -1618,61 +1617,99 @@ func (m *Manager) apiSetServers(req *request) error {
 
 // ─── keys ────────────────────────────────────────────────────────────────────
 
+// apiKeys отдаёт список ключей набора: без токенов и хэшей, только то, по чему
+// владелец узнаёт ключ.
+func (m *Manager) apiKeys(req *request) error {
+	id := req.args[0]
+	set := m.store.Set(id)
+	if set == nil {
+		return notFound("набор " + id + " не найден")
+	}
+	keys := registry.PublicSet(set).Keys
+	if keys == nil {
+		keys = []registry.PublicKey{}
+	}
+	writeJSON(req.w, http.StatusOK, map[string]any{"keys": keys})
+	return nil
+}
+
+// apiKeyIssue выдаёт ещё один ключ. Прежние остаются действующими, а набор
+// получает новый список через reload — без перезапуска и смены pid.
 func (m *Manager) apiKeyIssue(req *request) error {
 	id := req.args[0]
 	set := m.store.Set(id)
 	if set == nil {
 		return notFound("набор " + id + " не найден")
 	}
-	profile, err := m.keyProfileOf(set, req)
+	profile, label, err := m.keyIssueInput(set, req)
 	if err != nil {
 		return err
 	}
 	running := m.rt.status(set).Running
-	token, err := m.store.IssueKey(id, profile)
+	token, err := m.store.IssueKey(id, profile, label)
 	if err != nil {
+		if strings.Contains(err.Error(), "действующих ключей") {
+			return conflict(err.Error())
+		}
 		return err
 	}
 	updated := m.store.Set(id)
-	var restartErr string
-	if running {
-		if _, err := m.RestartSet(context.Background(), updated); err != nil {
-			m.log.Warn("перезапуск набора после выдачи ключа не удался", "set", id, "err", err)
-			restartErr = err.Error()
-		}
-	}
+	view, reloadErr := m.deliverKeys(updated, running)
 	resp := map[string]any{
 		"token": token,
-		"key":   activeKey(updated),
-		"set":   m.setView(updated),
+		"key":   keyByToken(updated, token),
+		"set":   view,
 	}
-	// Ключ уже выдан и показан один раз: ошибку рестарта отдаём полем, а не кодом.
-	if restartErr != "" {
-		resp["restartError"] = restartErr
+	// Ключ уже выдан и показан один раз: ошибку доставки отдаём полем, а не
+	// кодом. restartError — прежнее имя того же поля для панели.
+	if reloadErr != "" {
+		resp["reloadError"] = reloadErr
+		resp["restartError"] = reloadErr
 	}
 	writeJSON(req.w, http.StatusOK, resp)
 	return nil
 }
 
-// keyProfileOf читает необязательное поле profile из тела выдачи ключа.
-// Неизвестное имя — 400 с перечнем доступных: иначе ключ молча получил бы
-// отказ на каждом вызове, а владелец искал бы причину в правилах.
-func (m *Manager) keyProfileOf(set *registry.Set, req *request) (string, error) {
+// deliverKeys применяет список ключей на работающем наборе. Правка уже в
+// реестре, поэтому отказ процесса — текст, а не ошибка запроса.
+func (m *Manager) deliverKeys(set *registry.Set, running bool) (setView, string) {
+	if !running {
+		return m.setView(set), ""
+	}
+	view, err := m.reloadSetView(context.Background(), set)
+	if err != nil {
+		m.log.Warn("набор не принял новый список ключей", "set", set.ID, "err", err)
+		return m.setView(set), err.Error()
+	}
+	return view, view.ReloadError
+}
+
+// keyIssueInput читает необязательные поля profile и label из тела выдачи
+// ключа. Неизвестное имя профиля — 400 с перечнем доступных: иначе ключ молча
+// получил бы отказ на каждом вызове, а владелец искал бы причину в правилах.
+func (m *Manager) keyIssueInput(set *registry.Set, req *request) (profile, label string, err error) {
 	body, err := readBody(req.r)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	var in struct {
 		Profile string `json:"profile"`
+		Label   string `json:"label"`
+		// Note — прежнее имя label.
+		Note string `json:"note"`
 	}
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &in); err != nil {
-			return "", badRequest("тело запроса должно быть JSON")
+			return "", "", badRequest("тело запроса должно быть JSON")
 		}
 	}
-	profile := strings.TrimSpace(in.Profile)
+	label = strings.TrimSpace(in.Label)
+	if label == "" {
+		label = strings.TrimSpace(in.Note)
+	}
+	profile = strings.TrimSpace(in.Profile)
 	if profile == "" {
-		return "", nil
+		return "", label, nil
 	}
 	if _, ok := set.Profiles[profile]; !ok {
 		names := make([]string, 0, len(set.Profiles))
@@ -1681,11 +1718,11 @@ func (m *Manager) keyProfileOf(set *registry.Set, req *request) (string, error) 
 		}
 		sort.Strings(names)
 		if len(names) == 0 {
-			return "", badRequest("у набора " + set.ID + " нет профилей — задайте profiles в записи набора")
+			return "", "", badRequest("у набора " + set.ID + " нет профилей — задайте profiles в записи набора")
 		}
-		return "", badRequest("неизвестный профиль " + profile + "; доступны: " + strings.Join(names, ", "))
+		return "", "", badRequest("неизвестный профиль " + profile + "; доступны: " + strings.Join(names, ", "))
 	}
-	return profile, nil
+	return profile, label, nil
 }
 
 // apiKeyNote подписывает ключ человеческим именем: подпись уходит в метку
@@ -1694,14 +1731,19 @@ func (m *Manager) keyProfileOf(set *registry.Set, req *request) (string, error) 
 func (m *Manager) apiKeyNote(req *request) error {
 	id, keyID := req.args[0], req.args[1]
 	var body struct {
-		Note string `json:"note"`
+		Label string `json:"label"`
+		Note  string `json:"note"`
 	}
 	if err := decodeJSON(req.r, &body); err != nil {
 		return err
 	}
+	text := body.Label
+	if strings.TrimSpace(text) == "" {
+		text = body.Note
+	}
 	// Подпись чистится как любая метка клиента: >64 байт и управляющие
 	// символы в счётчик всё равно не пройдут.
-	note := stats.CleanLabel(strings.TrimSpace(body.Note))
+	note := stats.CleanLabel(strings.TrimSpace(text))
 	set := m.store.Set(id)
 	if set == nil {
 		return notFound("набор " + id + " не найден")
@@ -1743,55 +1785,72 @@ func (m *Manager) apiKeyNote(req *request) error {
 	return nil
 }
 
+// apiKeyRevoke отзывает один ключ. Остальные действующие продолжают работать
+// после reload; набор останавливается, только когда действующих не осталось.
 func (m *Manager) apiKeyRevoke(req *request) error {
 	id, keyID := req.args[0], req.args[1]
 	cur := m.store.Set(id)
 	if cur == nil {
 		return notFound("набор " + id + " не найден")
 	}
-	known := false
-	for _, key := range registry.PublicSet(cur).Keys {
-		if key.ID == keyID {
-			known = true
-			break
-		}
-	}
-	if !known {
+	wasActive := keyByID(cur, keyID).ID != "" && keyByID(cur, keyID).RevokedAt == ""
+	if keyByID(cur, keyID).ID == "" {
 		return notFound("нет ключа " + keyID)
 	}
-	wasActive, err := m.store.RevokeKey(id, keyID)
+	running := m.rt.status(cur).Running
+	remaining, err := m.store.RevokeKey(id, keyID)
 	if err != nil {
 		return err
 	}
 	set := m.store.Set(id)
-	if wasActive {
+	stopped := false
+	view := m.setView(set)
+	var reloadErr string
+	if !registry.CanServe(set) {
 		m.rt.Stop(set)
 		m.health.clear(id)
-		m.log.Info("набор остановлен: отозван активный ключ", "set", id, "key", keyID)
+		stopped = true
+		m.log.Info("набор остановлен: отозван последний действующий ключ", "set", id, "key", keyID)
+	} else {
+		view, reloadErr = m.deliverKeys(set, running)
 	}
-	var revoked registry.PublicKey
-	for _, key := range registry.PublicSet(set).Keys {
-		if key.ID == keyID {
-			revoked = key
-		}
+	resp := map[string]any{
+		"ok":         true,
+		"wasActive":  wasActive,
+		"stopped":    stopped,
+		"activeKeys": remaining,
+		"key":        keyByID(set, keyID),
+		"set":        view,
 	}
-	writeJSON(req.w, http.StatusOK, map[string]any{
-		"ok":        true,
-		"wasActive": wasActive,
-		"stopped":   wasActive,
-		"key":       revoked,
-		"set":       m.setView(set),
-	})
+	if reloadErr != "" {
+		resp["reloadError"] = reloadErr
+	}
+	writeJSON(req.w, http.StatusOK, resp)
 	return nil
 }
 
-func activeKey(set *registry.Set) any {
+// keyByID returns the key's public view, or the zero value.
+func keyByID(set *registry.Set, keyID string) registry.PublicKey {
+	if set == nil {
+		return registry.PublicKey{}
+	}
+	for _, key := range registry.PublicSet(set).Keys {
+		if key.ID == keyID {
+			return key
+		}
+	}
+	return registry.PublicKey{}
+}
+
+// keyByToken returns the public view of the key with this token: the plaintext
+// token exists only right after IssueKey, when the answer names it.
+func keyByToken(set *registry.Set, token string) any {
 	if set == nil {
 		return nil
 	}
-	for _, key := range registry.PublicSet(set).Keys {
-		if key.RevokedAt == "" {
-			return key
+	for _, key := range set.Keys {
+		if key.Token == token {
+			return keyByID(set, key.ID)
 		}
 	}
 	return nil

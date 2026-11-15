@@ -4,6 +4,7 @@
 package httplisten
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
@@ -26,19 +28,98 @@ import (
 // maxBodyBytes is the contract limit for one proxied MCP request.
 const maxBodyBytes = 4 << 20
 
-// New builds the set's HTTP handler. A missing authToken is a startup error
-// unless the set is open (AllowAnonymous): the proxy never listens without
-// authentication by accident.
-func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recorder) (http.Handler, error) {
+// Server is the set's HTTP handler. The access policy can be swapped while the
+// process runs: /api/sets/<id>/keys delivers a new key, and losing the last key
+// of an open set opens it again, over reload, not over a restart of the set.
+type Server struct {
+	http.Handler
+	auth *authSet
+}
+
+// SetAuth replaces the accepted tokens, the set's openness and the key labels
+// in one step: a newly issued key starts working, a revoked one stops, and an
+// open set that gained its first key stops admitting a caller without a header.
+func (s *Server) SetAuth(tokens []string, allowAnonymous bool, names map[string]string) {
+	s.auth.set(tokens, allowAnonymous, names)
+}
+
+// authSet is the guard's live state. One swap per reload, and each request
+// reads the state current at its start: a request never sees half a policy.
+type authSet struct {
+	tokens    *tokenSet
+	anonymous atomic.Bool
+	names     atomic.Pointer[map[string]string]
+}
+
+func newAuthSet(tokens []string, allowAnonymous bool, names map[string]string) *authSet {
+	a := &authSet{tokens: &tokenSet{}}
+	a.set(tokens, allowAnonymous, names)
+	return a
+}
+
+func (a *authSet) set(tokens []string, allowAnonymous bool, names map[string]string) {
+	a.tokens.set(tokens)
+	a.anonymous.Store(allowAnonymous)
+	if names == nil {
+		names = map[string]string{}
+	}
+	a.names.Store(&names)
+}
+
+// tokenSet хранит хэши токенов: сравнение идёт с хэшем предъявленного, поэтому
+// длина токена не утекает, а сравнение с каждым элементом — постоянное по
+// времени. Пустой набор принимает только открытый набор.
+type tokenSet struct {
+	v atomic.Pointer[[][sha256.Size]byte]
+}
+
+func newTokenSet(tokens ...string) *tokenSet {
+	ts := &tokenSet{}
+	ts.set(tokens)
+	return ts
+}
+
+func (ts *tokenSet) set(tokens []string) {
+	hashes := make([][sha256.Size]byte, 0, len(tokens))
+	for _, token := range tokens {
+		if token = strings.TrimSpace(token); token != "" {
+			hashes = append(hashes, sha256.Sum256([]byte(token)))
+		}
+	}
+	ts.v.Store(&hashes)
+}
+
+// ok reports whether presented is one of the accepted tokens.
+func (ts *tokenSet) ok(presented string) bool {
+	hashes := ts.v.Load()
+	if hashes == nil || len(*hashes) == 0 {
+		return false
+	}
+	got := sha256.Sum256([]byte(presented))
+	match := 0
+	for _, want := range *hashes {
+		match |= subtle.ConstantTimeCompare(got[:], want[:])
+	}
+	return match == 1
+}
+
+// New builds the set's HTTP handler. A missing token is a startup error unless
+// the set is open (AllowAnonymous): the proxy never listens without
+// authentication by accident. The token list is transport.authTokens; a file
+// with the single authToken still works.
+func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recorder) (*Server, error) {
 	if cfg == nil || cfg.Transport == nil {
 		return nil, errors.New("httplisten: у набора нет transport — задайте stdio или http")
 	}
 	if srv == nil {
 		return nil, errors.New("httplisten: у набора нет серверов")
 	}
-	token := cfg.Transport.AuthToken
+	tokens := cfg.Transport.AuthTokens
+	if len(tokens) == 0 && cfg.Transport.AuthToken != "" {
+		tokens = []string{cfg.Transport.AuthToken}
+	}
 	allowAnonymous := cfg.Transport.AllowAnonymous
-	if token == "" && !allowAnonymous {
+	if len(tokens) == 0 && !allowAnonymous {
 		return nil, errors.New("httplisten: пустой authToken — выпустите ключ (без авторизации набор не стартует)")
 	}
 	if log == nil {
@@ -88,14 +169,15 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	)
 
 	mux := http.NewServeMux()
+	auth := newAuthSet(tokens, allowAnonymous, cfg.Transport.ClientNames)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed, cfg.Transport.ClientNames))
+	mux.Handle(path, guard(mcpHandler, auth, true, allowed))
 	// Усечённый ответ лежит файлом рядом с этим процессом; клиент забирает его
 	// тем же путём, что и /mcp. Послабления открытому набору нет: файл не
 	// отдаётся анонимно никогда, даже когда /mcp пускает без ключа.
-	mux.Handle("GET /tool-out/{name}", guard(toolOutHandler(toolout.Dir(toolout.Base()), retention.TTL), token, false, allowed, cfg.Transport.ClientNames))
+	mux.Handle("GET /tool-out/{name}", guard(toolOutHandler(toolout.Dir(toolout.Base()), retention.TTL), auth, false, allowed))
 	if rec != nil {
 		// The panel polls this endpoint; it carries the same bearer as /mcp.
 		// У открытого набора bearer нет ни у кого, поэтому анонимный снимок
@@ -103,7 +185,7 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Редакция выбирается до снимка: собранная в редакции копия не
 			// платит за полный снимок, который тут же был бы выброшен.
-			anon := token == "" || !bearerOK(r, token)
+			anon := !bearerOK(r, auth.tokens)
 			var snap stats.Snapshot
 			if anon {
 				snap = rec.SnapshotRedacted()
@@ -112,9 +194,9 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			_ = json.NewEncoder(w).Encode(snap)
-		}), token, allowAnonymous, allowed, cfg.Transport.ClientNames))
+		}), auth, true, allowed))
 	}
-	return logRequests(mux, log), nil
+	return &Server{Handler: logRequests(mux, log), auth: auth}, nil
 }
 
 // toolOutName is the shape createToolOut gives a dump. Anything else is 404,
@@ -162,8 +244,9 @@ func toolOutHandler(dir string, ttl time.Duration) http.HandlerFunc {
 }
 
 // guard is the per-request policy in front of the MCP handler: method, Host,
-// Origin, bearer token, body cap.
-func guard(next http.Handler, token string, allowAnonymous bool, allowed []string, names map[string]string) http.Handler {
+// Origin, bearer token, body cap. openRoute marks the routes an open set also
+// serves without a header; /tool-out is not one of them.
+func guard(next http.Handler, auth *authSet, openRoute bool, allowed []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		// HEAD бесплатен и у /mcp (тело не отдаётся), а /tool-out по нему
@@ -191,16 +274,18 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 
 		// No header at all is allowed only for an open set; a token that is
 		// presented must always be the right one.
+		// Открытость читается на каждом запросе: ключ, выданный или отозванный
+		// под панелью, меняет её без перезапуска набора.
 		// Открытый набор: предъявленный заголовок сравнивается с пустым токеном
 		// и всегда получает 401 — клиент, который шлёт Authorization всегда,
 		// в открытый набор не пройдёт (нужен ключ либо молчание).
 		if r.Header.Get("Authorization") == "" {
-			if !allowAnonymous {
+			if !openRoute || !auth.anonymous.Load() {
 				w.Header().Set("WWW-Authenticate", "Bearer")
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
-		} else if !bearerOK(r, token) {
+		} else if !bearerOK(r, auth.tokens) {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
@@ -216,7 +301,7 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 			r = r.WithContext(stats.WithClientAddr(r.Context(), host))
 		}
-		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r, names)))
+		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r, *auth.names.Load())))
 
 		if r.Body != nil {
 			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
@@ -264,14 +349,12 @@ func bearerToken(r *http.Request) (string, bool) {
 	return tok, tok != ""
 }
 
-func bearerOK(r *http.Request, token string) bool {
+func bearerOK(r *http.Request, tokens *tokenSet) bool {
 	presented, ok := bearerToken(r)
 	if !ok {
 		return false
 	}
-	// ConstantTimeCompare returns 0 on a length mismatch, so this leaks only
-	// the token length.
-	return subtle.ConstantTimeCompare([]byte(presented), []byte(token)) == 1
+	return tokens.ok(presented)
 }
 
 // hostOnly drops the port: AllowedHosts is a host list, not a listener list.

@@ -524,29 +524,30 @@ func (s *Store) DeleteSet(id string) error {
 	return s.commitLocked(next)
 }
 
-// IssueKey revokes the current active key and returns the new plaintext token.
-// profile names one of the set's profiles; empty leaves the key unrestricted.
-func (s *Store) IssueKey(setID, profile string) (string, error) {
+// IssueKey adds an active key and returns its plaintext token; earlier keys
+// stay valid. profile names one of the set's profiles; empty leaves the key
+// unrestricted. More than MaxActiveKeys active keys is refused: revoke one
+// first.
+func (s *Store) IssueKey(setID, profile, label string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
 		return "", fmt.Errorf("набор %s не найден", setID)
 	}
+	if n := activeKeyCount(set.Keys); n >= MaxActiveKeys {
+		return "", fmt.Errorf("у набора %s уже %d действующих ключей — отзовите лишний", setID, n)
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	keys := make([]Key, len(set.Keys), len(set.Keys)+1)
 	copy(keys, set.Keys)
-	for i := range keys {
-		if keys[i].RevokedAt == "" {
-			keys[i].RevokedAt = now
-		}
-	}
 	key := newKey(now)
 	key.Profile = strings.TrimSpace(profile)
+	key.Label = strings.TrimSpace(label)
 	keys = append(keys, key)
 	cp := *set
 	cp.Keys = keys
-	cp.Token = key.Token
+	cp.Token = activeToken(keys)
 	next := s.data.clone()
 	next.Sets[s.setIndexLocked(setID)] = &cp
 	if err := s.commitLocked(next); err != nil {
@@ -555,14 +556,14 @@ func (s *Store) IssueKey(setID, profile string) (string, error) {
 	return key.Token, nil
 }
 
-// RevokeKey revokes one key. wasActive reports whether it was the active one,
-// which leaves the set without a token.
-func (s *Store) RevokeKey(setID, keyID string) (wasActive bool, err error) {
+// RevokeKey revokes one key and reports how many active keys are left; zero
+// leaves the set without a token, and the caller stops it.
+func (s *Store) RevokeKey(setID, keyID string) (remaining int, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
-		return false, fmt.Errorf("набор %s не найден", setID)
+		return 0, fmt.Errorf("набор %s не найден", setID)
 	}
 	idx := -1
 	for i, key := range set.Keys {
@@ -572,27 +573,28 @@ func (s *Store) RevokeKey(setID, keyID string) (wasActive bool, err error) {
 		}
 	}
 	if idx < 0 {
-		return false, fmt.Errorf("нет ключа %s у набора %s", keyID, setID)
+		return 0, fmt.Errorf("нет ключа %s у набора %s", keyID, setID)
 	}
 	keys := make([]Key, len(set.Keys))
 	copy(keys, set.Keys)
-	if wasActive = keys[idx].RevokedAt == ""; wasActive {
+	if keys[idx].RevokedAt == "" {
 		keys[idx].RevokedAt = time.Now().UTC().Format(time.RFC3339)
 	}
+	remaining = activeKeyCount(keys)
 	cp := *set
 	cp.Keys = keys
 	cp.Token = activeToken(keys)
 	next := s.data.clone()
 	next.Sets[s.setIndexLocked(setID)] = &cp
 	if err := s.commitLocked(next); err != nil {
-		return wasActive, err
+		return 0, err
 	}
-	return wasActive, nil
+	return remaining, nil
 }
 
-// SetKeyNote пишет подпись ключа. Пустая строка снимает её. Подпись видит
-// клиент в /api/sets, а набор — в метке клиента статистики, поэтому его
-// перезапускает вызывающий.
+// SetKeyNote writes the key's label. An empty string clears it. The owner sees
+// it in /api/sets, and the set sees it in the statistics client label, so the
+// caller applies the change.
 func (s *Store) SetKeyNote(setID, keyID, note string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -612,6 +614,7 @@ func (s *Store) SetKeyNote(setID, keyID, note string) error {
 	}
 	keys := make([]Key, len(set.Keys))
 	copy(keys, set.Keys)
+	keys[idx].Label = note
 	keys[idx].Note = note
 	cp := *set
 	cp.Keys = keys
@@ -695,7 +698,8 @@ func PublicSet(set *Set) PublicSetEntry {
 			ID:        key.ID,
 			CreatedAt: key.CreatedAt,
 			RevokedAt: key.RevokedAt,
-			Note:      key.Note,
+			Label:     key.Label,
+			Note:      key.Label,
 			Profile:   key.Profile,
 		})
 	}

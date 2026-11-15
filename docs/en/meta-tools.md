@@ -6,8 +6,13 @@ shapes and error text.
 
 # Meta tools
 
-A set exposes five MCP tools. Downstream tools are not listed to the
-client; they are reached through `invoke_command`.
+A set exposes nine MCP tools: five that work with downstream servers, plus
+four for their resources and prompts. Downstream tools themselves are not
+listed to the client; they are reached through `invoke_command`.
+
+The four resource and prompt tools (`list_resources`, `read_resource`,
+`list_prompts`, `get_prompt`) answer only for a server whose config names them
+in `expose`; see [Resources and prompts](#resources-and-prompts) below.
 
 | tool | purpose |
 | --- | --- |
@@ -16,6 +21,10 @@ client; they are reached through `invoke_command`.
 | `describe_commands` | input schemas for named tools |
 | `invoke_command` | call one downstream tool |
 | `invoke_many` | call up to 8 independent tools in one request |
+| `list_resources` | resources of the servers that expose them |
+| `read_resource` | read one resource |
+| `list_prompts` | prompts of the servers that expose them |
+| `get_prompt` | render one prompt with arguments |
 
 Every error below is returned as a normal tool result with `isError: true` and
 one text item whose text starts with `Error: `. The MCP call itself does not
@@ -299,6 +308,78 @@ Bad input fails the whole request with `isError: true` and nothing is run: no
 calls, more than 8, an unknown key inside a call, a missing `server` or
 `command_name` (or its alias `command`), `parameters` that is not an object, or
 a bad `maxBytes`.
+
+## Resources and prompts
+
+A downstream server's resources and prompts are off by default: the client sees
+them only when the server's config names the surface in `expose`
+(`"resources"`, `"prompts"`, or both — see
+[configuration.md](configuration.md#expose)). An unknown value is a config
+error and the server does not start, so a typo never reads as a deliberate
+"expose nothing".
+
+### list_resources / list_prompts
+
+Input: `{"server": "notes"}` or `{}` (both fields optional; `maxBytes` is
+optional too, with no default cap, as in `list_commands`).
+
+With `server` the answer is an array; without it, an object keyed by server
+name over every usable server that exposes that surface — a server without
+`expose` does not appear at all:
+
+```json
+[
+  {"server": "notes", "uri": "notes://welcome", "name": "welcome", "mimeType": "text/markdown", "size": 240}
+]
+```
+
+```json
+[
+  {"server": "notes", "name": "greet", "description": "приветствие",
+   "arguments": [{"name": "who", "required": true}]}
+]
+```
+
+### read_resource
+
+Input: `{"server": "notes", "uri": "notes://welcome", "maxBytes": 4096}`.
+`uri` is the one `list_resources` returned. Without `maxBytes` the cap is
+32768 bytes, as in `invoke_command`.
+
+The answer carries the upstream `contents[]` unchanged — `uri`, `mimeType`, and
+`text` or `blob` (base64) — cut at the cap; the marker names the file with the
+whole answer, and the server's own secrets are scrubbed as in any other answer.
+
+### get_prompt
+
+Input: `{"server": "notes", "name": "greet", "arguments": {"who": "мир"}}`.
+`arguments` is a string-to-string map; the upstream messages come back
+unchanged in the `prompt` result.
+
+### What is refused
+
+A server without the matching `expose` entry, or a surface the server does not
+have (a `resources/read` answer is `isError: true` with `Error: <server>:
+набор не отдаёт ресурсы — добавьте "resources" в expose этого сервера`).
+
+### Permissions
+
+No new rule kind: a resource is addressed as `resource:<uri>` and a prompt as
+`prompt:<name>`, matched by the usual glob rules, and the caller's profile sees
+the same string:
+
+```json
+{"rules": [
+  {"pattern": "resource:notes://secret/*", "action": "deny", "message": "secret"},
+  {"pattern": "prompt:*", "action": "allow"}
+]}
+```
+
+The gate runs before the downstream is connected, and a denial returns the same
+`🚫 Blocked by mcprig policy: …` result as `invoke_command`. That applies to the
+listings too: `list_resources` and `list_prompts` show only what the rules and
+the caller's profile allow, so a `default: deny` yields an empty catalogue until
+a rule names the resource or prompt.
 
 ## Secret scrubbing
 

@@ -248,11 +248,12 @@ func (b *browser) close(id string) bool {
 	return ok
 }
 
-// denyTool is the browse gate: the server's own `permissions` rules decide, the
-// same way invoke_command decides for the proxy path. The panel has no global
-// block on purpose — that block belongs to the set.
-func (s *browseSession) denyTool(name string) error {
-	message, denied := config.DenyReason(nil, s.perms, s.server, name)
+// deny is the browse gate: the server's own `permissions` rules decide, the
+// same way invoke_command decides for the proxy path, and the address is the
+// same one that path uses ("resource:<uri>", "prompt:<name>"). The panel has no
+// global block on purpose — that block belongs to the set.
+func (s *browseSession) deny(address string) error {
+	message, denied := config.DenyReason(nil, s.perms, s.server, address)
 	if !denied {
 		return nil
 	}
@@ -268,7 +269,7 @@ func (b *browser) callTool(ctx context.Context, id, name string, args map[string
 		return nil, err
 	}
 	defer b.release(s)
-	if err := s.denyTool(name); err != nil {
+	if err := s.deny(name); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
@@ -286,6 +287,9 @@ func (b *browser) readResource(ctx context.Context, id, uri string) (any, error)
 		return nil, err
 	}
 	defer b.release(s)
+	if err := s.deny("resource:" + uri); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
@@ -301,6 +305,9 @@ func (b *browser) getPrompt(ctx context.Context, id, name string, args map[strin
 		return nil, err
 	}
 	defer b.release(s)
+	if err := s.deny("prompt:" + name); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.GetPrompt(ctx, &mcp.GetPromptParams{Name: name, Arguments: args})

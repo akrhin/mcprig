@@ -234,6 +234,8 @@ func run() error {
 	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	stopTracing := startTracing(log)
+	defer stopTracing()
 	store, err := oauth.OpenStore(stateDir())
 	if err != nil {
 		return err
@@ -266,7 +268,7 @@ func run() error {
 	go mgr.Warm(context.Background())
 	// Маркер усечения называет /tool-out, только когда файл можно забрать: у
 	// открытого набора ключа нет, и подсказка вела бы в 401.
-	mgr.ToolOutURL = cfg.Transport != nil && cfg.Transport.AuthToken != ""
+	mgr.ToolOutURL = len(transportTokens(cfg)) > 0
 	handler, err := httplisten.New(cfg, mgr.Server(), log, rec)
 	if err != nil {
 		return err
@@ -295,7 +297,7 @@ func run() error {
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)
 	defer signal.Stop(hup)
-	go reloadLoop(ctx, hup, mgr, *cfgPath, log)
+	go reloadLoop(ctx, hup, mgr, handler, *cfgPath, log)
 
 	// Выгрузки усечённых ответов чистятся при старте и дальше периодически.
 	startToolout(ctx, log)
@@ -316,14 +318,14 @@ func run() error {
 }
 
 // reloadLoop перечитывает servers.json по SIGHUP, пока процесс жив.
-func reloadLoop(ctx context.Context, hup <-chan os.Signal, mgr *mcpserver.Manager, cfgPath string, log *slog.Logger) {
+func reloadLoop(ctx context.Context, hup <-chan os.Signal, mgr *mcpserver.Manager, handler *httplisten.Server, cfgPath string, log *slog.Logger) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-hup:
 		}
-		res := reloadOnce(mgr, cfgPath, log)
+		res := reloadOnce(mgr, handler, cfgPath, log)
 		added, updated, removed, reset := countApplied(res.Applied)
 		log.Info(fmt.Sprintf("reload: применено %d, изменено %d, удалено %d, generation %d",
 			len(res.Applied), updated+reset, removed, res.Generation),
@@ -334,7 +336,7 @@ func reloadLoop(ctx context.Context, hup <-chan os.Signal, mgr *mcpserver.Manage
 
 // reloadOnce делает одну попытку и пишет ack супервизору. Битый конфиг не
 // роняет набор: прежний конфиг продолжает работать, ошибка уходит в status.
-func reloadOnce(mgr *mcpserver.Manager, cfgPath string, log *slog.Logger) mcpserver.ReloadResult {
+func reloadOnce(mgr *mcpserver.Manager, handler *httplisten.Server, cfgPath string, log *slog.Logger) mcpserver.ReloadResult {
 	dir := filepath.Dir(cfgPath)
 	// Метку читаем до работы: пока грузится конфиг, супервизор может начать
 	// следующую попытку, и её nonce не должен достаться нашему ответу.
@@ -344,12 +346,33 @@ func reloadOnce(mgr *mcpserver.Manager, cfgPath string, log *slog.Logger) mcpser
 	if err != nil {
 		res = mgr.ReloadFailed(err)
 	} else {
+		// Политика доступа применяется слушателем здесь же: выдача нового
+		// ключа и потеря последнего не ждут перезапуска набора. Остальной
+		// транспорт — дело mgr.Reload.
+		if handler != nil && cfg.Transport != nil {
+			handler.SetAuth(transportTokens(cfg), cfg.Transport.AllowAnonymous, cfg.Transport.ClientNames)
+		}
 		res = mgr.Reload(cfg)
 	}
 	if werr := writeReloadStatus(filepath.Join(dir, "reload.status"), res, nonce); werr != nil {
 		log.Warn("reload.status не записан", "err", werr)
 	}
 	return res
+}
+
+// transportTokens — токены, которые принимает слушатель: список ключей, а у
+// файла с одним ключом — сам authToken.
+func transportTokens(cfg *config.Config) []string {
+	if cfg == nil || cfg.Transport == nil {
+		return nil
+	}
+	if len(cfg.Transport.AuthTokens) > 0 {
+		return cfg.Transport.AuthTokens
+	}
+	if cfg.Transport.AuthToken != "" {
+		return []string{cfg.Transport.AuthToken}
+	}
+	return nil
 }
 
 // readReloadNonce берёт метку попытки, которую супервизор положил рядом с
@@ -460,6 +483,8 @@ func runStdio(args []string) error {
 		return err
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	stopTracing := startTracing(log)
+	defer stopTracing()
 	store, err := oauth.OpenStore(stateDir())
 	if err != nil {
 		return err
@@ -494,6 +519,23 @@ func runStdio(args []string) error {
 	startToolout(ctx, log)
 
 	return mgr.Server().Run(ctx, &mcp.StdioTransport{})
+}
+
+// startTracing включает OTLP-экспорт, если он задан окружением. Возвращённая
+// функция гасит экспортер и дописывает накопленный батч: иначе последние спаны
+// теряются вместе с процессом.
+func startTracing(log *slog.Logger) func() {
+	shutdown, err := mcpserver.SetupTracing(context.Background())
+	if err != nil {
+		log.Warn("трассировка: экспортер не поднялся, спаны не уходят", "err", err)
+	}
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(ctx); err != nil {
+			log.Warn("трассировка: остановка экспортера", "err", err)
+		}
+	}
 }
 
 // stateDir holds what must survive a restart but is not configuration: OAuth

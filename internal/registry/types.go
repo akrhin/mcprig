@@ -26,14 +26,18 @@ const (
 // servers.json.
 type Server = *config.Server
 
-// Key is one access key of a set. lazy-mcp takes a single auth token, so at
-// most one key is active (RevokedAt empty); the rest is revocation history.
+// Key is one access key of a set. A set serves every key with an empty
+// RevokedAt; the rest is revocation history. Revoking sets RevokedAt and leaves
+// the token in place, so the history still knows which key it was.
 type Key struct {
 	ID        string `json:"id"`
 	Token     string `json:"token"`
 	CreatedAt string `json:"createdAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
-	Note      string `json:"note,omitempty"`
+	// Label — подпись ключа: её видит владелец в панели, а набор — в метке
+	// клиента статистики. Note — прежнее имя того же поля в registry.json.
+	Label string `json:"label,omitempty"`
+	Note  string `json:"note,omitempty"`
 	// Profile — имя профиля набора (Set.Profiles), который сужает права этого
 	// ключа. Пусто — ключ ограничен только permissions.
 	Profile string `json:"profile,omitempty"`
@@ -59,7 +63,8 @@ func (n *Notify) Check() string {
 }
 
 // Set is a named group of servers deployed as its own lazy-mcp instance.
-// Token mirrors the active key and is never sent to a client as is.
+// Token mirrors the primary (first active) key; the rest of the keys are
+// served too. It is never sent to a client as is.
 type Set struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
@@ -97,8 +102,10 @@ type PublicKey struct {
 	ID        string `json:"id"`
 	CreatedAt string `json:"createdAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
-	Note      string `json:"note,omitempty"`
-	Profile   string `json:"profile,omitempty"`
+	Label     string `json:"label,omitempty"`
+	// Note повторяет Label для клиентов, написанных до переименования.
+	Note    string `json:"note,omitempty"`
+	Profile string `json:"profile,omitempty"`
 }
 
 // PublicSetEntry is the client-facing view of a set: no raw token, only the

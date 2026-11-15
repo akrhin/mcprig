@@ -163,7 +163,9 @@ func TestCorruptRegistryStartsEmpty(t *testing.T) {
 	}
 }
 
-func TestKeysSingleActive(t *testing.T) {
+// Выдача ключа не отзывает прежние, а отзыв одного оставляет остальные
+// действующими: набор держит несколько ключей сразу.
+func TestRevokeOneKeyKeepsOthers(t *testing.T) {
 	dir := t.TempDir()
 	store := openStore(t, dir)
 	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
@@ -172,7 +174,7 @@ func TestKeysSingleActive(t *testing.T) {
 		t.Fatalf("первый ключ: %+v", first)
 	}
 
-	plain, err := store.IssueKey("demo", "")
+	plain, err := store.IssueKey("demo", "", "ci")
 	if err != nil {
 		t.Fatalf("IssueKey: %v", err)
 	}
@@ -180,27 +182,81 @@ func TestKeysSingleActive(t *testing.T) {
 		t.Errorf("новый токен = %q", plain)
 	}
 	set := store.Set("demo")
-	if len(set.Keys) != 2 || activeCount(set.Keys) != 1 {
+	if len(set.Keys) != 2 || activeCount(set.Keys) != 2 {
 		t.Fatalf("после выдачи ключей: %d, активных %d", len(set.Keys), activeCount(set.Keys))
 	}
-	if set.Keys[0].RevokedAt == "" {
-		t.Error("прежний ключ не отозван")
+	if set.Keys[0].RevokedAt != "" {
+		t.Error("выдача нового ключа отозвала прежний")
 	}
-	if set.Token != plain {
-		t.Errorf("token = %q, want зеркало активного %q", set.Token, plain)
+	if set.Token != first.Token {
+		t.Errorf("token = %q, want прежний основной %q", set.Token, first.Token)
+	}
+	if got := ActiveTokens(set.Keys); len(got) != 2 || got[0] != first.Token || got[1] != plain {
+		t.Errorf("действующие токены = %v", got)
 	}
 
-	wasActive, err := store.RevokeKey("demo", set.Keys[1].ID)
-	if err != nil || !wasActive {
-		t.Fatalf("RevokeKey активного: wasActive=%v err=%v", wasActive, err)
+	remaining, err := store.RevokeKey("demo", set.Keys[1].ID)
+	if err != nil || remaining != 1 {
+		t.Fatalf("RevokeKey одного ключа: remainder=%d err=%v", remaining, err)
 	}
 	reopened := openStore(t, dir)
 	set = reopened.Set("demo")
-	if set.Token != "" || activeCount(set.Keys) != 0 {
-		t.Errorf("после отзыва активного: token=%q активных=%d", set.Token, activeCount(set.Keys))
+	if set.Token != first.Token || activeCount(set.Keys) != 1 {
+		t.Errorf("после отзыва одного: token=%q активных=%d", set.Token, activeCount(set.Keys))
 	}
 	if _, err := reopened.RevokeKey("demo", "нет-такого"); err == nil {
 		t.Error("отзыв несуществующего ключа не вернул ошибку")
+	}
+}
+
+// Девятый действующий ключ не выдаётся: потолок виден текстом ошибки.
+func TestKeyLimit(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
+	addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(freePort(t))+`}`)
+	for i := 1; i < MaxActiveKeys; i++ {
+		if _, err := store.IssueKey("demo", "", ""); err != nil {
+			t.Fatalf("IssueKey #%d: %v", i, err)
+		}
+	}
+	if n := activeCount(store.Set("demo").Keys); n != MaxActiveKeys {
+		t.Fatalf("действующих ключей = %d, want %d", n, MaxActiveKeys)
+	}
+	_, err := store.IssueKey("demo", "", "")
+	if err == nil || !strings.Contains(err.Error(), "действующих ключей") {
+		t.Fatalf("девятый ключ: err = %v", err)
+	}
+}
+
+// registry.json с одним ключом читается как список из одного: старый токен и
+// прежнее поле note остаются рабочими.
+func TestOldRegistrySingleKeyUpgrades(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"old","name":"old","servers":["fs"],"port":9100,"token":"legacy-token"},
+		{"id":"named","name":"named","servers":["fs"],"port":9101,"token":"t1","keys":[{"id":"k1","token":"t1","createdAt":"2026-01-01T00:00:00Z","note":"прежняя подпись"}]}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+
+	old := store.Set("old")
+	if old == nil || len(old.Keys) != 1 || old.Keys[0].ID != LegacyKeyID {
+		t.Fatalf("старый единственный токен не стал ключом: %+v", old)
+	}
+	if old.Token != "legacy-token" || len(ActiveTokens(old.Keys)) != 1 || ActiveTokens(old.Keys)[0] != "legacy-token" {
+		t.Errorf("действующие токены old = %v, token = %q", ActiveTokens(old.Keys), old.Token)
+	}
+	named := store.Set("named")
+	if named == nil || len(named.Keys) != 1 {
+		t.Fatalf("named: %+v", named)
+	}
+	if named.Keys[0].Label != "прежняя подпись" {
+		t.Errorf("note не стал label: %+v", named.Keys[0])
+	}
+	if !CanServe(named) {
+		t.Error("набор со старым ключом не может стартовать")
 	}
 }
 
@@ -704,7 +760,7 @@ func TestLoadKeepsSetsWithoutProfiles(t *testing.T) {
 
 func TestKeyOpsMissingSet(t *testing.T) {
 	store := openStore(t, t.TempDir())
-	if _, err := store.IssueKey("nope", ""); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
+	if _, err := store.IssueKey("nope", "", ""); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
 		t.Errorf("IssueKey: err = %v", err)
 	}
 	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
@@ -755,5 +811,48 @@ func TestConfigErrorScrubbedFromInfectedFile(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "_configError") {
 		t.Fatalf("ключ _configError пережил перезапись: %s", raw)
+	}
+}
+
+// PUT с "token" после отзыва всех ключей заводит ключ с новым id. Фиксированный
+// LegacyKeyID столкнулся бы с отозванным ключом той же истории, normalizeKeys
+// оставил бы отозванный, и показанный владельцу токен молча перестал бы
+// работать после перезапуска.
+func TestPutTokenAfterAllKeysRevokedSurvivesReload(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9101,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"old","name":"old","servers":["fs"],"port":9100,"token":"legacy-token"}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+	if keys := store.Set("old").Keys; len(keys) != 1 || keys[0].ID != LegacyKeyID {
+		t.Fatalf("подготовка: ключи %+v", keys)
+	}
+	if remaining, err := store.RevokeKey("old", LegacyKeyID); err != nil || remaining != 0 {
+		t.Fatalf("отзыв единственного ключа: remaining=%d err=%v", remaining, err)
+	}
+
+	const fresh = "fresh-token-0123456789abcdef0123456789abcdef"
+	if _, err := store.UpdateSet("old", json.RawMessage(`{"token":"`+fresh+`"}`)); err != nil {
+		t.Fatalf("PUT token: %v", err)
+	}
+
+	set := openStore(t, dir).Set("old")
+	if got := ActiveTokens(set.Keys); len(got) != 1 || got[0] != fresh {
+		t.Fatalf("после перезагрузки действующие токены = %v, want %q", got, fresh)
+	}
+	if set.Token != fresh {
+		t.Errorf("token после перезагрузки = %q, want %q", set.Token, fresh)
+	}
+	legacy := 0
+	for _, key := range set.Keys {
+		if key.ID == LegacyKeyID {
+			legacy++
+		}
+	}
+	if legacy != 1 {
+		t.Errorf("ключей legacy в истории = %d, want 1: %+v", legacy, set.Keys)
 	}
 }

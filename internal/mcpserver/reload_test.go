@@ -281,27 +281,61 @@ func TestReloadAppliesRateLimitAndPermissions(t *testing.T) {
 }
 
 // Поля транспорта, которые нельзя применить на живом процессе, честно
-// называются и остаются прежними: старый токен продолжает работать.
+// называются и остаются прежними: прежний адрес продолжает работать.
 func TestReloadTransportNeedsRestart(t *testing.T) {
 	var dials int32
 	m := testManager(&config.Config{
 		Servers:   []*config.Server{stdio("alpha")},
-		Transport: &config.HTTPTransport{Type: "http", AuthToken: "old-token"},
+		Transport: &config.HTTPTransport{Type: "http", AuthToken: "old-token", Host: "127.0.0.1"},
 	}, &dials, 0)
 	defer m.Close()
 
 	res := m.Reload(&config.Config{
 		Servers:   []*config.Server{stdio("alpha")},
-		Transport: &config.HTTPTransport{Type: "http", AuthToken: "new-token"},
+		Transport: &config.HTTPTransport{Type: "http", AuthToken: "old-token", Host: "0.0.0.0"},
 	})
-	if len(res.RestartNeeded) != 1 || res.RestartNeeded[0] != "authToken" {
+	if len(res.RestartNeeded) != 1 || res.RestartNeeded[0] != "host" {
 		t.Fatalf("restartNeeded = %v", res.RestartNeeded)
 	}
-	if got := m.config().Transport.AuthToken; got != "old-token" {
-		t.Fatalf("менеджер принял новый токен без перезапуска: %q", got)
+	if got := m.config().Transport.Host; got != "127.0.0.1" {
+		t.Fatalf("менеджер принял новый адрес без перезапуска: %q", got)
 	}
 	if res.Err != "" {
 		t.Fatalf("err = %q", res.Err)
+	}
+}
+
+// Смена ключа перезапуска не требует: токены ставит живой слушатель, а
+// менеджер обязан принять новое поколение целиком — иначе панель получает
+// ложный restartNeeded, а профили ключей откатываются к прежним.
+func TestReloadTokenAppliesWithoutRestart(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{
+		Servers: []*config.Server{stdio("alpha")},
+		Transport: &config.HTTPTransport{Type: "http", AuthToken: "old-token",
+			KeyProfiles: map[string]string{"aaaaaa": "reader"}},
+		Profiles: map[string]*config.Profile{"reader": {Allow: []string{"alpha"}}},
+	}, &dials, 0)
+	defer m.Close()
+
+	res := m.Reload(&config.Config{
+		Servers: []*config.Server{stdio("alpha")},
+		Transport: &config.HTTPTransport{Type: "http", AuthToken: "new-token",
+			KeyProfiles: map[string]string{"bbbbbb": "reader"}},
+		Profiles: map[string]*config.Profile{"reader": {Allow: []string{"alpha"}}},
+	})
+	if len(res.RestartNeeded) != 0 {
+		t.Fatalf("restartNeeded = %v", res.RestartNeeded)
+	}
+	if res.Err != "" {
+		t.Fatalf("err = %q", res.Err)
+	}
+	cfg := m.config().Transport
+	if cfg.AuthToken != "new-token" {
+		t.Fatalf("токен не применён: %q", cfg.AuthToken)
+	}
+	if cfg.KeyProfiles["bbbbbb"] != "reader" {
+		t.Fatalf("профиль нового ключа потерян: %v", cfg.KeyProfiles)
 	}
 }
 
@@ -466,14 +500,14 @@ func TestReloadAckDoesNotWaitForPendingConnect(t *testing.T) {
 	}
 }
 
-// Отвергнутая смена токена не снимает профили: ключ, у которого профиль пропал
+// Отвергнутая смена адреса не снимает профили: ключ, у которого профиль пропал
 // из нового файла, иначе остался бы при прежнем токене без ограничений.
 func TestReloadKeepsProfilesWhenTokenRejected(t *testing.T) {
 	var dials int32
 	m := testManager(&config.Config{
 		Servers: []*config.Server{stdio("alpha")},
 		Transport: &config.HTTPTransport{
-			Type: "http", AuthToken: "old-token",
+			Type: "http", AuthToken: "old-token", Host: "127.0.0.1",
 			KeyProfiles: map[string]string{"fp1": "reader"},
 		},
 	}, &dials, 0)
@@ -481,9 +515,9 @@ func TestReloadKeepsProfilesWhenTokenRejected(t *testing.T) {
 
 	res := m.Reload(&config.Config{
 		Servers:   []*config.Server{stdio("alpha")},
-		Transport: &config.HTTPTransport{Type: "http", AuthToken: "new-token"},
+		Transport: &config.HTTPTransport{Type: "http", AuthToken: "new-token", Host: "0.0.0.0"},
 	})
-	if len(res.RestartNeeded) != 1 || res.RestartNeeded[0] != "authToken" {
+	if len(res.RestartNeeded) != 1 || res.RestartNeeded[0] != "host" {
 		t.Fatalf("restartNeeded = %v", res.RestartNeeded)
 	}
 	tr := m.config().Transport
@@ -595,7 +629,7 @@ func TestReloadRevertsProfilesWithTransport(t *testing.T) {
 	m := testManager(&config.Config{
 		Servers: []*config.Server{stdio("alpha")},
 		Transport: &config.HTTPTransport{
-			Type: "http", AuthToken: "old-token",
+			Type: "http", AuthToken: "old-token", Host: "127.0.0.1",
 			KeyProfiles: map[string]string{"fp1": "reader"},
 		},
 		Profiles: oldProfiles,
@@ -604,11 +638,11 @@ func TestReloadRevertsProfilesWithTransport(t *testing.T) {
 
 	res := m.Reload(&config.Config{
 		Servers:   []*config.Server{stdio("alpha")},
-		Transport: &config.HTTPTransport{Type: "http", AuthToken: "new-token"},
+		Transport: &config.HTTPTransport{Type: "http", AuthToken: "new-token", Host: "0.0.0.0"},
 		Profiles:  map[string]*config.Profile{"reader": {}},
 	})
 	if len(res.RestartNeeded) == 0 {
-		t.Fatal("restartNeeded пуст: смена токена без перезапуска не применяется")
+		t.Fatal("restartNeeded пуст: смена адреса без перезапуска не применяется")
 	}
 	for _, name := range res.Applied {
 		if name == "profiles" {

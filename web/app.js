@@ -167,6 +167,10 @@
       'form.envAllow': 'envAllow · one per line',
       'form.tags': 'tags · comma separated',
       'form.enabled': 'enabled',
+      'form.expose': 'expose',
+      'form.exposeHint': 'Surfaces the MCP client may read. Without them the client sees the server\u2019s tools only.',
+      'form.exposeResources': 'expose resources',
+      'form.exposePrompts': 'expose prompts',
       'form.sandbox': 'sandbox',
       'form.sandboxHint': 'mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · empty means the default',
       'form.unset': 'not set',
@@ -396,6 +400,10 @@
       'form.envAllow': 'envAllow · по одному на строку',
       'form.tags': 'теги · через запятую',
       'form.enabled': 'включён',
+      'form.expose': 'отдавать клиенту',
+      'form.exposeHint': 'Что клиент MCP читает у этого сервера. Без этого он видит только инструменты.',
+      'form.exposeResources': 'отдавать ресурсы',
+      'form.exposePrompts': 'отдавать промпты',
       'form.sandbox': 'песочница',
       'form.sandboxHint': 'mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · пусто — значение по умолчанию',
       'form.unset': 'не задано',
@@ -757,6 +765,7 @@
      internal/registry (имя, транспорт) и internal/config (песочница, теги). */
 
   var MOCK_SANDBOX_KEYS = ['mode', 'onUnavailable', 'ro', 'rw', 'network', 'memoryMb', 'pids', 'timeoutSec'];
+  var MOCK_EXPOSE_KINDS = ['resources', 'prompts'];
 
   function mockServerErr(inp, name, exists) {
     if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) { return 'name: строчные латинские буквы, цифры, - и _'; }
@@ -774,6 +783,11 @@
     if ((inp.tags || []).indexOf('untrusted') >= 0 && !inp.sandbox) {
       return 'тег untrusted требует sandbox: сервер без изоляции не стартует';
     }
+    // та же строгость, что у config.Check: опечатка не должна молча значить «не отдавать»
+    var bad = (inp.expose || []).filter(function (k) { return MOCK_EXPOSE_KINDS.indexOf(k) < 0; });
+    if (bad.length) {
+      return 'expose: неизвестный вид "' + bad[0] + '" (допустимо ' + MOCK_EXPOSE_KINDS.join(', ') + ')';
+    }
     return '';
   }
 
@@ -787,6 +801,7 @@
     if (body.env && Object.keys(body.env).length) { srv.env = body.env; }
     if (body.envAllow && body.envAllow.length) { srv.envAllow = body.envAllow; }
     if (body.tags && body.tags.length) { srv.tags = body.tags; }
+    if (body.expose && body.expose.length) { srv.expose = body.expose; }
     if (body.sandbox && !http) { srv.sandbox = body.sandbox; }
     return srv;
   }
@@ -847,11 +862,16 @@
         s.servers = (s.servers || []).filter(function (n) { return n !== name; });
       });
     } else {
-      var srv = mockServer(name, body || {});
       if (method === 'POST') {
-        st.mock.servers.push(srv);
+        st.mock.servers.push(mockServer(name, body || {}));
       } else {
-        st.mock.servers = st.mock.servers.map(function (s) { return s.name === name ? srv : s; });
+        // PUT сливает тело с записью, как mergeServer в бэкенде: null и пустой
+        // массив снимают поле, отсутствующее в теле поле остаётся
+        var old = st.mock.servers.filter(function (s) { return s.name === name; })[0];
+        var patch = Object.assign({}, old, body || {});
+        st.mock.servers = st.mock.servers.map(function (s) {
+          return s.name === name ? mockServer(name, patch) : s;
+        });
       }
     }
     return Promise.resolve({ ok: true, restarted: [], stopped: [] });
@@ -1611,6 +1631,9 @@
     v('envAllow', srv && srv.envAllow ? srv.envAllow.join('\n') : '');
     v('tags', srv && srv.tags ? srv.tags.join(', ') : '');
     f.elements.enabled.checked = !srv || srv.enabled !== false;
+    var ex = (srv && srv.expose) || [];
+    f.elements.exposeResources.checked = ex.indexOf('resources') >= 0;
+    f.elements.exposePrompts.checked = ex.indexOf('prompts') >= 0;
     var sb = (srv && srv.sandbox) || {};
     v('sbMode', sb.mode);
     v('sbOnUnavailable', sb.onUnavailable);
@@ -1659,6 +1682,12 @@
     var tags = val('tags').split(',').map(function (s) { return s.trim(); })
       .filter(function (s) { return s; });
     if (tags.length) { out.tags = tags; }
+    // null, а не пропуск: PUT сливает тело с записью, и снятая галочка иначе
+    // оставила бы прежний expose на месте
+    var ex = [];
+    if (f.elements.exposeResources.checked) { ex.push('resources'); }
+    if (f.elements.exposePrompts.checked) { ex.push('prompts'); }
+    out.expose = ex.length ? ex : null;
     // песочница живёт только у stdio: у http её нет по контракту
     if (transport === 'stdio') {
       var sb = {};

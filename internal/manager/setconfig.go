@@ -19,11 +19,14 @@ import (
 // Формат servers.json — вход lazy-mcp `serve`. ${VAR} остаются нераскрытыми:
 // подстановку делает процесс набора, у него свои секреты.
 type setTransport struct {
-	Type         string   `json:"type"`
-	Host         string   `json:"host"`
-	Port         int      `json:"port"`
-	Path         string   `json:"path"`
-	AuthToken    string   `json:"authToken,omitempty"`
+	Type      string `json:"type"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	Path      string `json:"path"`
+	AuthToken string `json:"authToken,omitempty"`
+	// AuthTokens — все действующие ключи набора: набор принимает любой из
+	// них. authToken остаётся рядом ради прежних клиентов файла.
+	AuthTokens   []string `json:"authTokens,omitempty"`
 	AllowedHosts []string `json:"allowedHosts,omitempty"`
 	// AllowAnonymous marks an open set: the proxy listens without a bearer.
 	AllowAnonymous bool `json:"allowAnonymous,omitempty"`
@@ -73,6 +76,7 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 			Port:           set.Port,
 			Path:           "/mcp",
 			AuthToken:      set.Token,
+			AuthTokens:     registry.ActiveTokens(set.Keys),
 			AllowedHosts:   allowedHosts,
 			AllowAnonymous: set.Open && set.Token == "",
 			ClientNames:    clientNames(set.Keys),
@@ -98,16 +102,20 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 	return append(body, '\n'), nil
 }
 
-// clientNames — подпись каждого ключа под его отпечатком. Ключ без токена
-// (такой остаётся только в истории отзыва) и пустая подпись имени не дают.
+// clientNames — подпись каждого ключа под его отпечатком. Подпись берётся из
+// label (прежнее имя — note). Ключ без токена (такой остаётся только в истории
+// отзыва) и пустая подпись имени не дают.
 func clientNames(keys []registry.Key) map[string]string {
 	out := make(map[string]string, len(keys))
 	for _, key := range keys {
-		note := strings.TrimSpace(key.Note)
-		if key.Token == "" || note == "" {
+		label := strings.TrimSpace(key.Label)
+		if label == "" {
+			label = strings.TrimSpace(key.Note)
+		}
+		if key.Token == "" || label == "" {
 			continue
 		}
-		out[stats.Fingerprint(key.Token)] = note
+		out[stats.Fingerprint(key.Token)] = label
 	}
 	if len(out) == 0 {
 		return nil

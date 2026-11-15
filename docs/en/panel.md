@@ -42,10 +42,17 @@ and the interface language.
 The **servers** tab of the details drawer and the **Add server** button open a
 form over the panel: name, description, transport, command (one argument per line) or
 `url` and headers, working directory, `env`, `envAllow`, tags, the `enabled`
-switch and a **sandbox** fieldset — `mode`, `onUnavailable`, `network`, `ro` and
+switch, two **expose** checkboxes (`resources`, `prompts`) and a **sandbox**
+fieldset — `mode`, `onUnavailable`, `network`, `ro` and
 `rw` (one path per line), `memoryMb`, `pids`, `tmpMb`, `timeoutSec`. It writes
 through `POST /api/servers` and `PUT /api/servers/<name>`; a backend refusal is
 shown in the form as its own text and the stored record stays untouched.
+
+With both **expose** boxes unchecked the record carries no `expose` at all: the
+MCP client sees that server's tools only. Checking them is the only way to give
+the client its resources or prompts ([meta-tools.md](meta-tools.md#resources-and-prompts));
+an unknown value never comes from the form, but a hand-edited `registry.json`
+typo is refused by the backend with `expose: неизвестный вид …`.
 
 The same form is the only way to edit a `sandbox` block from the UI. Fields and
 their meaning are in [configuration.md](configuration.md#sandbox); the panel
@@ -78,9 +85,10 @@ value differs from the stored one; the panel sends `PATCH` with `{"note":…}`,
 redraws the list and shows a `restartError` of the set as its own warning rather
 than swallowing it. A newly issued token is displayed once, and
 so is the token of a newly created closed set: `POST /api/sets` returns it in
-the `201` body, while `GET /api/sets` never repeats it. Issuing a key later
-revokes the previous active key and restarts the set if it is running; revoking
-the active key stops the set.
+the `201` body, while `GET /api/sets` never repeats it. Issuing a key neither
+revokes the previous active key nor restarts the set: the new token reaches a
+running set by reload, and the old one keeps working. Revoking the last active
+key stops the set; revoking one of several leaves it running.
 
 ## OAuth
 
@@ -138,15 +146,16 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
 | `GET /api/state` | servers, sets, `firstPort` — the first paint |
 | `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
-| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port` or `open` restarts the set |
+| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port` or `open` restarts the set. A `token` in the body replaces the primary key and creates one when the set has no active key |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
 | `POST /api/sets/<id>/reload` | apply `servers.json` without a restart: `{"reloaded":true,"generation":N,"applied":[…],"restartNeeded":[…],"error":"…"}`. A stopped set answers `{"reloaded":false,"reason":"набор не запущен"}` and the file is written anyway. A non-empty `restartNeeded` or a set `error` gives `reloaded:false` with the cause in `reason`; a write failure is `500` |
 | `GET /api/sets/<id>/servers` | per-server health for one set |
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
-| `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token. An optional `{"profile":"reader"}` narrows the key to that profile of the set — an unknown name is `400` listing the profiles, a set without `profiles` is `400` with a hint to add the block; the answer carries the key, including its `profile`, and the set with sorted `profiles` names |
-| `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key; revoking the active key stops the set and the answer carries `stopped: true` |
-| `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"note":"hermes"}`; the note becomes the client's label in the statistics, an empty string clears it, a running set is restarted |
+| `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token. Earlier keys stay active, so issuing does not revoke the old one; the set serves up to 8 active keys, the ninth answers `409`. An optional `{"label":"hermes","profile":"reader"}` names and narrows the key to that profile of the set — an unknown name is `400` listing the profiles, a set without `profiles` is `400` with a hint to add the block. A running set gets the new key by reloading, not restarting; when the process did not apply it, the answer carries `reloadError` (and `restartError`, its older name) |
+| `GET /api/sets/<id>/keys` | `{"keys":[…]}` — `id`, `label`, `profile`, `createdAt`, `revokedAt` of every key, revoked ones included; never a token or a hash |
+| `DELETE /api/sets/<id>/keys/<keyID>` | revoke one key; the rest keep working. Revoking the last active key stops the set and the answer carries `stopped: true` and `activeKeys: 0` |
+| `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"label":"hermes"}` (`{"note":…}` still accepted); the label becomes the client's label in the statistics, an empty string clears it, a running set restarts — the listener reads client labels at start — and a failed restart answers `restartError` |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
 | `PUT /api/servers/<name>` | update; running sets reload instead of restarting, and the answer carries `reloaded` (set ids, repeated as `restarted` for one release) plus `reloadErrors` (id → cause) when a process did not apply it |
 | `DELETE /api/servers/<name>` | delete; running sets that use it are stopped, because the deleted server's session goes with it. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
