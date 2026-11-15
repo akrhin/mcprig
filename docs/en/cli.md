@@ -176,6 +176,7 @@ loopback unless `MCPRIG_HOST` says otherwise.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
+2026/11/09 00:05:27 WARN панель без пароля (MCPRIG_AUTH=off): доступна всем, кто дотянется до порта; задайте MCPRIG_PASSWORD
 2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 scheme=http publicUrl= data=/var/lib/mcprig auth=none
 ```
 
@@ -232,6 +233,11 @@ wildcard resolves to loopback); the panel address comes from `MCPRIG_HOST` and
 `MCPRIG_PUBLIC_URL` (or the panel address): no host, port `0` or a loopback host
 behind `https` is a problem, because an identity provider cannot send the code
 there.
+
+With `MCPRIG_AUTH=off` and neither `MCPRIG_PASSWORD` nor `MCPRIG_PASSWORD_HASH`
+set, the services section adds a warning line — `внимание: панель без пароля …`
+— because an open panel is reachable by anyone who gets to the port; it counts
+as a warning, not a problem, so the exit code stays `0`.
 
 ```text
 mcprig doctor, версия dev (/usr/local/bin/mcprig)

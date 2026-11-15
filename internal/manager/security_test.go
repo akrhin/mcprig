@@ -283,6 +283,19 @@ func TestReservedRefsRejectedByAPI(t *testing.T) {
 	})
 	status(t, w, http.StatusBadRequest)
 
+	// browse тоже принимает запись из тела (entry): служебная ${VAR} в ней
+	// ушла бы в env дочернего процесса без этой проверки.
+	w = e.do(t, http.MethodPost, "/api/browse", map[string]any{
+		"entry": map[string]any{
+			"name": "leak-browse", "transport": "stdio", "command": []string{"/bin/true"},
+			"env": map[string]string{"X": "${MCPRIG_PASSWORD}"},
+		},
+	})
+	status(t, w, http.StatusBadRequest)
+	if !strings.Contains(w.Body.String(), "служебная") {
+		t.Fatalf("browse: нет внятной ошибки: %s", w.Body.String())
+	}
+
 	// Шаблон ищется где угодно: префиксная проверка пропускала «p{file:…}».
 	w = e.do(t, http.MethodPost, "/api/import", map[string]any{
 		"mcpServers": map[string]any{
@@ -313,5 +326,22 @@ func TestReservedRefsRejectedByAPI(t *testing.T) {
 	status(t, w, http.StatusBadRequest)
 	if e.m.store.Server("good") != nil {
 		t.Fatal("импорт применился частично")
+	}
+}
+
+// Панель без пароля — законный MCPRIG_AUTH=off, но не молчаливый: в лог уходит
+// предупреждение, иначе открытый порт выглядит как настроенная защита.
+func TestPanelWithoutPasswordWarns(t *testing.T) {
+	var buf strings.Builder
+	newEnvLog(t, AuthOptions{Off: true}, slog.New(slog.NewTextHandler(&buf, nil)))
+	if !strings.Contains(buf.String(), "без пароля") {
+		t.Fatalf("нет предупреждения об открытой панели: %q", buf.String())
+	}
+
+	// С паролем предупреждения нет: режим password, а не none.
+	buf.Reset()
+	newEnvLog(t, AuthOptions{Password: "pw"}, slog.New(slog.NewTextHandler(&buf, nil)))
+	if strings.Contains(buf.String(), "без пароля") {
+		t.Fatalf("предупреждение при заданном пароле: %q", buf.String())
 	}
 }

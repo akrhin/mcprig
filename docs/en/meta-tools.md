@@ -47,8 +47,7 @@ connection: a filtered-out server is never dialed.
       "tags": ["fixture"]
     }
   ],
-  "version": "dev",
-  "pid": 666441
+  "version": "dev"
 }
 ```
 
@@ -64,7 +63,6 @@ connection: a filtered-out server is never dialed.
 | `isolation` | `bwrap` when the sandbox is applied; `без изоляции: <причина>` when it was requested but bubblewrap could not start (`onUnavailable: warn`/`allow`); `нет: конфиг отвергнут` when the record has a `_configError`; absent only for a valid server without a `sandbox` block |
 | `tags` | from the config, when present |
 | `version` | build version of the proxy |
-| `pid` | proxy process id |
 
 Health probes run concurrently, at most 8 at once, with a 15 s timeout and a
 15 s cache that also remembers failures.

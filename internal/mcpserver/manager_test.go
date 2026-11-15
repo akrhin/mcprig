@@ -99,7 +99,6 @@ type serversOut struct {
 		Tags    []string `json:"tags"`
 	} `json:"servers"`
 	Version string `json:"version"`
-	PID     int    `json:"pid"`
 }
 
 func listServersOut(t *testing.T, cs *mcp.ClientSession) serversOut {
@@ -135,6 +134,22 @@ func TestLazyConnect(t *testing.T) {
 	listServersOut(t, cs)
 	if n := atomic.LoadInt32(&dials); n != 1 {
 		t.Fatalf("the session must be reused, got %d dial(s)", n)
+	}
+}
+
+// list_servers answers with version but not with pid: the process id of the
+// proxy is of no use to a client and only widens what leaks.
+func TestListServersOmitsPID(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+
+	raw := resultText(t, call(t, clientFor(t, m.Server()), "list_servers", nil))
+	if strings.Contains(raw, `"pid"`) {
+		t.Fatalf("list_servers leaked pid: %s", raw)
+	}
+	if !strings.Contains(raw, `"version": "test"`) {
+		t.Fatalf("list_servers must keep version: %s", raw)
 	}
 }
 

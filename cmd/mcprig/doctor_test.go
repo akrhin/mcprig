@@ -404,3 +404,52 @@ func TestCheckRedirectBadPublicURL(t *testing.T) {
 		t.Fatalf("пустой host дал пустую строку")
 	}
 }
+
+// Открытая панель — не проблема (exit-код не меняется), но и не «ok»:
+// строка начинается с «предупреждение:» и печатается как «внимание:».
+func TestDoctorWarnsPanelWithoutPassword(t *testing.T) {
+	dataDir := t.TempDir()
+	port := doctorFreePort(t)
+	registryBody := `{"version":1,"nextPort":` + strconv.Itoa(port) + `,"servers":[],"sets":[]}`
+	writeDoctorFile(t, filepath.Join(dataDir, registry.RegistryFile), registryBody)
+	configPath := filepath.Join(t.TempDir(), "servers.json")
+	writeDoctorFile(t, configPath, `{"servers":[]}`)
+
+	panel := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, `{"status":"ok","sets":0}`)
+	}))
+	defer panel.Close()
+	host, portText, err := net.SplitHostPort(strings.TrimPrefix(panel.URL, "http://"))
+	if err != nil {
+		t.Fatalf("URL панели: %v", err)
+	}
+	panelPort, _ := strconv.Atoi(portText)
+
+	opts := doctorOptions{
+		ConfigPath: configPath,
+		DataDir:    dataDir,
+		BindIP:     "0.0.0.0",
+		PanelHost:  host,
+		PanelPort:  panelPort,
+		FirstPort:  port,
+		LastPort:   port,
+		Version:    "test",
+		Executable: "/bin/mcprig",
+		AuthOff:    true,
+	}
+	rep := buildDoctorReport(opts, doctorLine{}, false)
+	if !rep.OK || rep.Problems != 0 {
+		t.Fatalf("предупреждение не должно быть проблемой:\n%s", renderDoctor(rep))
+	}
+	out := string(renderDoctor(rep))
+	if !strings.Contains(out, "внимание: панель без пароля") {
+		t.Fatalf("нет предупреждения об открытой панели:\n%s", out)
+	}
+
+	// Пароль задан — предупреждения нет.
+	opts.HasPassword = true
+	if out := string(renderDoctor(buildDoctorReport(opts, doctorLine{}, false))); strings.Contains(out, "без пароля") {
+		t.Fatalf("предупреждение при заданном пароле:\n%s", out)
+	}
+}

@@ -174,6 +174,7 @@ loopback, если `MCPRIG_HOST` не говорит иного.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
+2026/11/09 00:05:27 WARN панель без пароля (MCPRIG_AUTH=off): доступна всем, кто дотянется до порта; задайте MCPRIG_PASSWORD
 2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 scheme=http publicUrl= data=/var/lib/mcprig auth=none
 ```
 
@@ -233,6 +234,11 @@ MCPRIG_DATA_DIR=~/.local/state/mcprig MCPRIG_PORT=9091 mcprig doctor
 Там же печатается эффективный redirect OAuth, собранный из `MCPRIG_PUBLIC_URL`
 (или адреса панели): нет хоста, порт `0` или loopback за `https` — проблема,
 потому что провайдер не сможет прислать туда код.
+
+При `MCPRIG_AUTH=off` без `MCPRIG_PASSWORD` и `MCPRIG_PASSWORD_HASH` в
+«служебных» появляется предупреждение — `внимание: панель без пароля …`:
+открытая панель доступна всем, кто дотянется до порта. Это предупреждение, а не
+проблема, поэтому код возврата остаётся `0`.
 
 ```text
 mcprig doctor, версия dev (/usr/local/bin/mcprig)

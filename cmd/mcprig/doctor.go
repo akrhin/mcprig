@@ -59,6 +59,10 @@ type doctorOptions struct {
 	LastPort   int
 	Version    string
 	Executable string
+	// AuthOff и HasPassword нужны одной проверке: панель запущена без пароля
+	// (MCPRIG_AUTH=off и ни пароля, ни его хеша). Это предупреждение, не проблема.
+	AuthOff     bool
+	HasPassword bool
 }
 
 func newDoctorFlags() (fs *flag.FlagSet, cfgPath *string, asJSON *bool) {
@@ -88,6 +92,9 @@ func runDoctor(args []string) error {
 		LastPort:   registry.LastPort,
 		Version:    version,
 		Executable: executablePath(),
+		AuthOff:    os.Getenv("MCPRIG_AUTH") == "off",
+		HasPassword: strings.TrimSpace(os.Getenv("MCPRIG_PASSWORD")) != "" ||
+			strings.TrimSpace(os.Getenv("MCPRIG_PASSWORD_HASH")) != "",
 	}, envLine, haveEnv)
 
 	var out []byte
@@ -558,6 +565,9 @@ func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLi
 		lines = append(lines, doctorLine{false, fmt.Sprintf("панель %s: /healthz %d", addr, code)})
 	default:
 		lines = append(lines, doctorLine{true, fmt.Sprintf("панель %s: /healthz 200", addr)})
+	}
+	if o.AuthOff && !o.HasPassword {
+		lines = append(lines, doctorLine{true, "предупреждение: панель без пароля (MCPRIG_AUTH=off) — доступна всем, кто дотянется до порта; задайте MCPRIG_PASSWORD"})
 	}
 	return lines
 }

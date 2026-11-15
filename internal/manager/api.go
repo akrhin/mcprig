@@ -199,6 +199,11 @@ func New(opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Открытая панель — осознанный выбор MCPRIG_AUTH=off, но молчать о нём
+	// нельзя: порт может оказаться доступен всей сети.
+	if a.mode == modeNone {
+		log.Warn("панель без пароля (MCPRIG_AUTH=off): доступна всем, кто дотянется до порта; задайте MCPRIG_PASSWORD")
+	}
 	if len(a.allowedHosts) == 0 {
 		log.Warn("менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты")
 	}
@@ -1078,6 +1083,9 @@ func (m *Manager) apiBrowseOpen(req *request) error {
 	}
 	// entry приходит из тела, минуя реестр: без проверки кнопка browse
 	// запускает сервер, который набор отверг бы.
+	if err := checkReservedRefs(body.Entry); err != nil {
+		return err
+	}
 	if msg := srv.Check(); msg != "" {
 		return badRequest(msg)
 	}

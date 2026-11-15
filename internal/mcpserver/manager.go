@@ -11,7 +11,6 @@ import (
 	"io"
 	"maps"
 	"net"
-	"os"
 	"reflect"
 	"slices"
 	"sort"
@@ -733,8 +732,7 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 	out := struct {
 		Servers []serverInfo `json:"servers"`
 		Version string       `json:"version"`
-		PID     int          `json:"pid"`
-	}{Servers: make([]serverInfo, len(targets)), Version: m.version, PID: os.Getpid()}
+	}{Servers: make([]serverInfo, len(targets)), Version: m.version}
 
 	var wg sync.WaitGroup
 	for i, e := range targets {
