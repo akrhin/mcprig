@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // freePort ищет свободный порт диапазона наборов: 9100 может занимать живой
@@ -109,6 +111,33 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if len(set.Keys) != 1 || set.Token != set.Keys[0].Token {
 		t.Errorf("ключ набора demo после загрузки: keys=%v token=%q", set.Keys, set.Token)
+	}
+}
+
+// Ошибка конфига — состояние запуска, а не запись реестра: сервер, помеченный
+// ею, не должен навсегда оставаться битым после перезаписи registry.json.
+func TestConfigErrorIsNotPersisted(t *testing.T) {
+	dir := t.TempDir()
+	store := openStore(t, dir)
+	addServer(t, store, `{"name":"broken","command":["nope"]}`)
+	store.Server("broken").ConfigError = "сервер #1: битый"
+	if err := store.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, RegistryFile))
+	if err != nil {
+		t.Fatalf("registry.json: %v", err)
+	}
+	if strings.Contains(string(raw), "_configError") {
+		t.Errorf("ошибка конфига попала в реестр: %s", raw)
+	}
+	srv := openStore(t, dir).Server("broken")
+	if srv == nil {
+		t.Fatal("сервер broken не пережил перезагрузку")
+	}
+	if srv.ConfigError != "" {
+		t.Errorf("ConfigError закреплён в реестре: %q", srv.ConfigError)
 	}
 }
 
@@ -405,6 +434,8 @@ func TestServerValidation(t *testing.T) {
 		{"headers числом", `{"name":"a","url":"http://x","headers":{"A":1}}`, "headers.A: ожидалась строка"},
 		{"имя заглавными", `{"name":"A","command":["x"]}`, "в имени допустимы"},
 		{"enabled строкой", `{"name":"a","command":["x"],"enabled":"yes"}`, "enabled: ожидалось true или false"},
+		{"permissions default", `{"name":"a","command":["x"],"permissions":{"default":"ask"}}`, "permissions.default"},
+		{"permissions.server в серверном блоке", `{"name":"a","command":["x"],"permissions":{"rules":[{"pattern":"x","action":"deny","server":"b"}]}}`, "permissions.rules[0].server"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -610,5 +641,51 @@ func TestKeyOpsMissingSet(t *testing.T) {
 	}
 	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
 		t.Errorf("RevokeKey: err = %v", err)
+	}
+}
+
+// permissions приходят тем же JSON, что читает config.Load для servers.json:
+// панель пишет блок в реестр, browse читает его оттуда, а не из воздуха.
+func TestServerPermissionsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	store := openStore(t, dir)
+	srv := addServer(t, store, `{"name":"alpha","command":["x"],"permissions":{"default":"deny","rules":[{"pattern":"read_*","action":"allow"}]}}`)
+	if srv.Permissions == nil || srv.Permissions.Default != config.PermissionDeny || len(srv.Permissions.Rules) != 1 {
+		t.Fatalf("permissions не разобраны: %+v", srv.Permissions)
+	}
+	reopened := openStore(t, dir).Server("alpha")
+	if reopened == nil || reopened.Permissions == nil || reopened.Permissions.Rules[0].Pattern != "read_*" {
+		t.Fatalf("permissions не пережили перезагрузку: %+v", reopened)
+	}
+	// Патч без поля блок сохраняет, явный null — убирает (как transport).
+	if got, err := store.UpdateServer("alpha", json.RawMessage(`{"description":"d"}`)); err != nil || got.Permissions == nil {
+		t.Fatalf("патч без permissions потерял блок: %+v %v", got, err)
+	}
+	if got, err := store.UpdateServer("alpha", json.RawMessage(`{"permissions":null}`)); err != nil || got.Permissions != nil {
+		t.Fatalf("явный null не убрал permissions: %+v %v", got, err)
+	}
+}
+
+// Заражённый registry.json: `_configError` от старой записи не должен осесть в
+// памяти и пережить каноническую перезапись при Open.
+func TestConfigErrorScrubbedFromInfectedFile(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"broken","command":["nope"],"_configError":"битый"}],"sets":[]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	srv := openStore(t, dir).Server("broken")
+	if srv == nil {
+		t.Fatal("сервер broken не загрузился")
+	}
+	if srv.ConfigError != "" {
+		t.Fatalf("ConfigError из файла остался в памяти: %q", srv.ConfigError)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, RegistryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "_configError") {
+		t.Fatalf("ключ _configError пережил перезапись: %s", raw)
 	}
 }

@@ -147,6 +147,9 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/browse/<id>`, `DELETE /api/browse/<id>` | read or close that session |
 | `POST /api/browse/<id>/{tool,resource,prompt}` | call something in the browse session |
 
+A browse session obeys the server's `permissions` for tools the same way
+`invoke_command` does; resources and prompts are not covered yet.
+
 Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
 least one existing server; when `port` is not given the manager allocates a free
 port from 9100–9199, and a given one must be free in the system, otherwise
@@ -275,7 +278,7 @@ time. Both modes can be combined; either one is enough to pass.
 Writes (`POST`/`PUT`/`DELETE`) are rejected when `Sec-Fetch-Site` is
 `cross-site`, when `Origin` does not match `Host`, or when the body is not
 JSON. A cookie-authenticated write must also carry `Origin`: without it the
-request gets `403` "нужен заголовок Origin" — a browser sends it on every such
+request gets `403` "не хватает заголовка Origin" — a browser sends it on every such
 request, a forged one from another site does not. Header-based proxy auth and
 login (`POST /api/login`, no cookie yet) are exempt.
 

@@ -10,6 +10,17 @@ repository the project is built in.
 
 ### Changed
 
+- Browse sessions in the panel now apply the server's `permissions` to tool
+  calls, the same gate `invoke_command` uses: a denied call answers `403`
+  instead of reaching the server. Resources and prompts are not covered yet.
+- A server's `permissions` block now survives the panel and the registry:
+  `POST /api/servers`, `PATCH /api/servers/<name>` and import keep it in
+  `registry.json`, so browse and `invoke_command` enforce the same rules. A
+  broken block is refused with `400` instead of being dropped.
+- `_configError` no longer appears in a config file: a validation defect stays
+  in memory (`list_servers` still reports it as `healthy: false`), and a file
+  that already carries the key stops marking that server broken on the next
+  load.
 - Russian user-facing text is proofread with `ru-text`: panel strings, CLI
   output and server error messages use sentence case, the «вы» form, one term
   per concept and the "what — why — what to do" shape of an error. Counts agree

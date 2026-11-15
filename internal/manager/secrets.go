@@ -244,8 +244,6 @@ func NewSecrets(dataDir string) (*Secrets, error) {
 	return &Secrets{local: f, bao: newBaoFromEnv()}, nil
 }
 
-func (s *Secrets) OpenBao() bool { return s.bao != nil }
-
 func (s *Secrets) setRemoteErr(err error) {
 	if err == nil {
 		s.remoteErr.Store(nil)

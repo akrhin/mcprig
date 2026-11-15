@@ -128,7 +128,7 @@ by absolute path.
 
 ## 9. The panel answers 403, or is unreachable from another machine
 
-**Symptom.** Writes fail with `403 "нужен заголовок Origin"`; after a reverse
+**Symptom.** Writes fail with `403 "не хватает заголовка Origin"`; after a reverse
 proxy an `https` Origin is rejected; or the panel refuses connections from the
 LAN.
 

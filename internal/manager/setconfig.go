@@ -40,7 +40,6 @@ type setHealthMonitor struct {
 type setFile struct {
 	Servers        []*config.Server `json:"servers"`
 	Transport      setTransport     `json:"transport"`
-	Logging        map[string]any   `json:"logging,omitempty"`
 	HealthMonitor  setHealthMonitor `json:"healthMonitor"`
 	RequestTimeout int              `json:"requestTimeout"`
 }
@@ -71,7 +70,6 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 			AllowAnonymous: set.Open && set.Token == "",
 			ClientNames:    clientNames(set.Keys),
 		},
-		Logging:        map[string]any{"level": "info"},
 		HealthMonitor:  setHealthMonitor{Interval: 60000, Timeout: 120000},
 		RequestTimeout: 120000,
 	}

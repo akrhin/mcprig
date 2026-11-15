@@ -182,8 +182,7 @@
       "enabled": true,
       "sandbox": {
         "mode": "bwrap"
-      },
-      "_configError": "sandbox: только для stdio"
+      }
     },
     {
       "name": "playwright",

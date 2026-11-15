@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
 )
@@ -20,7 +22,10 @@ const (
 	browseCallLimit = 60 * time.Second
 )
 
-var errBrowseGone = errors.New("сессия просмотра не найдена или истекла")
+var (
+	errBrowseGone   = errors.New("сессия просмотра не найдена или истекла")
+	errBrowseDenied = errors.New("вызов запрещён правилами permissions")
+)
 
 // loggingToolName — инструмент, которым сервер принимает уровень логов.
 // Наличие инструмента и есть признак: capability logging deprecated (SEP-2577).
@@ -76,6 +81,11 @@ type browseSession struct {
 	view *browseView
 	sess *mcp.ClientSession
 	used time.Time
+	// server и perms — из реестра, чтобы callTool применял то же `permissions`,
+	// что и invoke_command. Глобального блока у панели нет: он принадлежит
+	// набору и сюда не приходит.
+	server string
+	perms  *config.Permissions
 	// refs — сколько вызовов сейчас держат сессию. close и sweep помечают её
 	// closing и закрывают, когда refs снова 0: иначе закрытие прилетает в
 	// середину вызова.
@@ -167,7 +177,7 @@ func (b *browser) open(ctx context.Context, srv registry.Server) (*browseView, e
 	if len(b.items) >= browseMax {
 		victim = b.evictLocked()
 	}
-	b.items[view.ID] = &browseSession{view: view, sess: session, used: time.Now()}
+	b.items[view.ID] = &browseSession{view: view, sess: session, used: time.Now(), server: srv.Name, perms: srv.Permissions}
 	b.mu.Unlock()
 	if victim != nil {
 		go victim.sess.Close()
@@ -238,12 +248,29 @@ func (b *browser) close(id string) bool {
 	return ok
 }
 
+// denyTool is the browse gate: the server's own `permissions` rules decide, the
+// same way invoke_command decides for the proxy path. The panel has no global
+// block on purpose — that block belongs to the set.
+func (s *browseSession) denyTool(name string) error {
+	message, denied := config.DenyReason(nil, s.perms, s.server, name)
+	if !denied {
+		return nil
+	}
+	if message == "" {
+		return errBrowseDenied
+	}
+	return fmt.Errorf("%w: %s", errBrowseDenied, message)
+}
+
 func (b *browser) callTool(ctx context.Context, id, name string, args map[string]any) (any, error) {
 	s, err := b.lookup(id)
 	if err != nil {
 		return nil, err
 	}
 	defer b.release(s)
+	if err := s.denyTool(name); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})

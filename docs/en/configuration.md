@@ -51,7 +51,8 @@ and read as-is: no migration, no wrapper.
 so the file stays byte-compatible with lazy-mcp, but health in mcprig is
 governed by the 15 s cache described in
 [architecture.md](architecture.md#health). The panel also writes
-`logging: {level: "info"}` and `requestTimeout: 120000`.
+`requestTimeout: 120000`; a `logging` block it used to add is no longer
+written and is ignored if present.
 
 A hand-written file without `requestTimeout` means no limit; a set materialized
 by the panel always gets `120000`, so deleting the key by hand is the only way to
@@ -61,7 +62,7 @@ get zero.
 
 | field | type | default | meaning |
 | --- | --- | --- | --- |
-| `name` | string | required | server name used by the meta-tools; duplicate names get `_configError: дубль имени` |
+| `name` | string | required | server name used by the meta-tools; a repeated name leaves the later entry unhealthy (`имя уже занято другим сервером`) |
 | `description` | string | empty | shown by `list_servers` and searched by `filter` |
 | `transport` | `stdio` / `http` | inferred | inferred from `url` or `command` when absent |
 | `command` | array or string | | stdio command; see both forms below |
@@ -72,11 +73,14 @@ get zero.
 | `url` | string | | HTTP endpoint; http only |
 | `headers` | object of strings | empty | extra headers for every HTTP request |
 | `tags` | array of strings | empty | labels for `list_servers` and `filter` |
-| `sandbox` | object | absent — no isolation | bubblewrap block for a stdio server, see below. A server tagged `untrusted` must have it: without one the loader keeps it in the list as unhealthy (`_configError`) and the panel API rejects such a record with 400 |
+| `sandbox` | object | absent — no isolation | bubblewrap block for a stdio server, see below. A server tagged `untrusted` must have it: without one the loader keeps it in the list as unhealthy and the panel API rejects such a record with 400 |
 | `enabled` | bool | `true` | disabled servers are listed but never connected |
 | `permissions` | object | | per-server allow/deny block |
 | `oauth` | object | | per-server OAuth settings |
-| `_configError` | string | | written by the loader, never by a user |
+
+A defect never becomes a field of the file: the loader keeps the error in
+memory and `list_servers` reports that server as `healthy: false` with the
+text. Hand-editing the file cannot pin a server to a broken state.
 
 ### Sandbox
 

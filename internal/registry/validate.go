@@ -173,6 +173,16 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	// permissions читается тем же разбором, что и config.Load: сервер из панели
+	// иначе оставался без правил, и browse с invoke_command разрешали всё.
+	var perms *config.Permissions
+	if raw, ok := in["permissions"]; ok && !isNull(raw) {
+		p, msg := config.ParsePermissions(raw)
+		if msg != "" {
+			return nil, errors.New(msg)
+		}
+		perms = p
+	}
 
 	hasCommand, hasURL := len(command) > 0, url != ""
 	if hasCommand && hasURL {
@@ -220,6 +230,7 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	srv.Tags = tags
 	srv.Enabled = enabled
 	srv.Sandbox = sandbox
+	srv.Permissions = perms
 	// Те же правила, что у config.Load, включая запрет untrusted без песочницы:
 	// иначе API отвечает 200 и сервер живёт без изоляции.
 	if msg := srv.Check(); msg != "" {
@@ -239,7 +250,6 @@ func mergeServer(cur Server, patch map[string]json.RawMessage) (map[string]json.
 	if err != nil {
 		return nil, err
 	}
-	delete(out, "_configError")
 	for k, v := range patch {
 		if isNull(v) {
 			delete(out, k)

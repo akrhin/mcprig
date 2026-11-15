@@ -40,7 +40,7 @@ type Server struct {
 	Permissions *Permissions      `json:"permissions,omitempty"`
 	OAuth       *OAuth            `json:"oauth,omitempty"`
 	Sandbox     *Sandbox          `json:"sandbox,omitempty"`
-	ConfigError string            `json:"_configError,omitempty"`
+	ConfigError string            `json:"-"`
 }
 
 // Sandbox — изоляция stdio-сервера. Пустой блок означает умолчания: bwrap,
@@ -408,23 +408,16 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 
 // decodePermissions soft-fails a broken block onto the server, like lazy-mcp.
 func (s *Server) decodePermissions(data json.RawMessage) {
-	if len(data) == 0 || string(data) == "null" {
-		return
-	}
-	var p Permissions
-	if err := json.Unmarshal(data, &p); err != nil {
-		if s.ConfigError == "" {
-			s.ConfigError = "permissions: " + err.Error()
-		}
-		return
-	}
-	if msg := p.validate("permissions", false); msg != "" {
+	p, msg := ParsePermissions(data)
+	if msg != "" {
 		if s.ConfigError == "" {
 			s.ConfigError = msg
 		}
 		return
 	}
-	s.Permissions = &p
+	if p != nil {
+		s.Permissions = p
+	}
 }
 
 // decodeSandbox soft-fails: a typo in the block must not brick the whole file.

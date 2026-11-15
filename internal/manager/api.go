@@ -1064,6 +1064,9 @@ func (m *Manager) apiBrowseCall(req *request) error {
 		if errors.Is(err, errBrowseGone) {
 			return err
 		}
+		if errors.Is(err, errBrowseDenied) {
+			return &httpError{http.StatusForbidden, truncate(err.Error(), 800)}
+		}
 		return &httpError{http.StatusBadGateway, truncate(err.Error(), 800)}
 	}
 	writeJSON(req.w, http.StatusOK, map[string]any{"result": result})
