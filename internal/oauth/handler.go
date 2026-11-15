@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
@@ -36,8 +37,15 @@ type Options struct {
 	ClientSecret string
 	Scopes       []string
 	Browser      func(url string) error // nil — openBrowser
-	Store        *Store                 // nil — токены не сохраняются
-	Log          *slog.Logger
+	// Authorize забирает URL авторизации и возвращает код: так вход уводится
+	// из процесса, который не может принять редирект сам (панель отдаёт ссылку
+	// в браузер пользователя). nil — браузер и loopback-приёмник.
+	Authorize func(context.Context, string) (*Result, error)
+	Store     *Store // nil — токены не сохраняются
+	// SingleAttempt отклоняет повторный поток: один человек у браузера, и
+	// вторая ссылка молча отменяет первую, которую он уже открыл.
+	SingleAttempt bool
+	Log           *slog.Logger
 }
 
 // callbackAddr — адрес приёмника из redirect_uri: браузер вернётся ровно на
@@ -80,9 +88,20 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 	}
 	key := Key(o.ServerName, o.ServerURL)
 
+	var started atomic.Bool
 	fetch := func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
+		if o.SingleAttempt && !started.CompareAndSwap(false, true) {
+			return nil, fmt.Errorf("oauth %s: повторная авторизация не начинается — вход уже запрошен", o.ServerName)
+		}
 		log.Info("требуется авторизация MCP-сервера: откройте URL в браузере",
 			"server", o.ServerName, "url", args.URL)
+		if o.Authorize != nil {
+			res, err := o.Authorize(ctx, args.URL)
+			if err != nil {
+				return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
+			}
+			return &auth.AuthorizationResult{Code: res.Code, State: res.State, Iss: res.Iss}, nil
+		}
 		cb, err := NewCallback(addr, stateFromURL(args.URL))
 		if err != nil {
 			return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)

@@ -23,7 +23,7 @@ mcprig — один статический бинарник, который ст
 → [configuration.md](configuration.md) → [cli.md#init](cli.md#init) →
 [meta-tools.md](meta-tools.md).
 
-**Разрабатывать.** Сборка, тестовые ворота (`-p 1` не опция), живой стенд на
+**Разрабатывать.** Сборка, тестовые ворота (`-p 1` обязателен), живой стенд на
 настоящих серверах, выпуск релиза.
 → [dev/development.md](dev/development.md) → [dev/release.md](dev/release.md).
 
@@ -33,11 +33,11 @@ mcprig — один статический бинарник, который ст
 | --- | --- |
 | [install.md](install.md) | релизные архивы и их состав, юниты systemd, Docker `slim`/`full`, каталог состояния на диске |
 | [configuration.md](configuration.md) | каждое поле `servers.json`: серверы, `sandbox`, секреты, `transport`, `permissions`, `oauth`, и что бывает с битой записью |
-| [cli.md](cli.md) | шесть подкоманд с настоящим выводом: `serve`, `stdio`, `panel`, `doctor`, `warm`, `init`; хранение `tool-out` |
+| [cli.md](cli.md) | девять подкоманд с настоящим выводом: `serve`, `stdio`, `auth`, `panel`, `doctor`, `warm`, `status`, `logs`, `init`; хранение `tool-out` |
 | [panel.md](panel.md) | что показывает панель, HTTP API за ней, история вызовов, здоровье и как проверяется доступ |
 | [meta-tools.md](meta-tools.md) | пять инструментов, которые видит клиент, точные формы ответов, тексты ошибок, маскировка секретов, счётчики |
 | [architecture.md](architecture.md) | как процессы стыкуются, почему каждый набор — свой процесс, здоровье, статистика, OAuth |
-| [troubleshooting.md](troubleshooting.md) | симптом → причина → что сделать, из случаев, которые действительно были |
+| [troubleshooting.md](troubleshooting.md) | симптом → причина → что сделать, из реальных случаев |
 | [glossary.md](glossary.md) | набор/set, мета-тул, downstream/upstream, tool-out, sandbox, hook, warm |
 | [dev/development.md](dev/development.md) | требования, сборка, тестовые ворота, контрактный набор, живой стенд |
 | [dev/release.md](dev/release.md) | тег → CI → архивы → зеркало, чек-листом |
@@ -55,6 +55,6 @@ mcprig — один статический бинарник, который ст
 
 ## Язык
 
-Каждая продуктовая страница есть по-английски (канонический текст) и
-по-русски (`../en/` — оригинал, этот каталог — перевод той же страницы).
+Каждая продуктовая страница есть по-английски (`../en/` — оригинал, канонический
+текст) и по-русски (этот каталог — перевод той же страницы).
 `CURRENT-GOAL.md` и всё под `history/` — внутреннее и живёт только по-русски.

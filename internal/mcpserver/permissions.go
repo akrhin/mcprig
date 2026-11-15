@@ -1,99 +1,63 @@
-// Permission gate for invoke_command, compatible with lazy-mcp's experimental
-// `permissions` block. Without a block every call is allowed.
+// Policy answers for invoke_command: lazy-mcp's `permissions` block and, after
+// it, the calling key's profile. The gate itself lives in internal/config so
+// the panel's browse path can apply the same permission rules.
 package mcpserver
 
 import (
-	"regexp"
-	"strings"
-	"sync"
+	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/stats"
 )
 
 // denyReason applies lazy-mcp's resolution order and reports whether the call
 // is denied, together with the rule's message.
-//
-// Order (first non-empty wins, last matching rule within a level wins):
-// server rules, global rules, server default, global default, implicit allow.
 func denyReason(global, server *config.Permissions, serverName, command string) (string, bool) {
-	if server != nil {
-		if r := lastMatch(server.Rules, func(r config.Rule) bool { return globMatch(r.Pattern, command) }); r != nil {
-			return r.Message, r.Action == config.PermissionDeny
-		}
+	return config.DenyReason(global, server, serverName, command)
+}
+
+// callerProfile resolves the access key's profile from the request context. The
+// key is found by its fingerprint, not by the display label: a label is a note
+// the owner or the client chose. An empty name means no key (open set, stdio)
+// or a key without a profile, which is unrestricted by profile.
+//
+// cfg is the caller's snapshot: a reload between two reads could otherwise
+// answer with one generation's token table and another's profiles.
+func callerProfile(ctx context.Context, cfg *config.Config) (string, *config.Profile) {
+	fp := stats.ClientKey(ctx)
+	if fp == "" || cfg.Transport == nil {
+		return "", nil
 	}
-	if global != nil {
-		if r := lastMatch(global.Rules, func(r config.Rule) bool {
-			serverPattern := r.Server
-			if serverPattern == "" {
-				serverPattern = "*"
-			}
-			return globMatch(serverPattern, serverName) && globMatch(r.Pattern, command)
-		}); r != nil {
-			return r.Message, r.Action == config.PermissionDeny
-		}
+	name := cfg.Transport.KeyProfiles[fp]
+	if name == "" {
+		return "", nil
 	}
-	if server != nil && server.Default == config.PermissionDeny {
-		return "", true
+	return name, cfg.Profiles[name]
+}
+
+// gate applies permissions first, then the caller's profile: a profile narrows
+// what permissions allowed and never widens it, so a denied call keeps the
+// permissions message. A name without a matching block denies everything —
+// deleting a profile must not silently widen a key that still refers to it.
+//
+// Одно решение читает один снимок конфига: глобальные правила и профиль идут
+// из него, серверное правило — из снимка самой записи (perms). Два чтения
+// m.config() давали окно, где решение смешивало два поколения.
+func (m *Manager) gate(ctx context.Context, serverName, command string, perms *config.Permissions) (string, bool) {
+	cfg := m.config()
+	if message, denied := denyReason(cfg.Permissions, perms, serverName, command); denied {
+		return message, true
 	}
-	if global != nil && global.Default == config.PermissionDeny {
-		return "", true
+	name, profile := callerProfile(ctx, cfg)
+	if name == "" {
+		return "", false
+	}
+	if profile == nil || !profile.Allows(serverName, command) {
+		return "профиль " + name + " не разрешает " + serverName + "/" + command, true
 	}
 	return "", false
-}
-
-func lastMatch(rules []config.Rule, match func(config.Rule) bool) *config.Rule {
-	var found *config.Rule
-	for i := range rules {
-		if match(rules[i]) {
-			found = &rules[i]
-		}
-	}
-	return found
-}
-
-// globMatch is case-insensitive; `*` is any run of characters, `?` exactly one.
-// Runs of `*` collapse first, which defuses the backtracking blow-up.
-func globMatch(pattern, value string) bool {
-	re := compiledGlob(pattern)
-	return re != nil && re.MatchString(value)
-}
-
-// globCache holds one compiled pattern per distinct rule: the gate used to
-// compile every pattern on every call. Keyed by the normalized pattern, which
-// is the same string for the same rule; the config set is bounded, so the map
-// does not grow at runtime. (Precompiling at config load would need a hook in
-// internal/config; this cache compiles once per pattern instead.)
-var globCache sync.Map // normalized pattern -> *regexp.Regexp (nil when invalid)
-
-func compiledGlob(pattern string) *regexp.Regexp {
-	for strings.Contains(pattern, "**") {
-		pattern = strings.ReplaceAll(pattern, "**", "*")
-	}
-	if cached, ok := globCache.Load(pattern); ok {
-		re, _ := cached.(*regexp.Regexp)
-		return re
-	}
-	var b strings.Builder
-	b.WriteString("(?i)^")
-	for _, r := range pattern {
-		switch r {
-		case '*':
-			b.WriteString(".*")
-		case '?':
-			b.WriteString(".")
-		default:
-			b.WriteString(regexp.QuoteMeta(string(r)))
-		}
-	}
-	b.WriteString("$")
-	re, err := regexp.Compile(b.String())
-	if err != nil {
-		re = nil
-	}
-	globCache.Store(pattern, re)
-	return re
 }
 
 // blockedResult is the lazy-mcp policy shape host hooks look for.

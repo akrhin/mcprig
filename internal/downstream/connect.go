@@ -38,6 +38,17 @@ type Connector struct {
 	// снимается, иначе после восстановления bwrap сервер остаётся помеченным.
 	OnSandboxApplied func(*config.Server)
 
+	// Browser показывает URL авторизации. nil — открыть браузер по умолчанию;
+	// консольная команда подставляет печать ссылки, чтобы не звать xdg-open.
+	Browser func(string) error
+
+	// Authorize уводит вход из процесса: панель отдаёт ссылку в свой браузер
+	// и принимает код своим HTTP-сервером. nil — Browser плюс loopback.
+	Authorize func(context.Context, string) (*oauth.Result, error)
+
+	// SingleAuthorization — один поток входа на сервер за жизнь Connector.
+	SingleAuthorization bool
+
 	// OnToolsChanged вызывается, когда сервер прислал
 	// notifications/tools/list_changed. Набор по ней сбрасывает кэш
 	// tools/list, и новый инструмент виден без refresh: true. SDK подписывается
@@ -108,7 +119,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 	switch srv.Transport {
 	case config.TransportStdio:
 		if len(srv.Command) == 0 {
-			return nil, nil, fmt.Errorf("пустой command")
+			return nil, nil, fmt.Errorf("command пуст — укажите команду запуска")
 		}
 		// Песочница — префикс argv, транспорт не меняется. Ошибка здесь значит
 		// fail-closed: сервер не стартует, а не стартует «как раньше».
@@ -148,7 +159,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		return &mcp.CommandTransport{Command: cmd}, tail, nil
 	case config.TransportHTTP:
 		if srv.URL == "" {
-			return nil, nil, fmt.Errorf("пустой url")
+			return nil, nil, fmt.Errorf("url пуст — укажите адрес сервера")
 		}
 		tr := &mcp.StreamableClientTransport{
 			Endpoint: srv.URL,
@@ -168,7 +179,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		}
 		return tr, nil, nil
 	default:
-		return nil, nil, fmt.Errorf("неизвестный transport %q", srv.Transport)
+		return nil, nil, fmt.Errorf("неизвестный transport %q: допустимо stdio или http", srv.Transport)
 	}
 }
 
@@ -205,14 +216,17 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 		return nil, nil
 	}
 	h, err := oauth.NewHandler(ctx, oauth.Options{
-		ServerName:   srv.Name,
-		ServerURL:    srv.URL,
-		RedirectURL:  block.RedirectURL,
-		ClientID:     block.ClientID,
-		ClientSecret: block.ClientSecret,
-		Scopes:       block.Scopes,
-		Store:        c.Store,
-		Log:          c.Log,
+		ServerName:    srv.Name,
+		ServerURL:     srv.URL,
+		RedirectURL:   block.RedirectURL,
+		ClientID:      block.ClientID,
+		ClientSecret:  block.ClientSecret,
+		Scopes:        block.Scopes,
+		Store:         c.Store,
+		Log:           c.Log,
+		Browser:       c.Browser,
+		Authorize:     c.Authorize,
+		SingleAttempt: c.SingleAuthorization,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("oauth: %w", err)
@@ -225,7 +239,7 @@ func (c *Connector) oauthHandler(ctx context.Context, srv *config.Server) (*oaut
 // встроенная защита Go здесь не работает.
 func sameHostRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 {
-		return fmt.Errorf("слишком много редиректов")
+		return fmt.Errorf("слишком много редиректов — проверьте url сервера")
 	}
 	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
 		return fmt.Errorf("редирект на другой хост отклонён: %s", req.URL.Host)

@@ -126,7 +126,9 @@ func TestCloseReportsUnfinishedConnect(t *testing.T) {
 	}
 
 	e := m.entries[0]
-	go func() { _, _ = e.conn.session(context.Background(), m.dialFor(e.srv), connectDeadline(e.srv)) }()
+	go func() {
+		_, _ = e.conn.session(context.Background(), m.dialFor(e.server()), connectDeadline(e.server()))
+	}()
 	<-entered
 	e.conn.mu.Lock()
 	a := e.conn.try

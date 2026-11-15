@@ -406,7 +406,7 @@ func TestBearerTokenTrimsSpace(t *testing.T) {
 	if !ok || tok != testToken {
 		t.Fatalf("bearerToken = %q, %v", tok, ok)
 	}
-	if !bearerOK(req, testToken) {
+	if !bearerOK(req, newTokenSet(testToken)) {
 		t.Fatal("bearerOK отбил токен с двойным пробелом")
 	}
 	if got := clientLabel(req, nil); got != "key:"+stats.Fingerprint(testToken)+"/harness/1" {

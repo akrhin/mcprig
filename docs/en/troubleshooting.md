@@ -84,6 +84,20 @@ authenticating at the same moment, or anything else on that port, collide.
 under the set's data directory and survive a restart, so the browser is needed
 once, not on every start.
 
+**Symptom, second half.** A server that wants OAuth stays `healthy: false`, the
+log carries `требуется авторизация MCP-сервера` with a URL, or the upstream
+answers `401`.
+
+**What to do.** Press **authorize** in the row of that server in the registry
+list: the panel shows the link, accepts the redirect on `/oauth/callback` and
+restarts the set once the token is saved. From a terminal the same flow is
+`mcprig auth --set <set> <server>`. If dynamic registration answers
+`invalid_redirect_uri`, the authorization server refuses the plain `http`
+address of the panel and needs TLS in front of it — the loopback variant of the
+CLI is the way out until then. A `403`
+before that is not OAuth but egress — the process cannot reach the server, so
+give it `HTTPS_PROXY`; the link will not help until the request gets through.
+
 ## 7. The sandbox refuses to start a server
 
 **Symptom.** `sandbox unavailable: …`, or the server fails with `sandbox: путь
@@ -114,7 +128,7 @@ by absolute path.
 
 ## 9. The panel answers 403, or is unreachable from another machine
 
-**Symptom.** Writes fail with `403 "нужен заголовок Origin"`; after a reverse
+**Symptom.** Writes fail with `403 "не хватает заголовка Origin"`; after a reverse
 proxy an `https` Origin is rejected; or the panel refuses connections from the
 LAN.
 

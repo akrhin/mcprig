@@ -116,6 +116,10 @@ type Recorder struct {
 	// client, when set, overrides the caller's own label: a stdio process has
 	// exactly one client and names it after the transport.
 	client string
+	// throttled counts calls the set's rate limit refused, in total and per
+	// "server/tool" pair. Отказы не проходят через Record: апстрим их не видел.
+	throttled      int64
+	throttledTools map[string]int64
 }
 
 // counterKey включает сервер: два сервера с одинаковым именем инструмента —
@@ -214,11 +218,29 @@ func (r *Recorder) SetHistory(h *History) {
 	r.mu.Unlock()
 }
 
+// RecordThrottled accounts one call refused by the set's rate limit. The tool
+// counter stops growing at MaxCounters: the name comes from the caller.
+func (r *Recorder) RecordThrottled(server, tool string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.throttled++
+	key := CleanLabel(server + "/" + tool)
+	if r.throttledTools == nil {
+		r.throttledTools = make(map[string]int64, 4)
+	}
+	if _, ok := r.throttledTools[key]; ok || len(r.throttledTools) < MaxCounters {
+		r.throttledTools[key]++
+	}
+}
+
 // Snapshot is the panel view: counters with percentiles, newest tail first.
 type Snapshot struct {
 	Set      string    `json:"set,omitempty"`
 	Counters []Counter `json:"counters"`
 	Tail     []Call    `json:"tail"`
+	// Throttled — сколько вызовов отверг лимит частоты, всего и по парам.
+	Throttled      int64            `json:"throttled,omitempty"`
+	ThrottledTools map[string]int64 `json:"throttledTools,omitempty"`
 	// Schema — вес list_commands набора, если прокси уже снял его с кэша.
 	Schema *Schema `json:"schema,omitempty"`
 	// Stats — состояние истории на диске: сколько строк потерял полный канал.
@@ -274,7 +296,13 @@ func (r *Recorder) snapshot(redacted bool) Snapshot {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	out := Snapshot{Set: r.set, Counters: make([]Counter, 0, len(r.counters)), Schema: r.schema}
+	out := Snapshot{Set: r.set, Counters: make([]Counter, 0, len(r.counters)), Schema: r.schema, Throttled: r.throttled}
+	if len(r.throttledTools) > 0 {
+		out.ThrottledTools = make(map[string]int64, len(r.throttledTools))
+		for k, v := range r.throttledTools {
+			out.ThrottledTools[k] = v
+		}
+	}
 	if r.hist != nil {
 		out.Stats = &HistoryStats{Dropped: r.hist.Dropped()}
 	}

@@ -20,6 +20,10 @@
       ],
       "keyPrefix": "main_9f2",
       "autostart": true,
+      "profiles": [
+        "ci",
+        "reader"
+      ],
       "runtime": {
         "id": "main",
         "running": true,
@@ -36,7 +40,8 @@
         {
           "id": "k_main2",
           "createdAt": "2026-11-02T18:40:00.000Z",
-          "note": "ci"
+          "note": "ci",
+          "profile": "reader"
         }
       ]
     },
@@ -182,8 +187,7 @@
       "enabled": true,
       "sandbox": {
         "mode": "bwrap"
-      },
-      "_configError": "sandbox: только для stdio"
+      }
     },
     {
       "name": "playwright",
@@ -304,6 +308,9 @@
         "npx",
         "-y",
         "@modelcontextprotocol/server-filesystem"
+      ],
+      "expose": [
+        "resources"
       ],
       "enabled": true
     }

@@ -83,8 +83,6 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 			defer wg.Done()
 			start := time.Now()
 			ans := manyAnswer{Server: c.Server, CommandName: c.CommandName}
-			// The slot is keyed by the server entry: looking it up by the raw
-			// name would keep a channel for every name a caller makes up.
 			e := m.find(c.Server)
 			if e == nil {
 				ans.Error = fmt.Sprintf("неизвестный сервер %q", c.Server)
@@ -92,7 +90,15 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 				out[i] = ans
 				return
 			}
-			slot := slots.get(e)
+			// Лимит считается на каждый внутренний вызов, как у invoke_command.
+			if err := m.throttle(ctx, req, e.server().Name, c.CommandName); err != nil {
+				ans.Error = err.Error()
+				ans.MS = time.Since(start).Milliseconds()
+				out[i] = ans
+				return
+			}
+			// Слот ключуется именем: запись перезагрузка подменяет, имя — нет.
+			slot := slots.get(e.server().Name)
 			select {
 			case slot <- struct{}{}:
 				defer func() { <-slot }()
@@ -117,10 +123,10 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 	for i, item := range raw {
 		extra, err := extraKeys(item, "server", "command_name", "command", "parameters")
 		if err != nil {
-			return nil, fmt.Errorf("calls[%d]: ожидался объект", i)
+			return nil, fmt.Errorf("calls[%d]: нужен объект вызова", i)
 		}
 		if len(extra) > 0 {
-			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s — допустимые: server, command_name, command, parameters; аргументы кладутся в parameters", i, strings.Join(extra, ", "))
+			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s. Допустимые: server, command_name, command, parameters. Аргументы кладутся в parameters", i, strings.Join(extra, ", "))
 		}
 		if err := json.Unmarshal(item, &calls[i]); err != nil {
 			if text, ok := typeErrorText(err, fmt.Sprintf("calls[%d]: ", i)); ok {
@@ -129,15 +135,15 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 			return nil, fmt.Errorf("calls[%d]: %w", i, err)
 		}
 		if calls[i].Server == "" {
-			return nil, fmt.Errorf("calls[%d]: server обязателен", i)
+			return nil, fmt.Errorf("calls[%d]: укажите server", i)
 		}
 		if calls[i].CommandName == "" {
 			calls[i].CommandName = calls[i].Command
 		} else if calls[i].Command != "" && calls[i].Command != calls[i].CommandName {
-			return nil, fmt.Errorf("calls[%d]: укажите одно: command_name или command", i)
+			return nil, fmt.Errorf("calls[%d]: укажите command_name (или command)", i)
 		}
 		if calls[i].CommandName == "" {
-			return nil, fmt.Errorf("calls[%d]: укажите command_name или command", i)
+			return nil, fmt.Errorf("calls[%d]: укажите command_name (или command)", i)
 		}
 		if _, err := parametersOf(calls[i].Parameters); err != nil {
 			return nil, fmt.Errorf("calls[%d]: %w", i, err)
@@ -149,21 +155,35 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 // runManyCall executes one call and fills ans. A downstream isError counts as a
 // failed call, as it does in the counter.
 func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c manyCall, maxBytes int, ans *manyAnswer) error {
-	if !usable(e.srv) {
-		return serverProblem(e.srv)
+	// Снимок на весь вызов: перезагрузка может подменить конфиг посередине,
+	// а вызов должен проверяться по одному правилу, не по двум.
+	srv := e.server()
+	if !usable(srv) {
+		return serverProblem(srv)
 	}
-	if message, denied := denyReason(m.cfg.Permissions, e.srv.Permissions, e.srv.Name, c.CommandName); denied {
+	if message, denied := m.gate(ctx, srv.Name, c.CommandName, srv.Permissions); denied {
 		// Тот же shape, что у invoke_command: маркер в content и Meta с
 		// lazyMcpPolicy — хук-клиент ищет их там, а не в строке error.
-		blocked := blockedResult(e.srv.Name, c.CommandName, message)
+		blocked := blockedResult(srv.Name, c.CommandName, message)
 		ans.Result = blocked
 		ans.Error = resultMessage(blocked)
 		return nil
 	}
 	// Та же сверка, что у invoke_command: неизвестное имя не идёт в апстрим,
-	// иначе отказ приходит тремя разными текстами. Пустой кэш — как раньше.
-	if cached := e.cachedTools(); cached != nil && !hasTool(cached, c.CommandName) {
-		return fmt.Errorf("неизвестный инструмент %q у сервера %q", c.CommandName, e.srv.Name)
+	// иначе отказ приходит тремя разными текстами. Пустой кэш каталог не
+	// отменяет — см. toolForCall.
+	tool, err := m.toolForCall(ctx, e, srv, c.CommandName)
+	if err != nil {
+		return err
+	}
+	if tool != nil {
+		// Один изменившийся инструмент не тянет за собой соседние: отбит
+		// только он, остальные вызовы пачки идут как обычно.
+		if message, changed := m.quarantine(srv.Name, tool); changed {
+			ans.Result = quarantineResult(message)
+			ans.Error = message
+			return nil
+		}
 	}
 	args, err := parametersOf(c.Parameters)
 	if err != nil {
@@ -184,7 +204,7 @@ func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c man
 	if res.IsError {
 		return errors.New(resultMessage(res))
 	}
-	value, err := truncateValue(res, maxBytes)
+	value, err := m.truncateValue(res, maxBytes)
 	if err != nil {
 		return err
 	}
@@ -194,28 +214,30 @@ func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c man
 }
 
 func (m *Manager) timeoutText() string {
-	return fmt.Sprintf("таймаут вызова %d мс", m.cfg.RequestTimeout)
+	return fmt.Sprintf("таймаут вызова %d мс", m.config().RequestTimeout)
 }
 
 // serverSlots hands out one bounded channel per server, created on first use.
-// Keyed by the entry, not the name: the map then cannot grow past the set.
+// Keyed by the server name: a reload swaps the entry but not the name, so the
+// limit stays shared instead of briefly doubling, and the map stays as small as
+// the set — only a name that resolved to a server reaches here.
 type serverSlots struct {
 	mu    sync.Mutex
 	limit int
-	byKey map[*entry]chan struct{}
+	byKey map[string]chan struct{}
 }
 
 func newServerSlots(limit int) *serverSlots {
-	return &serverSlots{limit: limit, byKey: map[*entry]chan struct{}{}}
+	return &serverSlots{limit: limit, byKey: map[string]chan struct{}{}}
 }
 
-func (s *serverSlots) get(e *entry) chan struct{} {
+func (s *serverSlots) get(name string) chan struct{} {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ch := s.byKey[e]
+	ch := s.byKey[name]
 	if ch == nil {
 		ch = make(chan struct{}, s.limit)
-		s.byKey[e] = ch
+		s.byKey[name] = ch
 	}
 	return ch
 }

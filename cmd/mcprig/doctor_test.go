@@ -255,10 +255,47 @@ func TestToolOutLine(t *testing.T) {
 	}
 
 	line := toolOutLine(dataDir)
-	if !line.OK || !strings.Contains(line.Text, "2 файлов") || !strings.Contains(line.Text, "самый старый") || !strings.Contains(line.Text, "ч назад") {
+	if !line.OK || !strings.Contains(line.Text, "2 файла") || !strings.Contains(line.Text, "самый старый") || !strings.Contains(line.Text, "ч назад") {
 		t.Fatalf("строка: %+v", line)
 	}
-	if got := toolOutLine(t.TempDir()); got.Text != "tool-out нет" {
+	if got := toolOutLine(t.TempDir()); got.Text != "tool-out: файлов нет" {
 		t.Fatalf("пустой каталог: %q", got.Text)
+	}
+}
+
+// TestCheckRedirect: строка показывает действующий redirect и отбивает адрес,
+// по которому провайдер не сможет прислать код.
+func TestCheckRedirect(t *testing.T) {
+	cases := []struct {
+		publicURL string
+		host      string
+		port      int
+		wantOK    bool
+		want      string
+	}{
+		{"https://panel.example/mcprig", "127.0.0.1", 9091, true, "redirect OAuth: https://panel.example/mcprig/oauth/callback"},
+		{"", "127.0.0.1", 9091, true, "redirect OAuth: http://127.0.0.1:9091/oauth/callback"},
+		{"", "127.0.0.1", 0, false, "порт 0"},
+		{"https://127.0.0.1", "127.0.0.1", 9091, false, "loopback"},
+	}
+	for _, c := range cases {
+		line := checkRedirect(doctorOptions{PublicURL: c.publicURL, PanelHost: c.host, PanelPort: c.port})
+		if line.OK != c.wantOK || !strings.Contains(line.Text, c.want) {
+			t.Fatalf("publicUrl=%q host=%q port=%d: получено %+v", c.publicURL, c.host, c.port, line)
+		}
+	}
+}
+
+// TestCheckRedirectBadPublicURL: битый publicUrl — проблема в doctor, а не
+// зелёная строка с адресом, который провайдер отвергнет.
+func TestCheckRedirectBadPublicURL(t *testing.T) {
+	for _, publicURL := range []string{"https://host#", "mcprig.example", "https://host/prefix/"} {
+		line := checkRedirect(doctorOptions{PublicURL: publicURL, PanelHost: "127.0.0.1", PanelPort: 9091})
+		if line.OK || !strings.Contains(line.Text, "publicUrl") {
+			t.Fatalf("publicUrl=%q: получено %+v", publicURL, line)
+		}
+	}
+	if line := checkRedirect(doctorOptions{PanelHost: "", PanelPort: 9091}); line.Text == "" {
+		t.Fatalf("пустой host дал пустую строку")
 	}
 }

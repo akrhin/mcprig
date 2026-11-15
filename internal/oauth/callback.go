@@ -105,8 +105,13 @@ func (c *Callback) Wait(ctx context.Context) (*Result, error) {
 		c.mu.Unlock()
 	}()
 
-	ctx, cancel := context.WithTimeout(ctx, callbackTimeout)
-	defer cancel()
+	// Запасной предел — только для вызывающего без своего срока: у CLI и у
+	// health-пробы срок свой, и он должен решать, а не это число.
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, callbackTimeout)
+		defer cancel()
+	}
 	select {
 	case r := <-c.res:
 		return r, nil

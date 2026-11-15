@@ -25,7 +25,7 @@ const (
 	sourceEnv     = "env"
 )
 
-var errSecretNotFound = errors.New("значение не найдено")
+var errSecretNotFound = errors.New("секрет не найден")
 
 var secretNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
@@ -120,7 +120,7 @@ func newBaoClient() *http.Client {
 		Timeout: 5 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) > 0 && req.URL.Host != via[0].URL.Host {
-				return errors.New("OpenBao: редирект на другой хост запрещён")
+				return errors.New("OpenBao: редирект на другой хост запрещён — проверьте BAO_ADDR")
 			}
 			return nil
 		},
@@ -182,11 +182,11 @@ func (b *bao) get(name string) (string, error) {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
-		return "", fmt.Errorf("OpenBao: ответ не JSON: %w", err)
+		return "", fmt.Errorf("OpenBao вернул не JSON: %w", err)
 	}
 	v, _ := out.Data.Data["value"].(string)
 	if v == "" {
-		return "", errSecretNotFound
+		return "", fmt.Errorf("секрет %s не найден: %w", name, errSecretNotFound)
 	}
 	return v, nil
 }
@@ -243,8 +243,6 @@ func NewSecrets(dataDir string) (*Secrets, error) {
 	}
 	return &Secrets{local: f, bao: newBaoFromEnv()}, nil
 }
-
-func (s *Secrets) OpenBao() bool { return s.bao != nil }
 
 func (s *Secrets) setRemoteErr(err error) {
 	if err == nil {
@@ -411,7 +409,7 @@ func (s *Secrets) Set(name, value, store string) (string, error) {
 	case sourceFile:
 		return sourceFile, s.local.set(name, value)
 	default:
-		return "", errors.New("store: ожидалось local или openbao")
+		return "", errors.New("store: допустимо local или openbao")
 	}
 }
 
@@ -453,7 +451,7 @@ func (s *Secrets) DeleteFrom(name, store string) (bool, string, error) {
 		removed, err := s.local.delete(name)
 		return removed, sourceFile, err
 	default:
-		return false, "", errors.New("store: ожидалось local или openbao")
+		return false, "", errors.New("store: допустимо local или openbao")
 	}
 }
 

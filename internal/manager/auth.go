@@ -36,6 +36,9 @@ type AuthOptions struct {
 	UserHeader   string
 	AllowedHosts []string
 	Off          bool
+	// Secure ставит cookie Secure независимо от r.TLS: панель за TLS-прокси
+	// видит http, а публичный адрес (или собственный TLS) говорит https.
+	Secure bool
 }
 
 type scryptHash struct {
@@ -164,6 +167,7 @@ type auth struct {
 	password     string
 	hash         *scryptHash
 	proxySecret  string
+	secure       bool
 	user         string
 	userHeader   string
 	allowedHosts []string
@@ -195,6 +199,7 @@ func newAuth(o AuthOptions) (*auth, error) {
 	a := &auth{
 		password:     o.Password,
 		proxySecret:  o.ProxySecret,
+		secure:       o.Secure,
 		user:         o.User,
 		userHeader:   o.UserHeader,
 		allowedHosts: o.AllowedHosts,
@@ -312,7 +317,6 @@ func (a *auth) login(user, password string) bool {
 	return subtle.ConstantTimeCompare([]byte(password), []byte(a.password)) == 1
 }
 
-// clientIP — адрес клиента для счётчика неудачных входов.
 // clientIP — адрес для лимита входа. За обратным прокси RemoteAddr один на
 // всех, поэтому X-Forwarded-For читаем только когда прокси настроен явно:
 // иначе заголовок подделывается и лимит обходится.
@@ -333,13 +337,45 @@ func (a *auth) clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// secureRequest — панель обычно стоит за TLS-прокси, где до Go доходит http.
-func secureRequest(r *http.Request) bool {
-	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+// loginIPs — ключи лимита входа: адрес сокета и, при заданном секрете прокси,
+// адрес из X-Forwarded-For. Считаем по обоим: подмена заголовка упирается в
+// адрес сокета, а за честным прокси лимит остаётся на реального клиента.
+func (a *auth) loginIPs(r *http.Request) []string {
+	socket := hostOnly(r.RemoteAddr)
+	if ip := a.clientIP(r); ip != socket {
+		return []string{socket, ip}
+	}
+	return []string{socket}
 }
 
-// loginBlocked — попытки с этого IP исчерпаны; возвращает остаток окна.
-func (a *auth) loginBlocked(ip string) (time.Duration, bool) {
+func hostOnly(addr string) string {
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		return h
+	}
+	return addr
+}
+
+// secureRequest — панель обычно стоит за TLS-прокси, где до Go доходит http.
+// X-Forwarded-Proto верим только доверенному прокси (задан
+// MCPRIG_PROXY_SECRET): иначе любой клиент пометил бы свой http-запрос https.
+func secureRequest(r *http.Request, trustProxy bool) bool {
+	return r.TLS != nil || (trustProxy && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"))
+}
+
+// loginBlocked — попытки с этих адресов исчерпаны; возвращает остаток самого
+// длинного окна.
+func (a *auth) loginBlocked(ips []string) (time.Duration, bool) {
+	var wait time.Duration
+	blocked := false
+	for _, ip := range ips {
+		if w, b := a.loginBlockedOne(ip); b && (!blocked || w > wait) {
+			wait, blocked = w, true
+		}
+	}
+	return wait, blocked
+}
+
+func (a *auth) loginBlockedOne(ip string) (time.Duration, bool) {
 	a.loginMu.Lock()
 	defer a.loginMu.Unlock()
 	w := a.loginFails[ip]
@@ -357,7 +393,13 @@ func (a *auth) loginBlocked(ip string) (time.Duration, bool) {
 	return 0, false
 }
 
-func (a *auth) loginFailed(ip string) {
+func (a *auth) loginFailed(ips []string) {
+	for _, ip := range ips {
+		a.loginFailedOne(ip)
+	}
+}
+
+func (a *auth) loginFailedOne(ip string) {
 	a.loginMu.Lock()
 	defer a.loginMu.Unlock()
 	now := time.Now()
@@ -376,7 +418,13 @@ func (a *auth) loginFailed(ip string) {
 	}
 }
 
-func (a *auth) loginOK(ip string) {
+func (a *auth) loginOK(ips []string) {
+	for _, ip := range ips {
+		a.loginOKOne(ip)
+	}
+}
+
+func (a *auth) loginOKOne(ip string) {
 	a.loginMu.Lock()
 	delete(a.loginFails, ip)
 	a.loginMu.Unlock()
@@ -413,7 +461,7 @@ func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, err
 		MaxAge:   int(sessionTTL / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   secureRequest(r),
+		Secure:   a.secure || secureRequest(r, a.proxySecret != ""),
 	})
 	return a.user, nil
 }
@@ -429,6 +477,6 @@ func (a *auth) clearSession(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   secureRequest(r),
+		Secure:   a.secure || secureRequest(r, a.proxySecret != ""),
 	})
 }

@@ -51,7 +51,8 @@ and read as-is: no migration, no wrapper.
 so the file stays byte-compatible with lazy-mcp, but health in mcprig is
 governed by the 15 s cache described in
 [architecture.md](architecture.md#health). The panel also writes
-`logging: {level: "info"}` and `requestTimeout: 120000`.
+`requestTimeout: 120000`; a `logging` block it used to add is no longer
+written and is ignored if present.
 
 A hand-written file without `requestTimeout` means no limit; a set materialized
 by the panel always gets `120000`, so deleting the key by hand is the only way to
@@ -61,7 +62,7 @@ get zero.
 
 | field | type | default | meaning |
 | --- | --- | --- | --- |
-| `name` | string | required | server name used by the meta-tools; duplicate names get `_configError: дубль имени` |
+| `name` | string | required | server name used by the meta-tools; a repeated name leaves the later entry unhealthy (`имя уже занято другим сервером`) |
 | `description` | string | empty | shown by `list_servers` and searched by `filter` |
 | `transport` | `stdio` / `http` | inferred | inferred from `url` or `command` when absent |
 | `command` | array or string | | stdio command; see both forms below |
@@ -72,11 +73,26 @@ get zero.
 | `url` | string | | HTTP endpoint; http only |
 | `headers` | object of strings | empty | extra headers for every HTTP request |
 | `tags` | array of strings | empty | labels for `list_servers` and `filter` |
-| `sandbox` | object | absent — no isolation | bubblewrap block for a stdio server, see below. A server tagged `untrusted` must have it: without one the loader keeps it in the list as unhealthy (`_configError`) and the panel API rejects such a record with 400 |
+| `sandbox` | object | absent — no isolation | bubblewrap block for a stdio server, see below. A server tagged `untrusted` must have it: without one the loader keeps it in the list as unhealthy and the panel API rejects such a record with 400 |
 | `enabled` | bool | `true` | disabled servers are listed but never connected |
+| `expose` | array of `resources` / `prompts` | empty — neither | downstream surfaces the MCP client may reach, through `list_resources`, `read_resource`, `list_prompts`, `get_prompt`; an unknown value is a config error and the server does not start; a reload applies the change without a restart |
 | `permissions` | object | | per-server allow/deny block |
 | `oauth` | object | | per-server OAuth settings |
-| `_configError` | string | | written by the loader, never by a user |
+
+A defect never becomes a field of the file: the loader keeps the error in
+memory and `list_servers` reports that server as `healthy: false` with the
+text. Hand-editing the file cannot pin a server to a broken state.
+
+### expose
+
+`"expose": ["resources", "prompts"]` names the surfaces of a downstream server
+that the MCP client may reach through `list_resources`, `read_resource`,
+`list_prompts` and `get_prompt` ([meta-tools.md](meta-tools.md#resources-and-prompts)).
+Absent or empty means neither: the client sees the server's tools only. The
+value list is a whitelist — an unknown entry (`"ressources"`) is a config error,
+the server stays in the list as unhealthy and is never connected. A reload
+applies a change to the field in place, without dropping the session. The panel
+edits it with two checkboxes in the server form ([panel.md](panel.md#server-editor)).
 
 ### Sandbox
 
@@ -212,7 +228,8 @@ chain (OpenBao → `env.json` → process environment; `MCPRIG_*`, `BAO_*` and
 | `host` | `127.0.0.1` in `serve` | bind address |
 | `port` | `9100` in `serve` | bind port; the manager allocates 9100–9199 |
 | `path` | `/mcp` | endpoint path; must start with `/` |
-| `authToken` | | bearer token; empty refuses to start unless `allowAnonymous` |
+| `authTokens` | | every active key of the set: any of them is accepted. The panel writes it, and it takes priority over `authToken` |
+| `authToken` | | single-key compatibility: one bearer token, used only when `authTokens` is empty |
 | `allowAnonymous` | `false` | open set: no `Authorization` header is allowed |
 | `allowedHosts` | loopback | `Host` and `Origin` allowlist |
 | `clientNames` | | key fingerprint (6 hex) → key note: the client's label in the statistics |
@@ -224,9 +241,12 @@ key with a note is counted under that note instead of
 the token.
 
 `allowAnonymous` does not make a wrong token acceptable: a request that
-presents `Authorization` must still match `authToken`, and an open set has no
-token, so any presented token gets 401. Clients of an open set must omit the
-header.
+presents `Authorization` must still match one of `authTokens`, and an open set
+has no token, so any presented token gets 401. Clients of an open set must omit
+the header.
+
+A set with neither `authTokens` nor `authToken` refuses to start unless
+`allowAnonymous` is set.
 
 An empty `allowedHosts` means `127.0.0.1`, `localhost`, `::1`. `"*"` disables
 the check and logs a warning. The same list checks `Origin` when the header is
@@ -286,6 +306,149 @@ A server block is merged over the set-wide block; unset fields fall back to
 the set-wide value, then to the default. Dynamic client registration, PKCE,
 code exchange and refresh are done by the MCP SDK. Tokens are stored in
 `<data dir>/oauth.json`.
+
+The panel has its own OAuth redirect, which is not a `servers.json` field: it is
+pinned by `MCPRIG_PUBLIC_URL` (see [cli.md](cli.md#panel)), so that a panel
+behind a proxy registers the address the provider actually sees. Without it the
+panel builds the address from its listen host and port; `mcprig doctor` prints
+the result and flags one that cannot receive the code.
+
+## notify
+
+A set field in `registry.json` — where to report that the set broke:
+
+```json
+{
+  "notify": {"webhook": "https://example.com/mcprig"}
+}
+```
+
+| field | meaning |
+| --- | --- |
+| `webhook` | `http://` or `https://` address with a non-empty host; any other scheme is rejected on write (400). `null`, an empty string or no block means no notifications |
+
+An event is a `POST` with `Content-Type: application/json` and five fields:
+
+| event | when | `server` | `code` |
+| --- | --- | --- | --- |
+| `set.crashed` | the set process exited with a non-zero code | empty | exit code |
+| `set.restart_failed` | all five restart attempts are spent, or a restart after a crash failed (port busy, key revoked) | empty | code of the last exit |
+| `server.unhealthy` | a server of the set stopped answering | server name | none |
+
+```json
+{"event": "set.crashed", "set": "main", "code": 1, "at": "2026-11-15T13:40:00Z"}
+```
+
+One event per transition: while the set is down, further crashes stay silent; a
+successful start and a recovered server open the next transition. A crash and a
+failed restart are two events of one incident: the second arrives when the set
+never came back. Transitions are tracked in process memory, so a panel restart
+sends the event once more. There are three attempts, 100 and 300 ms apart, 5 s
+timeout each; after the third one the journal gets a `вебхук набора не
+отправлен` line with the set id, and the webhook address never appears there.
+Delivery runs in its own goroutine: a crash and a restart never wait for it. The
+body carries identifiers and the exit code only — no token, no `env`, no command;
+the webhook is an external host and must not be trusted.
+
+## rateLimit
+
+A set field in `registry.json`, copied into the set's own `servers.json` — how
+often one caller may call the set's tools:
+
+```json
+{
+  "rateLimit": {
+    "perMinute": 120,
+    "burst": 20,
+    "perTool": {"serena/find_symbol": {"perMinute": 10, "burst": 2}}
+  }
+}
+```
+
+| field | meaning |
+| --- | --- |
+| `perMinute` | the set-wide limit: calls per minute for one caller and one `server/tool` pair |
+| `burst` | how many calls pass at once; `perMinute` when absent, so a bare `perMinute` lets a whole minute's quota through at once |
+| `perTool` | overrides the limit for one `server/tool` pair; `perMinute: 0` lifts the set-wide limit for that tool |
+
+No block, or a block of zeros, means no limit — the behaviour without the field.
+Editing follows `notify`: an absent field keeps the stored block, `null` removes
+it, an object replaces it whole; a bad value is rejected on write (400) with the
+field name. The panel has no field for it.
+
+The caller is identified by the fingerprint of its access key, so one key's
+quota never mixes with another key's. The key's note and the `_meta` clientInfo
+do not touch the bucket: the note only renames the caller in `/stats`, and
+clientInfo is what the caller says about itself — a change there mints no quota.
+A set without keys is open, and there a bucket belongs to the caller's address
+(port stripped), since it presents no key and the label it sends itself is no
+identity. Behind a proxy that address is the proxy's, so the address is a coarse
+divider, not a defence. stdio has no address: one bucket per process.
+
+Every call is counted, including each inner call of `invoke_many`. The check runs
+before the set opens a downstream session, so a refused call never reaches a
+server; [meta-tools.md](meta-tools.md#rate-limit) shows the refusal text.
+`/stats` reports refusals as `throttled`, and `/api/calls` sums them into its
+answer. Buckets are capped at 4096 and dropped after 10 minutes idle; an
+overflow evicts the oldest bucket of the caller that caused it, and only then the
+oldest one overall. Eviction can therefore hand burst back to that caller: the
+limit brakes a runaway fan-out, it does not stop abuse.
+
+## profiles
+
+A set field in `registry.json`, copied into the set's own `servers.json` — a
+named, narrower view of the set's tools for one key:
+
+```json
+{
+  "profiles": {
+    "reader": {"deny": ["*/*_write"], "allow": ["*"]}
+  }
+}
+```
+
+| field | meaning |
+| --- | --- |
+| `deny` | command globs the profile refuses; a pattern containing `/` matches `server/command`, one without it the command name; `*` is any run, `?` one character, matching is case-insensitive |
+| `allow` | command globs the profile permits; empty means every command `deny` did not refuse |
+
+A key takes a profile when it is issued — `profile` in
+`POST /api/sets/<id>/keys`, see [panel.md](panel.md#routes); an unknown name is
+`400` listing the set's profiles. A key without a profile keeps every tool the
+set allows, so a set without a `profiles` block behaves exactly as before.
+
+The profile applies **after** `permissions` and can only narrow: a command
+denied there stays denied and reports the rule's message, never the profile's.
+`allow` cannot lift a rule's denial.
+
+`list_commands` returns only what the profile allows (an empty catalog under
+`deny: ["*"]`), and `invoke_command` / `invoke_many` refuse the rest as a tool
+result, `isError: true`, text
+`🚫 Blocked by mcprig policy: профиль <name> не разрешает <server>/<tool>`;
+[meta-tools.md](meta-tools.md#profiles) has the shape. A key is matched by the
+fingerprint of its token, not by its note. A key whose profile was deleted from
+the set sees nothing and every call is refused: removing a block never widens a
+key that still refers to it.
+
+Editing follows `notify` and `rateLimit`: an absent field keeps the stored
+profiles, `null` removes them, an object replaces them whole; a bad value is
+rejected on write (400) with the field name. The panel has no editor for the
+block yet; a key's profile is chosen when the key is issued.
+
+## Tracing
+
+Off by default: without the endpoint the process records nothing and opens no
+connection, while still forwarding the client's `traceparent`.
+
+| variable | meaning |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint, e.g. `http://127.0.0.1:4318`; its presence turns tracing on |
+| `OTEL_SERVICE_NAME` | `service.name` of the resource, `mcprig` by default |
+| `OTEL_RESOURCE_ATTRIBUTES` | standard `key=value,key=value` pairs; if the value does not parse, the default resource is used |
+| `OTEL_EXPORTER_OTLP_HEADERS` | standard OTLP headers, e.g. a collector's authorization token |
+
+The variables are read once at start; a change needs a restart. What is traced
+and which attributes a span carries — [architecture.md](architecture.md#tracing).
 
 ## See also
 

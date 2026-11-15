@@ -9,6 +9,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,10 +42,11 @@ func Open(dir string) (*Store, error) {
 		if uerr := json.Unmarshal(raw, &data); uerr != nil {
 			backup := fmt.Sprintf("%s.corrupt-%d", s.path, time.Now().Unix())
 			if rerr := os.Rename(s.path, backup); rerr != nil {
-				return nil, fmt.Errorf("реестр %s не разобран (%v), отложить не удалось: %w", s.path, uerr, rerr)
+				return nil, fmt.Errorf("реестр %s не разобран: %v. Отложить файл не удалось: %w", s.path, uerr, rerr)
 			}
 		} else {
 			s.data = data
+			s.validateProfiles(raw)
 			s.normalize()
 			// Persist normalization once, so a migrated legacy key keeps its
 			// createdAt instead of being rebuilt on every start.
@@ -114,7 +117,7 @@ func (s *Store) normalize() {
 		// id попадает в путь sets/<id>/servers.json: битый id отбрасывает
 		// запись целиком, но не роняет загрузку остальных.
 		if !namePattern.MatchString(set.ID) {
-			s.dropped = append(s.dropped, fmt.Sprintf("набор %q: id не по шаблону [a-z0-9][a-z0-9_-]{0,63}", set.ID))
+			s.dropped = append(s.dropped, fmt.Sprintf("id набора %q не подходит под шаблон [a-z0-9][a-z0-9_-]{0,63}", set.ID))
 			continue
 		}
 		if set.Name == "" {
@@ -125,6 +128,40 @@ func (s *Store) normalize() {
 		sets = append(sets, set)
 	}
 	s.data.Sets = sets
+}
+
+// validateProfiles re-checks every set's profiles block against the raw file.
+// The lenient unmarshal into Set loses an unknown key — "denny" leaves a valid
+// empty profile, and normalization would then write that loss back, silently
+// turning a typo into "allow everything". A block that fails strict parsing is
+// dropped whole and reported: keys still naming it are refused, not freed.
+func (s *Store) validateProfiles(raw []byte) {
+	var shape struct {
+		Sets []struct {
+			ID       string          `json:"id"`
+			Profiles json.RawMessage `json:"profiles"`
+		} `json:"sets"`
+	}
+	if err := json.Unmarshal(raw, &shape); err != nil {
+		return
+	}
+	bad := make(map[string]string, len(shape.Sets))
+	for _, one := range shape.Sets {
+		if _, err := config.ParseProfiles(one.Profiles); err != nil {
+			bad[one.ID] = err.Error()
+		}
+	}
+	if len(bad) == 0 {
+		return
+	}
+	for _, set := range s.data.Sets {
+		reason, ok := bad[set.ID]
+		if !ok {
+			continue
+		}
+		set.Profiles = nil
+		s.dropped = append(s.dropped, fmt.Sprintf("profiles набора %q отброшены: %s", set.ID, reason))
+	}
 }
 
 // Dropped возвращает записи, отброшенные при загрузке (битые id наборов),
@@ -316,7 +353,7 @@ func (s *Store) UpdateServer(name string, patch json.RawMessage) (Server, error)
 	defer s.mu.Unlock()
 	cur := s.serverLocked(name)
 	if cur == nil {
-		return nil, fmt.Errorf("нет сервера %s", name)
+		return nil, fmt.Errorf("сервер %s не найден", name)
 	}
 	in, err := decodeObject(patch)
 	if err != nil {
@@ -345,7 +382,7 @@ func (s *Store) DeleteServer(name string) error {
 	defer s.mu.Unlock()
 	idx := s.serverIndexLocked(name)
 	if idx < 0 {
-		return fmt.Errorf("нет сервера %s", name)
+		return fmt.Errorf("сервер %s не найден", name)
 	}
 	next := s.data.clone()
 	next.Servers = removeAt(next.Servers, idx)
@@ -434,7 +471,7 @@ func (s *Store) AddSet(raw json.RawMessage) (*Set, error) {
 	// Явный порт проверяем в системе и при создании: иначе набор запишется и
 	// упадёт на старте.
 	if raw, ok := in["port"]; ok && !isNull(raw) && portBusy(set.Port) {
-		return nil, fmt.Errorf("порт %d занят процессом", set.Port)
+		return nil, fmt.Errorf("порт %d занят процессом — выберите другой", set.Port)
 	}
 	if !set.Open {
 		set.Keys = []Key{newKey(time.Now().UTC().Format(time.RFC3339))}
@@ -456,7 +493,7 @@ func (s *Store) UpdateSet(id string, patch json.RawMessage) (*Set, error) {
 	defer s.mu.Unlock()
 	idx := s.setIndexLocked(id)
 	if idx < 0 {
-		return nil, fmt.Errorf("нет набора %s", id)
+		return nil, fmt.Errorf("набор %s не найден", id)
 	}
 	in, err := decodeObject(patch)
 	if err != nil {
@@ -480,34 +517,37 @@ func (s *Store) DeleteSet(id string) error {
 	defer s.mu.Unlock()
 	idx := s.setIndexLocked(id)
 	if idx < 0 {
-		return fmt.Errorf("нет набора %s", id)
+		return fmt.Errorf("набор %s не найден", id)
 	}
 	next := s.data.clone()
 	next.Sets = removeAt(next.Sets, idx)
 	return s.commitLocked(next)
 }
 
-// IssueKey revokes the current active key and returns the new plaintext token.
-func (s *Store) IssueKey(setID string) (string, error) {
+// IssueKey adds an active key and returns its plaintext token; earlier keys
+// stay valid. profile names one of the set's profiles; empty leaves the key
+// unrestricted. More than MaxActiveKeys active keys is refused: revoke one
+// first.
+func (s *Store) IssueKey(setID, profile, label string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
-		return "", fmt.Errorf("нет набора %s", setID)
+		return "", fmt.Errorf("набор %s не найден", setID)
+	}
+	if n := activeKeyCount(set.Keys); n >= MaxActiveKeys {
+		return "", fmt.Errorf("у набора %s уже %d действующих ключей — отзовите лишний", setID, n)
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	keys := make([]Key, len(set.Keys), len(set.Keys)+1)
 	copy(keys, set.Keys)
-	for i := range keys {
-		if keys[i].RevokedAt == "" {
-			keys[i].RevokedAt = now
-		}
-	}
 	key := newKey(now)
+	key.Profile = strings.TrimSpace(profile)
+	key.Label = strings.TrimSpace(label)
 	keys = append(keys, key)
 	cp := *set
 	cp.Keys = keys
-	cp.Token = key.Token
+	cp.Token = activeToken(keys)
 	next := s.data.clone()
 	next.Sets[s.setIndexLocked(setID)] = &cp
 	if err := s.commitLocked(next); err != nil {
@@ -516,14 +556,14 @@ func (s *Store) IssueKey(setID string) (string, error) {
 	return key.Token, nil
 }
 
-// RevokeKey revokes one key. wasActive reports whether it was the active one,
-// which leaves the set without a token.
-func (s *Store) RevokeKey(setID, keyID string) (wasActive bool, err error) {
+// RevokeKey revokes one key and reports how many active keys are left; zero
+// leaves the set without a token, and the caller stops it.
+func (s *Store) RevokeKey(setID, keyID string) (remaining int, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
-		return false, fmt.Errorf("нет набора %s", setID)
+		return 0, fmt.Errorf("набор %s не найден", setID)
 	}
 	idx := -1
 	for i, key := range set.Keys {
@@ -533,33 +573,34 @@ func (s *Store) RevokeKey(setID, keyID string) (wasActive bool, err error) {
 		}
 	}
 	if idx < 0 {
-		return false, fmt.Errorf("нет ключа %s у набора %s", keyID, setID)
+		return 0, fmt.Errorf("нет ключа %s у набора %s", keyID, setID)
 	}
 	keys := make([]Key, len(set.Keys))
 	copy(keys, set.Keys)
-	if wasActive = keys[idx].RevokedAt == ""; wasActive {
+	if keys[idx].RevokedAt == "" {
 		keys[idx].RevokedAt = time.Now().UTC().Format(time.RFC3339)
 	}
+	remaining = activeKeyCount(keys)
 	cp := *set
 	cp.Keys = keys
 	cp.Token = activeToken(keys)
 	next := s.data.clone()
 	next.Sets[s.setIndexLocked(setID)] = &cp
 	if err := s.commitLocked(next); err != nil {
-		return wasActive, err
+		return 0, err
 	}
-	return wasActive, nil
+	return remaining, nil
 }
 
-// SetKeyNote пишет подпись ключа. Пустая строка снимает её. Подпись видит
-// клиент в /api/sets, а набор — в метке клиента статистики, поэтому его
-// перезапускает вызывающий.
+// SetKeyNote writes the key's label. An empty string clears it. The owner sees
+// it in /api/sets, and the set sees it in the statistics client label, so the
+// caller applies the change.
 func (s *Store) SetKeyNote(setID, keyID, note string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	set := s.setLocked(setID)
 	if set == nil {
-		return fmt.Errorf("нет набора %s", setID)
+		return fmt.Errorf("набор %s не найден", setID)
 	}
 	idx := -1
 	for i, key := range set.Keys {
@@ -573,6 +614,7 @@ func (s *Store) SetKeyNote(setID, keyID, note string) error {
 	}
 	keys := make([]Key, len(set.Keys))
 	copy(keys, set.Keys)
+	keys[idx].Label = note
 	keys[idx].Note = note
 	cp := *set
 	cp.Keys = keys
@@ -617,7 +659,7 @@ func (s *Store) allocPortLocked() (int, error) {
 			return port, nil
 		}
 	}
-	return 0, fmt.Errorf("свободных портов в диапазоне %d–%d нет", FirstPort, LastPort)
+	return 0, fmt.Errorf("свободных портов в диапазоне %d–%d нет — освободите порт или смените диапазон", FirstPort, LastPort)
 }
 
 // portBusy — порт занят в системе, а не только в реестре. Между проверкой и
@@ -656,8 +698,14 @@ func PublicSet(set *Set) PublicSetEntry {
 			ID:        key.ID,
 			CreatedAt: key.CreatedAt,
 			RevokedAt: key.RevokedAt,
-			Note:      key.Note,
+			Label:     key.Label,
+			Note:      key.Label,
+			Profile:   key.Profile,
 		})
 	}
+	for name := range set.Profiles {
+		out.Profiles = append(out.Profiles, name)
+	}
+	sort.Strings(out.Profiles)
 	return out
 }

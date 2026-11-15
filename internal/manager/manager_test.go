@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // fakeBin — фейковый «прокси» набора, собранный один раз на пакет.
@@ -278,8 +280,32 @@ func TestSetsHideToken(t *testing.T) {
 	if strings.Contains(body, token) {
 		t.Fatal("GET /api/sets отдал полный токен")
 	}
-	if !strings.Contains(body, token[:8]) {
+	// Набор отдаёт префикс основного (первого действующего) ключа: выдача
+	// второго ключа его не меняет.
+	prefix := decode[[]struct {
+		KeyPrefix string `json:"keyPrefix"`
+	}](t, e.do(t, http.MethodGet, "/api/sets", nil))[0].KeyPrefix
+	if prefix == "" || prefix == token[:8] {
+		t.Fatalf("keyPrefix = %q, ждали префикс прежнего ключа", prefix)
+	}
+	if !strings.Contains(body, prefix) {
 		t.Fatalf("в ответе нет префикса ключа: %s", body)
+	}
+}
+
+// Девятый действующий ключ не выдаётся: лимит набора — 8.
+func TestKeyLimitReturnsConflict(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+
+	for i := 0; i < registry.MaxActiveKeys-1; i++ {
+		status(t, e.do(t, http.MethodPost, "/api/sets/"+id+"/keys", nil), http.StatusOK)
+	}
+	w := e.do(t, http.MethodPost, "/api/sets/"+id+"/keys", nil)
+	status(t, w, http.StatusConflict)
+	if !strings.Contains(w.Body.String(), "действующих ключей") {
+		t.Fatalf("ответ не назвал причину: %s", w.Body.String())
 	}
 }
 
@@ -381,7 +407,7 @@ func TestBodyErrors(t *testing.T) {
 
 	w := e.do(t, http.MethodPost, "/api/servers", "не json")
 	status(t, w, http.StatusBadRequest)
-	if got := decode[map[string]string](t, w)["error"]; got != "ожидался JSON" {
+	if got := decode[map[string]string](t, w)["error"]; got != "тело запроса должно быть JSON" {
 		t.Fatalf("ошибка = %q", got)
 	}
 

@@ -14,22 +14,29 @@ import (
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/toollock"
 )
 
 // Формат servers.json — вход lazy-mcp `serve`. ${VAR} остаются нераскрытыми:
 // подстановку делает процесс набора, у него свои секреты.
 type setTransport struct {
-	Type         string   `json:"type"`
-	Host         string   `json:"host"`
-	Port         int      `json:"port"`
-	Path         string   `json:"path"`
-	AuthToken    string   `json:"authToken,omitempty"`
+	Type      string `json:"type"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	Path      string `json:"path"`
+	AuthToken string `json:"authToken,omitempty"`
+	// AuthTokens — все действующие ключи набора: набор принимает любой из
+	// них. authToken остаётся рядом ради прежних клиентов файла.
+	AuthTokens   []string `json:"authTokens,omitempty"`
 	AllowedHosts []string `json:"allowedHosts,omitempty"`
 	// AllowAnonymous marks an open set: the proxy listens without a bearer.
 	AllowAnonymous bool `json:"allowAnonymous,omitempty"`
 	// ClientNames — подпись ключа по отпечатку: набор берёт её в метку
 	// клиента статистики. Отпечаток, а не токен.
 	ClientNames map[string]string `json:"clientNames,omitempty"`
+	// KeyProfiles — профиль ключа по отпечатку: набор находит им профиль
+	// вызывающего. Отпечаток, а не подпись: подпись клиент называет сам.
+	KeyProfiles map[string]string `json:"keyProfiles,omitempty"`
 }
 
 type setHealthMonitor struct {
@@ -40,9 +47,12 @@ type setHealthMonitor struct {
 type setFile struct {
 	Servers        []*config.Server `json:"servers"`
 	Transport      setTransport     `json:"transport"`
-	Logging        map[string]any   `json:"logging,omitempty"`
 	HealthMonitor  setHealthMonitor `json:"healthMonitor"`
 	RequestTimeout int              `json:"requestTimeout"`
+	// RateLimit — тот же блок, что в реестре: лимит исполняет сам набор.
+	RateLimit *config.RateLimit `json:"rateLimit,omitempty"`
+	// Profiles — тот же блок, что в реестре: профиль исполняет сам набор.
+	Profiles map[string]*config.Profile `json:"profiles,omitempty"`
 }
 
 // BuildSetConfig собирает конфиг набора из реестра.
@@ -67,18 +77,21 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 			Port:           set.Port,
 			Path:           "/mcp",
 			AuthToken:      set.Token,
+			AuthTokens:     registry.ActiveTokens(set.Keys),
 			AllowedHosts:   allowedHosts,
 			AllowAnonymous: set.Open && set.Token == "",
 			ClientNames:    clientNames(set.Keys),
+			KeyProfiles:    keyProfiles(set.Keys),
 		},
-		Logging:        map[string]any{"level": "info"},
 		HealthMonitor:  setHealthMonitor{Interval: 60000, Timeout: 120000},
 		RequestTimeout: 120000,
+		RateLimit:      set.RateLimit,
+		Profiles:       set.Profiles,
 	}
 	for _, name := range set.Servers {
 		srv := byName[name]
 		if srv == nil {
-			return nil, fmt.Errorf("сервер %s исчез из реестра", name)
+			return nil, fmt.Errorf("сервера %s больше нет в реестре — набор не пересобран", name)
 		}
 		cp := *srv
 		out.Servers = append(out.Servers, &cp)
@@ -90,16 +103,38 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 	return append(body, '\n'), nil
 }
 
-// clientNames — подпись каждого ключа под его отпечатком. Ключ без токена
-// (такой остаётся только в истории отзыва) и пустая подпись имени не дают.
+// clientNames — подпись каждого ключа под его отпечатком. Подпись берётся из
+// label (прежнее имя — note). Ключ без токена (такой остаётся только в истории
+// отзыва) и пустая подпись имени не дают.
 func clientNames(keys []registry.Key) map[string]string {
 	out := make(map[string]string, len(keys))
 	for _, key := range keys {
-		note := strings.TrimSpace(key.Note)
-		if key.Token == "" || note == "" {
+		label := strings.TrimSpace(key.Label)
+		if label == "" {
+			label = strings.TrimSpace(key.Note)
+		}
+		if key.Token == "" || label == "" {
 			continue
 		}
-		out[stats.Fingerprint(key.Token)] = note
+		out[stats.Fingerprint(key.Token)] = label
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// keyProfiles — профиль каждого ключа под его отпечатком. Ключ без профиля или
+// без токена (история отзыва) в карту не попадает: набор считает его
+// неограниченным по профилю.
+func keyProfiles(keys []registry.Key) map[string]string {
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		profile := strings.TrimSpace(key.Profile)
+		if key.Token == "" || profile == "" {
+			continue
+		}
+		out[stats.Fingerprint(key.Token)] = profile
 	}
 	if len(out) == 0 {
 		return nil
@@ -117,7 +152,35 @@ func WriteSetConfig(dataDir, id string, body []byte) (string, error) {
 	if err := writeAtomic(path, body); err != nil {
 		return "", err
 	}
+	pruneLock(dataDir, id, body)
 	return path, nil
+}
+
+// pruneLock снимает записи карантина у серверов, которых в наборе больше нет:
+// файл лежит в каталоге набора, и сам он не уменьшится.
+func pruneLock(dataDir, id string, body []byte) {
+	var cfg struct {
+		Servers []struct {
+			Name string `json:"name"`
+		} `json:"servers"`
+	}
+	if err := json.Unmarshal(body, &cfg); err != nil {
+		return
+	}
+	keep := make(map[string]bool, len(cfg.Servers))
+	for _, srv := range cfg.Servers {
+		keep[srv.Name] = true
+	}
+	_ = toollock.Update(toollock.Path(dataDir, id), func(lock *toollock.File) bool {
+		dirty := false
+		for key := range lock.Tools {
+			if server, _ := toollock.Split(key); !keep[server] {
+				delete(lock.Tools, key)
+				dirty = true
+			}
+		}
+		return dirty
+	})
 }
 
 // LogPath — <dataDir>/sets/<id>/mcprig.log.

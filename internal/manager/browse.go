@@ -5,13 +5,18 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/toollock"
 )
 
 const (
@@ -20,7 +25,11 @@ const (
 	browseCallLimit = 60 * time.Second
 )
 
-var errBrowseGone = errors.New("сессия просмотра не найдена или истекла")
+var (
+	errBrowseGone        = errors.New("сессия просмотра не найдена или истекла")
+	errBrowseDenied      = errors.New("вызов запрещён правилами permissions")
+	errBrowseQuarantined = errors.New("вызов ждёт одобрения дескриптора")
+)
 
 // loggingToolName — инструмент, которым сервер принимает уровень логов.
 // Наличие инструмента и есть признак: capability logging deprecated (SEP-2577).
@@ -41,6 +50,9 @@ type browseTool struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	InputSchema any    `json:"inputSchema,omitempty"`
+	// Changed — дескриптор разошёлся с одобренным: инструмент виден, вызов
+	// ждёт одобрения (тот же карантин, что у invoke_command).
+	Changed bool `json:"changed,omitempty"`
 }
 
 type browseResource struct {
@@ -76,6 +88,13 @@ type browseSession struct {
 	view *browseView
 	sess *mcp.ClientSession
 	used time.Time
+	// server и perms — из реестра, чтобы callTool применял то же `permissions`,
+	// что и invoke_command. Глобального блока у панели нет: он принадлежит
+	// набору и сюда не приходит.
+	server string
+	perms  *config.Permissions
+	// tools — дескрипторы как их отдал сервер: по ним сверяется карантин.
+	tools map[string]*mcp.Tool
 	// refs — сколько вызовов сейчас держат сессию. close и sweep помечают её
 	// closing и закрывают, когда refs снова 0: иначе закрытие прилетает в
 	// середину вызова.
@@ -89,10 +108,13 @@ type browser struct {
 	items   map[string]*browseSession
 	sec     *Secrets
 	version string
+	// dataDir — где лежат sets/<id>/tools.lock.json. Пустой — карантина нет
+	// (ручной serve без набора), как и у invoke_command.
+	dataDir string
 }
 
-func newBrowser(sec *Secrets, version string) *browser {
-	return &browser{items: map[string]*browseSession{}, sec: sec, version: version}
+func newBrowser(sec *Secrets, version, dataDir string) *browser {
+	return &browser{items: map[string]*browseSession{}, sec: sec, version: version, dataDir: dataDir}
 }
 
 func newBrowseID() string {
@@ -143,10 +165,19 @@ func (b *browser) open(ctx context.Context, srv registry.Server) (*browseView, e
 	// Логирование решается по факту, а не по capability: сама capability
 	// deprecated с протокола 2026-07-28 (SEP-2577), а сервер, у которого
 	// logging/setLevel в списке инструментов, работает.
+	// rawTools — те же дескрипторы целиком: карантин считает хэш по пяти
+	// полям, и разложенный browseTool их не сохраняет.
+	var rawTools []*mcp.Tool
 	if tools, err := session.ListTools(ctx, nil); err == nil {
+		rawTools = tools.Tools
 		for _, t := range tools.Tools {
-			view.Tools = append(view.Tools, browseTool{Name: t.Name, Description: t.Description, InputSchema: t.InputSchema})
+			_, changed := b.quarantine(srv.Name, t)
+			view.Tools = append(view.Tools, browseTool{Name: t.Name, Description: t.Description, InputSchema: t.InputSchema, Changed: changed})
 		}
+	}
+	byName := make(map[string]*mcp.Tool, len(rawTools))
+	for _, t := range rawTools {
+		byName[t.Name] = t
 	}
 	if offersLogging(view.Tools) {
 		view.Capabilities = append(view.Capabilities, "logging")
@@ -167,7 +198,7 @@ func (b *browser) open(ctx context.Context, srv registry.Server) (*browseView, e
 	if len(b.items) >= browseMax {
 		victim = b.evictLocked()
 	}
-	b.items[view.ID] = &browseSession{view: view, sess: session, used: time.Now()}
+	b.items[view.ID] = &browseSession{view: view, sess: session, used: time.Now(), server: srv.Name, perms: srv.Permissions, tools: byName}
 	b.mu.Unlock()
 	if victim != nil {
 		go victim.sess.Close()
@@ -238,12 +269,37 @@ func (b *browser) close(id string) bool {
 	return ok
 }
 
+// deny is the browse gate: the server's own `permissions` rules decide, the
+// same way invoke_command decides for the proxy path, and the address is the
+// same one that path uses ("resource:<uri>", "prompt:<name>"). The panel has no
+// global block on purpose — that block belongs to the set.
+func (s *browseSession) deny(address string) error {
+	message, denied := config.DenyReason(nil, s.perms, s.server, address)
+	if !denied {
+		return nil
+	}
+	if message == "" {
+		return errBrowseDenied
+	}
+	return fmt.Errorf("%w: %s", errBrowseDenied, message)
+}
+
 func (b *browser) callTool(ctx context.Context, id, name string, args map[string]any) (any, error) {
 	s, err := b.lookup(id)
 	if err != nil {
 		return nil, err
 	}
 	defer b.release(s)
+	if err := s.deny(name); err != nil {
+		return nil, err
+	}
+	// Карантин — после permissions, до вызова: кнопка browse не должна
+	// исполнять то, что invoke_command отказался бы исполнить.
+	if tool := s.tools[name]; tool != nil {
+		if message, changed := b.quarantine(s.server, tool); changed {
+			return nil, fmt.Errorf("%w: %s", errBrowseQuarantined, message)
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
@@ -253,12 +309,39 @@ func (b *browser) callTool(ctx context.Context, id, name string, args map[string
 	return res, nil
 }
 
+// quarantine — тот же файл одобрений, что читает прокси набора, но наборов
+// может быть несколько: сервер принадлежит им всем. Изменённый хоть в одном
+// наборе дескриптор останавливает вызов — иначе второй набор был бы лазейкой.
+func (b *browser) quarantine(server string, tool *mcp.Tool) (string, bool) {
+	if b.dataDir == "" {
+		return "", false
+	}
+	sets, err := os.ReadDir(filepath.Join(b.dataDir, "sets"))
+	if err != nil {
+		return "", false
+	}
+	now := toollock.Hash(tool)
+	key := toollock.Key(server, tool.Name)
+	for _, dir := range sets {
+		if !dir.IsDir() {
+			continue
+		}
+		if cur, ok := toollock.Read(toollock.Path(b.dataDir, dir.Name())).Tools[key]; ok && cur.Hash != now {
+			return toollock.Message(server, tool.Name, cur.Hash, now, dir.Name()), true
+		}
+	}
+	return "", false
+}
+
 func (b *browser) readResource(ctx context.Context, id, uri string) (any, error) {
 	s, err := b.lookup(id)
 	if err != nil {
 		return nil, err
 	}
 	defer b.release(s)
+	if err := s.deny("resource:" + uri); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
@@ -274,6 +357,9 @@ func (b *browser) getPrompt(ctx context.Context, id, name string, args map[strin
 		return nil, err
 	}
 	defer b.release(s)
+	if err := s.deny("prompt:" + name); err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, browseCallLimit)
 	defer cancel()
 	res, err := s.sess.GetPrompt(ctx, &mcp.GetPromptParams{Name: name, Arguments: args})

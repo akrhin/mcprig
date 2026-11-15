@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/akrhin/mcprig/internal/config"
 )
 
 // freePort ищет свободный порт диапазона наборов: 9100 может занимать живой
@@ -112,6 +114,33 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
+// Ошибка конфига — состояние запуска, а не запись реестра: сервер, помеченный
+// ею, не должен навсегда оставаться битым после перезаписи registry.json.
+func TestConfigErrorIsNotPersisted(t *testing.T) {
+	dir := t.TempDir()
+	store := openStore(t, dir)
+	addServer(t, store, `{"name":"broken","command":["nope"]}`)
+	store.Server("broken").ConfigError = "сервер #1: битый"
+	if err := store.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, RegistryFile))
+	if err != nil {
+		t.Fatalf("registry.json: %v", err)
+	}
+	if strings.Contains(string(raw), "_configError") {
+		t.Errorf("ошибка конфига попала в реестр: %s", raw)
+	}
+	srv := openStore(t, dir).Server("broken")
+	if srv == nil {
+		t.Fatal("сервер broken не пережил перезагрузку")
+	}
+	if srv.ConfigError != "" {
+		t.Errorf("ConfigError закреплён в реестре: %q", srv.ConfigError)
+	}
+}
+
 func TestCorruptRegistryStartsEmpty(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, RegistryFile)
@@ -134,7 +163,9 @@ func TestCorruptRegistryStartsEmpty(t *testing.T) {
 	}
 }
 
-func TestKeysSingleActive(t *testing.T) {
+// Выдача ключа не отзывает прежние, а отзыв одного оставляет остальные
+// действующими: набор держит несколько ключей сразу.
+func TestRevokeOneKeyKeepsOthers(t *testing.T) {
 	dir := t.TempDir()
 	store := openStore(t, dir)
 	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
@@ -143,7 +174,7 @@ func TestKeysSingleActive(t *testing.T) {
 		t.Fatalf("первый ключ: %+v", first)
 	}
 
-	plain, err := store.IssueKey("demo")
+	plain, err := store.IssueKey("demo", "", "ci")
 	if err != nil {
 		t.Fatalf("IssueKey: %v", err)
 	}
@@ -151,27 +182,81 @@ func TestKeysSingleActive(t *testing.T) {
 		t.Errorf("новый токен = %q", plain)
 	}
 	set := store.Set("demo")
-	if len(set.Keys) != 2 || activeCount(set.Keys) != 1 {
+	if len(set.Keys) != 2 || activeCount(set.Keys) != 2 {
 		t.Fatalf("после выдачи ключей: %d, активных %d", len(set.Keys), activeCount(set.Keys))
 	}
-	if set.Keys[0].RevokedAt == "" {
-		t.Error("прежний ключ не отозван")
+	if set.Keys[0].RevokedAt != "" {
+		t.Error("выдача нового ключа отозвала прежний")
 	}
-	if set.Token != plain {
-		t.Errorf("token = %q, want зеркало активного %q", set.Token, plain)
+	if set.Token != first.Token {
+		t.Errorf("token = %q, want прежний основной %q", set.Token, first.Token)
+	}
+	if got := ActiveTokens(set.Keys); len(got) != 2 || got[0] != first.Token || got[1] != plain {
+		t.Errorf("действующие токены = %v", got)
 	}
 
-	wasActive, err := store.RevokeKey("demo", set.Keys[1].ID)
-	if err != nil || !wasActive {
-		t.Fatalf("RevokeKey активного: wasActive=%v err=%v", wasActive, err)
+	remaining, err := store.RevokeKey("demo", set.Keys[1].ID)
+	if err != nil || remaining != 1 {
+		t.Fatalf("RevokeKey одного ключа: remainder=%d err=%v", remaining, err)
 	}
 	reopened := openStore(t, dir)
 	set = reopened.Set("demo")
-	if set.Token != "" || activeCount(set.Keys) != 0 {
-		t.Errorf("после отзыва активного: token=%q активных=%d", set.Token, activeCount(set.Keys))
+	if set.Token != first.Token || activeCount(set.Keys) != 1 {
+		t.Errorf("после отзыва одного: token=%q активных=%d", set.Token, activeCount(set.Keys))
 	}
 	if _, err := reopened.RevokeKey("demo", "нет-такого"); err == nil {
 		t.Error("отзыв несуществующего ключа не вернул ошибку")
+	}
+}
+
+// Девятый действующий ключ не выдаётся: потолок виден текстом ошибки.
+func TestKeyLimit(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
+	addSet(t, store, `{"name":"demo","servers":["fs"],"port":`+strconv.Itoa(freePort(t))+`}`)
+	for i := 1; i < MaxActiveKeys; i++ {
+		if _, err := store.IssueKey("demo", "", ""); err != nil {
+			t.Fatalf("IssueKey #%d: %v", i, err)
+		}
+	}
+	if n := activeCount(store.Set("demo").Keys); n != MaxActiveKeys {
+		t.Fatalf("действующих ключей = %d, want %d", n, MaxActiveKeys)
+	}
+	_, err := store.IssueKey("demo", "", "")
+	if err == nil || !strings.Contains(err.Error(), "действующих ключей") {
+		t.Fatalf("девятый ключ: err = %v", err)
+	}
+}
+
+// registry.json с одним ключом читается как список из одного: старый токен и
+// прежнее поле note остаются рабочими.
+func TestOldRegistrySingleKeyUpgrades(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"old","name":"old","servers":["fs"],"port":9100,"token":"legacy-token"},
+		{"id":"named","name":"named","servers":["fs"],"port":9101,"token":"t1","keys":[{"id":"k1","token":"t1","createdAt":"2026-01-01T00:00:00Z","note":"прежняя подпись"}]}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+
+	old := store.Set("old")
+	if old == nil || len(old.Keys) != 1 || old.Keys[0].ID != LegacyKeyID {
+		t.Fatalf("старый единственный токен не стал ключом: %+v", old)
+	}
+	if old.Token != "legacy-token" || len(ActiveTokens(old.Keys)) != 1 || ActiveTokens(old.Keys)[0] != "legacy-token" {
+		t.Errorf("действующие токены old = %v, token = %q", ActiveTokens(old.Keys), old.Token)
+	}
+	named := store.Set("named")
+	if named == nil || len(named.Keys) != 1 {
+		t.Fatalf("named: %+v", named)
+	}
+	if named.Keys[0].Label != "прежняя подпись" {
+		t.Errorf("note не стал label: %+v", named.Keys[0])
+	}
+	if !CanServe(named) {
+		t.Error("набор со старым ключом не может стартовать")
 	}
 }
 
@@ -318,16 +403,16 @@ func TestImport(t *testing.T) {
 	for _, skip := range skipped {
 		reasons[skip.Name] = skip.Reason
 	}
-	if reasons["str"] != "command: передайте массив" {
+	if reasons["str"] != "command: передайте массив строк, а не строку" {
 		t.Errorf("str: %q", reasons["str"])
 	}
 	if !strings.Contains(reasons["num"], "env.A") {
 		t.Errorf("num: %q", reasons["num"])
 	}
-	if reasons["junk"] != "запись не объект" {
+	if reasons["junk"] != "запись должна быть объектом или массивом команд" {
 		t.Errorf("junk: %q", reasons["junk"])
 	}
-	if !strings.Contains(reasons["Upper"], "имя сервера") {
+	if !strings.Contains(reasons["Upper"], "в имени допустимы") {
 		t.Errorf("Upper: %q", reasons["Upper"])
 	}
 	if srv := store.Server("str"); srv != nil {
@@ -397,14 +482,16 @@ func TestServerValidation(t *testing.T) {
 		{"stdio", `{"name":"a","command":["npx","x"]}`, ""},
 		{"command строкой", `{"name":"a","command":"npx -y x"}`, ""},
 		{"http", `{"name":"a","url":"http://127.0.0.1/mcp"}`, ""},
-		{"stdio без command", `{"name":"a","transport":"stdio"}`, "нужен command[] или url"},
-		{"http без url", `{"name":"a","transport":"http","description":"d"}`, "нужен command[] или url"},
-		{"command и url", `{"name":"a","command":["x"],"url":"http://x"}`, "что-то одно"},
+		{"stdio без command", `{"name":"a","transport":"stdio"}`, "нужен ровно один из них: command[] или url"},
+		{"http без url", `{"name":"a","transport":"http","description":"d"}`, "нужен ровно один из них: command[] или url"},
+		{"command и url", `{"name":"a","command":["x"],"url":"http://x"}`, "ровно один из них"},
 		{"cwd на http", `{"name":"a","url":"http://x","cwd":"/tmp"}`, "cwd допустим только"},
 		{"env числом", `{"name":"a","command":["x"],"env":{"A":1}}`, "env.A: ожидалась строка"},
 		{"headers числом", `{"name":"a","url":"http://x","headers":{"A":1}}`, "headers.A: ожидалась строка"},
-		{"имя заглавными", `{"name":"A","command":["x"]}`, "имя сервера"},
+		{"имя заглавными", `{"name":"A","command":["x"]}`, "в имени допустимы"},
 		{"enabled строкой", `{"name":"a","command":["x"],"enabled":"yes"}`, "enabled: ожидалось true или false"},
+		{"permissions default", `{"name":"a","command":["x"],"permissions":{"default":"ask"}}`, "permissions.default"},
+		{"permissions.server в серверном блоке", `{"name":"a","command":["x"],"permissions":{"rules":[{"pattern":"x","action":"deny","server":"b"}]}}`, "permissions.rules[0].server"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -603,12 +690,169 @@ func TestLoadDropsSetWithBadID(t *testing.T) {
 	}
 }
 
+// Опознаватель профиля с опечаткой ("denny") не должен тихо стать пустым
+// профилем и разрешить всё: загрузка проверяет блок по сырому файлу, а не по
+// разобранной записи, и отбрасывает его с причиной. Ключ, назвавший профиль,
+// после этого получает отказ, а не свободу.
+func TestLoadDropsBrokenProfiles(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"bad","name":"bad","servers":["fs"],"port":9100,
+		 "profiles":{"reader":{"denny":["*"]}},
+		 "keys":[{"id":"k1","token":"t1","profile":"reader"}]},
+		{"id":"good","name":"good","servers":["fs"],"port":9101,
+		 "profiles":{"reader":{"deny":["*/*_write"]}}}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+
+	bad := store.Set("bad")
+	if bad == nil {
+		t.Fatal("набор bad не загрузился")
+	}
+	if len(bad.Profiles) != 0 {
+		t.Fatalf("битый блок оставлен: %+v", bad.Profiles)
+	}
+	if dropped := store.Dropped(); len(dropped) != 1 || !strings.Contains(dropped[0], "profiles набора \"bad\" отброшены") {
+		t.Fatalf("отчёт о загрузке = %v", dropped)
+	}
+	// Ключ с несуществующим профилем сохранён: отказ даёт гейт, а не загрузка.
+	if len(bad.Keys) != 1 || bad.Keys[0].Profile != "reader" {
+		t.Fatalf("ключ потерял имя профиля: %+v", bad.Keys)
+	}
+
+	if good := store.Set("good"); good == nil || good.Profiles["reader"] == nil {
+		t.Fatal("годный блок соседнего набора пострадал")
+	}
+
+	// Канонический файл больше не несёт опечатку: её не вернуть следующей
+	// записью, а отчёт о потере уже отдан.
+	raw, err := os.ReadFile(filepath.Join(dir, RegistryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "denny") {
+		t.Fatalf("опечатка осталась в registry.json: %s", raw)
+	}
+}
+
+// Отсутствующий блок и null остаются в прежнем смысле: ключ без профиля и
+// набор без профилей.
+func TestLoadKeepsSetsWithoutProfiles(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"none","name":"none","servers":["fs"],"port":9100},
+		{"id":"null","name":"null","servers":["fs"],"port":9101,"profiles":null}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+	if len(store.Sets()) != 2 {
+		t.Fatalf("наборов = %d", len(store.Sets()))
+	}
+	if dropped := store.Dropped(); len(dropped) != 0 {
+		t.Fatalf("отчёт о загрузке = %v", dropped)
+	}
+}
+
 func TestKeyOpsMissingSet(t *testing.T) {
 	store := openStore(t, t.TempDir())
-	if _, err := store.IssueKey("nope"); err == nil || !strings.Contains(err.Error(), "нет набора") {
+	if _, err := store.IssueKey("nope", "", ""); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
 		t.Errorf("IssueKey: err = %v", err)
 	}
-	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "нет набора") {
+	if _, err := store.RevokeKey("nope", "k"); err == nil || !strings.Contains(err.Error(), "набор nope не найден") {
 		t.Errorf("RevokeKey: err = %v", err)
+	}
+}
+
+// permissions приходят тем же JSON, что читает config.Load для servers.json:
+// панель пишет блок в реестр, browse читает его оттуда, а не из воздуха.
+func TestServerPermissionsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	store := openStore(t, dir)
+	srv := addServer(t, store, `{"name":"alpha","command":["x"],"permissions":{"default":"deny","rules":[{"pattern":"read_*","action":"allow"}]}}`)
+	if srv.Permissions == nil || srv.Permissions.Default != config.PermissionDeny || len(srv.Permissions.Rules) != 1 {
+		t.Fatalf("permissions не разобраны: %+v", srv.Permissions)
+	}
+	reopened := openStore(t, dir).Server("alpha")
+	if reopened == nil || reopened.Permissions == nil || reopened.Permissions.Rules[0].Pattern != "read_*" {
+		t.Fatalf("permissions не пережили перезагрузку: %+v", reopened)
+	}
+	// Патч без поля блок сохраняет, явный null — убирает (как transport).
+	if got, err := store.UpdateServer("alpha", json.RawMessage(`{"description":"d"}`)); err != nil || got.Permissions == nil {
+		t.Fatalf("патч без permissions потерял блок: %+v %v", got, err)
+	}
+	if got, err := store.UpdateServer("alpha", json.RawMessage(`{"permissions":null}`)); err != nil || got.Permissions != nil {
+		t.Fatalf("явный null не убрал permissions: %+v %v", got, err)
+	}
+}
+
+// Заражённый registry.json: `_configError` от старой записи не должен осесть в
+// памяти и пережить каноническую перезапись при Open.
+func TestConfigErrorScrubbedFromInfectedFile(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9100,"servers":[{"name":"broken","command":["nope"],"_configError":"битый"}],"sets":[]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	srv := openStore(t, dir).Server("broken")
+	if srv == nil {
+		t.Fatal("сервер broken не загрузился")
+	}
+	if srv.ConfigError != "" {
+		t.Fatalf("ConfigError из файла остался в памяти: %q", srv.ConfigError)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, RegistryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "_configError") {
+		t.Fatalf("ключ _configError пережил перезапись: %s", raw)
+	}
+}
+
+// PUT с "token" после отзыва всех ключей заводит ключ с новым id. Фиксированный
+// LegacyKeyID столкнулся бы с отозванным ключом той же истории, normalizeKeys
+// оставил бы отозванный, и показанный владельцу токен молча перестал бы
+// работать после перезапуска.
+func TestPutTokenAfterAllKeysRevokedSurvivesReload(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"version":1,"nextPort":9101,"servers":[{"name":"fs","command":["x"]}],"sets":[
+		{"id":"old","name":"old","servers":["fs"],"port":9100,"token":"legacy-token"}
+	]}`
+	if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := openStore(t, dir)
+	if keys := store.Set("old").Keys; len(keys) != 1 || keys[0].ID != LegacyKeyID {
+		t.Fatalf("подготовка: ключи %+v", keys)
+	}
+	if remaining, err := store.RevokeKey("old", LegacyKeyID); err != nil || remaining != 0 {
+		t.Fatalf("отзыв единственного ключа: remaining=%d err=%v", remaining, err)
+	}
+
+	const fresh = "fresh-token-0123456789abcdef0123456789abcdef"
+	if _, err := store.UpdateSet("old", json.RawMessage(`{"token":"`+fresh+`"}`)); err != nil {
+		t.Fatalf("PUT token: %v", err)
+	}
+
+	set := openStore(t, dir).Set("old")
+	if got := ActiveTokens(set.Keys); len(got) != 1 || got[0] != fresh {
+		t.Fatalf("после перезагрузки действующие токены = %v, want %q", got, fresh)
+	}
+	if set.Token != fresh {
+		t.Errorf("token после перезагрузки = %q, want %q", set.Token, fresh)
+	}
+	legacy := 0
+	for _, key := range set.Keys {
+		if key.ID == LegacyKeyID {
+			legacy++
+		}
+	}
+	if legacy != 1 {
+		t.Errorf("ключей legacy в истории = %d, want 1: %+v", legacy, set.Keys)
 	}
 }

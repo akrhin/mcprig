@@ -103,7 +103,7 @@ func TestTruncatedStructuredAnswerNamesFile(t *testing.T) {
 	cs := clientFor(t, m.Server())
 
 	text := resultText(t, call(t, cs, "invoke_command", map[string]any{"server": "big", "command_name": "big"}))
-	const phrase = "[structuredContent не влезает в maxBytes: полный ответ в файле]"
+	const phrase = "[structuredContent больше maxBytes: полный ответ в файле]"
 	if !strings.Contains(text, phrase) {
 		t.Fatalf("нет пометки про structuredContent: %q", text)
 	}

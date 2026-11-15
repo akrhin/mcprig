@@ -231,6 +231,13 @@
           </thead>
           <tbody id="calls-body"></tbody>
         </table>
+        <div class="more-row" id="calls-more-row" hidden>
+          <button class="btn" type="button" id="calls-more" data-i18n="calls.more">Show more</button>
+          <span class="more-pause" id="calls-pause" hidden>
+            <span class="block-meta" data-i18n="calls.paused">auto-refresh paused</span>
+            <button class="link-btn" type="button" id="calls-resume" data-i18n="calls.resume">resume</button>
+          </span>
+        </div>
         <div class="empty" id="calls-note" hidden>
           <p class="empty-title" data-i18n="tail.empty">no calls yet</p>
           <p class="empty-text" data-i18n="calls.emptyText">Requests appear here as soon as the set serves.</p>
@@ -288,7 +295,7 @@
               </thead>
               <tbody id="tools-body"></tbody>
             </table>
-            <div class="empty" id="tools-empty" hidden>
+            <div class="empty" id="stats-tools-empty" hidden>
               <p class="empty-title" data-i18n="stats.noData">No per-tool data</p>
             </div>
           </section>
@@ -482,6 +489,13 @@
       </div>
       <label class="check"><input type="checkbox" name="enabled"> <span data-i18n="form.enabled">enabled</span></label>
 
+      <fieldset class="field-group">
+        <legend data-i18n="form.expose">expose</legend>
+        <p class="field-help" data-i18n="form.exposeHint">Surfaces the MCP client may read. Without them the client sees the server's tools only.</p>
+        <label class="check"><input type="checkbox" name="exposeResources"> <span data-i18n="form.exposeResources">expose resources</span></label>
+        <label class="check"><input type="checkbox" name="exposePrompts"> <span data-i18n="form.exposePrompts">expose prompts</span></label>
+      </fieldset>
+
       <fieldset class="field-group" data-when="stdio">
         <legend data-i18n="form.sandbox">sandbox</legend>
         <p class="field-help" data-i18n="form.sandboxHint">mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · empty means the default</p>
@@ -538,6 +552,63 @@
   </form>
 </dialog>
 
+<dialog class="dialog drawer" id="srvlog-dlg" aria-labelledby="srvlog-h">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <div>
+        <h2 id="srvlog-h">—</h2>
+        <p class="dialog-sub" data-i18n="srvlog.sub">lines that mention this server — the tail of the set log</p>
+      </div>
+      <button class="ghost-icon" type="button" id="srvlog-close" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body srvlog-body">
+      <div class="od-row">
+        <span class="block-meta mono" id="srvlog-count"></span>
+        <button class="btn btn-xs" type="button" id="srvlog-refresh" data-i18n="log.refresh">refresh</button>
+      </div>
+      <p class="field-error" id="srvlog-err" role="alert" hidden></p>
+      <div class="log srvlog" id="srvlog" tabindex="0" aria-live="polite"></div>
+      <p class="empty" id="srvlog-empty" hidden data-i18n="log.empty">log is empty</p>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dialog drawer" id="tools-dlg" aria-labelledby="tools-h">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <div>
+        <h2 id="tools-h">—</h2>
+        <p class="dialog-sub" data-i18n="tools.sub">descriptors the proxy remembers — a changed one waits for your approval</p>
+      </div>
+      <button class="ghost-icon" type="button" id="tools-close" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body tools-body">
+      <div class="od-row">
+        <span class="block-meta mono" id="tools-count"></span>
+        <button class="btn btn-xs" type="button" id="tools-refresh" data-i18n="log.refresh">refresh</button>
+      </div>
+      <p class="field-error" id="tools-err" role="alert" hidden></p>
+      <div class="tools-wrap">
+        <table class="table" aria-labelledby="tools-h">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="tools.thTool">Tool</th>
+              <th scope="col" data-i18n="tools.thState">State</th>
+              <th scope="col" class="num" data-i18n="tools.thAct">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="lock-body"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="tools-empty" hidden data-i18n="tools.empty">this set has not listed any tools yet</p>
+    </div>
+  </div>
+</dialog>
+
 <dialog class="dialog modal" id="keys-dlg" aria-labelledby="keys-title">
   <div class="dialog-inner">
     <div class="dialog-head">
@@ -551,6 +622,11 @@
     </div>
     <div class="dialog-body">
       <form class="inline-form" id="key-form" novalidate>
+        <div class="field" id="key-profile-field" hidden>
+          <label for="key-profile" data-i18n="keys.profile">Profile</label>
+          <select class="input" id="key-profile"></select>
+          <p class="field-help" data-i18n="keys.profileHelp">A profile limits the key to the rules the set lists under that name.</p>
+        </div>
         <label class="field-label" for="key-label" data-i18n="keys.newLabel">New key label</label>
         <div class="od-row">
           <input class="input od-fill" id="key-label" name="label" autocomplete="off" spellcheck="false" placeholder="ci-runner" data-i18n-ph="keys.notePh">
@@ -572,6 +648,32 @@
     </div>
     <div class="dialog-foot">
       <button class="btn" type="button" id="keys-done" data-i18n="common.done">done</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dialog modal" id="auth-dlg" aria-labelledby="auth-h">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <div>
+        <h2 id="auth-h" data-i18n="auth.title">OAuth authorization</h2>
+        <p class="dialog-sub mono" id="auth-server">—</p>
+      </div>
+      <button class="ghost-icon" type="button" id="auth-close" aria-label="Close" data-i18n-aria="common.close">
+        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="dialog-body">
+      <p class="field-help" id="auth-note" role="status"></p>
+      <div class="field" id="auth-link-row" hidden>
+        <label class="field-label" for="auth-link" data-i18n="auth.link">authorization link</label>
+        <input class="input mono" id="auth-link" readonly spellcheck="false" autocomplete="off">
+      </div>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn" type="button" id="auth-copy" data-i18n="auth.copy" hidden>copy link</button>
+      <button class="btn btn-primary" type="button" id="auth-open" data-i18n="auth.open" hidden>open link</button>
+      <button class="btn" type="button" id="auth-done" data-i18n="common.done">done</button>
     </div>
   </div>
 </dialog>

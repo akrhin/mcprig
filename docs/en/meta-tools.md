@@ -6,8 +6,13 @@ shapes and error text.
 
 # Meta tools
 
-A set exposes five MCP tools. Downstream tools are not listed to the
-client; they are reached through `invoke_command`.
+A set exposes nine MCP tools: five that work with downstream servers, plus
+four for their resources and prompts. Downstream tools themselves are not
+listed to the client; they are reached through `invoke_command`.
+
+The four resource and prompt tools (`list_resources`, `read_resource`,
+`list_prompts`, `get_prompt`) answer only for a server whose config names them
+in `expose`; see [Resources and prompts](#resources-and-prompts) below.
 
 | tool | purpose |
 | --- | --- |
@@ -16,6 +21,10 @@ client; they are reached through `invoke_command`.
 | `describe_commands` | input schemas for named tools |
 | `invoke_command` | call one downstream tool |
 | `invoke_many` | call up to 8 independent tools in one request |
+| `list_resources` | resources of the servers that expose them |
+| `read_resource` | read one resource |
+| `list_prompts` | prompts of the servers that expose them |
+| `get_prompt` | render one prompt with arguments |
 
 Every error below is returned as a normal tool result with `isError: true` and
 one text item whose text starts with `Error: `. The MCP call itself does not
@@ -76,6 +85,10 @@ Input is one of two forms:
 
 `prefix` filters the response after the tool list is read, so the cached schemas
 stay intact and a later call without it sees every command.
+
+A key issued with a profile (see [configuration.md](configuration.md#profiles))
+gets a catalog without the commands the profile refuses — `deny: ["*"]` leaves
+it empty. A key without a profile sees the whole set, as before.
 
 With `servers`, one `requestTimeout` bounds the whole call, not each server.
 Servers are queried in parallel, eight at a time.
@@ -173,6 +186,83 @@ so a side effect is never performed twice. `list_commands` and
 `describe_commands` are never repeated: they have their own timeouts.
 `requestTimeout`, when set, applies to one call.
 
+### Rate limit
+
+A set may carry `rateLimit` (see
+[configuration.md](configuration.md#ratelimit)). A call over the limit is
+refused as an ordinary tool error — `isError: true`, text starting `Error: ` —
+and the MCP call itself stays up:
+
+```text
+Error: лимит 60 вызовов в минуту для serena/find_symbol, повторите через 980 мс
+```
+
+The delay comes from the same token bucket that refused the call. Each inner
+call of `invoke_many` is counted on its own and carries the same refusal in its
+`error` field, so one refused entry never hides the others. The check runs before
+the set opens a downstream session: a refused call never reaches a server, and a
+refusal is counted in `/stats` as `throttled`, not as a tool call.
+
+### Profiles
+
+A key issued with a profile (see [configuration.md](configuration.md#profiles))
+is refused what the profile does not allow, in the same shape as a policy
+denial — `isError: true`, `_meta.lazyMcpPolicy: "blocked"`:
+
+```text
+🚫 Blocked by mcprig policy: профиль reader не разрешает serena/find_symbol
+```
+
+The refusal is a tool result, not a broken connection: the MCP call stays up.
+Inside `invoke_many` it lands in that entry's `error`, and the other entries run
+as usual. `permissions` is checked first, so a command denied by a rule reports
+its message rather than the profile. `list_commands` hides such commands
+instead of reporting them. The profile is found by the key's fingerprint, not by
+its note, and a key without a profile is not filtered at all.
+
+`describe_commands` is not filtered: the names are hidden from the catalog, but
+a schema for a guessed name is still served and the call itself is refused, so a
+key learns what it is barred from — knowingly, and nothing more.
+
+### Descriptor quarantine
+
+A tool's descriptor is its `name`, `description`, `inputSchema`,
+`outputSchema` and `annotations`. The first time a set sees a tool, the proxy
+approves that descriptor itself (`approvedBy: "auto"` in
+`<data>/sets/<id>/tools.lock.json`) and the call goes through. A descriptor
+that differs from the approved one later — a new version, a swapped
+implementation — is quarantined: the call is refused before anything reaches
+the downstream, with `isError: true` and `_meta.lazyMcpPolicy: "quarantine"`:
+
+```text
+🚫 Инструмент изменился: serena/find_symbol (одобрен 6f1c2b0e9a4d, сейчас 9b7a10c3f25e); одобрите: mcprig approve --set main serena/find_symbol
+```
+
+The hash is sha256 over the canonical record as `json.Marshal` writes it, not
+over the raw answer bytes: a server that reorders keys does not trip it. The
+policy is one and has no switch. Exactly those five fields are hashed:
+`title` and `icons` are decoration and do not trip it. Quarantine needs the set's
+data directory (`MCPRIG_DATA_DIR`, which the panel gives the set process): a
+hand-run `mcprig serve --config …` keeps no record and therefore no quarantine.
+Only the changed tool is refused — its
+neighbours on the same server keep working, and inside `invoke_many` the other
+calls run while that entry carries the message in `error`.
+
+`list_commands` shows a quarantined tool rather than hiding it, marked
+`"changed": true`. `permissions` and profiles are checked first, so their
+message wins when both apply.
+
+The second approval is a person's: from the panel (`Tools` button on the server
+row) or from the CLI:
+
+```bash
+mcprig approve --set main serena/find_symbol   # one tool
+mcprig approve --set main --all                # everything currently changed
+```
+
+Quarantine survives a set restart; entries of a server removed from the set are
+pruned when the set config is rebuilt.
+
 An answer longer than `maxBytes` is cut at a UTF-8 boundary; the returned text
 ends with a marker naming the kept and full sizes and the file holding the full
 answer:
@@ -190,6 +280,36 @@ the structure does not survive the text cut, and a client whose meaning lives in
 structured data has nothing to read otherwise. An answer within the cap is
 returned untouched — no file, no marker. A non-numeric or negative `maxBytes`, or one above 1048576, is an
 error like any other bad argument.
+
+### Fetching the full answer over HTTP
+
+A set served over HTTP hands the file out instead of a path: over the same
+listener, under the same guard as `/mcp` — the set's bearer key, `allowedHosts`
+and the `Origin` check. The marker then reads:
+
+```text
+[обрезано: 32768 из 149873 байт, полный ответ — /tool-out/1f3c9a2b7d4e5f60 (тот же ключ, что у /mcp)]
+```
+
+`GET /tool-out/<name>` returns the whole answer: `text/plain; charset=utf-8`,
+`no-store`, byte ranges honoured (`Range: bytes=0-9` is a `206`), `HEAD` answering
+the length without the body. The name is the file name without `.txt`, sixteen
+hex characters; anything else is `404`, and so is a name whose file is gone.
+
+A dump older than the retention TTL is `410 Gone` — the marker's promise has run
+out. The endpoint reads the TTL of its own process, once at start, from
+`MCPRIG_TOOLOUT_TTL` (default `24h`). A set started by the panel does not get that
+variable — `MCPRIG_` is a reserved prefix there — so it keeps the default `24h`,
+and a shorter panel retention may delete the file first; then the endpoint
+answers `404`, not `410`.
+
+The name is a capability, not a session: any holder of the set's key fetches any
+dump whose name it knows, whoever produced it.
+
+The endpoint is never anonymous, not even on an open set: `/mcp` may admit a
+request without a key, the dump does not. A set over stdio keeps the path in the
+marker — its file is on the caller's own filesystem, and there is no listener to
+ask.
 
 ## invoke_many
 
@@ -227,6 +347,78 @@ Bad input fails the whole request with `isError: true` and nothing is run: no
 calls, more than 8, an unknown key inside a call, a missing `server` or
 `command_name` (or its alias `command`), `parameters` that is not an object, or
 a bad `maxBytes`.
+
+## Resources and prompts
+
+A downstream server's resources and prompts are off by default: the client sees
+them only when the server's config names the surface in `expose`
+(`"resources"`, `"prompts"`, or both — see
+[configuration.md](configuration.md#expose)). An unknown value is a config
+error and the server does not start, so a typo never reads as a deliberate
+"expose nothing".
+
+### list_resources / list_prompts
+
+Input: `{"server": "notes"}` or `{}` (both fields optional; `maxBytes` is
+optional too, with no default cap, as in `list_commands`).
+
+With `server` the answer is an array; without it, an object keyed by server
+name over every usable server that exposes that surface — a server without
+`expose` does not appear at all:
+
+```json
+[
+  {"server": "notes", "uri": "notes://welcome", "name": "welcome", "mimeType": "text/markdown", "size": 240}
+]
+```
+
+```json
+[
+  {"server": "notes", "name": "greet", "description": "приветствие",
+   "arguments": [{"name": "who", "required": true}]}
+]
+```
+
+### read_resource
+
+Input: `{"server": "notes", "uri": "notes://welcome", "maxBytes": 4096}`.
+`uri` is the one `list_resources` returned. Without `maxBytes` the cap is
+32768 bytes, as in `invoke_command`.
+
+The answer carries the upstream `contents[]` unchanged — `uri`, `mimeType`, and
+`text` or `blob` (base64) — cut at the cap; the marker names the file with the
+whole answer, and the server's own secrets are scrubbed as in any other answer.
+
+### get_prompt
+
+Input: `{"server": "notes", "name": "greet", "arguments": {"who": "мир"}}`.
+`arguments` is a string-to-string map; the upstream messages come back
+unchanged in the `prompt` result.
+
+### What is refused
+
+A server without the matching `expose` entry, or a surface the server does not
+have (a `resources/read` answer is `isError: true` with `Error: <server>:
+набор не отдаёт ресурсы — добавьте "resources" в expose этого сервера`).
+
+### Permissions
+
+No new rule kind: a resource is addressed as `resource:<uri>` and a prompt as
+`prompt:<name>`, matched by the usual glob rules, and the caller's profile sees
+the same string:
+
+```json
+{"rules": [
+  {"pattern": "resource:notes://secret/*", "action": "deny", "message": "secret"},
+  {"pattern": "prompt:*", "action": "allow"}
+]}
+```
+
+The gate runs before the downstream is connected, and a denial returns the same
+`🚫 Blocked by mcprig policy: …` result as `invoke_command`. That applies to the
+listings too: `list_resources` and `list_prompts` show only what the rules and
+the caller's profile allow, so a `default: deny` yields an empty catalogue until
+a rule names the resource or prompt.
 
 ## Secret scrubbing
 

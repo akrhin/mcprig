@@ -372,10 +372,10 @@ func TestInvokeManyRejectsBadInput(t *testing.T) {
 		}}}, "calls[0]: лишние ключи: bogus"},
 		{"no command", map[string]any{"calls": []any{map[string]any{
 			"server": "a",
-		}}}, "calls[0]: укажите command_name или command"},
+		}}}, "calls[0]: укажите command_name (или command)"},
 		{"command conflicts with command_name", map[string]any{"calls": []any{map[string]any{
 			"server": "a", "command_name": "echo", "command": "boom",
-		}}}, "calls[0]: укажите одно: command_name или command"},
+		}}}, "calls[0]: укажите command_name (или command)"},
 		{"type error", map[string]any{"calls": []any{map[string]any{
 			"server": "a", "command": 5,
 		}}}, "calls[0]: ключ command: ожидался тип «строка», получен тип «число»"},

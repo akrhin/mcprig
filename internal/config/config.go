@@ -5,7 +5,10 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -32,15 +35,19 @@ type Server struct {
 	Env         map[string]string `json:"env,omitempty"`
 	// EnvAllow — имена переменных окружения владельца, которые сервер получает
 	// вдобавок к whitelist. Больше ничего из os.Environ() вниз не уходит.
-	EnvAllow    []string          `json:"envAllow,omitempty"`
-	URL         string            `json:"url,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
-	Enabled     bool              `json:"enabled"`
-	Permissions *Permissions      `json:"permissions,omitempty"`
-	OAuth       *OAuth            `json:"oauth,omitempty"`
-	Sandbox     *Sandbox          `json:"sandbox,omitempty"`
-	ConfigError string            `json:"_configError,omitempty"`
+	EnvAllow []string          `json:"envAllow,omitempty"`
+	URL      string            `json:"url,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Tags     []string          `json:"tags,omitempty"`
+	Enabled  bool              `json:"enabled"`
+	// Expose — какие поверхности сервера прокси отдаёт клиенту: "resources"
+	// и/или "prompts". Пусто — ни одной: без явного разрешения клиент видит
+	// только инструменты.
+	Expose      []string     `json:"expose,omitempty"`
+	Permissions *Permissions `json:"permissions,omitempty"`
+	OAuth       *OAuth       `json:"oauth,omitempty"`
+	Sandbox     *Sandbox     `json:"sandbox,omitempty"`
+	ConfigError string       `json:"-"`
 }
 
 // Sandbox — изоляция stdio-сервера. Пустой блок означает умолчания: bwrap,
@@ -120,17 +127,17 @@ func (s *Sandbox) validate() string {
 	switch s.Mode {
 	case SandboxModeNone, SandboxModeBwrap:
 	default:
-		return fmt.Sprintf("sandbox.mode: %q, допустимо none|bwrap", s.Mode)
+		return fmt.Sprintf("sandbox.mode: недопустимое значение %q, допустимые: none, bwrap", s.Mode)
 	}
 	switch s.OnUnavailable {
 	case OnUnavailableDeny, OnUnavailableWarn, OnUnavailableAllow:
 	default:
-		return fmt.Sprintf("sandbox.onUnavailable: %q, допустимо deny|warn|allow", s.OnUnavailable)
+		return fmt.Sprintf("sandbox.onUnavailable: недопустимое значение %q, допустимые: deny, warn, allow", s.OnUnavailable)
 	}
 	switch s.Network {
 	case SandboxNetworkNone, SandboxNetworkAllow:
 	default:
-		return fmt.Sprintf("sandbox.network: %q, допустимо none|allow", s.Network)
+		return fmt.Sprintf("sandbox.network: недопустимое значение %q, допустимые: none, allow", s.Network)
 	}
 	for _, field := range []struct {
 		name  string
@@ -195,7 +202,7 @@ func (s *Server) Warnings() []string {
 			break
 		}
 		if !pinned {
-			out = append(out, fmt.Sprintf("%s без пина версии: код подменяется молча", filepath.Base(s.Command[0])))
+			out = append(out, fmt.Sprintf("%s без фиксации версии: код может подмениться", filepath.Base(s.Command[0])))
 		}
 	}
 	return out
@@ -258,10 +265,10 @@ func (o *OAuth) validate(prefix string) string {
 		return ""
 	}
 	if o.CallbackPort < 0 || o.CallbackPort > 65535 {
-		return fmt.Sprintf("%s.callbackPort: ожидался порт 0–65535, получено %d", prefix, o.CallbackPort)
+		return fmt.Sprintf("%s.callbackPort: недопустимое значение %d: порт 0–65535", prefix, o.CallbackPort)
 	}
 	if o.ClientSecret != "" && o.ClientID == "" {
-		return prefix + ".clientSecret без clientId"
+		return prefix + ".clientSecret указан без clientId"
 	}
 	return ""
 }
@@ -333,7 +340,7 @@ func (p *Permissions) validate(prefix string, global bool) string {
 	switch p.Default {
 	case "", PermissionAllow, PermissionDeny:
 	default:
-		return fmt.Sprintf("%s.default: ожидалось allow или deny, получено %q", prefix, p.Default)
+		return fmt.Sprintf("%s.default: недопустимое значение %q: допустимо allow или deny", prefix, p.Default)
 	}
 	for i, r := range p.Rules {
 		rp := fmt.Sprintf("%s.rules[%d]", prefix, i)
@@ -371,6 +378,7 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 		OAuth       *OAuth          `json:"oauth"`
 		Sandbox     json.RawMessage `json:"sandbox"`
 		EnvAllow    []string        `json:"envAllow"`
+		Expose      json.RawMessage `json:"expose"`
 	}
 	var r raw
 	if err := json.Unmarshal(data, &r); err != nil {
@@ -396,6 +404,7 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 	s.Headers = stringMap(r.Headers, &s.ConfigError, "headers")
 	s.decodeSandbox(r.Sandbox)
 	s.decodePermissions(r.Permissions)
+	s.decodeExpose(r.Expose)
 	if msg := r.OAuth.validate("oauth"); msg != "" {
 		if s.ConfigError == "" {
 			s.ConfigError = msg
@@ -408,23 +417,16 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 
 // decodePermissions soft-fails a broken block onto the server, like lazy-mcp.
 func (s *Server) decodePermissions(data json.RawMessage) {
-	if len(data) == 0 || string(data) == "null" {
-		return
-	}
-	var p Permissions
-	if err := json.Unmarshal(data, &p); err != nil {
-		if s.ConfigError == "" {
-			s.ConfigError = "permissions: " + err.Error()
-		}
-		return
-	}
-	if msg := p.validate("permissions", false); msg != "" {
+	p, msg := ParsePermissions(data)
+	if msg != "" {
 		if s.ConfigError == "" {
 			s.ConfigError = msg
 		}
 		return
 	}
-	s.Permissions = &p
+	if p != nil {
+		s.Permissions = p
+	}
 }
 
 // decodeSandbox soft-fails: a typo in the block must not brick the whole file.
@@ -448,6 +450,39 @@ func (s *Server) decodeSandbox(data json.RawMessage) {
 		return
 	}
 	s.Sandbox = &sb
+}
+
+// Exposed surfaces a server may contribute to the proxy.
+const (
+	ExposeResources = "resources"
+	ExposePrompts   = "prompts"
+)
+
+// ParseExpose reads the expose block: absent or null is no surfaces at all.
+// The kinds themselves are checked by validateSandbox, so Load, Check and the
+// registry agree on what a valid list is.
+func ParseExpose(data json.RawMessage) ([]string, string) {
+	if len(data) == 0 || string(data) == "null" {
+		return nil, ""
+	}
+	var list []string
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil, "expose: ожидался массив строк: " + err.Error()
+	}
+	return list, ""
+}
+
+// decodeExpose soft-fails a broken block onto the server; the allowed values are
+// checked in validateSandbox, so Check and Load agree.
+func (s *Server) decodeExpose(data json.RawMessage) {
+	list, msg := ParseExpose(data)
+	if msg != "" {
+		if s.ConfigError == "" {
+			s.ConfigError = msg
+		}
+		return
+	}
+	s.Expose = list
 }
 
 // sandboxFields — единственные имена, которые понимает Sandbox.
@@ -570,7 +605,7 @@ func expandSecrets(value string) (string, error) {
 		name := match[2 : len(match)-1]
 		val, ok := os.LookupEnv(name)
 		if !ok {
-			firstErr = fmt.Errorf("переменная %s не задана", name)
+			firstErr = fmt.Errorf("переменная %s не задана в окружении", name)
 			return match
 		}
 		return val
@@ -626,12 +661,20 @@ func (s *Server) validate() bool {
 // Check проверяет копию, не трогая общий объект реестра.
 func (s *Server) validateSandbox(sandbox *Sandbox) bool {
 	if s.Name == "" {
-		s.ConfigError = "нет имени"
+		s.ConfigError = "у сервера нет имени"
 		return false
 	}
 	if name := reservedEnvName(s); name != "" {
 		s.ConfigError = name
 		return false
+	}
+	// Неизвестный вид — ошибка, а не тихое «ничего не отдаём»: опечатка в
+	// "ressources" иначе выглядела бы как сознательный запрет.
+	for _, kind := range s.Expose {
+		if kind != ExposeResources && kind != ExposePrompts {
+			s.ConfigError = fmt.Sprintf("expose: неизвестный вид %q (допустимо resources, prompts)", kind)
+			return false
+		}
 	}
 	switch s.Transport {
 	case "":
@@ -646,20 +689,20 @@ func (s *Server) validateSandbox(sandbox *Sandbox) bool {
 		}
 	case TransportStdio:
 		if len(s.Command) == 0 {
-			s.ConfigError = "stdio требует command"
+			s.ConfigError = "для stdio нужен command"
 			return false
 		}
 		if s.URL != "" {
-			s.ConfigError = "stdio не может иметь url"
+			s.ConfigError = "у stdio не бывает url"
 			return false
 		}
 	case TransportHTTP:
 		if s.URL == "" {
-			s.ConfigError = "http требует url"
+			s.ConfigError = "для http нужен url"
 			return false
 		}
 		if len(s.Command) > 0 {
-			s.ConfigError = "http не может иметь command"
+			s.ConfigError = "у http не бывает command"
 			return false
 		}
 	default:
@@ -718,6 +761,10 @@ type HTTPTransport struct {
 	Port      int    `json:"port,omitempty"`
 	Path      string `json:"path,omitempty"`
 	AuthToken string `json:"authToken,omitempty"`
+	// AuthTokens — все действующие ключи набора: принимается любой из них.
+	// authToken остаётся ради файлов с одним ключом; пустой список означает
+	// «смотреть на authToken».
+	AuthTokens []string `json:"authTokens,omitempty"`
 	// AllowAnonymous lets the listener start without an authToken and accepts
 	// requests carrying no Authorization header; a presented token is still
 	// checked. Set only for an open set.
@@ -727,6 +774,10 @@ type HTTPTransport struct {
 	// sha256 токена) → подпись. Отпечаток, а не токен: ключ набора в конфиг
 	// набора не попадает, а метка в статистике становится человеческой.
 	ClientNames map[string]string `json:"clientNames,omitempty"`
+	// KeyProfiles — профиль ключа по его отпечатку; ключ без профиля не
+	// ограничен ничем, кроме permissions. Отпечаток, а не метка: метку клиент
+	// называет сам.
+	KeyProfiles map[string]string `json:"keyProfiles,omitempty"`
 }
 
 type HealthMonitor struct {
@@ -742,6 +793,42 @@ type Config struct {
 	RequestTimeout int            `json:"requestTimeout,omitempty"` // ms
 	Permissions    *Permissions   `json:"permissions,omitempty"`
 	OAuth          *OAuth         `json:"oauth,omitempty"`
+	// RateLimit — лимит вызовов на клиента; пустое или нулевое поле — без него.
+	RateLimit *RateLimit `json:"rateLimit,omitempty"`
+	// Profiles — профили инструментов на ключ, см. internal/config/profiles.go.
+	Profiles map[string]*Profile `json:"profiles,omitempty"`
+}
+
+// ValidatePublicURL проверяет админский публичный адрес панели: абсолютный
+// http(s) с хостом, без query/fragment и без хвостового «/». Адрес становится
+// единственным источником OAuth-redirect, поэтому битое значение — отказ
+// конфигурации, а не тихий дефолт.
+func ValidatePublicURL(raw string) error {
+	// По сырой строке: url.Parse("https://host#") даёт пустой Fragment, и
+	// значение прошло бы.
+	if strings.ContainsAny(raw, "?#") {
+		return fmt.Errorf("publicUrl: query и fragment запрещены: %q", raw)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("publicUrl: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("publicUrl: нужна схема http или https: %q", raw)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("publicUrl: пустой хост: %q", raw)
+	}
+	if u.User != nil {
+		return fmt.Errorf("publicUrl: креденшелы в URL не допускаются: %q", raw)
+	}
+	if u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
+		return fmt.Errorf("publicUrl: query и fragment запрещены: %q", raw)
+	}
+	if strings.HasSuffix(u.Path, "/") {
+		return fmt.Errorf("publicUrl: хвостовой «/» запрещён: %q", raw)
+	}
+	return nil
 }
 
 // OAuthFor returns the effective OAuth settings for one server, set-wide block
@@ -769,6 +856,8 @@ func Load(path string) (*Config, error) {
 		RequestTimeout int               `json:"requestTimeout"`
 		Permissions    json.RawMessage   `json:"permissions"`
 		OAuth          *OAuth            `json:"oauth"`
+		RateLimit      json.RawMessage   `json:"rateLimit"`
+		Profiles       json.RawMessage   `json:"profiles"`
 	}
 	if err := json.Unmarshal(data, &shape); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -783,10 +872,44 @@ func Load(path string) (*Config, error) {
 		}
 		shape.Transport.AuthToken = token
 	}
+	// authTokens — список из реестра, а не написанный руками: ${VAR} в нём не
+	// раскрываем, но и резервный префикс не пропускаем.
+	if shape.Transport != nil {
+		for i, token := range shape.Transport.AuthTokens {
+			if name, ok := reservedRef(token); ok {
+				return nil, fmt.Errorf("%s: transport.authTokens[%d]: переменная ${%s} — резервный префикс, передача вниз запрещена", path, i, name)
+			}
+		}
+	}
 	cfg := &Config{Transport: shape.Transport, HealthMonitor: shape.HealthMonitor, RequestTimeout: shape.RequestTimeout}
+	// Битый блок лимита отбрасывается, как и битый глобальный OAuth: опечатка
+	// не должна валить набор, а «нет лимита» — сегодняшнее поведение. Молча —
+	// нет: владелец должен увидеть, что лимита, на который он рассчитывал, нет.
+	if len(shape.RateLimit) > 0 {
+		var rl RateLimit
+		err := rl.Decode(shape.RateLimit)
+		if err == nil {
+			if msg := rl.Check(); msg != "" {
+				err = errors.New(msg)
+			}
+		}
+		switch {
+		case err != nil:
+			slog.Default().Warn("rateLimit отброшен: набор работает без лимита", "path", path, "err", err)
+		case !rl.Empty():
+			cfg.RateLimit = &rl
+		}
+	}
 	// A broken global OAuth block is dropped too: a typo must not brick the set.
 	if shape.OAuth.validate("oauth") == "" {
 		cfg.OAuth = shape.OAuth
+	}
+	// A broken profiles block is dropped as well: keys that name a profile in
+	// it will be refused, which is the safe side of a typo.
+	if profiles, err := ParseProfiles(shape.Profiles); err != nil {
+		slog.Default().Warn("блок profiles отброшен: ключи, назвавшие профиль, будут отвергаться", "path", path, "err", err)
+	} else {
+		cfg.Profiles = profiles
 	}
 	// A broken global block is dropped, not fatal: a typo must not brick the set.
 	if p := decodeGlobalPermissions(shape.Permissions); p != nil {
@@ -813,7 +936,7 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("%s: сервер #%d без имени", path, i+1)
 		}
 		if seen[srv.Name] {
-			srv.ConfigError = "дубль имени"
+			srv.ConfigError = "имя уже занято другим сервером"
 		}
 		seen[srv.Name] = true
 		srv.expandSecrets()

@@ -80,7 +80,7 @@ func TestSandboxCallTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("вызов не оборван по timeoutSec")
 	}
-	if !strings.Contains(err.Error(), "таймаут 1s (sandbox)") {
+	if !strings.Contains(err.Error(), "таймаут 1s (песочница)") {
 		t.Fatalf("ошибка не про свой таймаут: %v", err)
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {

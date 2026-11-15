@@ -5,7 +5,7 @@ This file lists every subcommand and flag with real examples and their output.
 
 # CLI
 
-`mcprig` has six subcommands. Running it with no subcommand is the same as
+`mcprig` has ten subcommands. Running it with no subcommand is the same as
 `mcprig serve`; running it with flags only (`mcprig -config …`) is also
 `serve`.
 
@@ -13,10 +13,14 @@ This file lists every subcommand and flag with real examples and their output.
 | --- | --- |
 | `serve` | one set as an HTTP MCP endpoint |
 | `stdio` | one set over stdin/stdout, spawned by the client |
+| `auth` | authorize a server that asks for OAuth; prints the link, saves the token |
 | `panel` | manager and web panel (registry, sets, keys, call tail) |
 | `init` | print a client configuration fragment; writes nothing |
 | `doctor` | one-pass health report: config, sets, keys, secrets, services, sandbox |
 | `warm` | load a set's tool cache so the first client call is fast |
+| `approve` | approve a tool descriptor that changed under quarantine |
+| `status` | panel health and set state in the terminal |
+| `logs` | tail of a set's or a server's log, with `-f` |
 
 Exit codes: `0` after help, `2` for a command-line error (unknown subcommand,
 extra positional argument, unknown client), `1` for a runtime error (config
@@ -92,6 +96,36 @@ servers are opened with the `initialize` handshake
 (protocol `2025-11-25`), which every server understands; HTTP downstreams keep
 the modern `server/discover` handshake.
 
+## auth
+
+```bash
+mcprig auth --set main swaggerhub
+```
+
+Prints the authorization link and waits for the redirect; it never starts a
+browser, so the command works over SSH and from a machine without a graphical
+session. The token is written to the set's `oauth.json` at `<data dir>/sets/<id>/oauth.json`,
+where the set process reads it on its next start — restart the set in the panel
+afterwards.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-set` | | set name: config and token store come from its directory |
+| `-config` | | `servers.json` instead of `-set`; the token then lands in the data dir of the calling process |
+| `-timeout` | `6m` | how long the link may stay unused |
+
+The positional argument is the server name. A server that needs no OAuth
+connects and exits with a line saying so.
+
+The panel does the same from a browser: **authorize** in the server row, the
+link is drawn in a dialog and the code comes back to the panel address — see
+[panel.md](panel.md#oauth). The CLI keeps a loopback receiver, which is what a
+provider demanding `https` for any other address still accepts.
+
+The interactive flow does not run inside a client request on purpose: a set's
+health probe allows 15 s, while a person at a browser needs minutes. Without a
+token the set reports the server unhealthy; `auth` is the way past it.
+
 ## panel
 
 ```bash
@@ -105,6 +139,9 @@ No flags. Everything is environment:
 | `MCPRIG_DATA_DIR` | `$XDG_STATE_HOME/mcprig`, else `~/.local/state/mcprig` | registry, keys, logs, OAuth tokens |
 | `MCPRIG_HOST` | `127.0.0.1` | panel listen address |
 | `MCPRIG_PORT` | `9091` | panel port |
+| `MCPRIG_PUBLIC_URL` | empty | public address of the panel, `http(s)://host[:port][/prefix]`; when set it is the only source of the OAuth redirect and of the `Secure` cookie decision. Validated at startup: scheme, host, no query/fragment, no trailing `/` |
+| `MCPRIG_TLS_CERT` | empty | certificate for the panel listener; set together with `MCPRIG_TLS_KEY` — one without the other refuses to start, and an unreadable file fails startup |
+| `MCPRIG_TLS_KEY` | empty | private key for the panel listener |
 | `MCPRIG_CLI` | the running executable | binary spawned for each set (`serve --config …`) |
 | `MCPRIG_BIND_IP` | `0.0.0.0` | `transport.host` written into every set's `servers.json` |
 | `MCPRIG_SEED_FILE` | empty | JSON with `servers[]` and `sets[]`; used only when the registry is empty; new keys are generated for closed sets |
@@ -115,6 +152,11 @@ No flags. Everything is environment:
 | `MCPRIG_USER_HEADER` | `Remote-User` | header carrying the user name from a trusted proxy |
 | `MCPRIG_ALLOWED_HOSTS` | loopback only | comma-separated `Host` allowlist |
 | `MCPRIG_AUTH` | empty | `off` disables panel auth |
+
+Setting `MCPRIG_PROXY_SECRET` is what makes `X-Forwarded-*` trusted — the peer
+is not verified — so keep the panel port unreachable except through the proxy.
+With an `http` panel behind the secret, browser writes are rejected because the
+request counts as `https`; set `MCPRIG_PUBLIC_URL=https://…` to match.
 
 Auth modes are derived from what is set:
 
@@ -134,8 +176,23 @@ loopback unless `MCPRIG_HOST` says otherwise.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
-2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 data=/var/lib/mcprig auth=none
+2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 scheme=http publicUrl= data=/var/lib/mcprig auth=none
 ```
+
+`MCPRIG_PUBLIC_URL` is the address the panel is reached at from outside. It is
+the only source of the OAuth redirect (`<publicUrl>/oauth/callback`, the path
+prefix kept) and decides that the session cookie is `Secure`; without it the
+panel keeps building the redirect from `MCPRIG_HOST` and `MCPRIG_PORT`. A value
+that does not parse, has no host, carries a query or fragment, or ends with `/`
+stops the panel at startup.
+
+With `MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` the panel serves https itself; the
+session cookie is `Secure` whenever the public address is `https` or the panel
+has its own certificate, even though a TLS reverse proxy hands the process plain
+http. `X-Forwarded-Proto` and `X-Forwarded-Host` are trusted only when
+`MCPRIG_PROXY_SECRET` is set — without it they are ignored: they neither mark a
+request `https` nor name the panel for the Host and Origin checks, and the OAuth
+redirect never depends on them.
 
 A second panel on the same data directory refuses to start because of
 `manager.pid`.
@@ -162,7 +219,7 @@ autostart, listener, `/healthz` status); keys (count and the active key's
 8-character `keyPrefix`); `${VAR}` secrets (names only, with the source —
 OpenBao, `env.json` or the environment — never values); services (foreign
 listeners in `9100–9199`, `sets/*/oauth.json` size, `tool-out/` size, panel
-`/healthz`). The version and binary path line is printed above the first
+`/healthz`, and the effective OAuth redirect). The version and binary path line is printed above the first
 heading. The sandbox is a line inside the services section: it runs `bwrap`
 with a user namespace and reports `песочница: bwrap запускается, userns
 разрешён`, or a problem when a config actually asks for isolation and bwrap or
@@ -171,7 +228,10 @@ userns is missing — exit code 1.
 Exit code: `0` when every line is `ok`, `1` otherwise; the last line is
 `итог: N проблем`. Set listeners are dialled through `MCPRIG_BIND_IP` (a
 wildcard resolves to loopback); the panel address comes from `MCPRIG_HOST` and
-`MCPRIG_PORT`.
+`MCPRIG_PORT`. The same section prints the effective OAuth redirect built from
+`MCPRIG_PUBLIC_URL` (or the panel address): no host, port `0` or a loopback host
+behind `https` is a problem, because an identity provider cannot send the code
+there.
 
 ```text
 mcprig doctor, версия dev (/usr/local/bin/mcprig)
@@ -193,6 +253,7 @@ ok: чужие порты в диапазоне 9100–9199: 9119 (выдача 
 ok: sets/*/oauth.json нет
 ok: tool-out нет
 ok: панель 127.0.0.1:9091: /healthz 200
+ok: redirect OAuth: http://127.0.0.1:9091/oauth/callback
 
 итог: 0 проблем
 ```
@@ -251,6 +312,126 @@ Exit code: `0` when every set warmed, `1` when any set failed (panel
 unreachable, missing key, timeout); the failing line carries the reason.
 `deploy/mcprig-warm.timer` repeats this every ten minutes — see
 `deploy/README.md`.
+
+## approve
+
+```bash
+mcprig approve --set main serena/find_symbol
+mcprig approve --set main serena/find_symbol gitea/create_pull_request
+mcprig approve --set main --all
+```
+
+A tool whose descriptor changed after it was approved is quarantined: the proxy
+refuses its calls until a person approves the new descriptor
+([meta-tools.md](meta-tools.md#descriptor-quarantine)). The refusal names this
+command. The first appearance of a tool is approved automatically, so `approve`
+only ever deals with a genuine change.
+
+The panel owns the record: the command reads and writes it through the panel
+API, the same two routes the **Tools** drawer uses. `--all` takes every tool
+that is currently changed; without it each argument is one `server/tool`.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-set` | `main` | set name |
+| `-all` | | approve every changed tool of the set |
+| `-panel` | `MCPRIG_PANEL_URL`, else `http://127.0.0.1:$MCPRIG_PORT` | panel address |
+| `-password` | `MCPRIG_PASSWORD` | panel password |
+| `-secret` | `MCPRIG_PROXY_SECRET` | panel proxy secret |
+| `-user` | `admin` | panel login name |
+
+```text
+набор main: одобрен serena/find_symbol
+```
+
+`--all` lists what it approved:
+
+```text
+набор main: одобрено 2
+  gitea/create_pull_request
+  serena/replace_symbol_body
+```
+
+A tool that did not change is refused by the panel — `нечего одобрять:
+serena/find_symbol не менялся или неизвестен` — and the command exits `1`.
+
+The panel writes the record with `approvedBy: "panel"`: the drawer and this
+command are one client of one API, and the CLI has no identity of its own.
+Exit code: `0` when everything asked for was approved — `--all` with nothing
+changed is also `0`; `1` when the panel refused a tool (unchanged or unknown)
+or the request failed; `2` on a command-line error (both `--all` and a list, or
+neither).
+
+## status
+
+```bash
+mcprig status
+mcprig status --panel http://127.0.0.1:9091 --json
+mcprig status --set example
+```
+
+One shot of what the panel shows: `/healthz` (public, so a dead panel is an
+error naming the address rather than a stack trace) and `/api/state` (every set
+with its port, state, key and runtime error). The tool count and the last call
+time come from `/api/calls`: `0` and `—` mean the set is stopped or that request
+did not answer — it is best-effort and never fails the command.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-panel` | `MCPRIG_PANEL_URL`, else `http://127.0.0.1:$MCPRIG_PORT` | panel address |
+| `-set` | empty: every set | one set, by id |
+| `-json` | | `{panel, health, sets: [{id, name, state, port, tools, key, lastCall, error}]}` |
+| `-timeout` | `10s` | budget for the whole report |
+| `-password` | `MCPRIG_PASSWORD` | panel password (kept out of the output) |
+| `-secret` | `MCPRIG_PROXY_SECRET` | reverse-proxy secret |
+| `-user` | `admin` | panel login name |
+
+```text
+mcprig status, панель http://127.0.0.1:9091
+здоровье: ok
+
+набор    состояние   порт  инструментов  ключ  последний вызов
+example  запущен     9101  12            есть  2026-11-15 13:00:11
+lab      остановлен  9102  —             нет   —
+
+итог: 2 набора
+```
+
+Exit code: `0` when the panel answered; `1` otherwise (unreachable, `401` — add
+`-password` or `-secret`, unknown `-set`).
+
+## logs
+
+```bash
+mcprig logs --set example
+mcprig logs --set example --server context7 -n 50
+mcprig logs --set example -f --json
+```
+
+`logs` reads `/api/sets/<id>/logs`, or `/api/sets/<id>/servers/<name>/logs` with
+`-server`, passing the same `lines` parameter the panel uses. With `-f` it polls
+once a second and prints only lines it has not printed yet; Ctrl-C exits with
+code `0`. A repeating log is the one exception: when the whole answer is a tail
+of the previous one and is not identical to it, `logs` prints the answer again
+instead of staying silent — the panel tail carries no cursor.
+`-json` prints one object per line: `{"set","server","line","ts"}` when
+the panel returns structured lines, `{"line":"…"}` while it returns plain
+strings.
+
+| flag | default | meaning |
+| --- | --- | --- |
+| `-panel` | `MCPRIG_PANEL_URL`, else `http://127.0.0.1:$MCPRIG_PORT` | panel address |
+| `-set` | required | set whose log is read |
+| `-server` | empty: the whole set | one server's log |
+| `-n` | `200` | how many last lines to take |
+| `-f` | | follow: poll once a second, print only new lines |
+| `-json` | | one object per line |
+| `-password` | `MCPRIG_PASSWORD` | panel password (kept out of the output) |
+| `-secret` | `MCPRIG_PROXY_SECRET` | reverse-proxy secret |
+| `-user` | `admin` | panel login name |
+
+Exit code: `0` at EOF and on Ctrl-C, `1` when the panel refuses (unknown set or
+server, `401`, unreachable).
 
 ## init
 

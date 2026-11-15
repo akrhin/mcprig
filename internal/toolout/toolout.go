@@ -54,7 +54,7 @@ func FromEnv() (Config, []string) {
 	if v := strings.TrimSpace(os.Getenv("MCPRIG_TOOLOUT_TTL")); v != "" {
 		switch d, err := time.ParseDuration(v); {
 		case err != nil:
-			warns = append(warns, fmt.Sprintf("MCPRIG_TOOLOUT_TTL=%q: %v — беру %s", v, err, DefaultTTL))
+			warns = append(warns, fmt.Sprintf("MCPRIG_TOOLOUT_TTL=%q: %v; беру %s", v, err, DefaultTTL))
 		case d <= 0:
 			warns = append(warns, fmt.Sprintf("MCPRIG_TOOLOUT_TTL=%q: срок должен быть положительным — беру %s", v, DefaultTTL))
 		default:
@@ -64,7 +64,7 @@ func FromEnv() (Config, []string) {
 	if v := strings.TrimSpace(os.Getenv("MCPRIG_TOOLOUT_MAX")); v != "" {
 		switch n, err := ParseSize(v); {
 		case err != nil:
-			warns = append(warns, fmt.Sprintf("MCPRIG_TOOLOUT_MAX=%q: %v — беру %d байт", v, err, DefaultMax))
+			warns = append(warns, fmt.Sprintf("MCPRIG_TOOLOUT_MAX=%q: %v; беру %d байт", v, err, DefaultMax))
 		case n <= 0:
 			warns = append(warns, fmt.Sprintf("MCPRIG_TOOLOUT_MAX=%q: объём должен быть положительным — беру %d байт", v, DefaultMax))
 		default:
@@ -93,11 +93,11 @@ func ParseSize(s string) (int64, error) {
 	}
 	mult, ok := sizeUnits[unit]
 	if !ok {
-		return 0, fmt.Errorf("непонятная единица %q", unit)
+		return 0, fmt.Errorf("непонятная единица %q: допустимо B, KiB, MiB, GiB", unit)
 	}
 	n, err := strconv.ParseInt(num, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("не число: %q", strings.TrimSpace(s))
+		return 0, fmt.Errorf("MCPRIG_TOOLOUT_MAX: не число: %q", strings.TrimSpace(s))
 	}
 	if n > (1<<62)/mult {
 		return 0, fmt.Errorf("слишком большое значение: %q", strings.TrimSpace(s))

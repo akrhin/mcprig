@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -81,15 +82,15 @@ func (e *usageError) Error() string { return e.msg }
 // newServeFlags описывает флаги serve один раз: их разбирает и parseArgs, и run.
 func newServeFlags() (fs *flag.FlagSet, cfgPath *string, showVersion *bool, addr *string) {
 	fs = flag.NewFlagSet("serve", flag.ContinueOnError)
-	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
 	showVersion = fs.Bool("version", false, "показать версию и выйти")
-	addr = fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из transport")
+	addr = fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из поля transport конфигурации")
 	return fs, cfgPath, showVersion, addr
 }
 
 func newStdioFlags() (fs *flag.FlagSet, cfgPath *string) {
 	fs = flag.NewFlagSet("stdio", flag.ContinueOnError)
-	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
 	return fs, cfgPath
 }
 
@@ -103,7 +104,7 @@ func parseFlags(fs *flag.FlagSet, args []string) error {
 		return &usageError{err.Error()}
 	}
 	if fs.NArg() > 0 {
-		return &usageError{fmt.Sprintf("лишние аргументы: %q", fs.Args())}
+		return &usageError{fmt.Sprintf("лишние аргументы: %s; команда принимает: serve|stdio|auth|approve|panel|init|doctor|warm|status|logs", strings.Join(fs.Args(), ", "))}
 	}
 	return nil
 }
@@ -136,6 +137,12 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 			return "", nil, err
 		}
 		return "stdio", args[1:], nil
+	case "auth":
+		// Позиционный аргумент — имя сервера, поэтому разбор внутри runAuth.
+		return "auth", args[1:], nil
+	case "approve":
+		// Позиционные server/tool, поэтому разбор внутри runApprove.
+		return "approve", args[1:], nil
 	case "init":
 		if len(args) > 1 {
 			return "init", args[1:], nil
@@ -153,13 +160,25 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 			return "", nil, err
 		}
 		return "warm", args[1:], nil
+	case "status":
+		fs, _ := newStatusFlags()
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
+		}
+		return "status", args[1:], nil
+	case "logs":
+		fs, _ := newLogsFlags()
+		if err := parseFlags(fs, args[1:]); err != nil {
+			return "", nil, err
+		}
+		return "logs", args[1:], nil
 	case "panel":
 		if len(args) > 1 {
 			return "", nil, &usageError{fmt.Sprintf("panel не принимает аргументов: %q", args[1:])}
 		}
 		return "panel", nil, nil
 	}
-	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, panel, init, doctor, warm", args[0])}
+	return "", nil, &usageError{fmt.Sprintf("неизвестная подкоманда %q; доступны: serve, stdio, auth, approve, panel, init, doctor, warm, status, logs", args[0])}
 }
 
 // tooloutInterval is a variable only so a test can shorten the sweep; serve and
@@ -185,6 +204,8 @@ func run() error {
 	switch mode {
 	case "stdio":
 		return runStdio(rest)
+	case "auth":
+		return runAuth(rest)
 	case "panel":
 		return manager.Run(manager.FromEnv(version))
 	case "init":
@@ -193,6 +214,12 @@ func run() error {
 		return runDoctor(rest)
 	case "warm":
 		return runWarm(rest)
+	case "approve":
+		return runApprove(rest)
+	case "status":
+		return runStatus(rest)
+	case "logs":
+		return runLogs(rest)
 	}
 	args := rest
 
@@ -212,6 +239,8 @@ func run() error {
 	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	stopTracing := startTracing(log)
+	defer stopTracing()
 	store, err := oauth.OpenStore(stateDir())
 	if err != nil {
 		return err
@@ -224,6 +253,7 @@ func run() error {
 			log.Warn("закрытие менеджера", "err", err)
 		}
 	}()
+	mgr.LockPath = lockPath()
 
 	rec := stats.NewRecorder(os.Getenv("MCPRIG_SET"), 0)
 	// Recorder до прогрева: прогрев наполняет кэш инструментов и публикует
@@ -242,6 +272,9 @@ func run() error {
 	// Прогрев в фоне: иначе первый list_commands ждёт, пока поднимутся все
 	// npx/uvx-серверы (на одиннадцати это ~11 с).
 	go mgr.Warm(context.Background())
+	// Маркер усечения называет /tool-out, только когда файл можно забрать: у
+	// открытого набора ключа нет, и подсказка вела бы в 401.
+	mgr.ToolOutURL = len(transportTokens(cfg)) > 0
 	handler, err := httplisten.New(cfg, mgr.Server(), log, rec)
 	if err != nil {
 		return err
@@ -265,6 +298,13 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// SIGHUP перечитывает servers.json на живом процессе: супервизор правит
+	// один сервер и не рвёт набор целиком.
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
+	go reloadLoop(ctx, hup, mgr, handler, *cfgPath, log)
+
 	// Выгрузки усечённых ответов чистятся при старте и дальше периодически.
 	startToolout(ctx, log)
 
@@ -281,6 +321,149 @@ func run() error {
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdown)
+}
+
+// reloadLoop перечитывает servers.json по SIGHUP, пока процесс жив.
+func reloadLoop(ctx context.Context, hup <-chan os.Signal, mgr *mcpserver.Manager, handler *httplisten.Server, cfgPath string, log *slog.Logger) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-hup:
+		}
+		res := reloadOnce(mgr, handler, cfgPath, log)
+		added, updated, removed, reset := countApplied(res.Applied)
+		log.Info(fmt.Sprintf("reload: применено %d, изменено %d, удалено %d, generation %d",
+			len(res.Applied), updated+reset, removed, res.Generation),
+			"added", added, "updated", updated, "reset", reset, "removed", removed,
+			"restartNeeded", res.RestartNeeded, "err", res.Err)
+	}
+}
+
+// reloadOnce делает одну попытку и пишет ack супервизору. Битый конфиг не
+// роняет набор: прежний конфиг продолжает работать, ошибка уходит в status.
+func reloadOnce(mgr *mcpserver.Manager, handler *httplisten.Server, cfgPath string, log *slog.Logger) mcpserver.ReloadResult {
+	dir := filepath.Dir(cfgPath)
+	// Метку читаем до работы: пока грузится конфиг, супервизор может начать
+	// следующую попытку, и её nonce не должен достаться нашему ответу.
+	nonce := readReloadNonce(dir)
+	cfg, err := config.Load(cfgPath)
+	var res mcpserver.ReloadResult
+	if err != nil {
+		res = mgr.ReloadFailed(err)
+	} else {
+		// Политика доступа применяется слушателем здесь же: выдача нового
+		// ключа и потеря последнего не ждут перезапуска набора. Остальной
+		// транспорт — дело mgr.Reload.
+		if handler != nil && cfg.Transport != nil {
+			handler.SetAuth(transportTokens(cfg), cfg.Transport.AllowAnonymous, cfg.Transport.ClientNames)
+		}
+		res = mgr.Reload(cfg)
+	}
+	if werr := writeReloadStatus(filepath.Join(dir, "reload.status"), res, nonce); werr != nil {
+		log.Warn("reload.status не записан", "err", werr)
+	}
+	return res
+}
+
+// transportTokens — токены, которые принимает слушатель: список ключей, а у
+// файла с одним ключом — сам authToken.
+func transportTokens(cfg *config.Config) []string {
+	if cfg == nil || cfg.Transport == nil {
+		return nil
+	}
+	if len(cfg.Transport.AuthTokens) > 0 {
+		return cfg.Transport.AuthTokens
+	}
+	if cfg.Transport.AuthToken != "" {
+		return []string{cfg.Transport.AuthToken}
+	}
+	return nil
+}
+
+// readReloadNonce берёт метку попытки, которую супервизор положил рядом с
+// конфигом до SIGHUP: ack несёт её, и ответ прошлой попытки не сойдёт за новый.
+func readReloadNonce(dir string) string {
+	body, err := os.ReadFile(filepath.Join(dir, "reload.request"))
+	if err != nil {
+		return ""
+	}
+	var req struct {
+		Nonce string `json:"nonce"`
+	}
+	if json.Unmarshal(body, &req) != nil {
+		return ""
+	}
+	return req.Nonce
+}
+
+// countApplied считает записи вида "added:name".
+func countApplied(applied []string) (added, updated, removed, reset int) {
+	for _, item := range applied {
+		switch {
+		case strings.HasPrefix(item, "added:"):
+			added++
+		case strings.HasPrefix(item, "updated:"):
+			updated++
+		case strings.HasPrefix(item, "removed:"):
+			removed++
+		case strings.HasPrefix(item, "reset:"):
+			reset++
+		}
+	}
+	return added, updated, removed, reset
+}
+
+// reloadStatus — единственный ack для супервизора: HTTP для этого не заводим.
+type reloadStatus struct {
+	// Nonce повторяет reload.request: ответ относится ровно к этой попытке.
+	Nonce         string   `json:"nonce,omitempty"`
+	Generation    int      `json:"generation"`
+	At            string   `json:"at"`
+	Applied       []string `json:"applied"`
+	RestartNeeded []string `json:"restartNeeded"`
+	Error         string   `json:"error"`
+}
+
+// writeReloadStatus пишет status атомарно (временный файл + rename), чтобы
+// супервизор не прочитал половину: старый файл остаётся до удачного rename.
+func writeReloadStatus(path string, res mcpserver.ReloadResult, nonce string) error {
+	st := reloadStatus{
+		Nonce:         nonce,
+		Generation:    res.Generation,
+		At:            time.Now().Format(time.RFC3339),
+		Applied:       res.Applied,
+		RestartNeeded: res.RestartNeeded,
+		Error:         res.Err,
+	}
+	if st.Applied == nil {
+		st.Applied = []string{}
+	}
+	if st.RestartNeeded == nil {
+		st.RestartNeeded = []string{}
+	}
+	body, err := json.Marshal(st)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".reload.status-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(body); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func defaultConfigPath() string {
@@ -306,6 +489,8 @@ func runStdio(args []string) error {
 		return err
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	stopTracing := startTracing(log)
+	defer stopTracing()
 	store, err := oauth.OpenStore(stateDir())
 	if err != nil {
 		return err
@@ -318,6 +503,7 @@ func runStdio(args []string) error {
 			log.Warn("закрытие менеджера", "err", err)
 		}
 	}()
+	mgr.LockPath = lockPath()
 
 	// История вызовов: у stdio нет панели над процессом, но разрез по
 	// периодам читается с диска так же, как у набора. Без неё прокси работает
@@ -342,6 +528,23 @@ func runStdio(args []string) error {
 	return mgr.Server().Run(ctx, &mcp.StdioTransport{})
 }
 
+// startTracing включает OTLP-экспорт, если он задан окружением. Возвращённая
+// функция гасит экспортер и дописывает накопленный батч: иначе последние спаны
+// теряются вместе с процессом.
+func startTracing(log *slog.Logger) func() {
+	shutdown, err := mcpserver.SetupTracing(context.Background())
+	if err != nil {
+		log.Warn("трассировка: экспортер не поднялся, спаны не уходят", "err", err)
+	}
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(ctx); err != nil {
+			log.Warn("трассировка: остановка экспортера", "err", err)
+		}
+	}
+}
+
 // stateDir holds what must survive a restart but is not configuration: OAuth
 // tokens now, the manager's registry later.
 func stateDir() string {
@@ -356,4 +559,15 @@ func stateDir() string {
 		return ".mcprig"
 	}
 	return filepath.Join(home, ".local", "state", "mcprig")
+}
+
+// lockPath names the approved-descriptor record. A set process gets its own
+// directory in MCPRIG_DATA_DIR (internal/manager/runtime.go, setEnv), so the
+// file sits right there — the same path the panel reads and approves. A manual
+// serve without a set has nobody to approve, and the quarantine stays off.
+func lockPath() string {
+	if dir := os.Getenv("MCPRIG_DATA_DIR"); dir != "" {
+		return filepath.Join(dir, "tools.lock.json")
+	}
+	return ""
 }

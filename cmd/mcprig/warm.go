@@ -6,11 +6,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -83,7 +81,7 @@ func runWarm(args []string) error {
 	}
 	switch {
 	case o.All && o.Config != "":
-		return &usageError{"--all и --config несовместимы"}
+		return &usageError{"укажите что-то одно: --all или --config"}
 	case o.All && o.Set != "main":
 		return &usageError{"--all и --set несовместимы: прогреваются все наборы"}
 	case o.All && o.URL != "":
@@ -270,7 +268,7 @@ func warmSession(ctx context.Context, cs *mcp.ClientSession) (int, error) {
 	}
 	if len(down) > 0 {
 		sort.Strings(down)
-		return total, fmt.Errorf("не ответили серверы: %s", strings.Join(down, ", "))
+		return total, fmt.Errorf("не ответили серверы: %s — проверьте, что они запущены, или поднимите --timeout", strings.Join(down, ", "))
 	}
 	return total, nil
 }
@@ -333,7 +331,7 @@ func readToken(path string) (string, error) {
 	}
 	tok := strings.TrimSpace(string(body))
 	if tok == "" {
-		return "", fmt.Errorf("файл %s пуст", path)
+		return "", fmt.Errorf("файл %s пуст — передайте токен через --token", path)
 	}
 	return tok, nil
 }
@@ -356,18 +354,6 @@ type panelSet struct {
 	Open      bool   `json:"open"`
 }
 
-// panelBaseURL: --panel, иначе MCPRIG_PANEL_URL, иначе локальная панель на
-// MCPRIG_PORT (9091 по умолчанию, как в deploy/mcprig.service).
-func panelBaseURL(o *warmConfig) string {
-	if o.Panel != "" {
-		return o.Panel
-	}
-	if v := os.Getenv("MCPRIG_PANEL_URL"); v != "" {
-		return v
-	}
-	return "http://127.0.0.1:" + envDefault("MCPRIG_PORT", "9091")
-}
-
 func endpointFor(ctx context.Context, o *warmConfig, set string) (string, error) {
 	sets, err := fetchPanelSets(ctx, o)
 	if err != nil {
@@ -378,10 +364,10 @@ func endpointFor(ctx context.Context, o *warmConfig, set string) (string, error)
 			// открытый набор в панели виден как Open: без ключа он всё равно
 			// прогревается, поэтому warmEndpoint не считает это ошибкой.
 			o.setOpen = s.Open
-			return setEndpoint(panelBaseURL(o), s.Port), nil
+			return setEndpoint(panelBaseURL(o.Panel), s.Port), nil
 		}
 	}
-	return "", fmt.Errorf("набор %q не найден в панели %s", set, panelBaseURL(o))
+	return "", fmt.Errorf("набор %q не найден в панели %s", set, panelBaseURL(o.Panel))
 }
 
 func setEndpoint(panelURL string, port int) string {
@@ -393,72 +379,21 @@ func setEndpoint(panelURL string, port int) string {
 }
 
 func fetchPanelSets(ctx context.Context, o *warmConfig) ([]panelSet, error) {
-	base := strings.TrimRight(panelBaseURL(o), "/")
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: jar, Timeout: 10 * time.Second}
-	password := o.Password
-	if password == "" {
-		password = os.Getenv("MCPRIG_PASSWORD")
-	}
-	if password != "" {
-		user := o.User
-		if user == "" {
-			user = "admin"
-		}
-		body, _ := json.Marshal(map[string]string{"user": user, "password": password})
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/login", strings.NewReader(string(body)))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		panelHeaders(req, o)
-		res, err := client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("панель %s: %w", base, err)
-		}
-		raw, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-		res.Body.Close()
-		if res.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("панель %s: /api/login %d %s", base, res.StatusCode, strings.TrimSpace(string(raw)))
-		}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/sets", nil)
+	base := strings.TrimRight(panelBaseURL(o.Panel), "/")
+	creds := panelCreds{Password: o.Password, Secret: o.Secret, User: o.User}
+	client, err := newPanelClient(ctx, base, creds)
 	if err != nil {
 		return nil, err
 	}
-	panelHeaders(req, o)
-	res, err := client.Do(req)
+	raw, err := panelGet(ctx, client, base, creds, "/api/sets", "наборы")
 	if err != nil {
-		return nil, fmt.Errorf("панель %s: %w", base, err)
-	}
-	defer res.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(res.Body, 8<<20))
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("панель %s: /api/sets %d %s", base, res.StatusCode, strings.TrimSpace(string(raw)))
+		return nil, err
 	}
 	var sets []panelSet
 	if err := json.Unmarshal(raw, &sets); err != nil {
 		return nil, fmt.Errorf("панель %s: /api/sets: %w", base, err)
 	}
 	return sets, nil
-}
-
-// panelHeaders — вход через обратный прокси: секрет и имя пользователя.
-func panelHeaders(req *http.Request, o *warmConfig) {
-	secret := o.Secret
-	if secret == "" {
-		secret = os.Getenv("MCPRIG_PROXY_SECRET")
-	}
-	if secret == "" {
-		return
-	}
-	req.Header.Set("x-mcp-proxy-secret", secret)
-	user := o.User
-	if user == "" {
-		user = "admin"
-	}
-	req.Header.Set(envDefault("MCPRIG_USER_HEADER", "Remote-User"), user)
 }
 
 func warmAll(o *warmConfig) []warmResult {
@@ -471,7 +406,7 @@ func warmAll(o *warmConfig) []warmResult {
 	if len(sets) == 0 {
 		return []warmResult{{Set: "panel", Error: "в панели нет наборов"}}
 	}
-	base := panelBaseURL(o)
+	base := panelBaseURL(o.Panel)
 	results := make([]warmResult, 0, len(sets))
 	for _, s := range sets {
 		one := *o
@@ -492,16 +427,16 @@ func renderWarm(results []warmResult) []byte {
 	for _, r := range results {
 		if r.Error != "" {
 			fails++
-			fmt.Fprintf(&b, "%s: ошибка: %s\n", r.Set, r.Error)
+			fmt.Fprintf(&b, "%s: не ответил: %s\n", r.Set, r.Error)
 			continue
 		}
 		tools += r.Tools
 		ms += r.Ms
-		fmt.Fprintf(&b, "%s: %d %s, %.1f мс\n", r.Set, r.Tools, instrumentWord(r.Tools), r.Ms)
+		fmt.Fprintf(&b, "%s: %d %s, %s мс\n", r.Set, r.Tools, pluralBy(r.Tools, "инструмент", "инструмента", "инструментов"), dec(r.Ms))
 	}
-	fmt.Fprintf(&b, "итог: %d %s, %d %s, %.1f мс", len(results), setWord(len(results)), tools, instrumentWord(tools), ms)
+	fmt.Fprintf(&b, "итог: %d %s, %d %s, %s мс", len(results), pluralBy(len(results), "набор", "набора", "наборов"), tools, pluralBy(tools, "инструмент", "инструмента", "инструментов"), dec(ms))
 	if fails > 0 {
-		fmt.Fprintf(&b, ", %d %s", fails, errorWord(fails))
+		fmt.Fprintf(&b, ", %d %s", fails, pluralBy(fails, "ошибка", "ошибки", "ошибок"))
 	}
 	b.WriteByte('\n')
 	return []byte(b.String())
@@ -511,32 +446,13 @@ func elapsedMs(start time.Time) float64 {
 	return float64(time.Since(start).Microseconds()) / 1000
 }
 
-func instrumentWord(n int) string {
+// pluralBy выбирает форму слова по числу: одна, две–четыре, много.
+func pluralBy(n int, one, few, many string) string {
 	if n%10 == 1 && n%100 != 11 {
-		return "инструмент"
+		return one
 	}
 	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "инструмента"
+		return few
 	}
-	return "инструментов"
-}
-
-func setWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "набор"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "набора"
-	}
-	return "наборов"
-}
-
-func errorWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "ошибка"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "ошибки"
-	}
-	return "ошибок"
+	return many
 }

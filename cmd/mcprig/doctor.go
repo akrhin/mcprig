@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -53,6 +54,7 @@ type doctorOptions struct {
 	BindIP     string
 	PanelHost  string
 	PanelPort  int
+	PublicURL  string
 	FirstPort  int
 	LastPort   int
 	Version    string
@@ -61,7 +63,7 @@ type doctorOptions struct {
 
 func newDoctorFlags() (fs *flag.FlagSet, cfgPath *string, asJSON *bool) {
 	fs = flag.NewFlagSet("doctor", flag.ContinueOnError)
-	cfgPath = fs.String("config", defaultConfigPath(), "путь к servers.json")
+	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
 	asJSON = fs.Bool("json", false, "машинный вывод")
 	return fs, cfgPath, asJSON
 }
@@ -81,6 +83,7 @@ func runDoctor(args []string) error {
 		BindIP:     envDefault("MCPRIG_BIND_IP", "0.0.0.0"),
 		PanelHost:  envDefault("MCPRIG_HOST", "127.0.0.1"),
 		PanelPort:  envPort("MCPRIG_PORT", 9091),
+		PublicURL:  strings.TrimSpace(os.Getenv("MCPRIG_PUBLIC_URL")),
 		FirstPort:  registry.FirstPort,
 		LastPort:   registry.LastPort,
 		Version:    version,
@@ -123,6 +126,7 @@ func buildDoctorReport(o doctorOptions, envLine doctorLine, haveEnv bool) doctor
 		rep.Secrets = checkSecrets(scanRaw, o.DataDir)
 	}
 	rep.Services = append(checkSandbox(cfg), checkServices(o, reg, regErr)...)
+	rep.Services = append([]doctorLine{checkRedirect(o)}, rep.Services...)
 
 	for _, lines := range [][]doctorLine{rep.Version, rep.Config, rep.Sets, rep.Keys, rep.Secrets, rep.Services} {
 		for _, line := range lines {
@@ -187,6 +191,33 @@ func keyWord(n int) string {
 	return "ключей"
 }
 
+// variableWord — «1 переменная», «2 переменные», «5 переменных».
+func variableWord(n int) string {
+	if n%10 == 1 && n%100 != 11 {
+		return "переменная"
+	}
+	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
+		return "переменные"
+	}
+	return "переменных"
+}
+
+// fileWord — «1 файл», «2 файла», «5 файлов».
+func fileWord(n int) string {
+	if n%10 == 1 && n%100 != 11 {
+		return "файл"
+	}
+	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
+		return "файла"
+	}
+	return "файлов"
+}
+
+// dec — число с одним знаком после запятой: «1,5», как принято в русском выводе.
+func dec(v float64) string {
+	return strings.Replace(fmt.Sprintf("%.1f", v), ".", ",", 1)
+}
+
 // readRegistry читает реестр без registry.Open: doctor не имеет права
 // переписывать файл (нормализация и сид — дело панели).
 func readRegistry(dataDir string) (*registry.Data, []byte, error) {
@@ -232,7 +263,7 @@ func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, 
 					enabled++
 				}
 			}
-			return []doctorLine{{true, fmt.Sprintf("конфиг %s не найден, серверы из реестра: %d, %d включено", path, len(reg.Servers), enabled)}}, regRaw, nil
+			return []doctorLine{{true, fmt.Sprintf("конфиг %s не найден; серверы взяты из реестра: %d, включено %d", path, len(reg.Servers), enabled)}}, regRaw, nil
 		}
 		return []doctorLine{{false, fmt.Sprintf("конфиг %s не найден, реестр недоступен", path)}}, nil, nil
 	default:
@@ -258,7 +289,7 @@ func checkSets(reg *registry.Data, regErr error, dataDir, bindIP string) (sets, 
 		prefix, active := activeKey(set.Keys)
 		switch {
 		case active:
-			keys = append(keys, doctorLine{true, fmt.Sprintf("%s: %d %s, активный %s", set.ID, len(set.Keys), keyWord(len(set.Keys)), prefix)})
+			keys = append(keys, doctorLine{true, fmt.Sprintf("%s: ключей %d, активный — %s", set.ID, len(set.Keys), prefix)})
 		case set.Open:
 			keys = append(keys, doctorLine{true, fmt.Sprintf("%s: %d %s, набор открыт (ключ не нужен)", set.ID, len(set.Keys), keyWord(len(set.Keys)))})
 		default:
@@ -272,7 +303,7 @@ func checkSets(reg *registry.Data, regErr error, dataDir, bindIP string) (sets, 
 		addr := net.JoinHostPort(dialHost, strconv.Itoa(set.Port))
 		if !portOpen(addr) {
 			if set.Autostart {
-				sets = append(sets, doctorLine{false, fmt.Sprintf("%s: порт %d, autostart, но не слушает %s", set.ID, set.Port, addr)})
+				sets = append(sets, doctorLine{false, fmt.Sprintf("%s: порт %d: автозапуск включён, но порт не слушается", set.ID, set.Port)})
 			} else {
 				sets = append(sets, doctorLine{true, fmt.Sprintf("%s: порт %d, остановлен (autostart выключен)", set.ID, set.Port)})
 			}
@@ -317,7 +348,7 @@ func loadPanelEnv(dir string) (doctorLine, bool) {
 	if len(paths) == 0 {
 		return doctorLine{}, false
 	}
-	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d переменных", strings.Join(paths, ", "), added)}, true
+	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d %s", strings.Join(paths, ", "), added, variableWord(added))}, true
 }
 
 // parseEnvFile разбирает подмножество systemd EnvironmentFile, которого
@@ -381,7 +412,7 @@ func checkSecrets(raw []byte, dataDir string) []doctorLine {
 			source = "env"
 		}
 		if source == "" {
-			lines = append(lines, doctorLine{false, fmt.Sprintf("%s: не найден (OpenBao, env.json, окружение)", name)})
+			lines = append(lines, doctorLine{false, fmt.Sprintf("%s: не найден ни в OpenBao, ни в env.json, ни в окружении — проверьте BAO_ADDR", name)})
 			continue
 		}
 		lines = append(lines, doctorLine{true, fmt.Sprintf("%s: %s", name, secretSourceLabel(source))})
@@ -405,11 +436,39 @@ func checkSandbox(cfg *config.Config) []doctorLine {
 	}
 	if err := sandbox.Probe(); err != nil {
 		if wanted {
-			return []doctorLine{{false, fmt.Sprintf("песочница: %v (её просят серверы конфига)", err)}}
+			return []doctorLine{{false, fmt.Sprintf("песочница: %v — её просят серверы конфигурации", err)}}
 		}
-		return []doctorLine{{true, fmt.Sprintf("предупреждение: песочница: %v", err)}}
+		return []doctorLine{{true, fmt.Sprintf("песочница: %v", err)}}
 	}
 	return []doctorLine{{true, "песочница: bwrap запускается, userns разрешён"}}
+}
+
+// checkRedirect печатает эффективный адрес приёма кода и ругается, когда он
+// ведёт в пустоту: провайдер отвергнет регистрацию, а человек — ссылку.
+func checkRedirect(o doctorOptions) doctorLine {
+	if o.PublicURL != "" {
+		if err := config.ValidatePublicURL(o.PublicURL); err != nil {
+			return doctorLine{false, fmt.Sprintf("redirect OAuth: %v", err)}
+		}
+	}
+	redirect, err := manager.CallbackURL(o.PublicURL, o.PanelHost, o.PanelPort)
+	if err != nil {
+		return doctorLine{false, fmt.Sprintf("redirect OAuth: %v", err)}
+	}
+	u, err := url.Parse(redirect)
+	if err != nil {
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %q: %v", redirect, err)}
+	}
+	host := u.Hostname()
+	switch {
+	case host == "":
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %s: нет хоста", redirect)}
+	case u.Port() == "0":
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %s: порт 0", redirect)}
+	case u.Scheme == "https" && (strings.EqualFold(host, "localhost") || (net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback())):
+		return doctorLine{false, fmt.Sprintf("redirect OAuth %s: loopback при https недостижим снаружи", redirect)}
+	}
+	return doctorLine{true, "redirect OAuth: " + redirect}
 }
 
 func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLine {
@@ -562,13 +621,13 @@ func toolOutLine(dataDir string) doctorLine {
 	size, count, oldest, err := toolout.Usage(dataDir)
 	switch {
 	case err == nil:
-		line := fmt.Sprintf("tool-out: %d файлов, %s", count, humanBytes(size))
+		line := fmt.Sprintf("tool-out: %d %s, %s", count, fileWord(count), humanBytes(size))
 		if count > 0 {
 			line += fmt.Sprintf(", самый старый %s", humanAge(time.Since(oldest)))
 		}
 		return doctorLine{true, line}
 	case errors.Is(err, fs.ErrNotExist):
-		return doctorLine{true, "tool-out нет"}
+		return doctorLine{true, "tool-out: файлов нет"}
 	default:
 		return doctorLine{false, fmt.Sprintf("tool-out: %v", err)}
 	}
@@ -593,11 +652,11 @@ func humanBytes(n int64) string {
 	case n < unit:
 		return fmt.Sprintf("%d Б", n)
 	case n < unit*unit:
-		return fmt.Sprintf("%.1f КБ", float64(n)/unit)
+		return dec(float64(n)/unit) + " КБ"
 	case n < unit*unit*unit:
-		return fmt.Sprintf("%.1f МБ", float64(n)/(unit*unit))
+		return dec(float64(n)/(unit*unit)) + " МБ"
 	default:
-		return fmt.Sprintf("%.1f ГБ", float64(n)/(unit*unit*unit))
+		return dec(float64(n)/(unit*unit*unit)) + " ГБ"
 	}
 }
 

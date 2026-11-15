@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
 )
@@ -49,7 +50,7 @@ func requiredString(in map[string]json.RawMessage, key string) (string, error) {
 		return "", err
 	}
 	if v == "" {
-		return "", fmt.Errorf("%s: обязательное поле", key)
+		return "", fmt.Errorf("%s: обязательное поле — заполните его", key)
 	}
 	return v, nil
 }
@@ -117,7 +118,7 @@ func commandOf(in map[string]json.RawMessage) ([]string, error) {
 // and never comes from the body.
 func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if !namePattern.MatchString(name) {
-		return nil, errors.New("имя сервера: строчные латинские буквы, цифры, дефис и подчёркивание")
+		return nil, errors.New("в имени допустимы строчные латинские буквы, цифры, дефис и подчёркивание")
 	}
 	srv := &config.Server{Name: name, Enabled: true}
 
@@ -173,13 +174,34 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	// permissions читается тем же разбором, что и config.Load: сервер из панели
+	// иначе оставался без правил, и browse с invoke_command разрешали всё.
+	var perms *config.Permissions
+	if raw, ok := in["permissions"]; ok && !isNull(raw) {
+		p, msg := config.ParsePermissions(raw)
+		if msg != "" {
+			return nil, errors.New(msg)
+		}
+		perms = p
+	}
+	// expose читается тем же разбором, что и config.Load: без него сервер из
+	// панели не отдавал клиенту ни ресурсов, ни промптов, и включить это было
+	// неоткуда. Неизвестный вид ловит Check ниже — одним списком допустимых.
+	var expose []string
+	if raw, ok := in["expose"]; ok && !isNull(raw) {
+		list, msg := config.ParseExpose(raw)
+		if msg != "" {
+			return nil, errors.New(msg)
+		}
+		expose = list
+	}
 
 	hasCommand, hasURL := len(command) > 0, url != ""
 	if hasCommand && hasURL {
-		return nil, errors.New("укажите что-то одно: command[] или url")
+		return nil, errors.New("нужен ровно один из них: command[] или url")
 	}
 	if !hasCommand && !hasURL {
-		return nil, errors.New("нужен command[] или url")
+		return nil, errors.New("нужен ровно один из них: command[] или url")
 	}
 	if transport == "" {
 		if hasURL {
@@ -191,11 +213,11 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	switch transport {
 	case "stdio":
 		if !hasCommand {
-			return nil, errors.New("транспорт stdio требует command[]")
+			return nil, errors.New("для транспорта stdio нужен command[]")
 		}
 	case "http":
 		if !hasURL {
-			return nil, errors.New("транспорт http требует url")
+			return nil, errors.New("для транспорта http нужен url")
 		}
 		if _, ok := in["cwd"]; ok && !isNull(in["cwd"]) {
 			return nil, errors.New("cwd допустим только для транспорта stdio")
@@ -220,6 +242,8 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	srv.Tags = tags
 	srv.Enabled = enabled
 	srv.Sandbox = sandbox
+	srv.Permissions = perms
+	srv.Expose = expose
 	// Те же правила, что у config.Load, включая запрет untrusted без песочницы:
 	// иначе API отвечает 200 и сервер живёт без изоляции.
 	if msg := srv.Check(); msg != "" {
@@ -239,7 +263,6 @@ func mergeServer(cur Server, patch map[string]json.RawMessage) (map[string]json.
 	if err != nil {
 		return nil, err
 	}
-	delete(out, "_configError")
 	for k, v := range patch {
 		if isNull(v) {
 			delete(out, k)
@@ -276,7 +299,7 @@ func slugify(v string) string {
 
 func checkPort(port int) error {
 	if port < FirstPort || port > LastPort {
-		return fmt.Errorf("порт: целое %d–%d", FirstPort, LastPort)
+		return fmt.Errorf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
 	}
 	return nil
 }
@@ -348,7 +371,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 			}
 		}
 		if len(missing) > 0 {
-			return nil, fmt.Errorf("нет в реестре: %s", strings.Join(missing, ", "))
+			return nil, fmt.Errorf("в реестре нет серверов: %s", strings.Join(missing, ", "))
 		}
 		out.Servers = names
 	}
@@ -360,7 +383,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	if raw, ok := in["port"]; ok && !isNull(raw) {
 		var port int
 		if err := json.Unmarshal(raw, &port); err != nil {
-			return nil, fmt.Errorf("порт: целое %d–%d", FirstPort, LastPort)
+			return nil, fmt.Errorf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
 		}
 		out.Port = port
 		explicitPort = true
@@ -383,7 +406,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	// Порт из тела при правке: незанятый в реестре ещё не значит свободный в
 	// системе, иначе рестарт набора упадёт уже после записи.
 	if cur != nil && explicitPort && cur.Port != out.Port && portBusy(out.Port) {
-		return nil, fmt.Errorf("порт %d занят процессом", out.Port)
+		return nil, fmt.Errorf("порт %d занят процессом — выберите другой", out.Port)
 	}
 
 	if autostart, present, err := strictBool(in, "autostart"); err != nil {
@@ -397,6 +420,94 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		out.Open = open
 	}
 
+	// notify — три состояния: поля нет — старое значение остаётся; null —
+	// снятие; объект — замена (пустой webhook внутри объекта — тоже снятие,
+	// иначе правка не могла бы убрать блок, не зная про null).
+	if raw, ok := in["notify"]; ok {
+		if isNull(raw) {
+			out.Notify = nil
+		} else {
+			var n Notify
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return nil, errors.New(`notify: ожидался объект {"webhook": "https://…"}`)
+			}
+			if msg := n.Check(); msg != "" {
+				return nil, errors.New(msg)
+			}
+			if strings.TrimSpace(n.Webhook) == "" {
+				out.Notify = nil
+			} else {
+				out.Notify = &n
+			}
+		}
+	}
+
+	// rateLimit — те же три состояния, что у notify: поля нет — значение
+	// остаётся; null — снятие; объект — замена. Нулевой блок значит «без
+	// лимита» и хранится как отсутствие поля.
+	if raw, ok := in["rateLimit"]; ok {
+		if isNull(raw) {
+			out.RateLimit = nil
+		} else {
+			var rl config.RateLimit
+			if err := rl.Decode(raw); err != nil {
+				return nil, fmt.Errorf(`rateLimit: ожидался объект {"perMinute": 120, "burst": 20, "perTool": {"server/tool": {"perMinute": 10, "burst": 2}}}: %w`, err)
+			}
+			if msg := rl.Check(); msg != "" {
+				return nil, errors.New(msg)
+			}
+			if rl.Empty() {
+				out.RateLimit = nil
+			} else {
+				out.RateLimit = &rl
+			}
+		}
+	}
+
+	// profiles — те же три состояния, что у notify: поля нет — блок остаётся,
+	// null — снятие, объект — замена целиком. Ключи, назвавшие снятый профиль,
+	// перестают проходить вызовы: профиль не находится — отказ, а не «всё можно».
+	if raw, ok := in["profiles"]; ok {
+		if isNull(raw) {
+			out.Profiles = nil
+		} else {
+			profiles, err := config.ParseProfiles(raw)
+			if err != nil {
+				return nil, err
+			}
+			out.Profiles = profiles
+		}
+	}
+
+	// token — совместимость: PUT с "token" назначает токен основному ключу,
+	// а если действующих ключей нет — заводит ключ с новым id. Токены
+	// остальных ключей это не трогает: их выдаёт и отзывает /keys.
+	if raw, ok := in["token"]; ok && !isNull(raw) {
+		var token string
+		if err := json.Unmarshal(raw, &token); err != nil {
+			return nil, fmt.Errorf("token: ожидался токен строкой")
+		}
+		token = strings.TrimSpace(token)
+		if token != "" {
+			primary := -1
+			for i, key := range out.Keys {
+				if key.RevokedAt == "" {
+					primary = i
+					break
+				}
+			}
+			if primary < 0 {
+				out.Keys = append(out.Keys, Key{ID: freshKeyID(out.Keys), Token: token, CreatedAt: time.Now().UTC().Format(time.RFC3339)})
+			} else {
+				out.Keys[primary].Token = token
+			}
+		}
+	}
+
+	// normalizeKeys до записи: фиксированный id нового ключа столкнулся бы с
+	// отозванным ключом той же истории, и загрузка оставила бы отозванный —
+	// показанный владельцу токен молча перестал бы работать после перезапуска.
+	out.Keys = normalizeKeys(out.Keys, "", time.Now().UTC().Format(time.RFC3339))
 	out.Token = activeToken(out.Keys)
 	return out, nil
 }

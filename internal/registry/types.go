@@ -5,7 +5,12 @@
 // headers accept strings only, and writes are atomic.
 package registry
 
-import "github.com/akrhin/mcprig/internal/config"
+import (
+	"net/url"
+	"strings"
+
+	"github.com/akrhin/mcprig/internal/config"
+)
 
 const (
 	// RegistryFile is the registry file name inside the data directory.
@@ -21,18 +26,45 @@ const (
 // servers.json.
 type Server = *config.Server
 
-// Key is one access key of a set. lazy-mcp takes a single auth token, so at
-// most one key is active (RevokedAt empty); the rest is revocation history.
+// Key is one access key of a set. A set serves every key with an empty
+// RevokedAt; the rest is revocation history. Revoking sets RevokedAt and leaves
+// the token in place, so the history still knows which key it was.
 type Key struct {
 	ID        string `json:"id"`
 	Token     string `json:"token"`
 	CreatedAt string `json:"createdAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
-	Note      string `json:"note,omitempty"`
+	// Label — подпись ключа: её видит владелец в панели, а набор — в метке
+	// клиента статистики. Note — прежнее имя того же поля в registry.json.
+	Label string `json:"label,omitempty"`
+	Note  string `json:"note,omitempty"`
+	// Profile — имя профиля набора (Set.Profiles), который сужает права этого
+	// ключа. Пусто — ключ ограничен только permissions.
+	Profile string `json:"profile,omitempty"`
+}
+
+// Notify — куда набор шлёт события своей поломки. Один адрес на набор:
+// события падения относятся ко всему процессу, а не к отдельному серверу.
+type Notify struct {
+	Webhook string `json:"webhook,omitempty"`
+}
+
+// Check возвращает описание дефекта; пустая строка — блок годен. Пустой
+// адрес значит «уведомлений нет» и дефектом не считается.
+func (n *Notify) Check() string {
+	if n == nil || strings.TrimSpace(n.Webhook) == "" {
+		return ""
+	}
+	u, err := url.Parse(strings.TrimSpace(n.Webhook))
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return "notify.webhook: нужен адрес http:// или https:// с хостом"
+	}
+	return ""
 }
 
 // Set is a named group of servers deployed as its own lazy-mcp instance.
-// Token mirrors the active key and is never sent to a client as is.
+// Token mirrors the primary (first active) key; the rest of the keys are
+// served too. It is never sent to a client as is.
 type Set struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
@@ -43,6 +75,12 @@ type Set struct {
 	Token       string   `json:"token"`
 	Autostart   bool     `json:"autostart,omitempty"`
 	Open        bool     `json:"open,omitempty"`
+	Notify      *Notify  `json:"notify,omitempty"`
+	// RateLimit — лимит частоты вызовов набора; нет поля или ноль — без него.
+	RateLimit *config.RateLimit `json:"rateLimit,omitempty"`
+	// Profiles — профили инструментов, на которые ссылаются ключи набора.
+	// Профиль сужает permissions и не может их расширить.
+	Profiles map[string]*config.Profile `json:"profiles,omitempty"`
 }
 
 // Data is registry.json.
@@ -64,7 +102,10 @@ type PublicKey struct {
 	ID        string `json:"id"`
 	CreatedAt string `json:"createdAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
-	Note      string `json:"note,omitempty"`
+	Label     string `json:"label,omitempty"`
+	// Note повторяет Label для клиентов, написанных до переименования.
+	Note    string `json:"note,omitempty"`
+	Profile string `json:"profile,omitempty"`
 }
 
 // PublicSetEntry is the client-facing view of a set: no raw token, only the
@@ -79,4 +120,7 @@ type PublicSetEntry struct {
 	KeyPrefix   string      `json:"keyPrefix"`
 	Autostart   bool        `json:"autostart,omitempty"`
 	Open        bool        `json:"open,omitempty"`
+	// Profiles — имена профилей набора по алфавиту: панель предлагает их при
+	// выдаче ключа, не читая правила.
+	Profiles []string `json:"profiles,omitempty"`
 }

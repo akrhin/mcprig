@@ -4,6 +4,7 @@
 package httplisten
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -11,31 +12,115 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/toolout"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // maxBodyBytes is the contract limit for one proxied MCP request.
 const maxBodyBytes = 4 << 20
 
-// New builds the set's HTTP handler. A missing authToken is a startup error
-// unless the set is open (AllowAnonymous): the proxy never listens without
-// authentication by accident.
-func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recorder) (http.Handler, error) {
+// Server is the set's HTTP handler. The access policy can be swapped while the
+// process runs: /api/sets/<id>/keys delivers a new key, and losing the last key
+// of an open set opens it again, over reload, not over a restart of the set.
+type Server struct {
+	http.Handler
+	auth *authSet
+}
+
+// SetAuth replaces the accepted tokens, the set's openness and the key labels
+// in one step: a newly issued key starts working, a revoked one stops, and an
+// open set that gained its first key stops admitting a caller without a header.
+func (s *Server) SetAuth(tokens []string, allowAnonymous bool, names map[string]string) {
+	s.auth.set(tokens, allowAnonymous, names)
+}
+
+// authSet is the guard's live state. One swap per reload, and each request
+// reads the state current at its start: a request never sees half a policy.
+type authSet struct {
+	tokens    *tokenSet
+	anonymous atomic.Bool
+	names     atomic.Pointer[map[string]string]
+}
+
+func newAuthSet(tokens []string, allowAnonymous bool, names map[string]string) *authSet {
+	a := &authSet{tokens: &tokenSet{}}
+	a.set(tokens, allowAnonymous, names)
+	return a
+}
+
+func (a *authSet) set(tokens []string, allowAnonymous bool, names map[string]string) {
+	a.tokens.set(tokens)
+	a.anonymous.Store(allowAnonymous)
+	if names == nil {
+		names = map[string]string{}
+	}
+	a.names.Store(&names)
+}
+
+// tokenSet хранит хэши токенов: сравнение идёт с хэшем предъявленного, поэтому
+// длина токена не утекает, а сравнение с каждым элементом — постоянное по
+// времени. Пустой набор принимает только открытый набор.
+type tokenSet struct {
+	v atomic.Pointer[[][sha256.Size]byte]
+}
+
+func newTokenSet(tokens ...string) *tokenSet {
+	ts := &tokenSet{}
+	ts.set(tokens)
+	return ts
+}
+
+func (ts *tokenSet) set(tokens []string) {
+	hashes := make([][sha256.Size]byte, 0, len(tokens))
+	for _, token := range tokens {
+		if token = strings.TrimSpace(token); token != "" {
+			hashes = append(hashes, sha256.Sum256([]byte(token)))
+		}
+	}
+	ts.v.Store(&hashes)
+}
+
+// ok reports whether presented is one of the accepted tokens.
+func (ts *tokenSet) ok(presented string) bool {
+	hashes := ts.v.Load()
+	if hashes == nil || len(*hashes) == 0 {
+		return false
+	}
+	got := sha256.Sum256([]byte(presented))
+	match := 0
+	for _, want := range *hashes {
+		match |= subtle.ConstantTimeCompare(got[:], want[:])
+	}
+	return match == 1
+}
+
+// New builds the set's HTTP handler. A missing token is a startup error unless
+// the set is open (AllowAnonymous): the proxy never listens without
+// authentication by accident. The token list is transport.authTokens; a file
+// with the single authToken still works.
+func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recorder) (*Server, error) {
 	if cfg == nil || cfg.Transport == nil {
-		return nil, errors.New("httplisten: в конфиге нет transport")
+		return nil, errors.New("httplisten: у набора нет transport — задайте stdio или http")
 	}
 	if srv == nil {
-		return nil, errors.New("httplisten: нет mcp-сервера")
+		return nil, errors.New("httplisten: у набора нет серверов")
 	}
-	token := cfg.Transport.AuthToken
+	tokens := cfg.Transport.AuthTokens
+	if len(tokens) == 0 && cfg.Transport.AuthToken != "" {
+		tokens = []string{cfg.Transport.AuthToken}
+	}
 	allowAnonymous := cfg.Transport.AllowAnonymous
-	if token == "" && !allowAnonymous {
-		return nil, errors.New("httplisten: пустой authToken — без авторизации набор не стартует")
+	if len(tokens) == 0 && !allowAnonymous {
+		return nil, errors.New("httplisten: пустой authToken — выпустите ключ (без авторизации набор не стартует)")
 	}
 	if log == nil {
 		log = slog.Default()
@@ -58,7 +143,14 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 		path = "/mcp"
 	}
 	if !strings.HasPrefix(path, "/") {
-		return nil, errors.New("httplisten: path должен начинаться с /")
+		return nil, errors.New("httplisten: path должен начинаться с «/»: получено " + path)
+	}
+
+	// Срок жизни выгрузки читается один раз: маркер обещает файл, и отдавать
+	// его дольше этого срока нельзя, даже если чистка до файла не дошла.
+	retention, warns := toolout.FromEnv()
+	for _, w := range warns {
+		log.Warn("httplisten: tool-out", "warn", w)
 	}
 
 	// Stateless 2026-07-28 per SEP-2567: one temporary session per POST. The
@@ -77,10 +169,15 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	)
 
 	mux := http.NewServeMux()
+	auth := newAuthSet(tokens, allowAnonymous, cfg.Transport.ClientNames)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.Handle(path, guard(mcpHandler, token, allowAnonymous, allowed, cfg.Transport.ClientNames))
+	mux.Handle(path, guard(mcpHandler, auth, true, allowed))
+	// Усечённый ответ лежит файлом рядом с этим процессом; клиент забирает его
+	// тем же путём, что и /mcp. Послабления открытому набору нет: файл не
+	// отдаётся анонимно никогда, даже когда /mcp пускает без ключа.
+	mux.Handle("GET /tool-out/{name}", guard(toolOutHandler(toolout.Dir(toolout.Base()), retention.TTL), auth, false, allowed))
 	if rec != nil {
 		// The panel polls this endpoint; it carries the same bearer as /mcp.
 		// У открытого набора bearer нет ни у кого, поэтому анонимный снимок
@@ -88,7 +185,7 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Редакция выбирается до снимка: собранная в редакции копия не
 			// платит за полный снимок, который тут же был бы выброшен.
-			anon := token == "" || !bearerOK(r, token)
+			anon := !bearerOK(r, auth.tokens)
 			var snap stats.Snapshot
 			if anon {
 				snap = rec.SnapshotRedacted()
@@ -97,19 +194,66 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			_ = json.NewEncoder(w).Encode(snap)
-		}), token, allowAnonymous, allowed, cfg.Transport.ClientNames))
+		}), auth, true, allowed))
 	}
-	return logRequests(mux, log), nil
+	return &Server{Handler: logRequests(mux, log), auth: auth}, nil
+}
+
+// toolOutName is the shape createToolOut gives a dump. Anything else is 404,
+// not 400: a wrong name must not confirm that a tool-out directory exists.
+var toolOutName = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// toolOutHandler serves one saved answer from this process's tool-out. A name
+// past its TTL is 410: the file was there and the marker's promise ran out.
+//
+// shortcut: имя выгрузки — 64-битный capability без привязки к клиенту: любой
+// держатель ключа набора заберёт чужую выгрузку, если знает имя
+// (docs/history/proposals/0002-proxy-improvements.md).
+// shortcut: TTL конечной точки не прокидывается в набор под панелью, прокинуть
+// вместе с профилями/лимитами (T2/T3).
+func toolOutHandler(dir string, ttl time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		if !toolOutName.MatchString(name) {
+			http.NotFound(w, r)
+			return
+		}
+		f, err := os.Open(filepath.Join(dir, name+".txt"))
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer func() { _ = f.Close() }()
+		info, err := f.Stat()
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if time.Since(info.ModTime()) > ttl {
+			http.Error(w, "полный ответ больше не хранится", http.StatusGone)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "no-store")
+		// Имя ведёт на выгрузку внутри эндпоинта набора: реферер наружу не нужен.
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		// ServeContent режет Range и ставит Last-Modified по mtime.
+		http.ServeContent(w, r, "", info.ModTime(), f)
+	}
 }
 
 // guard is the per-request policy in front of the MCP handler: method, Host,
-// Origin, bearer token, body cap.
-func guard(next http.Handler, token string, allowAnonymous bool, allowed []string, names map[string]string) http.Handler {
+// Origin, bearer token, body cap. openRoute marks the routes an open set also
+// serves without a header; /tool-out is not one of them.
+func guard(next http.Handler, auth *authSet, openRoute bool, allowed []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
-		case http.MethodGet, http.MethodPost, http.MethodDelete:
+		// HEAD бесплатен и у /mcp (тело не отдаётся), а /tool-out по нему
+		// говорит длину выгрузки, не скачивая её.
+		case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodDelete:
 		default:
-			w.Header().Set("Allow", "GET, POST, DELETE")
+			w.Header().Set("Allow", "GET, HEAD, POST, DELETE")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
@@ -130,22 +274,34 @@ func guard(next http.Handler, token string, allowAnonymous bool, allowed []strin
 
 		// No header at all is allowed only for an open set; a token that is
 		// presented must always be the right one.
+		// Открытость читается на каждом запросе: ключ, выданный или отозванный
+		// под панелью, меняет её без перезапуска набора.
 		// Открытый набор: предъявленный заголовок сравнивается с пустым токеном
 		// и всегда получает 401 — клиент, который шлёт Authorization всегда,
 		// в открытый набор не пройдёт (нужен ключ либо молчание).
 		if r.Header.Get("Authorization") == "" {
-			if !allowAnonymous {
+			if !openRoute || !auth.anonymous.Load() {
 				w.Header().Set("WWW-Authenticate", "Bearer")
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
-		} else if !bearerOK(r, token) {
+		} else if !bearerOK(r, auth.tokens) {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r, names)))
+		// Отпечаток ключа едет отдельно от метки: подпись ключа и _meta
+		// clientInfo — не идентичность, а лимит частоты корзинит по ключу.
+		if presented, ok := bearerToken(r); ok {
+			r = r.WithContext(stats.WithClientKey(r.Context(), stats.Fingerprint(presented)))
+		}
+		// Адрес — то, чем опознаётся клиент открытого набора: ключа у него нет,
+		// а метка самообъявлена. Порт срезан, иначе одна машина = много корзин.
+		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			r = r.WithContext(stats.WithClientAddr(r.Context(), host))
+		}
+		r = r.WithContext(stats.WithClient(r.Context(), clientLabel(r, *auth.names.Load())))
 
 		if r.Body != nil {
 			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
@@ -193,14 +349,12 @@ func bearerToken(r *http.Request) (string, bool) {
 	return tok, tok != ""
 }
 
-func bearerOK(r *http.Request, token string) bool {
+func bearerOK(r *http.Request, tokens *tokenSet) bool {
 	presented, ok := bearerToken(r)
 	if !ok {
 		return false
 	}
-	// ConstantTimeCompare returns 0 on a length mismatch, so this leaks only
-	// the token length.
-	return subtle.ConstantTimeCompare([]byte(presented), []byte(token)) == 1
+	return tokens.ok(presented)
 }
 
 // hostOnly drops the port: AllowedHosts is a host list, not a listener list.

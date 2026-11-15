@@ -1120,6 +1120,411 @@
       "tool": "browser_navigate",
       "ms": 828,
       "failed": false
+    },
+    {
+      "time": "2026-11-08T22:33:58+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 40,
+      "failed": true
+    },
+    {
+      "time": "2026-11-08T22:33:40+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 77,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:33:22+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 114,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:33:04+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 151,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:32:46+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 188,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:32:28+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 225,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:32:10+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "ms": 262,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:31:52+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 299,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:31:34+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 336,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:31:16+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 373,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:30:58+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 410,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:30:40+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 447,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:30:22+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 484,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:30:04+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "ms": 521,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:29:46+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 558,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:29:28+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 595,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:29:10+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 632,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:28:52+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 669,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:28:34+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 706,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:28:16+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 743,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:27:58+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "ms": 780,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:27:40+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 817,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:27:22+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 854,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:27:04+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 891,
+      "failed": true
+    },
+    {
+      "time": "2026-11-08T22:26:46+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 928,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:26:28+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 65,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:26:10+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 102,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:25:52+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "ms": 139,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:25:34+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 176,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:25:16+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 213,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:24:58+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 250,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:24:40+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 287,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:24:22+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 324,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:24:04+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 361,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:23:46+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "ms": 398,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:23:28+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 435,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:23:10+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 472,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:22:52+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 509,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:22:34+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "raven",
+      "tool": "audit_page",
+      "ms": 546,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:22:16+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "socraticode",
+      "tool": "codebase_search",
+      "ms": 583,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:21:58+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "context7",
+      "tool": "query-docs",
+      "ms": 620,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:21:40+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "playwright",
+      "tool": "browser_take_screenshot",
+      "ms": 657,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:21:22+03:00",
+      "client": "hermes/1.2",
+      "set": "main",
+      "server": "serena",
+      "tool": "find_symbol",
+      "ms": 694,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:21:04+03:00",
+      "client": "openclaw/0.9.1",
+      "set": "main",
+      "server": "xerj",
+      "tool": "xerj_search",
+      "ms": 731,
+      "failed": false
+    },
+    {
+      "time": "2026-11-08T22:20:46+03:00",
+      "client": "opencode/2.2.6",
+      "set": "main",
+      "server": "gitea",
+      "tool": "list_issues",
+      "ms": 768,
+      "failed": false
     }
   ],
   "counters": [

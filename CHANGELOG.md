@@ -8,8 +8,164 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Added
+
+- Downstream resources and prompts reach the MCP client: a server whose config
+  names them in `expose` (`["resources"]`, `["prompts"]`, or both) contributes
+  them through the new `list_resources`, `read_resource`, `list_prompts` and
+  `get_prompt` tools. Without `expose` the client still sees tools alone, and an
+  unknown value is a config error — the server does not start. Permissions
+  address them as `resource:<uri>` and `prompt:<name>`, so the existing rules
+  and profiles apply unchanged; answers are cut at `maxBytes` (32768 by default
+  for a read) and the full one lands in `tool-out`. The listings honour the same
+  rules: a `default: deny` keeps a resource out of `list_resources` until a rule
+  allows it.
+- `expose` is editable from the panel: the server form carries two checkboxes
+  (resources, prompts), the registry reads and validates the field on `POST
+  /api/servers` and `PUT /api/servers/<name>`, and an unknown value is a `400`
+  that names what is allowed. Unchecking both removes the field.
+- An edit no longer restarts a whole set: `PUT /api/sets/<id>`, `PUT
+  /api/servers/<name>` and the new `POST /api/sets/<id>/reload` write
+  `servers.json` and send `SIGHUP` to the set process alone — its stdio children
+  have no handler and keep running. The process rereads the file and answers in
+  `reload.status` next to it (`nonce`, `generation`, `applied`, `restartNeeded`,
+  `error`); the nonce the panel puts into `reload.request` before the signal
+  keeps a late answer to an earlier attempt from being taken for this one. Calls
+  in flight to the other servers keep their sessions, and the set's pid and
+  restart counter stay put. A transport change (`port`, `open`, `path`,
+  `host`, `allowedHosts`) is still applied by a restart and lands in
+  `restartNeeded`; keys are the exception and travel by reload (below); `path`, `host` and `allowedHosts` in a hand-edited
+  `servers.json` land there too and the set is restarted by hand. A server's
+  `env` and `envAllow` are not reloadable either, so an edit of them restarts
+  the sets using that server. A broken config leaves the process on the previous one and
+  reports the cause. A failed reload does not lose the edit: `PUT /api/sets/<id>`
+  answers 200 with `reloadError`, and `PUT /api/servers/<name>` lists the sets it
+  could not apply in `reloadErrors`. That answer now names the sets `reloaded`
+  instead of `restarted`; `restarted` still carries the same list for one
+  release.
+
+- A set serves several keys at once. Every key carries `id`, its token,
+  `createdAt`, `revokedAt`, `profile` and `label`; the token never leaves the
+  server and the hash lives only in the listener's memory. Issuing a key no
+  longer revokes the previous one, and revoking one key no longer stops the
+  set — only the last active key does. A set keeps up to 8 active keys and the
+  ninth answers `409`. The routes are `GET /api/sets/<id>/keys` (ids, labels,
+  profiles and dates, never a token), `POST /api/sets/<id>/keys` with an optional
+  `{"label":…,"profile":…}` (the token is in that answer only) and `DELETE
+  /api/sets/<id>/keys/<keyID>`; `PUT /api/sets/<id>` with `token` still replaces
+  the primary key, and creates one when the set has no active key. A new key
+  reaches a running set by reload, not by restart: the transport takes the whole
+  `authTokens` list, compares the presented token with every active key's
+  sha256 in constant time per element, and takes the caller's fingerprint — and
+  so its profile and rate limit — from the token that matched. Keys issued
+  before this release read as a one-element list, and a `note` becomes the key's
+  `label`.
+- The panel states where it is reachable: `MCPRIG_PUBLIC_URL` sets the public
+  address (`http(s)://host[:port][/prefix]`), and it becomes the only source of
+  the OAuth redirect (`<publicUrl>/oauth/callback`, path prefix kept) and of the
+  decision that the session cookie is `Secure`. A bad value — no scheme, no
+  host, credentials, query, fragment or a
+  trailing `/` — stops the panel at startup instead of falling back silently.
+  Without it the redirect is built from `MCPRIG_HOST` and `MCPRIG_PORT` as
+  before. `mcprig doctor` prints the effective redirect and flags one that
+  cannot receive the code (no host, port `0`, loopback behind `https`).
+- The panel can serve TLS itself: `MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` make it
+  listen over https. Both are required together, and an unreadable file fails
+  startup loudly instead of quietly dropping to http.
+- A set can cap how often a caller calls its tools: `rateLimit:
+  {"perMinute": 120, "burst": 20, "perTool": {"serena/find_symbol":
+  {"perMinute": 10, "burst": 2}}}` in the set's record. Each inner call of
+  `invoke_many` counts on its own, a caller is identified by the fingerprint of
+  its key (in an open set, by its address), and a refused call is an ordinary tool error that never reaches a
+  server — `/stats` reports it as `throttled`. No block, or zeros, means no
+  limit. The field is edited in `registry.json` or over the API, as `notify`.
+- A truncated tool answer can be fetched over HTTP: `GET /tool-out/<name>`
+  serves the saved file behind the same guard as `/mcp` — bearer key,
+  `allowedHosts`, Origin — and the truncation marker names that URL when the set
+  runs over HTTP with a key. The file is never served anonymously, even in an
+  open set, and a name past `MCPRIG_TOOLOUT_TTL` (24h by default) answers `410`.
+- `mcprig status` shows panel health and, per set, its state, port, tool count,
+  key and last call; `mcprig logs` prints a set's or a server's log tail with
+  `-f` and `--json`. Both take `--panel` (default `MCPRIG_PANEL_URL`, else
+  `MCPRIG_PORT`) and log in with `MCPRIG_PASSWORD` or the reverse-proxy secret.
+- A set can report failures on its own: `notify: {"webhook": "https://…"}` in the
+  set's record sends `set.crashed`, `set.restart_failed` and
+  `server.unhealthy` as one JSON POST per transition — 5 s timeout, three
+  attempts, and never a token, `env` or command in the body. The address itself
+  never reaches the log, even when it carries a query token.
+- The panel has a **Log** drawer per server and **Show more** under the call
+  history: the drawer reads the set's log filtered by server name, and the
+  button pages `/api/calls` by `before` until a page comes back short. Paging
+  pauses the 5 s refresh and shows **resume** next to it, which returns to the
+  first page.
+- A key can be narrowed to a profile of its set: `profiles: {"reader":
+  {"deny": ["*/*_write"], "allow": ["*"]}}` in the set's record, and a key
+  issued with `{"profile": "reader"}` (a `400` lists the set's profiles, or
+  says the set has none). The profile applies after `permissions` and only
+  narrows — a rule's denial keeps its own message. `list_commands` hides what
+  the profile refuses, `invoke_command` and `invoke_many` refuse it as a tool
+  error naming the profile, and a key without a profile behaves as before.
+  The field is edited in `registry.json` or over the API, as `notify`.
+- Tracing crosses the proxy: a client's W3C `traceparent` in `_meta` (SEP-414)
+  is validated (version `00`, non-zero ids, no `ff`), becomes the parent of the
+  call's span and goes down to the upstream in the `_meta` of `invoke_command`,
+  `read_resource` and `get_prompt`; nothing else from the client's `_meta` is
+  forwarded. Spans — `mcp.tool.call`, `mcp.server.connect`, `mcp.reload`, with
+  names and outcome only, never a key or its fingerprint — are exported over
+  OTLP/HTTP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, and cost nothing (no
+  recording, no network) when it is not.
+
+- A changed tool descriptor is quarantined: the set remembers `name`,
+  `description`, `inputSchema`, `outputSchema` and `annotations` hashed into
+  `sets/<id>/tools.lock.json`, approves a tool the first time it appears
+  (`approvedBy: "auto"`) and refuses `invoke_command` and `invoke_many` for that
+  tool once the descriptor differs — `isError`, `_meta.lazyMcpPolicy:
+  "quarantine"` and a message with the old and new hash and the command that
+  lifts the block. Neighbours on the same server and other calls of the same
+  batch run as usual; `list_commands` marks the tool `changed: true`.
+  A person approves the new descriptor from the **Tools** drawer of the panel
+  (`GET /api/sets/<id>/tools`, `POST /api/sets/<id>/tools/approve`, `{"all":
+  true}` included) or with the new `mcprig approve --set <id> <server/tool>…`/`--all`,
+  which talks to the same routes. The check does not depend on a warm
+  catalogue: a cold cache is filled first, and a catalogue that cannot be read
+  refuses the call (`list_commands {refresh:true}` no longer empties the
+  neighbours' caches either). The panel's **browse** session applies the same
+  record — a changed tool is marked in its listing and refused with `403`
+  before the downstream sees the call. The record survives a set restart, and
+  entries of a server removed from a set are pruned when the set config is
+  rebuilt. Without a set data directory (`MCPRIG_DATA_DIR`) there is no record
+  and no quarantine.
+
 ### Changed
 
+- `X-Forwarded-Proto` and `X-Forwarded-Host` are trusted only when
+  `MCPRIG_PROXY_SECRET` is set. Without it both are ignored for the Host and
+  Origin checks and for the `https` mark, so a client can no longer claim
+  `https` or a different public host by sending a header; the OAuth redirect
+  never depends on them. The session cookie is `Secure`
+  whenever the public address is `https` or the panel has its own certificate,
+  no longer only when the request itself arrived over TLS.
+- Login failures are counted by the socket address *and* by the address from
+  `X-Forwarded-For`: rotating the header behind a trusted proxy no longer
+  bypasses the five-per-minute limit, and a request is refused when either
+  counter is over it.
+- Browse sessions in the panel now apply the server's `permissions` to tool
+  calls, the same gate `invoke_command` uses: a denied call answers `403`
+  instead of reaching the server. Resources and prompts are not covered yet.
+- A server's `permissions` block now survives the panel and the registry:
+  `POST /api/servers`, `PATCH /api/servers/<name>` and import keep it in
+  `registry.json`, so browse and `invoke_command` enforce the same rules. A
+  broken block is refused with `400` instead of being dropped.
+- `_configError` no longer appears in a config file: a validation defect stays
+  in memory (`list_servers` still reports it as `healthy: false`), and a file
+  that already carries the key stops marking that server broken on the next
+  load.
+- Russian user-facing text is proofread with `ru-text`: panel strings, CLI
+  output and server error messages use sentence case, the «вы» form, one term
+  per concept and the "what — why — what to do" shape of an error. Counts agree
+  with their numeral, percentages print as `4,8%`, `mcprig auth` names the
+  deadline as a clock time, and the schema line shows the tool count it already
+  passed in. The Russian documentation follows the same rules.
 - The panel's **Overview** tab now leads with the set's servers: the seven-day
   summary (calls, error rate, p50, p95) moved below the servers table and reads
   as a one-line caption, the set rail ends with `N sets · K running`, and the
@@ -25,6 +181,18 @@ repository the project is built in.
 
 ### Added
 
+- The **authorize** button in a server row of the panel runs the OAuth flow from
+  the browser: the link is drawn in a dialog, the code comes back to
+  `http://<panel host>:<panel port>/oauth/callback`, and the set restarts itself
+  once the token is saved. A provider that refuses plain `http` for a
+  non-loopback address (dynamic registration answers `invalid_redirect_uri`)
+  still needs TLS in front of the panel.
+- `mcprig auth --set <set> <server>` authorizes a server that asks for OAuth:
+  the command prints the authorization link and waits for the redirect instead
+  of starting a browser, so it works over SSH and on a host without a graphical
+  session. The token goes to the set's `oauth.json` and is picked up on the next
+  set start. The interactive step deliberately lives outside a client request:
+  a set's health probe allows 15 s and a person at a browser needs minutes.
 - The **Calls** tab lists the meta-tools `list_servers`, `list_commands` and
   `describe_commands` (server `mcprig`) and the reason a call failed: the text
   is shortened in the row and shown in full in a tooltip. Previously only calls
@@ -102,7 +270,7 @@ repository the project is built in.
   `lookup` holds the session by refcount, `close`/`sweep` close it after
   `release`.
 - Expired panel sessions are removed by the health ticker, not only by `get`.
-- A failed log rotation of a set no longer loses output: the old file stays and
+- A failed log rotation loses no output: the old file stays and
   the error is visible in the set status `error` field.
 - The log tail is read from the last kilobytes through `Seek` instead of the
   whole 5 MiB file on every panel poll.

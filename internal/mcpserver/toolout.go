@@ -13,6 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/toolout"
 )
 
@@ -28,11 +29,12 @@ const (
 // A variable so a test can point the dump at a directory of its own.
 var toolOutDir = func() string { return toolout.Dir(toolout.Base()) }
 
-// truncateResult caps a downstream answer at maxBytes and points at the file
-// carrying the full one. An answer that fits is returned untouched: no file,
-// no marker. Nothing is buffered whole: the head that the caller sees is kept
-// in memory, the rest streams to the file.
-func truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult, error) {
+// truncateResult caps a downstream answer at maxBytes and points at the full
+// one. An answer that fits is returned untouched: no file, no marker. Nothing
+// is buffered whole: the head that the caller sees is kept in memory, the rest
+// streams to the file. The marker names the file by path, or by its /tool-out
+// URL when the manager serves HTTP with a key.
+func (m *Manager) truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult, error) {
 	// headLimit carries maxBytes plus one rune of slack: the cut may land
 	// inside a multi-byte rune and the check needs the byte after it.
 	w := &spillWriter{headLimit: maxBytes + utf8.UTFMax}
@@ -58,11 +60,11 @@ func truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult,
 	for cut > 0 && cut < len(w.head) && !utf8.RuneStart(w.head[cut]) {
 		cut--
 	}
-	text := string(w.head[:cut]) + fmt.Sprintf("\n[обрезано: %d из %d байт, полный ответ — %s]", cut, w.total, path)
+	text := string(w.head[:cut]) + fmt.Sprintf("\n[обрезано: %d из %d байт, полный ответ — %s]", cut, w.total, m.toolOutRef(path))
 	if res.StructuredContent != nil {
 		// Без этой строки клиент со structured-смыслом (ticktick и подобные)
 		// видит пустой ответ: структура в текстовый срез не попадает.
-		text += "\n[structuredContent не влезает в maxBytes: полный ответ в файле]"
+		text += "\n[structuredContent больше maxBytes: полный ответ в файле]"
 	}
 	return &mcp.CallToolResult{
 		IsError: res.IsError,
@@ -70,10 +72,22 @@ func truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult,
 	}, nil
 }
 
+// toolOutRef names the dump the way the caller can actually reach it: the
+// on-disk path is useless to an HTTP client, while /tool-out answers under the
+// same guard as /mcp. stdio keeps the path — its file is on the caller's own
+// filesystem.
+func (m *Manager) toolOutRef(path string) string {
+	if !m.ToolOutURL {
+		return path
+	}
+	name := strings.TrimSuffix(filepath.Base(path), ".txt")
+	return "/tool-out/" + name + " (тот же ключ, что у /mcp)"
+}
+
 // truncateValue applies the invoke_command cap and hands back what a caller
 // would see: the text of a single text item, anything else serialized.
-func truncateValue(res *mcp.CallToolResult, maxBytes int) (any, error) {
-	cut, err := truncateResult(res, maxBytes)
+func (m *Manager) truncateValue(res *mcp.CallToolResult, maxBytes int) (any, error) {
+	cut, err := m.truncateResult(res, maxBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +216,23 @@ func createToolOut() (*os.File, error) {
 		return nil, fmt.Errorf("усечение: запись полного ответа: %w", err)
 	}
 	return f, nil
+}
+
+// profileCommands keeps only what the caller's profile allows. The profile is
+// read once per list_commands: one key has one profile.
+func profileCommands(name string, profile *config.Profile, cmds []commandInfo) []commandInfo {
+	if name == "" {
+		return cmds
+	}
+	out := make([]commandInfo, 0, len(cmds))
+	for _, cmd := range cmds {
+		// nil-профиль значит, что блока с таким именем нет в наборе: ключ
+		// остаётся запрещённым, а не получает всё.
+		if profile != nil && profile.Allows(cmd.Server, cmd.Name) {
+			out = append(out, cmd)
+		}
+	}
+	return out
 }
 
 // filterCommands keeps names carrying prefix; filtering happens on the way out

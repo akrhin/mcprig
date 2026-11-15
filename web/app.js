@@ -79,7 +79,7 @@
       'setSrv.thType': 'Type',
       'setSrv.thState': 'Health',
       'setSrv.thTools': 'Tools',
-      'setSrv.thLast': 'Last request',
+      'setSrv.thLast': 'Last call',
       'setSrv.thAct': 'Actions',
       'setSrv.toolsTip': 'tool count comes from a probe of this server',
       'setSrv.lastTip': 'from the last 100 calls',
@@ -101,6 +101,9 @@
       'calls.bad': 'error',
       'calls.ok': 'ok',
       'calls.emptyText': 'Requests appear here as soon as the set serves.',
+      'calls.more': 'Show more',
+      'calls.paused': 'auto-refresh paused',
+      'calls.resume': 'resume',
       'stats.today': 'Today',
       'stats.7d': '7 days',
       'stats.30d': '30 days',
@@ -113,7 +116,7 @@
       'stats.all': 'all',
       'stats.reset': 'reset',
       'stats.approxTip': 'from the histogram',
-      'stats.requests': 'Requests',
+      'stats.requests': 'Calls',
       'stats.ok': 'ok',
       'stats.errors': 'errors',
       'stats.meta': '{calls} {callsW} · {errors} errors · p50 {p50} · p95 {p95}',
@@ -134,10 +137,10 @@
       'stats.noPerSet': 'No per-set data',
       'stats.noSets': 'per-set traffic appears when every set is selected',
       'stats.noClients': 'no client data in this period',
-      'stats.emptyStrong': 'No requests in this period',
+      'stats.emptyStrong': 'No calls in this period',
       'stats.emptyFilters': 'the filters narrowed the sample to zero — reset them or widen the period',
       'stats.emptyPeriod': 'no calls in the period “{p}”',
-      'stats.emptyPeriod2': 'This set recorded no requests in the selected period.',
+      'stats.emptyPeriod2': 'This set recorded no calls in the selected period.',
       'stats.resetFilters': 'Reset filters',
       'stats.unreach': 'no response: {list}',
       'stats.fail': 'the stats request failed: {msg}',
@@ -164,6 +167,10 @@
       'form.envAllow': 'envAllow · one per line',
       'form.tags': 'tags · comma separated',
       'form.enabled': 'enabled',
+      'form.expose': 'expose',
+      'form.exposeHint': 'Surfaces the MCP client may read. Without them the client sees the server\u2019s tools only.',
+      'form.exposeResources': 'expose resources',
+      'form.exposePrompts': 'expose prompts',
       'form.sandbox': 'sandbox',
       'form.sandboxHint': 'mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · empty means the default',
       'form.unset': 'not set',
@@ -183,9 +190,28 @@
       'log.wideTip': 'expand the log panel',
       'log.refresh': 'refresh',
       'log.empty': 'log is empty',
+      'srvlog.sub': 'lines that mention this server — the tail of the set log',
+      'srvlog.title': 'Log · {server} · {set}',
+      'srvlog.fail': 'could not load the log',
+      'srv.tools': 'tools',
+      'tools.title': 'Tools · {server} · {set}',
+      'tools.sub': 'descriptors the proxy remembers — a changed one waits for your approval',
+      'tools.thTool': 'Tool',
+      'tools.thState': 'State',
+      'tools.thAct': 'Actions',
+      'tools.empty': 'this set has not listed any tools yet',
+      'tools.ok': 'approved',
+      'tools.changed': 'changed',
+      'tools.approve': 'approve',
+      'tools.fail': 'could not load the tool list',
+      'tools.approveFail': 'could not approve the tool',
       'keys.title': 'Set keys',
       'keys.sub': 'A key authenticates one client. It is shown once, right after it is created.',
       'keys.newLabel': 'New key label',
+      'keys.profile': 'Profile',
+      'keys.profileNone': 'no profile',
+      'keys.profileHelp': 'A profile limits the key to the rules the set lists under that name.',
+      'keys.profileIs': 'profile: {name}',
       'keys.noteFor': 'Note for key {id}',
       'keys.notePh': 'note',
       'keys.note': 'Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.',
@@ -211,10 +237,18 @@
       'unit.h': 'h',
       'unit.m': 'm',
       'unit.ms': '{n} ms',
-      'schema.line': '{bytes} · {tokens} {tok}',
+      'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
       'srv.edit': 'edit',
       'srv.check': 'check',
+      'srv.log': 'log',
       'srv.probe': 'probe',
+      'srv.authorize': 'authorize',
+      'auth.title': 'OAuth authorization',
+      'auth.waiting': 'Open the link in a browser — the panel waits for the redirect. The set restarts by itself once the token is saved.',
+      'auth.link': 'authorization link',
+      'auth.open': 'open link',
+      'auth.copy': 'copy link',
+      'auth.copied': 'link copied',
       'srv.notProbed': 'not probed',
       'srv.notInSet': 'not in this set',
       'srv.setOff': 'set is not running',
@@ -224,6 +258,7 @@
       'srv.failed': 'Failed',
       'srv.probeFail': 'probe failed',
       'srv.notFound': 'server {name} is not in the registry',
+      'srv.reloadWarn': 'saved, but running sets did not apply the change: {err}',
       'err.offline': 'no connection to the daemon',
       'err.http': 'HTTP {status} · {path}',
       'add.nameRequired': 'a name is required'
@@ -244,23 +279,23 @@
       'rail.add': 'Новый набор',
       'rail.name': 'имя',
       'rail.port': 'порт',
-      'rail.create': 'создать',
+      'rail.create': 'Создать',
       'rail.item': '{name} · порт {port} · {state}',
       'rail.sum': '{n} {setsW} · запущено {r}',
-      'common.cancel': 'отмена',
-      'common.save': 'сохранить',
-      'common.close': 'закрыть',
-      'common.done': 'готово',
+      'common.cancel': 'Отмена',
+      'common.save': 'Сохранить',
+      'common.close': 'Закрыть',
+      'common.done': 'Готово',
       'empty.title': 'Наборов пока нет',
       'empty.p': 'Набор — это одна точка входа MCP со своим портом, серверами и ключами.',
       'empty.add': 'Создать первый набор',
       'head.endpoint': 'Адрес',
-      'head.copy': 'копировать',
-      'head.copyTip': 'скопировать MCP-адрес набора',
+      'head.copy': 'Копировать',
+      'head.copyTip': 'скопировать адрес набора',
       'head.copied': 'скопировано',
-      'head.copyFail': 'не удалось',
+      'head.copyFail': 'не удалось скопировать адрес',
       'head.key': 'Ключ',
-      'head.keyOpen': 'набор открыт',
+      'head.keyOpen': 'вход без ключа',
       'head.copyKey': 'Скопировать ключ',
       'head.noKey': 'ключа нет',
       'head.schemaTip': 'сколько контекста стоит перечень инструментов набора',
@@ -271,14 +306,14 @@
       'head.restart': 'Перезапустить',
       'head.stop': 'Остановить',
       'head.stopped': 'набор остановлен',
-      'head.exited': 'процесс завершился (code {code})',
+      'head.exited': 'процесс завершился (код {code})',
       'head.exitCode': 'код выхода {code}',
       'head.restarts': 'автоперезапусков: {n}',
       'tabs.overview': 'Обзор',
       'tabs.calls': 'Вызовы',
       'tabs.stats': 'Статистика',
       'kpi.calls': 'вызовов · 7 дней',
-      'kpi.errRate': 'ошибок',
+      'kpi.errRate': 'доля ошибок',
       'kpi.p50': 'p50',
       'kpi.p95': 'p95',
       'setSrv.title': 'Серверы',
@@ -305,12 +340,15 @@
       'calls.ph': 'инструмент или клиент',
       'calls.onlyErr': 'только ошибки',
       'calls.thClient': 'Клиент',
-      'calls.unavailable': 'метрики вызовов недоступны: маршрут /api/calls ещё не поднят',
+      'calls.unavailable': 'метрики вызовов недоступны: счётчики появятся после первого вызова',
       'calls.of': '{n} из {m}',
       'calls.noMatch': 'ничего не найдено — ослабьте фильтр',
       'calls.bad': 'ошибка',
       'calls.ok': 'ок',
-      'calls.emptyText': 'Запросы появятся здесь, как только набор начнёт их принимать.',
+      'calls.emptyText': 'Вызовы появятся здесь, как только набор начнёт их принимать.',
+      'calls.more': 'Показать ещё',
+      'calls.paused': 'автообновление приостановлено',
+      'calls.resume': 'возобновить',
       'stats.today': 'Сегодня',
       'stats.7d': '7 дней',
       'stats.30d': '30 дней',
@@ -321,9 +359,9 @@
       'stats.tool': 'инструмент',
       'stats.client': 'клиент',
       'stats.all': 'все',
-      'stats.reset': 'сбросить',
+      'stats.reset': 'Сбросить',
       'stats.approxTip': 'по гистограмме',
-      'stats.requests': 'Запросы',
+      'stats.requests': 'Вызовы',
       'stats.ok': 'ок',
       'stats.errors': 'ошибки',
       'stats.meta': '{calls} {callsW} · ошибок {errors} · p50 {p50} · p95 {p95}',
@@ -340,14 +378,14 @@
       'stats.thP50': 'p50',
       'stats.thP95': 'p95',
       'stats.thShare': 'Доля',
-      'stats.noData': 'в этом периоде данных нет',
+      'stats.noData': 'за период данных нет',
       'stats.noPerSet': 'Нет данных по наборам',
       'stats.noSets': 'разбивка по наборам видна при выборе всех наборов',
-      'stats.noClients': 'в этом периоде нет данных по клиентам',
-      'stats.emptyStrong': 'В этом периоде запросов нет',
+      'stats.noClients': 'за период данных по клиентам нет',
+      'stats.emptyStrong': 'За период вызовов нет',
       'stats.emptyFilters': 'фильтры сузили выборку до нуля — сбросьте их или расширьте период',
-      'stats.emptyPeriod': 'в периоде «{p}» вызовов нет',
-      'stats.emptyPeriod2': 'В выбранном периоде у набора нет запросов.',
+      'stats.emptyPeriod': 'за период «{p}» вызовов нет',
+      'stats.emptyPeriod2': 'за выбранный период набор не записал вызовов',
       'stats.resetFilters': 'Сбросить фильтры',
       'stats.unreach': 'нет ответа: {list}',
       'stats.fail': 'запрос статистики не удался: {msg}',
@@ -366,7 +404,7 @@
       'form.description': 'описание',
       'form.transport': 'транспорт',
       'form.stdio': 'stdio — локальный процесс',
-      'form.http': 'http — удалённый endpoint',
+      'form.http': 'http — удалённый сервер по URL',
       'form.command': 'команда · один аргумент на строку',
       'form.cwd': 'рабочий каталог',
       'form.headers': 'заголовки · K: V',
@@ -374,35 +412,58 @@
       'form.envAllow': 'envAllow · по одному на строку',
       'form.tags': 'теги · через запятую',
       'form.enabled': 'включён',
+      'form.expose': 'отдавать клиенту',
+      'form.exposeHint': 'Что клиент MCP читает у этого сервера. Без этого он видит только инструменты.',
+      'form.exposeResources': 'отдавать ресурсы',
+      'form.exposePrompts': 'отдавать промпты',
       'form.sandbox': 'песочница',
       'form.sandboxHint': 'mode bwrap | none · onUnavailable deny | warn | allow · network none | allow · пусто — значение по умолчанию',
       'form.unset': 'не задано',
       'form.ro': 'ro · по одному на строку',
       'form.rw': 'rw · по одному на строку',
-      'form.delete': 'удалить сервер',
+      'form.delete': 'Удалить сервер',
       'form.editing': 'сервер · {name}',
       'form.new': 'новый сервер',
-      'form.create': 'создать',
+      'form.create': 'Создать',
       'form.deleteConfirm': 'Удалить сервер {name} из реестра хоста? Он исчезнет из наборов, где используется.',
       'env.empty': 'переменных нет',
       'env.note': 'значения подставляет процесс набора — панель их не хранит и не показывает',
       'env.set': 'задана',
       'env.unset': 'не задана',
       'log.tail': 'хвост лога набора',
-      'log.wide': 'шире',
+      'log.wide': 'Развернуть лог',
       'log.wideTip': 'развернуть панель лога',
-      'log.refresh': 'обновить',
+      'log.refresh': 'Обновить',
       'log.empty': 'лог пуст',
+      'srvlog.sub': 'строки, где встречается имя сервера, — хвост лога набора',
+      'srvlog.title': 'Лог · {server} · {set}',
+      'srvlog.fail': 'не удалось получить лог',
+      'srv.tools': 'Инструменты',
+      'tools.title': 'Инструменты · {server} · {set}',
+      'tools.sub': 'дескрипторы, которые помнит прокси, — изменившийся ждёт вашего одобрения',
+      'tools.thTool': 'Инструмент',
+      'tools.thState': 'Состояние',
+      'tools.thAct': 'Действия',
+      'tools.empty': 'набор ещё не показывал инструментов',
+      'tools.ok': 'одобрен',
+      'tools.changed': 'изменился',
+      'tools.approve': 'Одобрить',
+      'tools.fail': 'не удалось получить список инструментов',
+      'tools.approveFail': 'не удалось одобрить инструмент',
       'keys.title': 'Ключи набора',
-      'keys.sub': 'Ключ аутентифицирует одного клиента. Он показывается один раз — сразу после создания.',
+      'keys.sub': 'Ключ даёт доступ одному клиенту. Он показывается один раз — сразу после создания.',
       'keys.newLabel': 'Подпись нового ключа',
+      'keys.profile': 'Профиль',
+      'keys.profileNone': 'без профиля',
+      'keys.profileHelp': 'Профиль ограничивает ключ правилами, которые набор перечисляет под этим именем.',
+      'keys.profileIs': 'профиль: {name}',
       'keys.noteFor': 'Подпись для ключа {id}',
       'keys.notePh': 'подпись',
       'keys.note': 'Токен знает только тот, кто его выпустил: панель показывает первые 8 символов. Отзыв ключа действует без перезапуска набора.',
-      'keys.issue': 'выпустить ключ',
+      'keys.issue': 'Выпустить ключ',
       'keys.once': 'Скопируйте ключ сейчас — он больше не покажется',
       'keys.copy': 'Скопировать ключ',
-      'keys.revoke': 'отозвать',
+      'keys.revoke': 'Отозвать',
       'keys.revoked': 'отозван {date}',
       'keys.active': 'активен',
       'keys.restartWarn': 'подпись сохранена, но набор не перезапустился: {err}',
@@ -410,33 +471,42 @@
       'status.running': 'работает',
       'status.failed': 'сбой',
       'status.stopped': 'остановлен',
-      'iso.okTip': 'песочница bwrap применена',
-      'iso.none': 'без изоляции',
-      'iso.rejected': 'конфиг отвергнут',
-      'iso.rejectedTip': 'конфиг отвергнут: сервер не запустится',
+      'iso.okTip': 'песочница включена',
+      'iso.none': 'без песочницы',
+      'iso.rejected': 'конфигурация отклонена',
+      'iso.rejectedTip': 'конфигурация отклонена — сервер не запустится',
       'unit.b': 'Б',
       'unit.kb': 'КБ',
-      'unit.tokens': 'ток',
+      'unit.tokens': 'токенов',
       'unit.tools': 'инструментов',
       'unit.h': 'ч',
       'unit.m': 'м',
       'unit.ms': '{n} мс',
-      'schema.line': '{bytes} · {tokens} {tok}',
-      'srv.edit': 'изменить',
-      'srv.check': 'проверить',
-      'srv.probe': 'проба',
-      'srv.notProbed': 'без пробы',
+      'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
+      'srv.edit': 'Изменить',
+      'srv.check': 'Проверить',
+      'srv.log': 'Лог',
+      'srv.probe': 'Проверить',
+      'srv.authorize': 'Войти через OAuth',
+      'auth.title': 'Войти через OAuth',
+      'auth.waiting': 'Откройте ссылку в браузере — панель ждёт возврата. После сохранения токена набор перезапустится сам.',
+      'auth.link': 'ссылка авторизации',
+      'auth.open': 'открыть ссылку',
+      'auth.copy': 'скопировать ссылку',
+      'auth.copied': 'ссылка скопирована',
+      'srv.notProbed': 'не проверен',
       'srv.notInSet': 'не в наборе',
       'srv.setOff': 'набор не запущен',
-      'srv.unchecked': 'не проверено',
+      'srv.unchecked': 'не проверен',
       'srv.noResponse': 'нет ответа',
       'srv.healthy': 'Здоров',
       'srv.failed': 'Сбой',
-      'srv.probeFail': 'проба не удалась',
+      'srv.probeFail': 'проверка не удалась',
       'srv.notFound': 'сервер {name} не найден в реестре',
-      'err.offline': 'нет связи с демоном',
+      'srv.reloadWarn': 'сохранено, но работающие наборы не применили правку: {err}',
+      'err.offline': 'панель не отвечает — проверьте, запущен ли mcprig',
       'err.http': 'HTTP {status} · {path}',
-      'add.nameRequired': 'имя обязательно'
+      'add.nameRequired': 'Укажите имя набора'
     }
   };
 
@@ -453,7 +523,8 @@
     server: { en: ['server', 'servers'], ru: ['сервер', 'сервера', 'серверов'] },
     call: { en: ['call', 'calls'], ru: ['вызов', 'вызова', 'вызовов'] },
     tool: { en: ['tool', 'tools'], ru: ['инструмент', 'инструмента', 'инструментов'] },
-    client: { en: ['client', 'clients'], ru: ['клиент', 'клиента', 'клиентов'] }
+    client: { en: ['client', 'clients'], ru: ['клиент', 'клиента', 'клиентов'] },
+    line: { en: ['line', 'lines'], ru: ['строка', 'строки', 'строк'] }
   };
 
   function word(n, kind) {
@@ -515,7 +586,11 @@
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
     mock: null, srvEditing: '', srvReturn: null,
-    st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' }
+    st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' },
+    // paged — открыта вторая страница вызовов: тикер её не перезаписывает.
+    // callsSeq — номер загрузки первой страницы: ответ догрузки из прошлого
+    // окна отбрасывается, иначе он допишется в уже заменённый список
+    callsMore: { paged: false, busy: false, full: false }, callsSeq: 0
   };
 
   /* ---------- мелочи ---------- */
@@ -555,10 +630,10 @@
     });
   }
 
-  // проценты — Intl: сам ставит "4.8%" в английском и "4,8 %" в русском
+  // проценты — Intl: ставит "4.8%" в английском и "4,8 %" в русском; пробел перед знаком убираем
   function pct(fail, all) {
     if (!all) { return '—'; }
-    return numFmt({ style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(fail / all);
+    return numFmt({ style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(fail / all).replace(/\s+%/, '%');
   }
 
   function mins(n) { return (n < 10 ? '0' : '') + n; }
@@ -638,15 +713,55 @@
     return 'state';
   }
 
+  // Карантин в демо: файл читается один раз, дальше состояние живёт в st.mockTools,
+  // иначе кнопка «Одобрить» в демо ничего бы не меняла.
+  function mockTools() {
+    if (!st.mockTools) {
+      st.mockTools = fetch('mock/tools.json', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); });
+    }
+    return st.mockTools.then(function (d) { return { tools: d.tools || [] }; });
+  }
+
+  // Демо повторяет контракт /api/calls: limit и before (строго раньше). Иначе
+  // «Показать ещё» в демо нечего показать, а адрес запроса расходится с живым.
+  function mockCallsPage(data, path) {
+    var q = new URLSearchParams(path.split('?')[1] || '');
+    var limit = parseInt(q.get('limit'), 10) || 0;
+    var before = q.get('before');
+    var id = q.get('set');
+    var rows = data.calls || [];
+    // демон отдаёт строки одного набора, значит и режем окно после сужения
+    if (id) { rows = rows.filter(function (r) { return !r.set || r.set === id; }); }
+    if (before) {
+      rows = rows.filter(function (r) { return new Date(r.time) < new Date(before); });
+    }
+    data.calls = limit > 0 ? rows.slice(0, limit) : rows;
+  }
+
+  // Демон отдаёт строки, где имя сервера стоит отдельным словом, — мок так же:
+  // граница слова у него wordByte, а точка в ней тоже буква (serena.mcp ≠ serena).
+  function mockServerLog(data, path) {
+    var m = /\/servers\/([^/]+)\/logs(\?|$)/.exec(path);
+    if (!m) { return; }
+    var name = decodeURIComponent(m[1]).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var re = new RegExp('(^|[^A-Za-z0-9_.-])' + name + '([^A-Za-z0-9_.-]|$)');
+    data.logs = (data.logs || []).filter(function (l) { return re.test(l); });
+  }
+
   function get(path) {
     if (MOCK) {
       // реестр в демо-режиме живёт в памяти: правка должна быть видна сразу
       if (st.mock && path.indexOf('/api/state') === 0) { return Promise.resolve(st.mock); }
+      // список карантина в демо живёт в памяти: одобрение должно быть видно сразу
+      if (/^\/api\/sets\/[^/]+\/tools$/.test(path)) { return mockTools(); }
       // срезы считаются из строк, а не читаются готовым файлом: иначе фильтры
       // в демо не на что влиять и цифры врут
       if (path.indexOf('/api/stats') === 0) { return Promise.resolve(mockStats(path)); }
     }
-    var url = MOCK ? 'mock/' + mockName(path) + '.json' : path;
+    // запрос мока сохраняет query — в сети видно тот же before, что ушёл бы демону
+    var qs = path.indexOf('?') > 0 ? path.slice(path.indexOf('?')) : '';
+    var url = MOCK ? 'mock/' + mockName(path) + '.json' + qs : path;
     return fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .catch(function () { throw new Error(t('err.offline')); })
       .then(function (r) {
@@ -656,6 +771,8 @@
       })
       .then(function (d) {
         if (MOCK && d && path.indexOf('/api/state') === 0 && !st.mock) { st.mock = d; }
+        if (MOCK && d && path.indexOf('/api/calls') === 0) { mockCallsPage(d, path); }
+        if (MOCK && d && /\/servers\/[^/]+\/logs/.test(path)) { mockServerLog(d, path); }
         return d;
       });
   }
@@ -684,6 +801,7 @@
      internal/registry (имя, транспорт) и internal/config (песочница, теги). */
 
   var MOCK_SANDBOX_KEYS = ['mode', 'onUnavailable', 'ro', 'rw', 'network', 'memoryMb', 'pids', 'timeoutSec'];
+  var MOCK_EXPOSE_KINDS = ['resources', 'prompts'];
 
   function mockServerErr(inp, name, exists) {
     if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) { return 'name: строчные латинские буквы, цифры, - и _'; }
@@ -701,6 +819,11 @@
     if ((inp.tags || []).indexOf('untrusted') >= 0 && !inp.sandbox) {
       return 'тег untrusted требует sandbox: сервер без изоляции не стартует';
     }
+    // та же строгость, что у config.Check: опечатка не должна молча значить «не отдавать»
+    var bad = (inp.expose || []).filter(function (k) { return MOCK_EXPOSE_KINDS.indexOf(k) < 0; });
+    if (bad.length) {
+      return 'expose: неизвестный вид "' + bad[0] + '" (допустимо ' + MOCK_EXPOSE_KINDS.join(', ') + ')';
+    }
     return '';
   }
 
@@ -714,11 +837,59 @@
     if (body.env && Object.keys(body.env).length) { srv.env = body.env; }
     if (body.envAllow && body.envAllow.length) { srv.envAllow = body.envAllow; }
     if (body.tags && body.tags.length) { srv.tags = body.tags; }
+    if (body.expose && body.expose.length) { srv.expose = body.expose; }
     if (body.sandbox && !http) { srv.sandbox = body.sandbox; }
     return srv;
   }
 
   function mockSend(method, path, body) {
+    // Одобрение в демо пишет текущий хэш в запись — как демон, только в памяти.
+    var am = /^\/api\/sets\/([^/]+)\/tools\/approve$/.exec(path);
+    if (am && method === 'POST' && st.mockTools) {
+      return st.mockTools.then(function (d) {
+        var rows = (d && d.tools) || [];
+        var approved = [];
+        rows.forEach(function (row) {
+          var one = body && body.server && row.server === body.server && row.tool === body.tool;
+          if (!one && !(body && body.all)) { return; }
+          if (row.state !== 'changed') { return; }
+          row.approvedHash = row.hash;
+          row.state = 'ok';
+          approved.push(row.server + '/' + row.tool);
+        });
+        return { approved: approved };
+      });
+    }
+    // Выдача ключа: демо проверяет профиль теми же словами, что демон
+    // (internal/manager/api.go, keyProfileOf), и показывает новый ключ сразу.
+    var km = /^\/api\/sets\/([^/]+)\/keys$/.exec(path);
+    if (km && method === 'POST' && st.mock) {
+      var want = String((body && body.profile) || '').trim();
+      var kset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(km[1]); })[0];
+      var names = (kset && kset.profiles) || [];
+      if (want && names.indexOf(want) < 0) {
+        var msg = names.length
+          ? 'неизвестный профиль ' + want + '; доступны: ' + names.slice().sort().join(', ')
+          : 'у набора ' + decodeURIComponent(km[1]) + ' нет профилей — задайте profiles в записи набора';
+        fail(msg);
+        return Promise.reject(new Error(msg));
+      }
+      var fresh = { id: 'k_' + kset.id + '_' + (kset.keys.length + 1), createdAt: new Date().toISOString() };
+      if (want) { fresh.profile = want; }
+      kset.keys.push(fresh);
+      return Promise.resolve({ token: 'demo_' + fresh.id, key: fresh, set: kset });
+    }
+    // Подпись ключа в демо тоже сохраняется: иначе выданный ключ тут же
+    // терял бы метку, которую панель только что отправила.
+    var nm = /^\/api\/sets\/([^/]+)\/keys\/([^/]+)$/.exec(path);
+    if (nm && method === 'PATCH' && st.mock) {
+      var nset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(nm[1]); })[0];
+      var keyID = decodeURIComponent(nm[2]);
+      (nset ? nset.keys : []).forEach(function (k) {
+        if (k.id === keyID) { k.note = String((body && body.note) || ''); }
+      });
+      return Promise.resolve({ ok: true });
+    }
     var m = /^\/api\/servers(?:\/([^/]+))?$/.exec(path);
     if (!m || !st.mock) { return Promise.resolve({ ok: true, ms: 14, tools: [] }); }
     // у POST имя приходит в теле, у PUT/DELETE — в пути
@@ -744,11 +915,16 @@
         s.servers = (s.servers || []).filter(function (n) { return n !== name; });
       });
     } else {
-      var srv = mockServer(name, body || {});
       if (method === 'POST') {
-        st.mock.servers.push(srv);
+        st.mock.servers.push(mockServer(name, body || {}));
       } else {
-        st.mock.servers = st.mock.servers.map(function (s) { return s.name === name ? srv : s; });
+        // PUT сливает тело с записью, как mergeServer в бэкенде: null и пустой
+        // массив снимают поле, отсутствующее в теле поле остаётся
+        var old = st.mock.servers.filter(function (s) { return s.name === name; })[0];
+        var patch = Object.assign({}, old, body || {});
+        st.mock.servers = st.mock.servers.map(function (s) {
+          return s.name === name ? mockServer(name, patch) : s;
+        });
       }
     }
     return Promise.resolve({ ok: true, restarted: [], stopped: [] });
@@ -1105,6 +1281,12 @@
         var check = act.appendChild(el('button', 'btn btn-xs'));
         check.type = 'button';
         check.dataset.check = '';
+        var log = act.appendChild(el('button', 'btn btn-xs'));
+        log.type = 'button';
+        log.dataset.log = '';
+        var toolsBtn = act.appendChild(el('button', 'btn btn-xs'));
+        toolsBtn.type = 'button';
+        toolsBtn.dataset.tools = '';
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
         edit.dataset.edit = '';
@@ -1142,6 +1324,12 @@
         var check = tr.querySelector('[data-check]');
         check.textContent = t('srv.check');
         check.dataset.check = row.name;
+        var log = tr.querySelector('[data-log]');
+        log.textContent = t('srv.log');
+        log.dataset.log = row.name;
+        var toolsBtn = tr.querySelector('[data-tools]');
+        toolsBtn.textContent = t('srv.tools');
+        toolsBtn.dataset.tools = row.name;
         var edit = tr.querySelector('[data-edit]');
         edit.textContent = t('srv.edit');
         edit.dataset.edit = row.name;
@@ -1351,6 +1539,9 @@
         var probe = act.appendChild(el('button', 'btn btn-xs'));
         probe.type = 'button';
         probe.dataset.probe = '';
+        var auth = act.appendChild(el('button', 'btn btn-xs'));
+        auth.type = 'button';
+        auth.dataset.authorize = '';
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
         edit.dataset.regedit = '';
@@ -1377,10 +1568,76 @@
         var probe = tr.querySelector('[data-probe]');
         probe.textContent = t('srv.probe');
         probe.dataset.probe = row.name;
+        // вход по OAuth — у удалённого сервера набора: локальному он не нужен
+        var auth = tr.querySelector('[data-authorize]');
+        var canAuth = row.mine && !!srv.url;
+        auth.hidden = !canAuth;
+        auth.textContent = t('srv.authorize');
+        auth.dataset.authorize = canAuth ? row.name : '';
         var edit = tr.querySelector('[data-regedit]');
         edit.textContent = t('srv.edit');
         edit.dataset.regedit = row.name;
       });
+  }
+
+  /* ---------- вход по OAuth ----------
+     Панель отдаёт ссылку в браузер человека и принимает код на /oauth/callback:
+     вход идёт в демоне, а не в запросе клиента, поэтому состояние читается
+     опросом, а не ожиданием одного долгого ответа. */
+
+  var authFlow = null;
+  var authPoll = 0;
+
+  function authPath(id, name) {
+    return '/api/sets/' + encodeURIComponent(id) + '/servers/' + encodeURIComponent(name) + '/authorize';
+  }
+
+  function showAuth(v) {
+    v = v || {};
+    var pending = v.state === 'pending' || v.state === 'idle';
+    var link = v.url || '';
+    $('auth-note').textContent = pending ? t('auth.waiting') : (v.message || '');
+    show($('auth-link-row'), !!link);
+    show($('auth-open'), !!link);
+    show($('auth-copy'), !!link);
+    if (link) { $('auth-link').value = link; }
+    return pending;
+  }
+
+  function pollAuth() {
+    var flow = authFlow;
+    if (!flow) { return; }
+    clearTimeout(authPoll);
+    get(authPath(flow.id, flow.name)).then(function (v) {
+      if (authFlow !== flow) { return; }
+      if (showAuth(v)) { authPoll = setTimeout(pollAuth, 1500); }
+      else if (v && v.state === 'ok') { setTimeout(loadHealth, 1500); }
+    }).catch(function () {
+      if (authFlow === flow) { authPoll = setTimeout(pollAuth, 3000); }
+    });
+  }
+
+  function startAuth(name) {
+    var set = current();
+    if (!set) { return; }
+    authFlow = { id: set.id, name: name };
+    $('auth-server').textContent = name;
+    $('auth-link').value = '';
+    showAuth({ state: 'pending' });
+    var dlg = $('auth-dlg');
+    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
+    send('POST', authPath(set.id, name), {}).then(function (v) {
+      if (!authFlow) { return; }
+      showAuth(v);
+      pollAuth();
+    });
+  }
+
+  function closeAuth() {
+    authFlow = null;
+    clearTimeout(authPoll);
+    var dlg = $('auth-dlg');
+    if (dlg.open) { dlg.close(); }
   }
 
   /* ---------- редактор сервера ----------
@@ -1433,6 +1690,9 @@
     v('envAllow', srv && srv.envAllow ? srv.envAllow.join('\n') : '');
     v('tags', srv && srv.tags ? srv.tags.join(', ') : '');
     f.elements.enabled.checked = !srv || srv.enabled !== false;
+    var ex = (srv && srv.expose) || [];
+    f.elements.exposeResources.checked = ex.indexOf('resources') >= 0;
+    f.elements.exposePrompts.checked = ex.indexOf('prompts') >= 0;
     var sb = (srv && srv.sandbox) || {};
     v('sbMode', sb.mode);
     v('sbOnUnavailable', sb.onUnavailable);
@@ -1481,6 +1741,12 @@
     var tags = val('tags').split(',').map(function (s) { return s.trim(); })
       .filter(function (s) { return s; });
     if (tags.length) { out.tags = tags; }
+    // null, а не пропуск: PUT сливает тело с записью, и снятая галочка иначе
+    // оставила бы прежний expose на месте
+    var ex = [];
+    if (f.elements.exposeResources.checked) { ex.push('resources'); }
+    if (f.elements.exposePrompts.checked) { ex.push('prompts'); }
+    out.expose = ex.length ? ex : null;
     // песочница живёт только у stdio: у http её нет по контракту
     if (transport === 'stdio') {
       var sb = {};
@@ -1528,10 +1794,24 @@
     srvErr('');
     // текст ошибки даёт бэкенд: он точнее любого предсказания в браузере
     send(editing ? 'PUT' : 'POST', editing ? '/api/servers/' + encodeURIComponent(editing) : '/api/servers', body)
-      .then(function () { return loadState(); })
+      .then(function (r) {
+        st.srvReloadErrors = (r && r.reloadErrors) || null;
+        return loadState();
+      })
       // loadState перерисовывает наборы и шапку, но не список правой панели
       .then(function () { renderServers(st.health); })
-      .then(function () { closeSrv(); })
+      .then(function () {
+        // Правка записана, но работающие наборы её не применили: форма
+        // остаётся открытой с причиной, а не закрывается молча.
+        if (st.srvReloadErrors) {
+          var parts = Object.keys(st.srvReloadErrors).map(function (id) {
+            return id + ': ' + st.srvReloadErrors[id];
+          });
+          srvErr(t('srv.reloadWarn', { err: parts.join('; ') }));
+          return;
+        }
+        closeSrv();
+      })
       .catch(function (err) { srvErr(err.message); })
       .then(function () { st.busy = false; btn.disabled = false; });
   }
@@ -1556,23 +1836,78 @@
       .then(function () { st.busy = false; btn.disabled = false; });
   }
 
+  var CALLS_PAGE = 100;
+
+  // ответ по одному набору строк `set` не несёт; мок отдаёт общий файл — сужаем сами
+  function callsOf(data, id) {
+    if (!data) { return data; }
+    var mine = function (r) { return !r.set || r.set === id; };
+    data.calls = (data.calls || []).filter(mine);
+    data.counters = (data.counters || []).filter(mine);
+    return data;
+  }
+
+  // низ таблицы вызовов: кнопка «ещё» на полной странице, пометка о паузе — после
+  // догрузки. Обе живут в одной строке, поэтому она видна, если видна хоть одна.
+  function syncCallsMore() {
+    var full = st.callsMore.full, paused = st.callsMore.paged;
+    show($('calls-more'), full);
+    show($('calls-pause'), paused);
+    show($('calls-more-row'), full || paused);
+  }
+
   function loadCalls() {
     if (!st.sel) { return; }
-    var id = st.sel;
-    return get('/api/calls?set=' + encodeURIComponent(id) + '&limit=100').then(function (data) {
-      if (id !== st.sel) { return; }
-      // ответ по одному набору строк `set` не несёт; мок отдаёт общий файл — сужаем сами
-      if (data) {
-        var mine = function (r) { return !r.set || r.set === id; };
-        data.calls = (data.calls || []).filter(mine);
-        data.counters = (data.counters || []).filter(mine);
-      }
-      st.calls = data;
+    var id = st.sel, seq = ++st.callsSeq;
+    st.callsMore.paged = false;
+    return get('/api/calls?set=' + encodeURIComponent(id) + '&limit=' + CALLS_PAGE).then(function (data) {
+      if (id !== st.sel || seq !== st.callsSeq) { return; }
+      st.calls = callsOf(data, id);
+      // «Показать ещё» появляется, только если страница пришла полной
+      st.callsMore.full = !!st.calls && st.calls.calls.length >= CALLS_PAGE;
+      syncCallsMore();
       loadKpi();
       renderCalls(st.calls);
       renderHead();
       renderSetServers();
     }).catch(function (e) { fail(e.message, e); });
+  }
+
+  // Следующая страница: before — время последней строки ровно в том виде, в каком
+  // оно пришло, без пересчёта через Date (иначе смещение часового пояса меняет миг).
+  function loadMoreCalls() {
+    var id = st.sel, data = st.calls;
+    if (!id || !data || !data.calls || !data.calls.length || st.callsMore.busy) { return; }
+    var before = data.calls[data.calls.length - 1].time;
+    // seq не растёт: это не новая первая страница. Если тикер успеет её взять,
+    // ответ уйдёт в уже заменённый список — поэтому сверяем номер после ответа
+    var seq = st.callsSeq;
+    var btn = $('calls-more');
+    st.callsMore.busy = true;
+    btn.disabled = true;
+    return get('/api/calls?set=' + encodeURIComponent(id) + '&limit=' + CALLS_PAGE +
+      '&before=' + encodeURIComponent(before)).then(function (page) {
+      if (id !== st.sel || seq !== st.callsSeq) { return; }
+      var rows = page ? callsOf(page, id).calls : [];
+      data.calls = data.calls.concat(rows);
+      st.callsMore.paged = true;
+      st.callsMore.full = rows.length >= CALLS_PAGE;
+      renderCalls(data);
+      syncCallsMore();
+    }).catch(function (e) {
+      if (id !== st.sel || seq !== st.callsSeq) { return; }
+      // загруженное остаётся: плашка говорит о неудаче, а не отменяет список
+      fail(e.message, e);
+    }).then(function () {
+      st.callsMore.busy = false;
+      btn.disabled = false;
+    });
+  }
+
+  // «Возобновить» — тот же первый запрос: догруженное уходит, тикер оживает
+  function resumeCalls() {
+    if (st.callsMore.busy) { return; }
+    loadCalls();
   }
 
   /* ---------- вкладка «Вызовы» ---------- */
@@ -1675,6 +2010,11 @@
     }).catch(function (e) { fail(e.message, e); });
   }
 
+  // тон строки общий у обоих логов: слово-маркер важнее того, кто пишет лог
+  function logClass(line) {
+    return /\b(error|err|fatal|panic)\b/i.test(line) ? 'is-error' : /\bwarn(ing)?\b/i.test(line) ? 'is-warn' : '';
+  }
+
   function renderLog(lines) {
     var key = lines.join('\n');
     if (key === st.logKey) { return; }
@@ -1685,10 +2025,178 @@
     sync($('log'), lines, function (l, i) { return String(i); },
       function () { return el('div', 'logline'); },
       function (row, line) {
-        var cls = /\b(error|err|fatal|panic)\b/i.test(line) ? 'is-error' : /\bwarn(ing)?\b/i.test(line) ? 'is-warn' : '';
+        var cls = logClass(line);
         row.className = 'logline' + (cls ? ' ' + cls : '');
         row.textContent = line;
       });
+  }
+
+  /* ---------- лог одного сервера ----------
+     Отдельного файла у сервера нет: демон отдаёт строки лога набора, где имя
+     сервера встречается отдельным словом, поэтому дровер читает тот же маршрут. */
+
+  var srvLog = { name: '', set: '', seq: 0 };
+
+  function openSrvLog(name) {
+    var set = current();
+    if (!set) { return; }
+    srvLog.name = name;
+    srvLog.set = set.id;
+    srvLog.returnFocus = document.activeElement;
+    $('srvlog-h').textContent = t('srvlog.title', { server: name, set: set.id });
+    $('srvlog-err').hidden = true;
+    var dlg = $('srvlog-dlg');
+    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
+    $('srvlog-refresh').focus();
+    loadSrvLog();
+  }
+
+  function closeSrvLog() {
+    var dlg = $('srvlog-dlg');
+    if (!dlg.open) { return; }
+    dlg.close();
+    srvLog.name = '';
+    srvLog.seq++;
+    var back = srvLog.returnFocus;
+    srvLog.returnFocus = null;
+    if (back && document.contains(back) && back.offsetParent !== null) { back.focus(); }
+  }
+
+  function loadSrvLog() {
+    if (!srvLog.name) { return; }
+    var name = srvLog.name, id = srvLog.set, seq = ++srvLog.seq;
+    var btn = $('srvlog-refresh');
+    btn.disabled = true;
+    $('srvlog-err').hidden = true;
+    return get('/api/sets/' + encodeURIComponent(id) + '/servers/' + encodeURIComponent(name) + '/logs?lines=200')
+      .then(function (data) {
+        if (seq !== srvLog.seq) { return; }
+        renderSrvLog((data && data.logs) || []);
+      })
+      .catch(function (e) {
+        if (seq !== srvLog.seq) { return; }
+        // уже показанные строки остаются: старый хвост полезнее пустого места
+        var box = $('srvlog-err');
+        box.textContent = t('srvlog.fail') + ' · ' + e.message;
+        box.hidden = false;
+      })
+      .then(function () { if (seq === srvLog.seq) { btn.disabled = false; } });
+  }
+
+  function renderSrvLog(lines) {
+    var box = $('srvlog');
+    $('srvlog-count').textContent = cnt(lines.length, 'line');
+    show(box, lines.length > 0);
+    show($('srvlog-empty'), lines.length === 0);
+    // текст лога — только textContent: строки приходят от процессов, не от панели
+    box.replaceChildren();
+    lines.forEach(function (line) {
+      var row = el('div', 'logline', line);
+      var cls = logClass(line);
+      if (cls) { row.className += ' ' + cls; }
+      box.appendChild(row);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  /* ---------- карантин дескрипторов ----------
+     Панель показывает то, что помнит прокси: новый инструмент одобрен сам,
+     изменившийся ждёт человека, иначе вызов нижестоящего сервера отбит. */
+
+  var toolLock = { set: '', server: '', seq: 0, rows: [] };
+
+  function openTools(server) {
+    var set = current();
+    if (!set) { return; }
+    toolLock.set = set.id;
+    toolLock.server = server;
+    toolLock.returnFocus = document.activeElement;
+    $('tools-h').textContent = t('tools.title', { server: server, set: set.id });
+    $('tools-err').hidden = true;
+    var dlg = $('tools-dlg');
+    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
+    $('tools-refresh').focus();
+    loadTools();
+  }
+
+  function closeTools() {
+    var dlg = $('tools-dlg');
+    if (!dlg.open) { return; }
+    dlg.close();
+    toolLock.server = '';
+    toolLock.seq++;
+    var back = toolLock.returnFocus;
+    toolLock.returnFocus = null;
+    if (back && document.contains(back) && back.offsetParent !== null) { back.focus(); }
+  }
+
+  function loadTools() {
+    if (!toolLock.server) { return; }
+    var id = toolLock.set, seq = ++toolLock.seq;
+    var btn = $('tools-refresh');
+    btn.disabled = true;
+    $('tools-err').hidden = true;
+    return get('/api/sets/' + encodeURIComponent(id) + '/tools')
+      .then(function (data) {
+        if (seq !== toolLock.seq) { return; }
+        // демон отдаёт весь набор, дровер показывает один сервер
+        renderTools(((data && data.tools) || []).filter(function (x) { return x.server === toolLock.server; }));
+      })
+      .catch(function (e) {
+        if (seq !== toolLock.seq) { return; }
+        var box = $('tools-err');
+        box.textContent = t('tools.fail') + ' · ' + e.message;
+        box.hidden = false;
+      })
+      .then(function () { if (seq === toolLock.seq) { btn.disabled = false; } });
+  }
+
+  function renderTools(rows) {
+    toolLock.rows = rows;
+    $('tools-count').textContent = cnt(rows.length, 'tool');
+    show($('tools-empty'), rows.length === 0);
+    sync($('lock-body'), rows, function (r) { return r.tool; },
+      function () {
+        var tr = el('tr');
+        var nm = tr.appendChild(el('td', 'cell-name'));
+        nm.dataset.label = t('tools.thTool');
+        var stateCell = tr.appendChild(el('td'));
+        stateCell.dataset.label = t('tools.thState');
+        stateCell.appendChild(el('span', 'badge'));
+        var act = tr.appendChild(el('td', 'cell-actions'));
+        var btn = act.appendChild(el('button', 'btn btn-xs'));
+        btn.type = 'button';
+        btn.dataset.approve = '';
+        return tr;
+      },
+      function (tr, row) {
+        tr.dataset.tool = row.tool;
+        var nm = tr.querySelector('.cell-name');
+        nm.textContent = row.tool;
+        nm.title = row.tool;
+        var changed = row.state === 'changed';
+        var badge = tr.querySelector('.badge');
+        badge.className = 'badge ' + (changed ? 'badge-warn' : 'badge-ok');
+        badge.textContent = changed ? t('tools.changed') : t('tools.ok');
+        var btn = tr.querySelector('[data-approve]');
+        btn.textContent = t('tools.approve');
+        btn.dataset.approve = row.tool;
+        // одобрять нечего у одобренного: кнопка остаётся, но не жмётся вслепую
+        btn.hidden = !changed;
+        btn.title = changed ? t('tools.approve') : '';
+      });
+  }
+
+  function approveTool(tool, btn) {
+    if (!toolLock.server) { return; }
+    if (btn) { btn.disabled = true; }
+    return send('POST', '/api/sets/' + encodeURIComponent(toolLock.set) + '/tools/approve',
+      { server: toolLock.server, tool: tool })
+      .then(function () { return loadTools(); })
+      .catch(function (e) {
+        fail(t('tools.approveFail') + ' · ' + e.message, e);
+      })
+      .then(function () { if (btn) { btn.disabled = false; } });
   }
 
   /* ---------- статистика ----------
@@ -1858,7 +2366,7 @@
     $('s-clients-count').textContent = cnt((d.clients || []).length, 'client');
     $('s-byset-count').textContent = Array.isArray(d.bySet) ? cnt(d.bySet.length, 'set') : '';
 
-    renderBreakdown($('tools-body'), d.tools, 'tool', t('stats.thTool'), 'server', $('tools-empty'), 11);
+    renderBreakdown($('tools-body'), d.tools, 'tool', t('stats.thTool'), 'server', $('stats-tools-empty'), 11);
     renderBreakdown($('byserver-body'), d.servers, 'server', t('stats.thServer'), '', $('byserver-empty'), 11);
     renderClients(d.clients || []);
     renderSets(d.bySet);
@@ -2184,11 +2692,29 @@
     var set = current();
     if (!set) { return; }
     renderKeys(set);
+    fillKeyProfiles(set);
     show($('new-key-box'), false);
     show($('keys-warn'), false);
     $('key-label').value = '';
     var dlg = $('keys-dlg');
     if (typeof dlg.showModal === 'function') { dlg.showModal(); }
+  }
+
+  // Профиль — сужение прав, записанное в наборе: панель знает только имена,
+  // правила читает демон. Нет профилей — нет и селектора.
+  function fillKeyProfiles(set) {
+    var names = (set && set.profiles) || [];
+    var sel = $('key-profile');
+    sel.textContent = '';
+    if (!names.length) { show($('key-profile-field'), false); return; }
+    var none = sel.appendChild(el('option', '', t('keys.profileNone')));
+    none.value = '';
+    names.forEach(function (name) {
+      var opt = sel.appendChild(el('option', '', name));
+      opt.value = name;
+    });
+    sel.value = '';
+    show($('key-profile-field'), true);
   }
 
   function renderKeys(set) {
@@ -2200,6 +2726,7 @@
         var li = el('li', 'keyitem');
         var head = li.appendChild(el('div'));
         head.appendChild(el('span', 'key-name'));
+        head.appendChild(el('span', 'badge badge-unknown key-badge'));
         head.appendChild(el('span', 'key-sub'));
         var note = li.appendChild(el('div', 'key-note'));
         var input = note.appendChild(el('input', 'input'));
@@ -2219,6 +2746,11 @@
         li.dataset.revoked = String(revoked);
         // имя строки — id ключа: префикс у всех ключей набора один и тот же
         li.querySelector('.key-name').textContent = k.id;
+        var badge = li.querySelector('.key-badge');
+        badge.textContent = k.profile || '';
+        badge.hidden = !k.profile;
+        badge.title = k.profile ? t('keys.profileIs', { name: k.profile }) : '';
+        badge.setAttribute('aria-label', k.profile ? t('keys.profileIs', { name: k.profile }) : '');
         li.querySelector('.key-sub').textContent = revoked
           ? day(k.createdAt) + ' · ' + t('keys.revoked', { date: day(k.revokedAt) })
           : day(k.createdAt) + ' · ' + t('keys.active');
@@ -2274,6 +2806,7 @@
     renderCalls(st.calls);
     renderEnv();
     renderKeys(current() || {});
+    fillKeyProfiles(current());
     fillFilters();
     renderStats(st.st.data);
     applyRail();
@@ -2331,12 +2864,14 @@
     if (e.key === 'Escape') {
       if ($('theme-menu').hidden === false) { closeThemeMenu(true); return; }
       if ($('srv-dlg').open) { closeSrv(); return; }
+      if ($('srvlog-dlg').open) { closeSrvLog(); return; }
+      if ($('tools-dlg').open) { closeTools(); return; }
       if (document.body.classList.contains('side-open')) { closeSide(); return; }
       if (document.body.classList.contains('rail-open')) { closeRail(); }
       return;
     }
     if (e.key !== 'Tab') { return; }
-    var root = $('srv-dlg').open ? $('srv-dlg') : null;
+    var root = $('srv-dlg').open ? $('srv-dlg') : $('srvlog-dlg').open ? $('srvlog-dlg') : $('tools-dlg').open ? $('tools-dlg') : null;
     if (!root && !document.body.classList.contains('side-open')) { return; }
     root = root || $('side');
     var f = [].slice.call(root.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
@@ -2520,15 +3055,51 @@
   $('set-srv-body').addEventListener('click', function (e) {
     var check = e.target.closest('[data-check]');
     if (check) { probeServer(check.dataset.check, check); return; }
+    var logBtn = e.target.closest('[data-log]');
+    if (logBtn) { openSrvLog(logBtn.dataset.log); return; }
+    var toolsBtn = e.target.closest('[data-tools]');
+    if (toolsBtn) { openTools(toolsBtn.dataset.tools); return; }
     var edit = e.target.closest('[data-edit]');
     if (edit) { openSrv(edit.dataset.edit); }
   });
 
+  $('srvlog-close').addEventListener('click', closeSrvLog);
+  $('srvlog-refresh').addEventListener('click', loadSrvLog);
+  $('tools-close').addEventListener('click', closeTools);
+  $('tools-refresh').addEventListener('click', loadTools);
+  $('lock-body').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-approve]');
+    if (btn) { approveTool(btn.dataset.approve, btn); }
+  });
+  $('calls-more').addEventListener('click', loadMoreCalls);
+  $('calls-resume').addEventListener('click', resumeCalls);
+
   $('servers').addEventListener('click', function (e) {
     var probe = e.target.closest('[data-probe]');
     if (probe) { probeServer(probe.dataset.probe, probe); return; }
+    var auth = e.target.closest('[data-authorize]');
+    if (auth && auth.dataset.authorize) { startAuth(auth.dataset.authorize); return; }
     var edit = e.target.closest('[data-regedit]');
     if (edit) { openSrv(edit.dataset.regedit); }
+  });
+
+  $('auth-close').addEventListener('click', closeAuth);
+  $('auth-done').addEventListener('click', closeAuth);
+  $('auth-dlg').addEventListener('close', function () {
+    authFlow = null;
+    clearTimeout(authPoll);
+  });
+  $('auth-open').addEventListener('click', function () {
+    var url = $('auth-link').value;
+    if (url) { window.open(url, '_blank', 'noopener'); }
+  });
+  $('auth-copy').addEventListener('click', function () {
+    var btn = this;
+    navigator.clipboard.writeText($('auth-link').value).then(function () {
+      var was = t('auth.copy');
+      btn.textContent = t('auth.copied');
+      setTimeout(function () { btn.textContent = was; }, 1500);
+    });
   });
 
   /* ---------- новый набор ---------- */
@@ -2583,11 +3154,12 @@
     var set = current();
     if (!set || st.busy) { return; }
     var label = $('key-label').value.trim();
+    var profile = $('key-profile').value;
     var btn = this.querySelector('button[type="submit"]');
     st.busy = true;
     btn.disabled = true;
     show($('keys-warn'), false);
-    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', {})
+    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', profile ? { profile: profile } : {})
       .then(function (r) {
         $('key-label').value = '';
         $('new-key').textContent = (r && r.token) || '';
@@ -2605,7 +3177,12 @@
           return loadState().then(function () { renderKeys(current() || set); });
         });
       })
-      .catch(function (err) { fail(err.message, err); })
+      .catch(function (err) {
+        // Отказ демона (400 на неизвестный профиль) — ответ формы, а не сбой
+        // связи: показываем его текст здесь, диалог не закрываем.
+        $('keys-warn').textContent = err.message;
+        show($('keys-warn'), true);
+      })
       .then(function () { st.busy = false; btn.disabled = false; });
   });
 
@@ -2675,7 +3252,12 @@
   loadEnv();
   loadState().then(function () {
     every(5000, loadState);
-    every(5000, function () { if (st.sel) { loadHealth(); loadCalls(); } });
+    every(5000, function () {
+      if (!st.sel) { return; }
+      loadHealth();
+      // пока листают историю, страница не перезаписывается первой
+      if (!st.callsMore.paged) { loadCalls(); }
+    });
     every(10000, function () {
       var set = current();
       if (set && set.runtime && set.runtime.running) { loadLog(); }

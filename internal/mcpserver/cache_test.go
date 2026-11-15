@@ -55,7 +55,7 @@ func TestWarmFillsCache(t *testing.T) {
 	m.Warm(context.Background())
 	for _, e := range m.entries[:2] {
 		if e.cachedTools() == nil {
-			t.Fatalf("%s: прогрев не наполнил кэш", e.srv.Name)
+			t.Fatalf("%s: прогрев не наполнил кэш", e.server().Name)
 		}
 	}
 	if n := atomic.LoadInt32(&dials); n != 2 {

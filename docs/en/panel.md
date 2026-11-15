@@ -42,16 +42,39 @@ and the interface language.
 The **servers** tab of the details drawer and the **Add server** button open a
 form over the panel: name, description, transport, command (one argument per line) or
 `url` and headers, working directory, `env`, `envAllow`, tags, the `enabled`
-switch and a **sandbox** fieldset — `mode`, `onUnavailable`, `network`, `ro` and
+switch, two **expose** checkboxes (`resources`, `prompts`) and a **sandbox**
+fieldset — `mode`, `onUnavailable`, `network`, `ro` and
 `rw` (one path per line), `memoryMb`, `pids`, `tmpMb`, `timeoutSec`. It writes
 through `POST /api/servers` and `PUT /api/servers/<name>`; a backend refusal is
 shown in the form as its own text and the stored record stays untouched.
+
+With both **expose** boxes unchecked the record carries no `expose` at all: the
+MCP client sees that server's tools only. Checking them is the only way to give
+the client its resources or prompts ([meta-tools.md](meta-tools.md#resources-and-prompts));
+an unknown value never comes from the form, but a hand-edited `registry.json`
+typo is refused by the backend with `expose: неизвестный вид …`.
 
 The same form is the only way to edit a `sandbox` block from the UI. Fields and
 their meaning are in [configuration.md](configuration.md#sandbox); the panel
 does not validate them itself — it shows what the backend answers, including
 `sandbox: неизвестные поля: …`, `sandbox допустим только для stdio` and
 `тег untrusted требует sandbox: сервер без изоляции не стартует`.
+
+Each server row has a **Log** button: it opens a drawer with the set's log
+filtered by that server's name — a server has no log file of its own. The
+drawer reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the
+lines as text; a name that never appears in the log shows `log is empty`, and a
+failed request keeps the lines already shown and reports the reason above them.
+
+The **Tools** button of a row opens the descriptor drawer for that server
+([meta-tools.md](meta-tools.md#descriptor-quarantine)): one line per tool with
+its state — `approved`, or `changed` in warning colour with an **approve**
+button. It reads `GET /api/sets/<id>/tools` and keeps the server's entries;
+**approve** sends `POST /api/sets/<id>/tools/approve` and the list is read
+again, so the row turns `approved` on the spot. Until then the proxy refuses
+that tool's calls. The drawer shows what the set process wrote, so without a set
+data directory (`MCPRIG_DATA_DIR`) every tool reads `approved`; entries of a
+server removed from the set are pruned when the set config is rebuilt.
 
 The registry list in the drawer also shows isolation, on the second line of a
 row: `bwrap` when the sandbox is applied, `no isolation` in warning colour when
@@ -61,15 +84,44 @@ is in the tooltip), and `config rejected` in error colour for a record with
 value comes from the same `isolation` field MCP clients see in `list_servers`.
 
 The **Keys** dialog lists key ids, creation and revocation dates and notes. It
-shows only the 8-character prefix. The note of an existing key is edited in
+shows only the 8-character prefix. When the set has a `profiles` block, the
+issue form carries a **Profile** select (empty means no profile); the chosen name
+goes to `POST /api/sets/<id>/keys` as `{"profile":…}`, a `400` from the daemon is
+shown in the dialog itself and the dialog stays open, and every key row shows its
+profile as a badge. A set without profiles keeps the form as it was. The note of
+an existing key is edited in
 place: the row has a label field and a **Save** button that appears once the
 value differs from the stored one; the panel sends `PATCH` with `{"note":…}`,
 redraws the list and shows a `restartError` of the set as its own warning rather
 than swallowing it. A newly issued token is displayed once, and
 so is the token of a newly created closed set: `POST /api/sets` returns it in
-the `201` body, while `GET /api/sets` never repeats it. Issuing a key later
-revokes the previous active key and restarts the set if it is running; revoking
-the active key stops the set.
+the `201` body, while `GET /api/sets` never repeats it. Issuing a key neither
+revokes the previous active key nor restarts the set: the new token reaches a
+running set by reload, and the old one keeps working. Revoking the last active
+key stops the set; revoking one of several leaves it running.
+
+## OAuth
+
+A remote server that answers `401` shows **authorize** in the row of the
+registry list. The button starts the authorization-code flow inside the daemon
+and draws a dialog with the link; the browser is the user's, so the panel never
+waits for it in a request — the state is polled with
+`GET /api/sets/<set>/servers/<name>/authorize`.
+
+| item | value |
+| --- | --- |
+| redirect URI | `http://<panel host>:<panel port>/oauth/callback` |
+| callback route | public: the browser carries no panel session, `state` is the key |
+| token file | `<data dir>/sets/<set>/oauth.json` |
+| after success | the set restarts itself, so the token is picked up |
+| give up after | 10 minutes |
+
+The redirect address is the one the panel is opened at, so it must be reachable
+from the browser. An authorization server that refuses plain `http` for an
+address that is not loopback (dynamic registration answers `invalid_redirect_uri`)
+needs TLS in front of the panel; the flow itself is the same. `mcprig auth
+--set <set> <server>` does the same thing from a terminal with a loopback
+listener — see [cli.md](cli.md#auth).
 
 ## Themes
 
@@ -104,18 +156,23 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
 | `GET /api/state` | servers, sets, `firstPort` — the first paint |
 | `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
-| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update (restarts a running set) and delete (stops it) |
+| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port` or `open` restarts the set. A `token` in the body replaces the primary key and creates one when the set has no active key |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
+| `POST /api/sets/<id>/reload` | apply `servers.json` without a restart: `{"reloaded":true,"generation":N,"applied":[…],"restartNeeded":[…],"error":"…"}`. A stopped set answers `{"reloaded":false,"reason":"набор не запущен"}` and the file is written anyway. A non-empty `restartNeeded` or a set `error` gives `reloaded:false` with the cause in `reason`; a write failure is `500` |
 | `GET /api/sets/<id>/servers` | per-server health for one set |
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
-| `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token |
-| `DELETE /api/sets/<id>/keys/<keyID>` | revoke a key; revoking the active key stops the set and the answer carries `stopped: true` |
-| `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"note":"hermes"}`; the note becomes the client's label in the statistics, an empty string clears it, a running set is restarted |
+| `GET /api/sets/<id>/tools` | `{"tools":[…]}` — the set's descriptor records: `server`, `tool`, `hash` (as the catalog serves it now), `approvedHash` and `state` (`ok`, `changed`) |
+| `POST /api/sets/<id>/tools/approve` | approve the current descriptor: `{"server":"serena","tool":"find_symbol"}`, or `{"all":true}` for everything currently changed; answers `{"approved":["serena/find_symbol"]}`, empty when nothing needed it. The record is written with `approvedBy: "panel"` |
+| `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token. Earlier keys stay active, so issuing does not revoke the old one; the set serves up to 8 active keys, the ninth answers `409`. An optional `{"label":"hermes","profile":"reader"}` names and narrows the key to that profile of the set — an unknown name is `400` listing the profiles, a set without `profiles` is `400` with a hint to add the block. A running set gets the new key by reloading, not restarting; when the process did not apply it, the answer carries `reloadError` (and `restartError`, its older name) |
+| `GET /api/sets/<id>/keys` | `{"keys":[…]}` — `id`, `label`, `profile`, `createdAt`, `revokedAt` of every key, revoked ones included; never a token or a hash |
+| `DELETE /api/sets/<id>/keys/<keyID>` | revoke one key; the rest keep working. Revoking the last active key stops the set and the answer carries `stopped: true` and `activeKeys: 0` |
+| `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"label":"hermes"}` (`{"note":…}` still accepted); the label becomes the client's label in the statistics, an empty string clears it, a running set restarts — the listener reads client labels at start — and a failed restart answers `restartError` |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
-| `PUT /api/servers/<name>`, `DELETE /api/servers/<name>` | update and delete; running sets are restarted. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
+| `PUT /api/servers/<name>` | update; running sets reload instead of restarting, and the answer carries `reloaded` (set ids, repeated as `restarted` for one release) plus `reloadErrors` (id → cause) when a process did not apply it |
+| `DELETE /api/servers/<name>` | delete; running sets that use it are stopped, because the deleted server's session goes with it. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
-| `GET /api/calls?set=<id>&limit=<N>` | merged call tail of running sets; default 50, max 500; for one set it also carries `schema` |
+| `GET /api/calls?set=<id>&limit=<N>&before=<time>&after=<time>` | merged call tail of running sets; default 50, max 500; `before`/`after` are RFC3339 times bounding a row's `time` (strictly older / strictly newer, one at a time); for one set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; the answer returns at once, sets using the variable restart in the background (60 s budget) and `restarted` lists them; stopping the panel cancels the background restart |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
@@ -124,21 +181,83 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/browse/<id>`, `DELETE /api/browse/<id>` | read or close that session |
 | `POST /api/browse/<id>/{tool,resource,prompt}` | call something in the browse session |
 
+A browse session obeys the server's `permissions` for tools the same way
+`invoke_command` does; resources and prompts are not covered yet.
+
+### Reload without a restart
+
+`POST /api/sets/<id>/reload` and an edit through `PUT /api/sets/<id>` write
+`servers.json` and send `SIGHUP` to the set process alone — its stdio children
+have no handler and must survive an edit of their neighbour. The process rereads
+the file itself and answers with `reload.status` next to `servers.json` —
+`{"nonce":"…","generation":N,"at":"RFC3339","applied":[…],"restartNeeded":[…],"error":"…"}`,
+the generation growing on every attempt and the nonce repeating the one the
+panel put into `reload.request` before the signal, so a late answer to an
+earlier attempt is never taken for this one. The panel waits up to 3 s and
+returns that answer as it is. Applied without a restart are the set's servers
+and their fields: an added server connects on its first call, a removed one has
+its session closed, unchanged servers keep their sessions, changed `command`,
+`cwd`, `url`, `env` and `sandbox` recreate that server alone, while
+`permissions`, `enabled` and `description` update in place; `rateLimit` and
+`profiles` come from the new file. A call already in flight to the server being
+recreated fails with «сервер изменён перезагрузкой конфига — вызов не выполнен,
+повторите» instead of waiting for its old process. The transport is read only at
+startup. An edit through `PUT /api/sets/<id>` of `port` or `open` — and a new
+active key through the key endpoints — restarts the set; a hand edit of
+`servers.json` touching `path`, `host` or `allowedHosts` comes back in
+`restartNeeded`, and the set then has to be restarted by hand
+(`POST /api/sets/<id>/restart`). `POST /api/sets/<id>/reload` never restarts
+anything itself: a non-empty `restartNeeded` answers `reloaded:false` with that
+reason. A server's `env` and `envAllow` are not reloaded either — the set's
+environment is fixed at its start — so `PUT /api/servers/<name>` that touches
+them restarts the sets using that server, and the answer lists them in
+`reloaded` all the same.
+
+A broken config is not applied: the process
+stays on the previous one, and the cause arrives in `error` and in
+`reload.status`.
+
 Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
-least one existing server; its `port`, when given, must be 9100–9199 and free
-in the system, otherwise the manager allocates one; a port held by a process
-gives `409` «порт N занят другим процессом». `id` and `token` in a create body
-are ignored.
+least one existing server; when `port` is not given the manager allocates a free
+port from 9100–9199, and a given one must be free in the system, otherwise
+`409` «порт N занят другим процессом». `id` and `token` in a create body are
+ignored.
 
 The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at
 5 MiB. A `lazy-mcp.log` inherited from the old proxy is renamed on the set's
 first start, so the old tail stays visible in the panel. A failed rotation
-(rename or reopen) loses no output: the old file stays in place and the error
+loses no output: the old file stays in place and the error
 text is shown in the set status `error`.
 
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
 registry key. A set that does not answer is listed in `unreachable` by id; its
 error text is not forwarded.
+
+Calls refused by a set's `rateLimit` are not in `calls` or `counters` — no
+downstream call happened. The answer carries them separately: `throttled` (the
+sum over the sets in the answer) and `throttledTools` (`server/tool` → count).
+Both are absent until something is refused.
+
+Pages go by row time: `before=<time>` returns calls strictly older than it,
+`after=<time>` strictly newer. Both at once answer `400`, as does a value that
+is not RFC3339 (nanoseconds are accepted). Send the `time` of the last row of a
+page as `before` to get the next one:
+
+```
+GET /api/calls?set=opencode&limit=100&before=2026-11-08T12:00:03.512Z
+```
+
+The depth is bounded by the set's tail: `/stats` keeps its last 512 calls, so a
+`before` past that answers an empty list instead of older rows — anything
+deeper lives in `/api/stats` only. Two calls with the same `time` at a page
+boundary are a known limit: the next page skips the second one; pages never
+repeat a row.
+
+The calls table loads 100 rows and shows **Show more** under it. The button
+sends the `time` of the last row as `before`, appends the next page and hides
+itself when a page comes back short; after the first press the panel stops its
+5 s refresh, so loaded pages are not overwritten, and shows **resume** next to
+the button — it reloads the first page and brings the refresh back.
 
 An answer with `?set=<id>` carries a `schema` field — what the set's tool list
 costs in context: `schemaBytes` (the length of the JSON `list_commands` returns
@@ -226,7 +345,8 @@ open.
 ## Access
 
 Modes come from `MCPRIG_PASSWORD`, `MCPRIG_PROXY_SECRET` and `MCPRIG_AUTH=off`;
-see [cli.md](cli.md#panel). There is no built-in TLS: put the panel behind a
+see [cli.md](cli.md#panel). The panel serves https itself when
+`MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` are set; otherwise put it behind a
 reverse proxy, or keep it on loopback.
 
 ```text
@@ -237,7 +357,10 @@ both      password and proxy secret
 ```
 
 With password auth the panel sets `mcp_session` (HMAC-SHA256, 12 h, `HttpOnly`,
-`SameSite=Lax`, `Secure` over TLS) and keeps sessions in memory. Login is
+`SameSite=Lax`, `Secure` over TLS) and keeps sessions in memory. The cookie is
+`Secure` whenever `MCPRIG_PUBLIC_URL` is `https` or the panel has its own
+certificate, not only when the request arrived over TLS — a TLS reverse proxy
+hands the process plain http, and the cookie must not leak then. Login is
 limited to 5 failures per minute per IP and runs at most two scrypt hashes at a
 time (the rest wait; past 8 pending the login answers `429`).
 `POST /api/login` answers `400` when `user` or `password` is empty (`401` is
@@ -252,16 +375,27 @@ time. Both modes can be combined; either one is enough to pass.
 Writes (`POST`/`PUT`/`DELETE`) are rejected when `Sec-Fetch-Site` is
 `cross-site`, when `Origin` does not match `Host`, or when the body is not
 JSON. A cookie-authenticated write must also carry `Origin`: without it the
-request gets `403` "нужен заголовок Origin" — a browser sends it on every such
+request gets `403` "не хватает заголовка Origin" — a browser sends it on every such
 request, a forged one from another site does not. Header-based proxy auth and
 login (`POST /api/login`, no cookie yet) are exempt.
 
 `Origin` is compared in full — scheme, host and port; `MCPRIG_ALLOWED_HOSTS` is
-not a list of sources (it names the panel itself). Behind a TLS proxy send
-`X-Forwarded-Proto: https` or `X-Forwarded-Host` (plus `X-Forwarded-Port` when
-the public port differs): otherwise the request looks like plain http and the
-panel rejects an `https` Origin on writes. A configured `MCPRIG_PROXY_SECRET`
-(trusted proxy) has the same effect; an `http` Origin is still rejected then.
+not a list of sources (it names the panel itself). `X-Forwarded-Proto` and
+`X-Forwarded-Host` are trusted only when `MCPRIG_PROXY_SECRET` is set: a
+trusted proxy then makes an `https` request count as secure and a forwarded
+host count as the panel's public name, so an `https` Origin matches. Without the
+secret both headers are ignored — otherwise any client could claim `https` and
+spoof the check. Trust is switched on by *setting* `MCPRIG_PROXY_SECRET`, not by
+verifying the peer: keep the panel port unreachable except through the proxy.
+With an `http` panel behind the secret, browser writes are rejected because the
+request counts as `https` — set `MCPRIG_PUBLIC_URL=https://…` to match what the
+browser sees.
+
+The OAuth redirect is taken from `MCPRIG_PUBLIC_URL` alone when set
+(`<publicUrl>/oauth/callback`, path prefix kept); without it the panel builds it
+from `MCPRIG_HOST` and `MCPRIG_PORT`, and the forwarded headers play no part.
+Register the redirect with your identity provider as the panel prints it —
+`mcprig doctor` shows the effective value.
 
 `Host` must be in `MCPRIG_ALLOWED_HOSTS`; an empty list means loopback only.
 

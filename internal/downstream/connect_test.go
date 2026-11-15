@@ -20,8 +20,8 @@ func TestTransportRejectsBrokenServer(t *testing.T) {
 		srv  *config.Server
 		want string
 	}{
-		{"stdio without command", &config.Server{Transport: config.TransportStdio}, "пустой command"},
-		{"http without url", &config.Server{Transport: config.TransportHTTP}, "пустой url"},
+		{"stdio without command", &config.Server{Transport: config.TransportStdio}, "command пуст"},
+		{"http without url", &config.Server{Transport: config.TransportHTTP}, "url пуст"},
 		{"unknown transport", &config.Server{Transport: "grpc"}, "неизвестный transport"},
 	}
 	for _, c := range cases {

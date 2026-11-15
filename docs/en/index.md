@@ -34,7 +34,7 @@ stand against real servers, then cut a release.
 | --- | --- |
 | [install.md](install.md) | release archives and what they contain, systemd user units, Docker `slim`/`full`, the state directory on disk |
 | [configuration.md](configuration.md) | every field of `servers.json`: servers, `sandbox`, secrets, `transport`, `permissions`, `oauth`, and what happens to a broken entry |
-| [cli.md](cli.md) | the six subcommands with real output: `serve`, `stdio`, `panel`, `doctor`, `warm`, `init`; `tool-out` retention |
+| [cli.md](cli.md) | the nine subcommands with real output: `serve`, `stdio`, `auth`, `panel`, `doctor`, `warm`, `status`, `logs`, `init`; `tool-out` retention |
 | [panel.md](panel.md) | what the panel shows, the HTTP API behind it, call history, health, and how access is checked |
 | [meta-tools.md](meta-tools.md) | the five tools a client sees, exact response shapes, error text, secret scrubbing, counters |
 | [architecture.md](architecture.md) | how the processes fit together, why each set is its own process, health, statistics, OAuth |

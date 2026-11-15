@@ -275,12 +275,14 @@ func (m *Manager) noteHealth(id string, view setHealth) {
 	}
 	type bad struct{ name, reason string }
 	var became []bad
+	var recovered []string
 	for _, s := range view.Servers {
 		if s.Healthy == nil {
 			continue
 		}
 		if *s.Healthy {
 			prev[s.Name] = true
+			recovered = append(recovered, s.Name)
 			continue
 		}
 		if was, known := prev[s.Name]; !known || was {
@@ -289,8 +291,13 @@ func (m *Manager) noteHealth(id string, view setHealth) {
 		prev[s.Name] = false
 	}
 	c.mu.Unlock()
+	webhook := webhookOf(m.store.Set(id))
+	for _, name := range recovered {
+		m.rt.notify.clear(id, name)
+	}
 	for _, b := range became {
 		m.log.Warn("набор "+id+": сервер "+b.name+" unhealthy", "reason", b.reason)
+		m.rt.notify.emit(webhook, id, b.name, "server.unhealthy", 0)
 	}
 }
 
