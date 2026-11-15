@@ -68,6 +68,33 @@
       'tabs.overview': 'Overview',
       'tabs.calls': 'Calls',
       'tabs.stats': 'Statistics',
+      'nav.label': 'Panel pages',
+      'nav.sets': 'Sets',
+      'nav.servers': 'All servers',
+      'nav.vars': 'Variables',
+      'reg.title': 'All servers',
+      'reg.count': '{n} {serversW} in the registry',
+      'reg.thSets': 'In sets',
+      'reg.inNone': 'not attached',
+      'reg.hint': 'Health comes from the check of a running set; a server outside every set stays unchecked until you press Check here. An OAuth sign-in happens in the set the server belongs to.',
+      'reg.emptyTitle': 'The registry is empty',
+      'reg.emptyText': 'A server is one MCP endpoint: a local command or a remote URL. Sets take their members from here.',
+      'vars.title': 'Variables',
+      'vars.note': 'The names your servers reference as ${NAME}. A value is written here and handed to the set process at start; the panel never reads one back.',
+      'vars.name': 'name',
+      'vars.value': 'value',
+      'vars.store': 'store',
+      'vars.storeAuto': 'automatic',
+      'vars.storeFile': 'file on this host',
+      'vars.needName': 'name: latin letters, digits and _, not starting with a digit',
+      'vars.needValue': 'the value cannot be empty',
+      'vars.saved': 'value saved for {name} · {source}',
+      'vars.savedUnref': 'no server mentions {name} yet, so the name stays out of the list',
+      'vars.forgot': '{name} forgotten',
+      'vars.restarted': 'restarted: {list}',
+      'vars.del': 'forget the value',
+      'vars.delConfirm': 'Forget {name}? A set that uses it starts without the value.',
+      'vars.honest': 'Values live in OpenBao or in a file only this host can read: the panel shows a name, whether it is set and where it comes from, never a value. A name no server references stays out of the list until some server mentions it.',
       'kpi.calls': 'calls · 7 days',
       'kpi.errRate': 'error rate',
       'kpi.p50': 'p50',
@@ -158,13 +185,8 @@
       'stats.colTip': '{label} · {n} calls',
       'stats.colTipErr': '{label} · {n} calls, {err} errors',
       'side.label': 'Details',
-      'side.servers': 'servers',
-      'side.env': 'variables',
-      'side.log': 'log',
-      'side.close': 'Close the details panel',
-      'side.registry': 'host-wide registry',
-      'side.registryEmpty': 'registry is empty',
       'side.server': 'server',
+      'side.close': 'Close the details panel',
       'form.sub': 'Changes apply to the host registry and take effect on the next set restart.',
       'form.description': 'description',
       'form.transport': 'transport',
@@ -194,7 +216,6 @@
       'form.deleteEmpty': 'Left without servers: {empty} — such a set starts, but offers no tools.',
       'form.deleteFree': 'Delete server {name} from the host registry? No set uses it.',
       'env.empty': 'no variables',
-      'env.note': 'values are supplied by the set process — the panel shows names only, never values',
       'env.set': 'set',
       'env.unset': 'not set',
       'log.tail': 'log tail of the set',
@@ -253,7 +274,6 @@
       'srv.edit': 'edit',
       'srv.check': 'check',
       'srv.log': 'log',
-      'srv.probe': 'probe',
       'srv.authorize': 'authorize',
       'auth.title': 'OAuth authorization',
       'auth.waiting': 'Open the link in a browser — the panel waits for the redirect. The set restarts by itself once the token is saved.',
@@ -262,7 +282,6 @@
       'auth.copy': 'copy link',
       'auth.copied': 'link copied',
       'srv.notProbed': 'not probed',
-      'srv.notInSet': 'not in this set',
       'srv.setOff': 'set {name} is not running',
       'srv.unchecked': 'not checked',
       'srv.noResponse': 'no response',
@@ -377,6 +396,33 @@
       'tabs.overview': 'Обзор',
       'tabs.calls': 'Вызовы',
       'tabs.stats': 'Статистика',
+      'nav.label': 'Страницы панели',
+      'nav.sets': 'Наборы',
+      'nav.servers': 'Все серверы',
+      'nav.vars': 'Переменные',
+      'reg.title': 'Все серверы',
+      'reg.count': '{n} {serversW} в реестре',
+      'reg.thSets': 'В наборах',
+      'reg.inNone': 'не в наборе',
+      'reg.hint': 'Здоровье — это проверка запущенного набора; сервер вне наборов остаётся непроверенным, пока не нажать «Проверить» здесь. Вход через OAuth делается в наборе, куда сервер входит.',
+      'reg.emptyTitle': 'Реестр пуст',
+      'reg.emptyText': 'Сервер — одна точка MCP: локальная команда или удалённый адрес. Наборы берут состав отсюда.',
+      'vars.title': 'Переменные',
+      'vars.note': 'Имена, которые серверы упоминают как ${NAME}. Значение пишется здесь и уходит процессу набора при старте; обратно панель его не читает.',
+      'vars.name': 'имя',
+      'vars.value': 'значение',
+      'vars.store': 'хранилище',
+      'vars.storeAuto': 'автоматически',
+      'vars.storeFile': 'файл на этом хосте',
+      'vars.needName': 'имя: латинские буквы, цифры и _, не с цифры',
+      'vars.needValue': 'значение не может быть пустым',
+      'vars.saved': 'значение {name} сохранено · {source}',
+      'vars.savedUnref': 'ни один сервер пока не упоминает {name}, поэтому в списке имени нет',
+      'vars.forgot': 'значение {name} забыто',
+      'vars.restarted': 'перезапущены: {list}',
+      'vars.del': 'забыть значение',
+      'vars.delConfirm': 'Забыть {name}? Набор, который её использует, запустится без значения.',
+      'vars.honest': 'Значения живут в OpenBao или в файле, который читает только этот хост: панель показывает имя, стоит ли значение и откуда оно берётся, — но не само значение. Имя, которое не упоминает ни один сервер, в списке не появится.',
       'kpi.calls': 'вызовов · 7 дней',
       'kpi.errRate': 'доля ошибок',
       'kpi.p50': 'p50',
@@ -467,13 +513,8 @@
       'stats.colTip': '{label} · вызовов {n}',
       'stats.colTipErr': '{label} · вызовов {n}, ошибок {err}',
       'side.label': 'Детали',
-      'side.servers': 'серверы',
-      'side.env': 'переменные',
-      'side.log': 'лог',
-      'side.close': 'Закрыть панель деталей',
-      'side.registry': 'общий реестр хоста',
-      'side.registryEmpty': 'реестр пуст',
       'side.server': 'сервер',
+      'side.close': 'Закрыть панель деталей',
       'form.sub': 'Изменения попадают в реестр хоста и действуют после перезапуска набора.',
       'form.description': 'описание',
       'form.transport': 'транспорт',
@@ -503,7 +544,6 @@
       'form.deleteEmpty': 'Без него пустым останется: {empty} — такой набор запускается, но инструментов не даёт.',
       'form.deleteFree': 'Удалить сервер {name} из реестра хоста? Он не используется ни в одном наборе.',
       'env.empty': 'переменных нет',
-      'env.note': 'значения даёт процесс набора — панель показывает только имена',
       'env.set': 'задана',
       'env.unset': 'не задана',
       'log.tail': 'хвост лога набора',
@@ -562,8 +602,7 @@
       'srv.edit': 'Изменить',
       'srv.check': 'Проверить',
       'srv.log': 'Лог',
-      'srv.probe': 'Проверить',
-      'srv.authorize': 'Войти через OAuth',
+      'srv.authorize': 'Авторизовать',
       'auth.title': 'Войти через OAuth',
       'auth.waiting': 'Откройте ссылку в браузере — панель ждёт возврата. После сохранения токена набор перезапустится сам.',
       'auth.link': 'ссылка авторизации',
@@ -571,7 +610,6 @@
       'auth.copy': 'скопировать ссылку',
       'auth.copied': 'ссылка скопирована',
       'srv.notProbed': 'не проверен',
-      'srv.notInSet': 'не в наборе',
       'srv.setOff': 'набор {name} не запущен',
       'srv.unchecked': 'не проверен',
       'srv.noResponse': 'нет ответа',
@@ -703,15 +741,24 @@
     });
   }
 
+  /* ---------- страницы панели ----------
+     Адрес называет открытую страницу: #/sets, #/servers, #/vars. Набор и его
+     вкладки живут внутри #/sets и остаются в адресе как #/set/<id> и #/stats/<p>. */
+  function pageOf(hash) {
+    if (/^#\/servers$/.test(hash)) { return 'servers'; }
+    if (/^#\/vars$/.test(hash)) { return 'vars'; }
+    return 'sets';
+  }
+
   // набор из адреса (#/set/demo) выбирается сразу, данные подтягивает первый /api/state
   var linkId = (/^#\/set\/([^/]+)$/.exec(location.hash) || [])[1];
   var st = {
     sets: [], servers: [], sel: linkId ? decodeURIComponent(linkId) : null,
-    health: null, calls: null, kpi: null, env: [], logKey: '', errTimer: 0, busy: false, boot: !!linkId,
+    health: null, calls: null, kpi: null, env: null, logKey: '', errTimer: 0, busy: false, boot: !!linkId,
     version: '',
     // probe — доказательства строки «Проверить»: они свежее кэша health (15 с)
     probeTools: {}, probeHealth: {}, healthBusy: false,
-    tab: 'overview', sideTab: 'servers', railPref: '',
+    tab: 'overview', page: pageOf(location.hash), railPref: '',
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
     mock: null, srvEditing: '', srvReturn: null,
@@ -1321,17 +1368,40 @@
     $('f-updated').textContent = clock();
     $('f-version').textContent = st.version ? 'mcprig ' + st.version + ' ·' : '—';
     $('rail-count').textContent = fmtN(st.sets.length);
-    show($('empty-state'), none);
+    // шапка набора и его вкладки — только на странице наборов: на соседних
+    // страницах тот же набор ни к чему
+    var onSets = st.page === 'sets';
+    show($('empty-state'), none && onSets);
     show($('rail-empty'), none);
-    show($('phead'), !none);
-    show($('tabs'), !none);
+    show($('phead'), !none && onSets);
+    show($('tabs'), !none && onSets);
     applyTab(none ? null : st.tab);
-    // адрес и крошки повторяют открытое; наборы приходят и без выбора
+    renderCrumb();
     var set = current();
-    $('crumb-set').textContent = set ? (set.name || set.id) : '—';
     $('endpoint').textContent = set
       ? 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp' : '—';
     if (none) { renderKpis(null); renderSetServers(); }
+  }
+
+  // Крошка называет то, что открыто: набор — на его странице, иначе страницу
+  function renderCrumb() {
+    var set = current();
+    $('crumb-set').textContent = st.page !== 'sets' ? t('nav.' + st.page)
+      : set ? (set.name || set.id) : '—';
+  }
+
+  // Переключение страницы: адрес уже сменён ссылкой или hashchange
+  function applyPage(name) {
+    if (st.page !== name) { st.page = name; }
+    show($('page-sets'), name === 'sets');
+    show($('page-servers'), name === 'servers');
+    show($('page-vars'), name === 'vars');
+    [].forEach.call(document.querySelectorAll('#pagenav .segbtn'), function (a) {
+      if (a.dataset.page === name) { a.setAttribute('aria-current', 'page'); } else { a.removeAttribute('aria-current'); }
+    });
+    if (name === 'servers') { renderServers(st.health); }
+    if (name === 'vars') { loadEnv(); }
+    renderChrome();
   }
 
   // Рейл: личность набора и состояние. Цифр трафика здесь нет — они в наборе.
@@ -1384,6 +1454,13 @@
     if (h.healthy === false) { return { cls: 'badge-err', text: t('srv.failed') }; }
     if (h.unknown) { return { cls: 'badge-unknown', text: t('srv.unchecked'), hollow: true }; }
     return { cls: 'badge-ok', text: t('srv.healthy') };
+  }
+
+  // Один бейдж здоровья на обе таблицы — строка и реестр: цвет и текст живут здесь
+  function paintBadge(node, st8) {
+    node.className = 'badge ' + st8.cls;
+    node.replaceChildren(el('span', 'dot' + (st8.hollow ? ' dot-hollow' : '')),
+      document.createTextNode(st8.text));
   }
 
   // Последний вызов по серверу — из того же хвоста, что и вкладка «Вызовы».
@@ -1482,9 +1559,7 @@
         } else {
           var probed = st.probeHealth && st.probeHealth[row.name];
           var st8 = badgeState(h, running, setNm, probed);
-          badge.className = 'badge ' + st8.cls;
-          badge.replaceChildren(el('span', 'dot' + (st8.hollow ? ' dot-hollow' : '')),
-            document.createTextNode(st8.text));
+          paintBadge(badge, st8);
           badge.title = (h && h.error) || (probed && !running ? t('srv.probeOkTip') : '');
         }
         // у остановленного набора инструментов нет: число здесь врало бы о составе
@@ -1608,8 +1683,10 @@
     // статистика идёт за рельсом: свой фильтр набора начинается с текущего,
     // ручной выбор в списке фильтра живёт до следующего переключения набора
     st.st.set = id || '';
-    // адрес повторяет открытое: на статистике его держит setTab, набор его не перебивает
-    if (st.tab !== 'stats') {
+    // адрес повторяет открытое: на статистике его держит setTab, набор его не перебивает;
+    // на соседних страницах выбранный набор в адрес не попадает — там живёт страница,
+    // а вкладка «Наборы» из адреса остаётся наборной страницей и его не переписывает
+    if (st.page === 'sets' && st.tab !== 'stats' && location.hash !== '#/sets') {
       if (id) {
         history.replaceState(null, '', '#/set/' + id);
       } else {
@@ -1646,7 +1723,7 @@
     var state = setState(set);
     var name = set.name || set.id;
     $('set-name').textContent = name;
-    $('crumb-set').textContent = name;
+    renderCrumb();
     $('set-port').textContent = ':' + set.port;
     $('set-state').className = 'badge ' + (state.cls === 'ok' ? 'badge-ok'
       : state.cls === 'err' ? 'badge-err' : 'badge-warn');
@@ -1739,19 +1816,29 @@
     });
   }
 
-  /* ---------- реестр хоста (дровер «Детали») ---------- */
+  /* ---------- реестр хоста (страница «Все серверы») ---------- */
 
   function renderServers(health) {
     var set = current();
     var inSet = (set && set.servers) || [];
+    var hs = (health && health.servers) || [];
     // список — общий реестр хоста, а не состав набора: новый сервер виден сразу,
-    // а принадлежность к набору помечена в строке
+    // наборы, куда он входит, живут отдельной колонкой
     var rows = st.servers.map(function (s) {
-      var h = health && health.servers
-        ? health.servers.filter(function (x) { return x.name === s.name; })[0] || null : null;
-      return { name: s.name, srv: s, health: h, mine: inSet.indexOf(s.name) >= 0 };
+      var h = hs.filter(function (x) { return x.name === s.name; })[0] || null;
+      var mine = inSet.indexOf(s.name) >= 0;
+      // здоровье и статус набора — у своего набора, иначе у первого, где сервер стоит:
+      // иначе «не проверен» врёт про сервер остановленного набора
+      var own = mine ? set : setsOf(s.name)[0] || null;
+      return {
+        name: s.name, srv: s, health: h, mine: mine, sets: setsOf(s.name),
+        own: own ? (own.name || own.id) : '',
+        ownRunning: !!(own && own.runtime && own.runtime.running)
+      };
     });
-    $('srv-count').textContent = fmtN(rows.length);
+    $('srv-note').textContent = t('reg.count', {
+      n: fmtN(rows.length), serversW: word(rows.length, 'server')
+    });
     show($('servers-empty'), rows.length === 0);
     sync($('servers'), rows, function (r) { return r.name; },
       function () {
@@ -1763,16 +1850,31 @@
         var ty = tr.appendChild(el('td'));
         ty.dataset.label = t('setSrv.thType');
         ty.appendChild(el('span', 'chip'));
+        var hc = tr.appendChild(el('td'));
+        hc.dataset.label = t('setSrv.thState');
+        hc.appendChild(el('span', 'badge badge-unknown'));
+        var tc = tr.appendChild(el('td', 'num'));
+        tc.dataset.label = t('setSrv.thTools');
+        tc.title = t('setSrv.toolsTip');
+        var sc = tr.appendChild(el('td', 'cell-sets'));
+        sc.dataset.label = t('reg.thSets');
+        sc.appendChild(el('span'));
         var act = tr.appendChild(el('td', 'cell-actions'));
-        var probe = act.appendChild(el('button', 'btn btn-xs'));
-        probe.type = 'button';
-        probe.dataset.probe = '';
+        var check = act.appendChild(el('button', 'btn btn-xs'));
+        check.type = 'button';
+        check.dataset.check = '';
         var auth = act.appendChild(el('button', 'btn btn-xs'));
         auth.type = 'button';
         auth.dataset.authorize = '';
+        var log = act.appendChild(el('button', 'btn btn-xs'));
+        log.type = 'button';
+        log.dataset.log = '';
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
-        edit.dataset.regedit = '';
+        edit.dataset.edit = '';
+        var del = act.appendChild(el('button', 'ghost-icon icon-xs'));
+        del.type = 'button';
+        del.dataset.del = '';
         return tr;
       },
       function (tr, row) {
@@ -1783,30 +1885,55 @@
         var iso = isoOf(h && h.isolation);
         var sub = tr.querySelector('.cell-sub');
         // причина ошибки приходит от демона по-русски — её не переводим
-        var note = !row.mine ? t('srv.notInSet')
-          : h && h.healthy === false ? (h.error || t('srv.noResponse'))
-            : h && h.healthy === true && h.unknown ? t('srv.unchecked')
-              : iso ? iso.label : (srv.description || '');
+        var note = h && h.healthy === false ? (h.error || t('srv.noResponse'))
+          : iso ? iso.label : (srv.description || '');
         sub.textContent = note || '';
         sub.hidden = !note;
         sub.title = (h && h.error) || '';
         sub.className = 'cell-sub' + (h && h.healthy === false ? ' cell-iso' : '');
         tr.querySelector('.chip').textContent =
           srv.transport || (srv.command ? 'stdio' : srv.url ? 'http' : '—');
-        var probe = tr.querySelector('[data-probe]');
-        probe.textContent = t('srv.probe');
+        // Здоровье знает только проверка: своя (строка «Проверить») или проверка
+        // набора, в котором сервер стоит. Вне набора он честно непроверен.
+        var probed = st.probeHealth[row.name];
+        var badge = tr.querySelector('.badge');
+        // статус набора своей строки: у запущенного набора проверка даёт «Здоров»,
+        // у остановленного — «отвечает, не запущен», как в таблице набора
+        paintBadge(badge, probed
+          ? badgeState(probed, row.ownRunning, row.own, true)
+          : badgeState(h, row.ownRunning, row.own));
+        badge.title = (probed && probed.error) || (h && h.error) || (probed ? t('srv.probeOkTip') : '');
+        tr.children[3].textContent = st.probeTools[row.name] != null ? fmtN(st.probeTools[row.name]) : '—';
+        var setsCell = tr.querySelector('.cell-sets span');
+        setsCell.textContent = row.sets.length
+          ? row.sets.map(function (s) { return s.name || s.id; }).join(', ')
+          : t('reg.inNone');
+        var check = tr.querySelector('[data-check]');
+        check.textContent = t('srv.check');
         // проверка поднимает процесс на время: об этом должен знать тот, кто жмёт
-        probe.title = t('srv.probeTip');
-        probe.dataset.probe = row.name;
-        // вход по OAuth — у удалённого сервера набора: локальному он не нужен
+        check.title = t('srv.probeTip');
+        check.dataset.check = row.name;
+        // вход по OAuth — у удалённого сервера набора: локальному он не нужен,
+        // а вход идёт в наборе, поэтому только для текущего
         var auth = tr.querySelector('[data-authorize]');
         var canAuth = row.mine && !!srv.url;
         auth.hidden = !canAuth;
         auth.textContent = t('srv.authorize');
         auth.dataset.authorize = canAuth ? row.name : '';
-        var edit = tr.querySelector('[data-regedit]');
+        // лог — хвост лога набора: сервер вне наборов своего лога не имеет
+        var log = tr.querySelector('[data-log]');
+        log.hidden = row.sets.length === 0;
+        log.textContent = t('srv.log');
+        log.dataset.log = row.name;
+        log.dataset.set = row.sets.length ? row.sets[0].id : '';
+        var edit = tr.querySelector('[data-edit]');
         edit.textContent = t('srv.edit');
-        edit.dataset.regedit = row.name;
+        edit.dataset.edit = row.name;
+        var del = tr.querySelector('[data-del]');
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+        del.dataset.del = row.name;
+        del.title = t('form.delete');
+        del.setAttribute('aria-label', del.title);
       });
   }
 
@@ -2051,26 +2178,30 @@
 
   // Наборы, где стоит сервер: confirm называет их поимённо — «исчезнет из наборов»
   // человеку ничего не говорит о том, что именно он теряет.
+  function setsOf(name) {
+    return st.sets.filter(function (s) { return (s.servers || []).indexOf(name) >= 0; });
+  }
+
   function setsWith(name) {
-    return st.sets.filter(function (s) {
-      return (s.servers || []).indexOf(name) >= 0;
-    }).map(function (s) { return s.name || s.id; });
+    return setsOf(name).map(function (s) { return s.name || s.id; });
+  }
+
+  // Что будет с наборами при удалении сервера — один текст на форму и на список
+  function deleteText(name) {
+    var sets = setsWith(name);
+    // набор, где он единственный: после удаления в нём не останется ни одного сервера
+    var empty = setsOf(name).filter(function (s) { return (s.servers || []).length === 1; })
+      .map(function (s) { return s.name || s.id; });
+    return !sets.length
+      ? t('form.deleteFree', { name: name })
+      : t('form.deleteConfirm', { name: name, sets: sets.join(', ') })
+        + (empty.length ? ' ' + t('form.deleteEmpty', { empty: empty.join(', ') }) : '');
   }
 
   function delSrv() {
     var name = st.srvEditing;
     if (!name || st.busy) { return; }
-    var sets = setsWith(name);
-    // набор, где он единственный: после удаления в нём не останется ни одного сервера
-    var empty = st.sets.filter(function (s) {
-      return (s.servers || []).length === 1 && s.servers[0] === name;
-    }).map(function (s) { return s.name || s.id; });
-    var text = !sets.length
-      ? t('form.deleteFree', { name: name })
-      : t('form.deleteConfirm', { name: name, sets: sets.join(', ') })
-        + (empty.length ? ' ' + t('form.deleteEmpty', { empty: empty.join(', ') }) : '');
-    var ok = window.confirm(text);
-    if (!ok) { return; }
+    if (!window.confirm(deleteText(name))) { return; }
     var btn = $('srv-del');
     st.busy = true;
     btn.disabled = true;
@@ -2083,6 +2214,19 @@
         $('srv-add').focus();
       })
       .catch(function (err) { srvErr(err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  // то же удаление из списка реестра: ошибка уходит в плашку над содержимым
+  function delServerRow(name, btn) {
+    if (!name || st.busy) { return; }
+    if (!window.confirm(deleteText(name))) { return; }
+    st.busy = true;
+    btn.disabled = true;
+    send('DELETE', '/api/servers/' + encodeURIComponent(name), null, true)
+      .then(function () { return loadState(); })
+      .then(function () { renderServers(st.health); renderSetServers(); })
+      .catch(function (e) { fail(e.message, e); })
       .then(function () { st.busy = false; btn.disabled = false; });
   }
 
@@ -2525,6 +2669,10 @@
         var li = el('li');
         li.appendChild(el('code'));
         li.appendChild(el('span', 'v-state'));
+        var del = li.appendChild(el('button', 'ghost-icon icon-xs'));
+        del.type = 'button';
+        del.dataset.envdel = '';
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
         return li;
       },
       function (li, v) {
@@ -2534,7 +2682,62 @@
         li.querySelector('.v-state').textContent = (v.set ? t('env.set') : t('env.unset')) +
           (v.source ? ' · ' + v.source : '') +
           (!v.set && st.envRemoteError ? ' · ' + st.envRemoteError : '');
+        var del = li.querySelector('[data-envdel]');
+        del.dataset.envdel = v.name;
+        del.title = t('vars.del');
+        del.setAttribute('aria-label', t('vars.del') + ' · ' + v.name);
       });
+  }
+
+  // Плашка под формой: строка исхода одна, ошибка и «сохранено» не стоят рядом
+  function envNote(ok, text) {
+    show($('env-err'), !ok);
+    show($('env-msg'), ok);
+    $(ok ? 'env-msg' : 'env-err').textContent = text;
+  }
+
+  function saveEnv(e) {
+    e.preventDefault();
+    var name = $('env-name').value.trim();
+    var value = $('env-value').value;
+    var store = $('env-store').value;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { envNote(false, t('vars.needName')); $('env-name').focus(); return; }
+    if (!value) { envNote(false, t('vars.needValue')); $('env-value').focus(); return; }
+    var btn = $('env-save');
+    if (st.busy) { return; }
+    st.busy = true;
+    btn.disabled = true;
+    send('PUT', '/api/env/' + encodeURIComponent(name), { value: value, store: store })
+      .then(function (r) {
+        r = r || {};
+        envNote(true, t('vars.saved', { name: r.name || name, source: r.source || store || 'auto' }) +
+          (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''));
+        $('env-value').value = '';
+        return loadEnv().then(function () {
+          // значение записано, но имени нет в списке: его пока не упоминает ни один сервер
+          var seen = (st.env || []).some(function (v) { return v.name === (r.name || name); });
+          if (!seen) { envNote(true, t('vars.saved', { name: r.name || name, source: r.source || 'auto' }) + ' · ' + t('vars.savedUnref', { name: name })); }
+        });
+      })
+      .catch(function (err) { envNote(false, err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  function delEnv(name, btn) {
+    if (st.busy || !name) { return; }
+    if (!window.confirm(t('vars.delConfirm', { name: name }))) { return; }
+    st.busy = true;
+    btn.disabled = true;
+    // без store: значение забывается во всех хранилищах, а не только в одном
+    send('DELETE', '/api/env/' + encodeURIComponent(name), null, true)
+      .then(function (r) {
+        r = r || {};
+        envNote(true, t('vars.forgot', { name: r.name || name })
+          + (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''));
+        return loadEnv();
+      })
+      .catch(function (err) { envNote(false, err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
   }
 
   function loadLog() {
@@ -2573,13 +2776,14 @@
 
   var srvLog = { name: '', set: '', seq: 0 };
 
-  function openSrvLog(name) {
-    var set = current();
-    if (!set) { return; }
+  function openSrvLog(name, setId) {
+    // набор — тот, где сервер стоит: со страницы реестра он приходит в dataset
+    var id = setId || (current() && current().id);
+    if (!id) { return; }
     srvLog.name = name;
-    srvLog.set = set.id;
+    srvLog.set = id;
     srvLog.returnFocus = document.activeElement;
-    $('srvlog-h').textContent = t('srvlog.title', { server: name, set: set.id });
+    $('srvlog-h').textContent = t('srvlog.title', { server: name, set: id });
     $('srvlog-err').hidden = true;
     var dlg = $('srvlog-dlg');
     if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
@@ -3121,8 +3325,14 @@
   function setTab(name) {
     st.tab = name;
     applyTab(name);
-    // адрес повторяет то, что открыто: у статистики в нём ещё и период
-    var hash = name === 'stats' ? '#/stats/' + st.st.period : (st.sel ? '#/set/' + st.sel : '');
+    // адрес повторяет то, что открыто: у статистики в нём ещё и период.
+    // На соседних страницах вкладки не видны и адрес не трогают; на «Наборах»
+    // из адреса набор в адрес не переезжает — там живёт страница.
+    var hash = '';
+    if (st.page === 'sets') {
+      if (name === 'stats') { hash = '#/stats/' + st.st.period; }
+      else if (st.sel && location.hash !== '#/sets') { hash = '#/set/' + st.sel; }
+    }
     if (hash && location.hash !== hash) { history.replaceState(null, '', hash); }
     if (name === 'stats') {
       if (!st.st.data) { loadStats(); }
@@ -3147,27 +3357,13 @@
 
   /* ---------- панель деталей ---------- */
 
-  function setSideTab(name) {
-    st.sideTab = name;
-    ['servers', 'env', 'log'].forEach(function (p) {
-      var btn = document.querySelector('.drawer-seg .segbtn[data-side="' + p + '"]');
-      var on = p === name;
-      btn.setAttribute('aria-selected', on ? 'true' : 'false');
-      btn.tabIndex = on ? 0 : -1;
-      show(document.querySelector('.pane[data-pane="' + p + '"]'), on);
-    });
-  }
-
   function openSide() {
     st.sideReturn = document.activeElement;
     document.body.classList.add('side-open');
     $('side-open').setAttribute('aria-expanded', 'true');
     $('side').setAttribute('aria-hidden', 'false');
     show($('scrim'), true);
-    if (window.innerWidth < 1200) {
-      var tab = document.querySelector('.drawer-seg .segbtn[aria-selected="true"]') || $('side-close');
-      tab.focus();
-    }
+    if (window.innerWidth < 1200) { $('side-close').focus(); }
   }
 
   function closeSide() {
@@ -3394,13 +3590,6 @@
     $('tabbtn-' + order[i]).focus();
   });
 
-  document.querySelector('.drawer-seg').addEventListener('click', function (e) {
-    var btn = e.target.closest('.segbtn');
-    if (btn) { setSideTab(btn.dataset.side); }
-  });
-  document.querySelector('.drawer-seg').addEventListener('keydown', function (e) {
-    arrowNav(e, this, function (b) { setSideTab(b.dataset.side); });
-  });
   $('s-period').addEventListener('keydown', function (e) {
     arrowNav(e, this, function (b) { setPeriod(b.dataset.period); });
   });
@@ -3477,9 +3666,12 @@
 
   window.addEventListener('hashchange', function () {
     var m = /^#\/set\/([^/]+)$/.exec(location.hash);
-    if (m && m[1] !== st.sel) { select(decodeURIComponent(m[1])); return; }
+    if (m) { applyPage('sets'); if (m[1] !== st.sel) { select(decodeURIComponent(m[1])); } return; }
     var s = /^#\/stats\/([a-z0-9]+)$/.exec(location.hash);
-    if (s) { setTab('stats'); setPeriod(s[1], true); }
+    if (s) { applyPage('sets'); setTab('stats'); setPeriod(s[1], true); return; }
+    // «Наборы» из адреса, а не из вкладки: статистика на этой странице не открыта
+    if (location.hash === '#/sets' && st.tab === 'stats') { setTab('overview'); }
+    applyPage(pageOf(location.hash));
   });
 
   var resizeTimer = 0;
@@ -3689,12 +3881,24 @@
   $('calls-resume').addEventListener('click', resumeCalls);
 
   $('servers').addEventListener('click', function (e) {
-    var probe = e.target.closest('[data-probe]');
-    if (probe) { probeServer(probe.dataset.probe, probe); return; }
+    var check = e.target.closest('[data-check]');
+    if (check) { probeServer(check.dataset.check, check); return; }
     var auth = e.target.closest('[data-authorize]');
     if (auth && auth.dataset.authorize) { startAuth(auth.dataset.authorize); return; }
-    var edit = e.target.closest('[data-regedit]');
-    if (edit) { openSrv(edit.dataset.regedit); }
+    var logBtn = e.target.closest('[data-log]');
+    if (logBtn) { openSrvLog(logBtn.dataset.log, logBtn.dataset.set); return; }
+    var edit = e.target.closest('[data-edit]');
+    if (edit) { openSrv(edit.dataset.edit); return; }
+    var del = e.target.closest('[data-del]');
+    if (del) { delServerRow(del.dataset.del, del); }
+  });
+
+  $('srv-new').addEventListener('click', function () { openSrv(''); });
+
+  $('envform').addEventListener('submit', saveEnv);
+  $('env').addEventListener('click', function (e) {
+    var del = e.target.closest('[data-envdel]');
+    if (del) { delEnv(del.dataset.envdel, del); }
   });
 
   $('auth-close').addEventListener('click', closeAuth);
@@ -3860,10 +4064,9 @@
   setTitle();
   applyRail();
   applyThemeMenu();
+  applyPage(st.page);
   setTab(st.tab);
   setPeriod(st.st.period, true);
-  setSideTab(st.sideTab);
-  loadEnv();
   loadState().then(function () {
     every(5000, loadState);
     every(5000, function () {

@@ -16,19 +16,25 @@ CSP: no inline scripts or styles.
 
 | area | contents |
 | --- | --- |
-| top bar | breadcrumbs `mcprig / <set>`, the endpoint with a copy button, colour scheme, language, user |
+| top bar | breadcrumbs `mcprig / <page or set>`, the endpoint with a copy button, colour scheme, language, user |
 | left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
-| set head | name, port chip, state badge, **Keys**, **Restart**, **Start/Stop**, the key prefix and — right under it — the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
-| tabs | **Overview**, **Calls**, **Statistics** |
+| pages | **Sets**, **All servers** and **Variables** as pills at the top of the content, at `#/sets`, `#/servers` and `#/vars`; **Statistics** keeps `#/stats/<period>` and a set keeps `#/set/<id>`, so a reload or a shared link lands where it left off |
+| set head | name, port chip, state badge, **Keys**, **Prompt**, **Restart**, **Start/Stop**; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
+| tabs | **Overview**, **Calls**, **Statistics** — of the open set, on the **Sets** page |
 | KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days, as a one-line summary under the servers table |
-| servers of the set | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check** and **Edit** |
+| servers of the set | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check**, **Log**, **Tools**, **Edit** and the **×** that detaches the server from the set; under the table sit the registry picker and **add to set** |
+| all servers page | the whole registry of the host: name with the daemon's reason on the second line, type, health, tool count from the last **Check**, the sets the server belongs to, and **Check**, **Authorize**, **Log**, **Edit** and the **×** that deletes it from the registry; **Add server** sits in the head |
 | calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
-| details drawer | host registry, variables and the set log; opens from the header and covers the panel width on a phone |
+| variables page | every `${NAME}` your servers reference with whether a value is set and where it comes from, a form that writes a value, and the **×** that forgets it |
+| details drawer | the log tail of the set; opens from the header and covers the panel width on a phone |
 | footer | `N sets · M servers · K running` and the last refresh time |
 
 Health is shown as it is: `Healthy`, `Failed` with the daemon's reason on the
-second line, and `Not checked` for a server the set has not probed yet. While a
+second line, and `Not checked` for a server nothing has probed yet. While a
 health answer is on its way the cell keeps a skeleton bar instead of guessing.
+The badge of the all-servers page uses the same component and the same three
+states; a server outside the open set stays **Not checked** until **Check**
+probes it there, and a server of a stopped set says that the set is off.
 The tool count of one server is not part of the health answer, so the **Tools**
 column shows `—` until **Check** probes that server; the head of the set shows
 the total for the whole set.
@@ -39,7 +45,8 @@ and the interface language.
 
 ## Server editor
 
-The **servers** tab of the details drawer and the **Add server** button open a
+The **Edit** button of a row on the **All servers** page and the **Add server**
+button of that page open a
 form over the panel: name, description, transport, command (one argument per line) or
 `url` and headers, working directory, `env`, `envAllow`, tags, the `enabled`
 switch, two **expose** checkboxes (`resources`, `prompts`) and a **sandbox**
@@ -76,8 +83,8 @@ that tool's calls. The drawer shows what the set process wrote, so without a set
 data directory (`MCPRIG_DATA_DIR`) every tool reads `approved`; entries of a
 server removed from the set are pruned when the set config is rebuilt.
 
-The registry list in the drawer also shows isolation, on the second line of a
-row: `bwrap` when the sandbox is applied, `no isolation` in warning colour when
+The **All servers** page shows isolation on the second line of a row: `bwrap`
+when the sandbox is applied, `no isolation` in warning colour when
 the block was requested but bubblewrap did not start (the daemon's full reason
 is in the tooltip), and `config rejected` in error colour for a record with
 `_configError`. A valid server without a `sandbox` block carries no marker. The
@@ -100,10 +107,82 @@ revokes the previous active key nor restarts the set: the new token reaches a
 running set by reload, and the old one keeps working. Revoking the last active
 key stops the set; revoking one of several leaves it running.
 
+## All servers and variables
+
+The **All servers** page lists the whole registry of the host, not the
+composition of one set. A row carries the name with the daemon's reason of a
+failure below it, the transport, the health badge, the tool count the last
+**Check** found, the sets the server belongs to and the actions: **Check**
+(`POST /api/servers/<name>/probe`), **Authorize** for a remote server that
+answered `401`, **Log** of the open set, **Edit** and the **×** that deletes the
+server from the registry — the dialog names the sets it leaves first. Deleting
+from the registry is not the same as detaching from a set: the set composition
+lives on the **Overview** tab.
+
+The **Variables** page is where `${NAME}` gets its value. The list shows every
+name your servers reference with `set` or `unset` and the source — `openbao`,
+`file` or `env` — because the panel reads `GET /api/env`, which carries names,
+the flag and the source and never a value. The form writes one with
+`PUT /api/env/<NAME>`: name, value and store (`automatic` — OpenBao when it is
+configured, the file otherwise — `OpenBao` or the file), and the **×** forgets
+one everywhere with `DELETE /api/env/<NAME>` and no `store` parameter. Both
+answers come back at once, and sets that use the variable restart in the
+background; the page says which ones and adds a note when no server references
+the name yet. A written value is never read back: the panel cannot show it, and
+the page says so under the list.
+
+## Set composition
+
+The servers table of the **Overview** tab is also the place where the set is
+composed. **add to set** under the table offers the registry servers that are
+not in the set yet, and the **×** at the end of a row detaches that server. Both
+send `PUT /api/sets/<id>` with the whole `servers` list — never a diff — so one
+request carries one intent; the panel then reads `GET /api/state` again and
+redraws the head, the table and the picker. The request is quiet: a refusal
+appears as text right under the block, not as a toast.
+
+A running set takes the change by reload ([reload](#reload-without-a-restart)): a
+new server joins lazily and its tools appear after the first `list_commands` or
+**Check** probe, a removed one loses its session and cache. The process is not
+restarted — the hint under the picker says so, because a restart would drop the
+connections of every other server in the set. An empty list is legal: the set
+saves, starts and serves no tools; the panel says that in the same place instead
+of blocking the save.
+
+## Prompt for an agent
+
+`POST /api/sets/<id>/prompt` builds one text out of three parts: an
+introduction, the set's tools and the task. The body is
+`{"task":"…","intro":"…","servers":["…"]}`; `intro` and `servers` are
+optional. An empty `intro` becomes a short default paragraph, an empty `task`
+is `400` with `задача не задана`, and `servers` narrows the list — a name that
+is not in the set is `400` as well. The answer is `{"prompt":"…","notes":["…"]}`.
+
+The tool list comes from the live catalog of a running set: names and
+descriptions from `list_commands`, input schemas from `describe_commands`,
+compacted to one-line JSON. A stopped set, or one that did not answer, falls
+back to the names `GET /api/sets/<id>/tools` reads from `tools.lock.json` and
+says so in `notes`: `набор не запущен, схемы недоступны`. One schema is capped
+at 4000 characters, the whole prompt at 64 KiB; both cuts are reported in
+`notes`. The introduction and the task always stay whole; blocks of the tool
+list are what gets dropped. Error text is scrubbed the same way `list_servers`
+scrubs it: neither the set token nor a variable value reaches the prompt.
+
+**Prompt** in the head of the set opens the dialog: the task is required and
+the button does nothing until it is filled, the introduction is optional (empty
+means the default paragraph), and the servers of the set are listed as
+checkboxes — none checked means the whole set. **Build** posts to the endpoint
+above; the text comes back into a monospaced block with **copy** and
+**download .md**, and every `note` is shown above it, prefixed with `notes:`. A
+stopped set opens the same dialog and warns before the request that the text
+will carry tool names without schemas, so the missing schemas are not a
+surprise after **Build**.
+
 ## OAuth
 
-A remote server that answers `401` shows **authorize** in the row of the
-registry list. The button starts the authorization-code flow inside the daemon
+A remote server that answers `401` shows **authorize** in its row on the **All
+servers** page, as long as the server belongs to the open set. The button starts
+the authorization-code flow inside the daemon
 and draws a dialog with the link; the browser is the user's, so the panel never
 waits for it in a request — the state is polled with
 `GET /api/sets/<set>/servers/<name>/authorize`.
@@ -154,7 +233,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /healthz` | public liveness probe |
 | `GET /` | panel (redirects to `/login` when auth is on and there is no session) |
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
-| `GET /api/state` | servers, sets, `firstPort` — the first paint |
+| `GET /api/state` | servers, sets, `firstPort` — the first paint. A set's `keyMark` is the statistics' `key:<mark>` fingerprint of its primary key, empty for an open set |
 | `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
 | `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port` or `open` restarts the set. A `token` in the body replaces the primary key and creates one when the set has no active key |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
@@ -164,15 +243,16 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
 | `GET /api/sets/<id>/tools` | `{"tools":[…]}` — the set's descriptor records: `server`, `tool`, `hash` (as the catalog serves it now), `approvedHash` and `state` (`ok`, `changed`) |
 | `POST /api/sets/<id>/tools/approve` | approve the current descriptor: `{"server":"serena","tool":"find_symbol"}`, or `{"all":true}` for everything currently changed; answers `{"approved":["serena/find_symbol"]}`, empty when nothing needed it. The record is written with `approvedBy: "panel"` |
+| `POST /api/sets/<id>/prompt` | one text for an agent out of three parts: `{"task":"…","intro":"…","servers":["…"]}` → `{"prompt":"…","notes":["…"]}`. `intro` and `servers` are optional, an empty `task` is `400`; tools come from the live catalog with their input schemas, a stopped set falls back to the `tools.lock.json` names and says so in `notes` |
 | `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token. Earlier keys stay active, so issuing does not revoke the old one; the set serves up to 8 active keys, the ninth answers `409`. An optional `{"label":"hermes","profile":"reader"}` names and narrows the key to that profile of the set — an unknown name is `400` listing the profiles, a set without `profiles` is `400` with a hint to add the block. A running set gets the new key by reloading, not restarting; when the process did not apply it, the answer carries `reloadError` (and `restartError`, its older name) |
 | `GET /api/sets/<id>/keys` | `{"keys":[…]}` — `id`, `label`, `profile`, `createdAt`, `revokedAt` of every key, revoked ones included; never a token or a hash |
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke one key; the rest keep working. Revoking the last active key stops the set and the answer carries `stopped: true` and `activeKeys: 0` |
 | `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"label":"hermes"}` (`{"note":…}` still accepted); the label becomes the client's label in the statistics, an empty string clears it, a running set restarts — the listener reads client labels at start — and a failed restart answers `restartError` |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
 | `PUT /api/servers/<name>` | update; running sets reload instead of restarting, and the answer carries `reloaded` (set ids, repeated as `restarted` for one release) plus `reloadErrors` (id → cause) when a process did not apply it |
-| `DELETE /api/servers/<name>` | delete; running sets that use it are stopped, because the deleted server's session goes with it. Deleting the last server of a set answers 400 (`сервер X последний в наборе Y`) — remove the set instead |
+| `DELETE /api/servers/<name>` | delete; running sets that use it are stopped, because the deleted server's session goes with it. Deleting the last server of a set leaves the set with an empty list — its key and port stay |
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
-| `GET /api/calls?set=<id>&limit=<N>&before=<time>&after=<time>` | merged call tail of running sets; default 50, max 500; `before`/`after` are RFC3339 times bounding a row's `time` (strictly older / strictly newer, one at a time); for one set it also carries `schema` |
+| `GET /api/calls?set=<id>&limit=<N>&before=<time>&after=<time>` | merged call tail of the running sets plus the on-disk history of the stopped ones; default 50, max 500; `before`/`after` are RFC3339 times bounding a row's `time` (strictly older / strictly newer, one at a time); for one running set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |
 | `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; the answer returns at once, sets using the variable restart in the background (60 s budget) and `restarted` lists them; stopping the panel cancels the background restart |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
@@ -217,11 +297,15 @@ A broken config is not applied: the process
 stays on the previous one, and the cause arrives in `error` and in
 `reload.status`.
 
-Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
-least one existing server; when `port` is not given the manager allocates a free
-port from 9100–9199, and a given one must be free in the system, otherwise
-`409` «порт N занят другим процессом». `id` and `token` in a create body are
-ignored.
+Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set may have no
+servers at all: it can be created and started before its first server, and then
+only the meta-tools answer — `list_servers` returns an empty list. The key and
+port outlive the server list, so removing its last server does not require
+removing the set. In an update, `servers: []` clears the list and a missing
+`servers` key leaves it untouched. When `port` is not given the manager
+allocates a free port from 9100–9199, and a given one must be free in the
+system, otherwise `409` «порт N занят другим процессом». `id` and `token` in a
+create body are ignored.
 
 The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at
 5 MiB. A `lazy-mcp.log` inherited from the old proxy is renamed on the set's
@@ -230,8 +314,10 @@ loses no output: the old file stays in place and the error
 text is shown in the set status `error`.
 
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
-registry key. A set that does not answer is listed in `unreachable` by id; its
-error text is not forwarded.
+registry key. A **running** set that does not answer is listed in `unreachable`
+by id; its error text is not forwarded. A stopped set is not polled: its tail
+and counters come from the raw journal on disk (see [Call history](#call-history)),
+so a missing directory answers empty instead of landing in `unreachable`.
 
 Calls refused by a set's `rateLimit` are not in `calls` or `counters` — no
 downstream call happened. The answer carries them separately: `throttled` (the
@@ -247,9 +333,10 @@ page as `before` to get the next one:
 GET /api/calls?set=opencode&limit=100&before=2026-11-08T12:00:03.512Z
 ```
 
-The depth is bounded by the set's tail: `/stats` keeps its last 512 calls, so a
-`before` past that answers an empty list instead of older rows — anything
-deeper lives in `/api/stats` only. Two calls with the same `time` at a page
+The depth is bounded by the set's tail: a running set's `/stats` keeps its last
+512 calls, and a stopped set answers its 512 newest journal rows, so a `before`
+past that answers an empty list instead of older rows — anything deeper lives in
+`/api/stats` only. Two calls with the same `time` at a page
 boundary are a known limit: the next page skips the second one; pages never
 repeat a row.
 
@@ -265,16 +352,23 @@ for the whole set), `schemaTokens` (the same length divided by 4, rounded up)
 and `tools` (tool count). The numbers come from the set's `/stats` snapshot,
 i.e. its tool cache, with no calls to downstream servers. The merged answer
 without `set` has no such field: the weight is per set. It is absent until the
-set has filled its cache once. The panel prints it in the card head as
+set has filled its cache once, and a stopped set has none either — there is no
+live snapshot to read. The panel prints it in the card head as
 `list_commands`: `20 КБ · 5 067 ток · 22 инстр.`
 
 ## Call history
 
-Counters of `/api/calls` live in the set's memory and die with the process. The
-history below is kept on disk by the set itself, next to its config: for a set
-that is `<data-dir>/sets/<id>/stats/`, for a standalone `serve` — the directory
-of the `servers.json` it was started with. Files are `0600`, the directory
-`0700`.
+For a running set, the tail and counters of `/api/calls` live in its process
+memory. A stopped set answers from the raw journal below instead: both cover
+today plus the previous six days — the same window as `period=7d` of
+`/api/stats` — with exact percentiles, and an open set without a token shows
+`(аноним)` in the client column with no error text, as its live `/stats` does.
+Rows older than that window are left to `/api/stats` alone.
+
+The history below is kept on disk by the set itself, next to its config: for a
+set that is `<data-dir>/sets/<id>/stats/`, for a standalone `serve` — the
+directory of the `servers.json` it was started with. Files are `0600`, the
+directory `0700`.
 
 | file | contents | kept |
 | --- | --- | --- |

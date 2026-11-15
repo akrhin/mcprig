@@ -120,6 +120,16 @@
         </button>
       </div>
 
+      <!-- страницы панели: наборы, весь реестр, переменные. Ссылки настоящие —
+           адрес переживает перезагрузку и пересылается как есть -->
+      <nav class="segmented pagenav" id="pagenav" aria-label="Panel pages" data-i18n-aria="nav.label">
+        <a class="segbtn" href="#/sets" data-page="sets" aria-current="page" data-i18n="nav.sets">Sets</a>
+        <a class="segbtn" href="#/servers" data-page="servers" data-i18n="nav.servers">All servers</a>
+        <a class="segbtn" href="#/vars" data-page="vars" data-i18n="nav.vars">Variables</a>
+      </nav>
+
+      <div id="page-sets">
+
       <section class="empty-state" id="empty-state" hidden>
         <p class="empty-title" data-i18n="empty.title">No sets yet</p>
         <p class="empty-text" data-i18n="empty.p">A set is one MCP endpoint with its own port, servers and keys.</p>
@@ -391,6 +401,62 @@
         </div>
         <p class="form-alert" id="stats-unreach" role="status" hidden></p>
       </section>
+      </div><!-- /page-sets -->
+
+      <section class="block" id="page-servers" aria-labelledby="all-srv-h" hidden>
+        <div class="block-head">
+          <h2 id="all-srv-h" data-i18n="reg.title">Servers</h2>
+          <p class="block-meta" id="srv-note" role="status"></p>
+          <button class="btn btn-sm" type="button" id="srv-new" data-i18n="setSrv.add">Add server</button>
+        </div>
+        <table class="table rtable" id="all-srv-table" aria-labelledby="all-srv-h">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="setSrv.thServer">Server</th>
+              <th scope="col" data-i18n="setSrv.thType">Type</th>
+              <th scope="col" data-i18n="setSrv.thState">State</th>
+              <th scope="col" class="num" data-i18n="setSrv.thTools">Tools</th>
+              <th scope="col" data-i18n="reg.thSets">In sets</th>
+              <th scope="col" class="num" data-i18n="setSrv.thAct">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="servers"></tbody>
+        </table>
+        <p class="field-help" data-i18n="reg.hint">Health comes from the check of a running set: a remote server that answers 401 needs an OAuth sign-in from its own set. A server outside every set stays unchecked until you press Check here.</p>
+        <div class="empty" id="servers-empty" hidden>
+          <p class="empty-title" data-i18n="reg.emptyTitle">The registry is empty</p>
+          <p class="empty-text" data-i18n="reg.emptyText">A server is one MCP endpoint: a local command or a remote URL. Sets take their members from here.</p>
+        </div>
+      </section>
+
+      <section class="block" id="page-vars" aria-labelledby="vars-h" hidden>
+        <div class="block-head">
+          <h2 id="vars-h" data-i18n="vars.title">Variables</h2>
+          <p class="block-meta mono" id="env-count">0</p>
+        </div>
+        <p class="block-meta" data-i18n="vars.note">The names your servers reference as ${NAME}. A value is written here and handed to the set process at start; the panel never reads one back.</p>
+        <form class="od-row varform" id="envform" novalidate>
+          <label class="fsel"><span data-i18n="vars.name">name</span>
+            <input class="input mono" id="env-name" name="name" autocomplete="off" spellcheck="false" placeholder="GITEA_TOKEN">
+          </label>
+          <label class="fsel"><span data-i18n="vars.value">value</span>
+            <input class="input mono" id="env-value" name="value" type="password" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="fsel"><span data-i18n="vars.store">store</span>
+            <select class="input" id="env-store">
+              <option value="" data-i18n="vars.storeAuto">automatic</option>
+              <option value="openbao">OpenBao</option>
+              <option value="local" data-i18n="vars.storeFile">file on this host</option>
+            </select>
+          </label>
+          <button class="btn btn-sm" type="submit" id="env-save" data-i18n="common.save">save</button>
+        </form>
+        <p class="form-alert" id="env-err" role="alert" tabindex="-1" hidden></p>
+        <p class="form-alert form-alert-ok" id="env-msg" role="status" hidden></p>
+        <ul class="varlist" id="env"></ul>
+        <p class="empty" id="env-empty" hidden data-i18n="env.empty">no variables</p>
+        <p class="field-help" data-i18n="vars.honest">Values live in OpenBao or in a file only this host can read: the panel shows a name, whether it is set and where it comes from. A name that no server references yet stays out of the list until some server mentions it.</p>
+      </section>
     </main>
 
     <footer class="statusbar">
@@ -410,32 +476,14 @@
   <div class="drawer-inner">
     <div class="drawer-head">
       <h2 id="side-h" data-i18n="side.label">Details</h2>
+      <span class="count mono" id="log-count">0</span>
       <button class="ghost-icon" type="button" id="side-close" aria-label="Close details" data-i18n-aria="side.close">
         <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="segmented drawer-seg" role="tablist" aria-label="Details">
-      <button class="segbtn" type="button" role="tab" id="sidebtn-servers" data-side="servers" aria-selected="true" aria-controls="pane-servers"><span data-i18n="side.servers">servers</span> <span class="count mono" id="srv-count">0</span></button>
-      <button class="segbtn" type="button" role="tab" id="sidebtn-env" data-side="env" aria-selected="false" aria-controls="pane-env"><span data-i18n="side.env">env</span> <span class="count mono" id="env-count">0</span></button>
-      <button class="segbtn" type="button" role="tab" id="sidebtn-log" data-side="log" aria-selected="false" aria-controls="pane-log"><span data-i18n="side.log">log</span> <span class="count mono" id="log-count">0</span></button>
-    </div>
 
     <div class="drawer-body">
-      <section class="pane" data-pane="servers" id="pane-servers" role="tabpanel" aria-labelledby="sidebtn-servers">
-        <p class="block-meta" data-i18n="side.registry">host-wide registry</p>
-        <table class="table rtable" id="registry-table">
-          <tbody id="servers"></tbody>
-        </table>
-        <p class="empty" id="servers-empty" hidden data-i18n="side.registryEmpty">registry is empty</p>
-      </section>
-
-      <section class="pane" data-pane="env" id="pane-env" role="tabpanel" aria-labelledby="sidebtn-env" hidden>
-        <p class="block-meta" data-i18n="env.note">values are supplied by the set process — the panel shows names only, never values</p>
-        <ul class="varlist" id="env"></ul>
-        <p class="empty" id="env-empty" hidden data-i18n="env.empty">no variables</p>
-      </section>
-
-      <section class="pane" data-pane="log" id="pane-log" role="tabpanel" aria-labelledby="sidebtn-log" hidden>
+      <section class="pane" id="pane-log">
         <div class="od-row">
           <p class="block-meta" data-i18n="log.tail">log tail of the set</p>
           <button class="btn btn-xs" type="button" id="log-wide" aria-pressed="false" title="expand the log panel" data-i18n-title="log.wideTip" data-i18n="log.wide">wider</button>
