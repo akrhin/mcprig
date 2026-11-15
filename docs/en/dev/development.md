@@ -35,9 +35,9 @@ server, HTTP transport rules, the manager API, supervision and statistics.
 bash scripts/docs-check.sh
 ```
 
-The documentation gate fails on a broken relative link, a path that only exists
-on the author's machine (`docs/forbidden.txt`), a page no other page links to,
-`docs/en` and `docs/ru` listing different files, and a value in
+The documentation gate fails on a broken relative link, a path from
+`docs/forbidden.txt`, a page no other page links to, `docs/en` and `docs/ru`
+listing different files, and a value in
 `docs/anchors.txt` that no longer matches the text. `docs/history/` is exempt
 from the path rule: a dated audit keeps the commands it was run with. Run it
 before a pull request that touches `docs/`, `README*.md` or `CONTRIBUTING*.md`.

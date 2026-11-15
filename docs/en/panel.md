@@ -148,15 +148,15 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `POST /api/browse/<id>/{tool,resource,prompt}` | call something in the browse session |
 
 Set and server names must match `^[a-z0-9][a-z0-9_-]{0,63}$`. A set needs at
-least one existing server; its `port`, when given, must be 9100–9199 and free
-in the system, otherwise the manager allocates one; a port held by a process
-gives `409` «порт N занят другим процессом». `id` and `token` in a create body
-are ignored.
+least one existing server; when `port` is not given the manager allocates a free
+port from 9100–9199, and a given one must be free in the system, otherwise
+`409` «порт N занят другим процессом». `id` and `token` in a create body are
+ignored.
 
 The set log tail is `<data-dir>/sets/<id>/mcprig.log`, rotating to `.log.1` at
 5 MiB. A `lazy-mcp.log` inherited from the old proxy is renamed on the set's
 first start, so the old tail stays visible in the panel. A failed rotation
-(rename or reopen) loses no output: the old file stays in place and the error
+loses no output: the old file stays in place and the error
 text is shown in the set status `error`.
 
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its

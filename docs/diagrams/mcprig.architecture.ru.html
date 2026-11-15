@@ -5669,11 +5669,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>Экономия контекста</h3>
         </div>
         <ul>
-          <li>Каталог не в промпте: агент видит 5 мета-тулов</li>
+          <li>Каталог не в промпте: агент видит пять мета-инструментов</li>
           <li>list_commands отдаёт каталог по запросу и кэширует</li>
-          <li>describe_commands: схема только зовомого инструмента</li>
-          <li>invoke_many: пачка вызовов вместо N кругов</li>
-          <li>maxBytes режет ответ, полный текст остаётся файлом</li>
+          <li>describe_commands: схема только вызываемого инструмента</li>
+          <li>invoke_many: пачка вызовов вместо N отдельных обменов</li>
+          <li>maxBytes режет ответ, полный текст сохраняется в файле</li>
         </ul>
       </div>
 
@@ -5683,10 +5683,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>Клиенту менять нечего</h3>
         </div>
         <ul>
-          <li>Харнесс не меняется: те же tools/call и JSON-RPC на /mcp</li>
+          <li>Клиентская обвязка не меняется: те же tools/call и JSON-RPC на /mcp</li>
           <li>Имена инструментов настоящие: invoke_command{server, command_name, parameters}</li>
           <li>Ошибка приходит текстом инструмента: неизвестный сервер, неизвестный инструмент</li>
-          <li>Статистика по серверам, health опрашивается сам</li>
+          <li>Статистика по серверам, health опрашивается периодически</li>
         </ul>
       </div>
 
@@ -5697,7 +5697,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </div>
         <ul>
           <li>stdio: spawn(command) + своё окружение, рукопожатие initialize</li>
-          <li>HTTP: server/discover, OAuth по 401</li>
+          <li>HTTP: server/discover, OAuth по 401 или 403</li>
           <li>Bearer-токен на набор, у клиента свой набор</li>
           <li>Набор — дочерний процесс панели или свой юнит</li>
         </ul>
