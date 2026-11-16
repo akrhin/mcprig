@@ -761,7 +761,7 @@
     tab: 'overview', page: pageOf(location.hash), railPref: '',
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
-    mock: null, srvEditing: '', srvReturn: null,
+    mock: null, mockEnv: null, srvEditing: '', srvReturn: null,
     st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' },
     // paged — открыта вторая страница вызовов: тикер её не перезаписывает.
     // callsSeq — номер загрузки первой страницы: ответ догрузки из прошлого
@@ -900,6 +900,16 @@
     return st.mockTools.then(function (d) { return { tools: d.tools || [] }; });
   }
 
+  // Переменные в демо: файл читается один раз, дальше список живёт в st.mockEnv,
+  // иначе PUT/DELETE меняли бы ответ, а следующий GET снова отдавал бы файл.
+  function mockEnv() {
+    if (!st.mockEnv) {
+      st.mockEnv = fetch('mock/' + mockName('/api/env') + '.json', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); });
+    }
+    return st.mockEnv;
+  }
+
   // Демо повторяет контракт /api/calls: limit и before (строго раньше). Иначе
   // «Показать ещё» в демо нечего показать, а адрес запроса расходится с живым.
   function mockCallsPage(data, path) {
@@ -932,6 +942,8 @@
       if (st.mock && path.indexOf('/api/state') === 0) { return Promise.resolve(st.mock); }
       // список карантина в демо живёт в памяти: одобрение должно быть видно сразу
       if (/^\/api\/sets\/[^/]+\/tools$/.test(path)) { return mockTools(); }
+      // переменные в демо живут в памяти: PUT/DELETE должны менять список сразу
+      if (path.indexOf('/api/env') === 0) { return mockEnv(); }
       // срезы считаются из строк, а не читаются готовым файлом: иначе фильтры
       // в демо не на что влиять и цифры врут
       if (path.indexOf('/api/stats') === 0) { return Promise.resolve(mockStats(path)); }
@@ -1087,6 +1099,31 @@
         if (k.id === keyID) { k.note = String((body && body.note) || ''); }
       });
       return Promise.resolve({ ok: true });
+    }
+    // Переменная в демо меняется по-настоящему: PUT пишет значение, DELETE убирает
+    // строку, и следующий loadEnv отдаёт изменённый список (иначе страница врала бы).
+    var em = /^\/api\/env\/([A-Za-z_][A-Za-z0-9_]*)$/.exec(path);
+    if (em && (method === 'PUT' || method === 'DELETE')) {
+      var envName = em[1];
+      return mockEnv().then(function (d) {
+        d.vars = d.vars || [];
+        var row = d.vars.filter(function (v) { return v.name === envName; })[0];
+        if (method === 'DELETE') {
+          // ответ как у apiEnvDelete: removed и source — откуда ушло значение
+          var had = !!row && !!row.set;
+          var was = (row && row.source) || '';
+          // строка остаётся: живой /api/env перечисляет все ${VAR} серверов, а
+          // «не задана» — это set:false, а не исчезнувшее имя
+          if (row) { row.set = false; row.source = ''; }
+          return { name: envName, removed: had, source: was, restarted: [] };
+        }
+        // source — из store тела, как storeName в secrets.go: local и пусто → file
+        var from = String((body && (body.store || body.source)) || 'file');
+        var source = from === 'local' || from === 'automatic' ? 'file' : from;
+        if (row) { row.set = true; row.source = source; }
+        else { d.vars.push({ name: envName, set: true, source: source }); }
+        return { name: envName, set: true, source: source, restarted: [] };
+      });
     }
     var m = /^\/api\/servers(?:\/([^/]+))?$/.exec(path);
     if (!m || !st.mock) { return Promise.resolve({ ok: true, ms: 14, tools: [] }); }
