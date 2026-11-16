@@ -26,8 +26,9 @@ bwrap, какие дефекты эталона было решено не пе�
 | [decisions/0001-two-repos.md](decisions/0001-two-repos.md) | 2026-11-08 | принято (human-set): TS-эталон отдельно от Go-продукта |
 | [decisions/0002-installation.md](decisions/0002-installation.md) | 2026-11-08 | принято, реализовано в 0.4.0; тело оставлено как было написано — это три варианта поставки |
 | [decisions/0003-naming-and-repo.md](decisions/0003-naming-and-repo.md) | 2026-11-08 | принято и superseded by PR #9: модуль `github.com/akrhin/mcprig` |
-| [decisions/0004-empty-sets.md](decisions/0004-empty-sets.md) | 2026-11-15 | предложено: снять инвариант «в наборе ≥1 сервер», пустой набор — законное состояние |
+| [decisions/0004-empty-sets.md](decisions/0004-empty-sets.md) | 2026-11-15 | принято: инвариант «в наборе ≥1 сервер» снят, пустой набор — законное состояние |
 | [decisions/0005-security-posture.md](decisions/0005-security-posture.md) | 2026-11-16 | принято: SEC-05/10/12 починены, SEC-06/07/08/09/11 приняты с условием пересмотра |
+| [decisions/0006-list-servers-without-pid.md](decisions/0006-list-servers-without-pid.md) | 2026-11-16 | принято: `pid` убран из `list_servers`, контракт мета-тулов обновлён |
 
 ## Предложения
 

@@ -235,7 +235,7 @@ behind `https` is a problem, because an identity provider cannot send the code
 there.
 
 With `MCPRIG_AUTH=off` and neither `MCPRIG_PASSWORD` nor `MCPRIG_PASSWORD_HASH`
-set, the services section adds a warning line — `внимание: панель без пароля …`
+set, the services section adds a warning line — `предупреждение: панель без пароля …`
 — because an open panel is reachable by anyone who gets to the port; it counts
 as a warning, not a problem, so the exit code stays `0`.
 

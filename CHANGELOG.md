@@ -65,7 +65,7 @@ repository the project is built in.
 - A panel started without a password (`MCPRIG_AUTH=off`) now says so at
   startup: `WARN панель без пароля (MCPRIG_AUTH=off): доступна всем, кто
   дотянется до порта; задайте MCPRIG_PASSWORD`. `mcprig doctor` prints the same
-  as `внимание:` under services when no `MCPRIG_PASSWORD` or
+  as `предупреждение:` under services when no `MCPRIG_PASSWORD` or
   `MCPRIG_PASSWORD_HASH` is set — a warning, not a problem, so the exit code
   stays `0`.
 - `list_servers` no longer answers with `pid`: the proxy's process id is of no
