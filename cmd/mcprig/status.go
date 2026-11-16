@@ -97,7 +97,8 @@ func runStatus(args []string) error {
 		if err != nil {
 			return err
 		}
-		out = append(body, '\n')
+		body = append(body, '\n')
+		out = body
 	} else {
 		out = renderStatus(rep)
 	}
@@ -253,7 +254,7 @@ func renderStatus(rep statusReport) []byte {
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\n", s.ID, state, s.Port, tools, key, last)
 	}
-	tw.Flush()
+	_ = tw.Flush()
 	fmt.Fprintf(&b, "\nитог: %d %s\n", len(rep.Sets), pluralBy(len(rep.Sets), "набор", "набора", "наборов"))
 	return []byte(b.String())
 }

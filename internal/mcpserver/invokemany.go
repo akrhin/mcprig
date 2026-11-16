@@ -91,7 +91,7 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 				return
 			}
 			// Лимит считается на каждый внутренний вызов, как у invoke_command.
-			if err := m.throttle(ctx, req, e.server().Name, c.CommandName); err != nil {
+			if err := m.throttle(ctx, e.server().Name, c.CommandName); err != nil {
 				ans.Error = err.Error()
 				ans.MS = time.Since(start).Milliseconds()
 				out[i] = ans

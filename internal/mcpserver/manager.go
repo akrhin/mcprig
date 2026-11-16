@@ -1082,7 +1082,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		)
 	}
 	// Лимит — до открытия сессии набора: отказ не должен поднимать апстрим.
-	if err := m.throttle(ctx, req, srv.Name, in.CommandName); err != nil {
+	if err := m.throttle(ctx, srv.Name, in.CommandName); err != nil {
 		return errResult(err)
 	}
 	if !usable(srv) {
@@ -1262,7 +1262,7 @@ func identityOf(ctx context.Context) string {
 // throttle refuses a call over the set's rate limit and counts the refusal.
 // Nil means the call may proceed; a set without rateLimit never gets past the
 // nil limiter, so today's behaviour is unchanged.
-func (m *Manager) throttle(ctx context.Context, req *mcp.CallToolRequest, server, tool string) error {
+func (m *Manager) throttle(ctx context.Context, server, tool string) error {
 	limits := m.limiter()
 	if limits == nil {
 		return nil

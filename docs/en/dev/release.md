@@ -9,29 +9,42 @@ this page does not repeat those numbers.
 
 ## Pipeline
 
-1. Tag `vX.Y.Z` on `master` and push it to both remotes (Gitea and GitHub).
-2. Gitea CI runs `.gitea/workflows/release.yml` — `go vet`, tests with `-race`,
-   `govulncheck`, `gofmt` — then `goreleaser`: four platforms, `checksums.txt`,
-   a **published** release in Gitea (`.goreleaser.yaml` keeps `draft: false`),
-   and the `slim`/`full` images pushed to the registry. Jobs are serialized
-   (`concurrency: mcprig-release`), so a second tag waits instead of cancelling
-   the first. Nothing is published by hand: a release that stops halfway is
-   re-run by pushing the same tag again or with `rerun` in the Actions UI.
-3. The GitHub workflow (`.github/workflows/release.yml`) runs on the same tag:
-   it rebuilds the same archives with `goreleaser --skip=publish`, builds and
-   pushes the `slim`/`full` images to `ghcr.io/akrhin/mcprig`, and uploads the
-   archives with `gh`, so `.goreleaser.yaml` keeps one set of
-   `gitea_urls`/`draft` settings instead of two variants. It runs no tests and
-   no `govulncheck`.
-4. Release notes are the tag's `CHANGELOG.md` section, cut by
+Two repositories, one builder. GitHub is the source of truth for checks and
+releases; Gitea keeps a mirror of the code and runs no workflows at all.
+
+1. Tag `vX.Y.Z` on `master`, push to GitHub first, then to Gitea.
+2. GitHub `ci` runs on every push and pull request: `gofmt`, `go mod tidy -diff`,
+   `go vet`, `go build`, cross-build for `darwin/arm64`, `darwin/amd64` and
+   `linux/arm64`, `go test ./... -race -count=1 -p 1` with coverage uploaded as
+   an artifact, `golangci-lint` (`.golangci.yml`: standard linters plus `gosec`,
+   `bodyclose`, `errorlint`, `gocritic`, `noctx`, `unparam`), `govulncheck`,
+   `gitleaks` over the whole history, `scripts/docs-check.sh`, `node --check
+   web/app.js`, and a `docker build` of both image targets.
+3. GitHub `codeql` scans Go and the panel's JavaScript on every push and weekly;
+   `dependency-review` fails a pull request that adds a dependency with a
+   high-severity advisory.
+4. GitHub `release` runs on the tag: `goreleaser` builds four platforms and
+   `checksums.txt`, publishes the release page (`.goreleaser.yaml` keeps
+   `draft: false`) and builds the `slim`/`full` images once, pushing them to
+   `ghcr.io/akrhin/mcprig` and, when `REGISTRY`/`REGISTRY_USER`/
+   `REGISTRY_PASSWORD` secrets are set, to the host registry as well. Nothing is
+   published by hand.
+5. Gitea has no workflows left: it mirrors the code so the repository stays
+   readable without GitHub, and holds the releases and images pushed to it.
+6. Release notes are the tag's `CHANGELOG.md` section, cut by
    `scripts/release-notes.sh`.
 
-Every push and pull request runs `.gitea/workflows/ci.yml`: `gofmt`, `go vet`,
-`go build`, `go test ./... -race -p 1`, `scripts/docs-check.sh`,
-`node --check web/app.js` and `govulncheck`. A red run blocks nothing by itself —
-Gitea does not gate merges — so read the run before merging.
+What keeps the pipeline itself safe: every action is pinned to a commit SHA with
+the version in a comment, `permissions` is `contents: read` unless a job needs
+more, `persist-credentials: false` keeps the checkout token out of `.git/config`,
+pull requests never receive repository secrets, and the scans run their own
+tools (`gitleaks`, `govulncheck`) instead of third-party actions. Public
+repositories are not billed for standard runners, so the checks are not trimmed
+for cost.
 
-A tag can be released by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
+A red run blocks nothing by itself: neither forge gates merges on checks by
+default — read the run before merging. A tag can be released by hand:
+`gh workflow run release.yml -f tag=vX.Y.Z`.
 
 ## Before the tag
 

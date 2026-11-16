@@ -147,17 +147,16 @@ done
 
 ## Release
 
-A release is cut inside Gitea. A `v*` tag runs gofmt, vet, the race suite and
-govulncheck, then goreleaser publishes the archives and the release itself —
+A release is cut in GitHub. A `v*` tag runs `.github/workflows/release.yml`: the
+checks, then goreleaser, which publishes the archives, the release page and the
+`slim`/`full` images (GHCR, plus the host registry when its secrets are set) —
 no draft, nothing to click. Release notes are the tag's `CHANGELOG.md` section,
 cut from `## [Unreleased]` by a `release:` commit.
 
-Every push and pull request runs `.gitea/workflows/ci.yml`: gofmt, vet, build,
-the race suite, `scripts/docs-check.sh`, `node --check web/app.js` and
-govulncheck. Gitea cannot make a check mandatory, so the red run is read before
-the merge, not enforced by the server.
-
-The public side is a second, independent pass: `.github/workflows/release.yml`
-runs on the same tag in the GitHub repository, builds the same archives with
-goreleaser `--skip=publish`, uploads them to the GitHub release with `gh`, and
-pushes the `slim`/`full` images to GHCR. It never publishes to Gitea.
+Every push and pull request runs `.github/workflows/ci.yml`: gofmt, `go mod tidy
+-diff`, vet, build and cross-build, the race suite, `golangci-lint`,
+`govulncheck`, `gitleaks` over the whole history, `scripts/docs-check.sh`,
+`node --check web/app.js` and a `docker build` of both image targets. `codeql.yml`
+scans Go and the panel's JavaScript; `dependency-review.yml` fails a pull request
+that adds a vulnerable dependency. Gitea runs no workflows: it mirrors the code
+and holds the releases and images pushed to it.

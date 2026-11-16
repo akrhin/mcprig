@@ -87,12 +87,10 @@ func (m *Manager) apiCalls(req *request) error {
 		if set == nil {
 			return &httpError{http.StatusNotFound, "набор не найден"}
 		}
-		port, _ := m.runningPort(set)
-		targets = append(targets, target{set, port})
+		targets = append(targets, target{set, m.runningPort(set)})
 	} else {
 		for _, set := range m.store.Sets() {
-			port, _ := m.runningPort(set)
-			targets = append(targets, target{set, port})
+			targets = append(targets, target{set, m.runningPort(set)})
 		}
 	}
 
@@ -187,12 +185,12 @@ func (m *Manager) apiCalls(req *request) error {
 }
 
 // runningPort — порт работающего набора; остановленный набор не опрашиваем.
-func (m *Manager) runningPort(set *registry.Set) (int, bool) {
+func (m *Manager) runningPort(set *registry.Set) int {
 	st := m.rt.status(set)
-	if !st.Running || st.Port == 0 {
-		return 0, false
+	if !st.Running {
+		return 0
 	}
-	return st.Port, true
+	return st.Port
 }
 
 // fetchSetStats читает /stats набора: у открытого набора токена нет, поэтому

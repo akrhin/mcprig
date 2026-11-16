@@ -1,0 +1,14 @@
+# Правила по умолчанию плюс одно исключение: в тестах стоят заведомо
+# ненастоящие ключи, чтобы проверить, что прокси их вычищает из логов и спанов.
+title = "mcprig"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Заглушки ключей в тестах редактора секретов"
+paths = [
+  '''^internal/mcpserver/(gatelist|trace)_test\.go$''',
+  '''^cmd/mcprig/doctor_test\.go$''',
+]
+regexTarget = "match"
+regexes = ['''sk-live-0123456789''']

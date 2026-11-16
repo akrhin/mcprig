@@ -111,7 +111,7 @@ func probeRun() error {
 		if strings.Contains(msg, "execvp") {
 			return fmt.Errorf("запуск внутри песочницы не удался (%s): %s", trueBin, msg)
 		}
-		return fmt.Errorf("bwrap не может создать namespace — проверьте, разрешены ли user namespaces: %v: %s", err, msg)
+		return fmt.Errorf("bwrap не может создать namespace — проверьте, разрешены ли user namespaces: %w: %s", err, msg)
 	}
 	return nil
 }

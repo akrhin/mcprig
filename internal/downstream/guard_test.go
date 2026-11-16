@@ -1,6 +1,7 @@
 package downstream
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -75,8 +76,8 @@ func TestGuardParentProcess(t *testing.T) {
 // TestGuardKeepsChildExitCode: нормальный выход ребёнка — тот же код наружу.
 func TestGuardKeepsChildExitCode(t *testing.T) {
 	err := guardCmd(t, "/bin/sh", "-c", "exit 3").Run()
-	ee, ok := err.(*exec.ExitError)
-	if !ok {
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) {
 		t.Fatalf("ждали код 3, получили %v", err)
 	}
 	if code := ee.ExitCode(); code != 3 {

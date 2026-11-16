@@ -1,0 +1,31 @@
+version: 2
+# Обновления приезжают PR'ами и проходят тот же ci: формат, линтер, тесты,
+# govulncheck, gitleaks, CodeQL. Автомерж не включаю: Go-модуль и панель
+# меняются вместе, решает человек.
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      go-dependencies:
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

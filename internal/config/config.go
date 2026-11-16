@@ -208,18 +208,6 @@ func (s *Server) Warnings() []string {
 	return out
 }
 
-// hasAnyPath — есть ли в списке хотя бы один из путей.
-func hasAnyPath(paths []string, want ...string) bool {
-	for _, p := range paths {
-		for _, w := range want {
-			if p == w {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // isNodeCommand — команда, которой нужен запас виртуальной памяти.
 func isNodeCommand(argv []string) bool {
 	if len(argv) == 0 {
@@ -590,7 +578,7 @@ func expandSecrets(value string) (string, error) {
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
-			firstErr = fmt.Errorf("{file:%s}: %v", path, err)
+			firstErr = fmt.Errorf("{file:%s}: %w", path, err)
 			return match
 		}
 		return strings.TrimSuffix(strings.TrimSuffix(string(data), "\n"), "\r")
@@ -816,7 +804,7 @@ func ValidatePublicURL(raw string) error {
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("publicUrl: %v", err)
+		return fmt.Errorf("publicUrl: %w", err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return fmt.Errorf("publicUrl: нужна схема http или https: %q", raw)

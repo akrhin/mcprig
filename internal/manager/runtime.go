@@ -232,10 +232,10 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 
 	// Ack прошлого процесса не должен сойти за ответ нового: у каждого
 	// запуска поколение начинается с 1, а старый файл мог дожить до него.
-	os.Remove(ReloadStatusPath(rt.dataDir, set.ID))
-	os.Remove(ReloadRequestPath(rt.dataDir, set.ID))
+	_ = os.Remove(ReloadStatusPath(rt.dataDir, set.ID))
+	_ = os.Remove(ReloadRequestPath(rt.dataDir, set.ID))
 
-	cmd := exec.Command(rt.cliPath, "serve", "--config", cfgPath)
+	cmd := exec.CommandContext(context.Background(), rt.cliPath, "serve", "--config", cfgPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	// Свой каталог состояния у каждого набора: общий oauth.json затирается
 	// снимком другого процесса.
@@ -243,7 +243,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 	if err := cmd.Start(); err != nil {
-		logFile.Close()
+		_ = logFile.Close()
 		return RuntimeStatus{}, fmt.Errorf("не удалось запустить набор %s: %w", set.ID, err)
 	}
 
@@ -260,7 +260,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	rt.mu.Lock()
 	if rt.closed {
 		rt.mu.Unlock()
-		logFile.Close()
+		_ = logFile.Close()
 		killGroup(p.pid, syscall.SIGKILL)
 		_ = cmd.Wait()
 		return RuntimeStatus{}, errors.New("менеджер остановлен — перезапустите mcprig")
@@ -297,7 +297,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 
 func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server, p *process, logFile *os.File) {
 	err := p.cmd.Wait()
-	logFile.Close()
+	_ = logFile.Close()
 
 	code := -1
 	if p.cmd.ProcessState != nil {
@@ -870,7 +870,7 @@ func listenHost(bindIP string) string {
 // portFree проверяет, что порт свободен: готовность набора проверяется
 // подсоединением, и чужой слушатель выглядел бы поднявшимся набором.
 func portFree(host string, port int) error {
-	ln, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return &conflictErr{msg: fmt.Sprintf("порт %d занят другим процессом — выберите другой порт", port)}
 	}
@@ -900,9 +900,9 @@ func waitPort(ctx context.Context, host string, port int, budget time.Duration, 
 			return false
 		default:
 		}
-		conn, err := net.DialTimeout("tcp", addr, time.Second)
+		conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp", addr)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			return true
 		}
 		select {
@@ -1030,7 +1030,7 @@ func (w *logWriter) rotate() {
 		return
 	}
 	if w.file != nil {
-		w.file.Close()
+		_ = w.file.Close()
 	}
 	w.file = f
 	w.size = 0

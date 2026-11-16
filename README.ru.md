@@ -79,19 +79,34 @@ Docker работает так же и не требует Go: `docker pull ghcr
 
 ## Архитектура
 
-[![архитектура mcprig](docs/diagrams/mcprig.architecture.ru.png)](docs/diagrams/mcprig.architecture.ru.html)
-
 Клиент → одна точка входа набора → девять мета-тулов (пять работают с серверами,
 четыре обслуживают ресурсы и промты) → нижестоящие серверы этого
 набора. Панель держит по одному процессу `mcprig serve` на набор, поэтому
-перезапуск или падение одного набора не задевает остальные. Интерактивная версия
-схемы (темы, зум, экспорт PNG/SVG) —
-[docs/diagrams/mcprig.architecture.ru.html](docs/diagrams/mcprig.architecture.ru.html);
-спецификация, из которой она генерируется, лежит рядом как `.json`.
+перезапуск или падение одного набора не задевает остальные. Каждая схема ниже
+открывается интерактивно (темы, зум, экспорт PNG/SVG) по клику, а спецификация,
+из которой она генерируется, лежит рядом как `.json`.
 
-Что меняется, когда серверы стоят за одной точкой входа, и чем это платится —
-вторая картинка: [с прокси и без](docs/diagrams/mcprig.why.ru.html), карта
-возможностей — [что умеет один бинарник](docs/diagrams/mcprig.capabilities.ru.html).
+<details>
+<summary>Архитектура: клиент, набор, серверы, панель, файлы состояния</summary>
+
+[![архитектура mcprig](docs/diagrams/mcprig.architecture.ru.png)](docs/diagrams/mcprig.architecture.ru.html)
+
+</details>
+
+<details>
+<summary>С прокси и без него: чем платит контекст и что получает оператор</summary>
+
+[![с прокси и без](docs/diagrams/mcprig.why.ru.png)](docs/diagrams/mcprig.why.ru.html)
+
+</details>
+
+<details>
+<summary>Что умеет один бинарник: сервер, защита, наблюдение, управление</summary>
+
+[![что умеет один бинарник](docs/diagrams/mcprig.capabilities.ru.png)](docs/diagrams/mcprig.capabilities.ru.html)
+
+</details>
+
 Сравнение с другими прокси и слабые места — [docs/ru/alternatives.md](docs/ru/alternatives.md).
 
 ## Конфигурация

@@ -92,9 +92,7 @@ func TestSecureCookieBehindProxy(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/api/login", nil) // r.TLS == nil: до Go дошёл http
-	if _, err := m.auth.startSession(w, r); err != nil {
-		t.Fatalf("startSession: %v", err)
-	}
+	m.auth.startSession(w, r)
 	for _, c := range w.Result().Cookies() {
 		if c.Name != sessionCookie {
 			continue
@@ -152,9 +150,7 @@ func TestSecureOptionPreserved(t *testing.T) {
 		}
 		t.Cleanup(m.Close)
 		w := httptest.NewRecorder()
-		if _, err := m.auth.startSession(w, httptest.NewRequest(http.MethodPost, "/api/login", nil)); err != nil {
-			t.Fatalf("startSession: %v", err)
-		}
+		m.auth.startSession(w, httptest.NewRequest(http.MethodPost, "/api/login", nil))
 		for _, c := range w.Result().Cookies() {
 			if c.Name == sessionCookie {
 				return c

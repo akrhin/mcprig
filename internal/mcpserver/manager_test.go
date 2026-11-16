@@ -960,12 +960,16 @@ func TestServiceCallNotCounted(t *testing.T) {
 		return &mcp.CallToolResult{}, nil
 	})
 
-	handler(context.Background(), reqWithMeta(nil))
+	if _, err := handler(context.Background(), reqWithMeta(nil)); err != nil {
+		t.Fatalf("вызов: %v", err)
+	}
 	if snap := m.Stats.Snapshot(); len(snap.Counters) != 1 || len(snap.Tail) != 1 {
 		t.Fatalf("обычный вызов не учтён: counters=%+v tail=%+v", snap.Counters, snap.Tail)
 	}
 
-	handler(stats.WithServiceCall(context.Background()), reqWithMeta(nil))
+	if _, err := handler(stats.WithServiceCall(context.Background()), reqWithMeta(nil)); err != nil {
+		t.Fatalf("служебный вызов: %v", err)
+	}
 	snap := m.Stats.Snapshot()
 	if len(snap.Counters) != 1 || len(snap.Tail) != 1 {
 		t.Fatalf("служебный вызов попал в статистику: counters=%+v tail=%+v", snap.Counters, snap.Tail)

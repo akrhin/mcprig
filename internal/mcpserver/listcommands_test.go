@@ -142,7 +142,11 @@ func TestListCommandsTruncatesHugeCatalog(t *testing.T) {
 		t.Fatalf("нет маркера усечения: %q", text)
 	}
 	rest := text[strings.Index(text, "полный ответ — ")+len("полный ответ — "):]
-	path := rest[:strings.Index(rest, "]")]
+	end := strings.Index(rest, "]")
+	if end < 0 {
+		t.Fatalf("нет конца пути в маркере: %q", rest)
+	}
+	path := rest[:end]
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("полный каталог не выгружен: %v", err)

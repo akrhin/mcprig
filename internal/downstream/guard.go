@@ -1,6 +1,7 @@
 package downstream
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -46,7 +47,8 @@ func GuardMain(argv []string, stderr io.Writer) int {
 		return 1
 	}
 
-	cmd := exec.Command(argv[0], argv[1:]...)
+	// Отмены нет: сторож живёт ровно столько, сколько его ребёнок.
+	cmd := exec.CommandContext(context.Background(), argv[0], argv[1:]...) //nolint:gosec // G702: argv — команда сервера из конфига набора
 	// Наследование, а не проксирование: stdin/stdout — канал протокола.
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -55,8 +57,12 @@ func GuardMain(argv []string, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "child-guard:", err)
 		return 127
 	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	// Код выхода берётся из ProcessState, ошибка Wait наружу не идёт.
+	done := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(done)
+	}()
 
 	select {
 	case <-sigs:

@@ -325,37 +325,38 @@ func (a *auth) trustsProxy(r *http.Request) bool {
 	return false
 }
 
-func (a *auth) sessionOK(r *http.Request) (session, bool) {
+func (a *auth) sessionOK(r *http.Request) bool {
 	c, err := r.Cookie(sessionCookie)
 	if err != nil {
-		return session{}, false
+		return false
 	}
-	return a.sessions.get(c.Value)
+	_, found := a.sessions.get(c.Value)
+	return found
 }
 
 // check решает, пускать ли запрос. hostOK проверяется вызывающим (нужен 403, а
-// не 401). user пуст для режима none.
-func (a *auth) check(r *http.Request) (user string, ok bool) {
+// не 401).
+func (a *auth) check(r *http.Request) bool {
 	switch a.mode {
 	case modeNone:
-		return "", true
+		return true
 	case modeProxy:
 		if a.proxyOK(r) {
-			return r.Header.Get(a.userHeader), true
+			return true
 		}
 	case modePassword:
-		if sess, found := a.sessionOK(r); found {
-			return sess.user, true
+		if a.sessionOK(r) {
+			return true
 		}
 	case modeProxyPassword:
 		if a.proxyOK(r) {
-			return r.Header.Get(a.userHeader), true
+			return true
 		}
-		if sess, found := a.sessionOK(r); found {
-			return sess.user, true
+		if a.sessionOK(r) {
+			return true
 		}
 	}
-	return "", false
+	return false
 }
 
 func (a *auth) login(user, password string) bool {
@@ -497,9 +498,9 @@ func (a *auth) loginCheck(user, password string) (ok, busy bool) {
 	return a.login(user, password), false
 }
 
-func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, error) {
+func (a *auth) startSession(w http.ResponseWriter, r *http.Request) string {
 	value := a.sessions.create(a.user)
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure по факту TLS — на http-панели литерал true убил бы вход
 		Name:     sessionCookie,
 		Value:    value,
 		Path:     "/",
@@ -508,14 +509,14 @@ func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, err
 		SameSite: http.SameSiteLaxMode,
 		Secure:   a.secure || secureRequest(r, a.trustsProxy(r)),
 	})
-	return a.user, nil
+	return a.user
 }
 
 func (a *auth) clearSession(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		a.sessions.destroy(c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure по факту TLS — на http-панели литерал true убил бы выход
 		Name:     sessionCookie,
 		Value:    "",
 		Path:     "/",

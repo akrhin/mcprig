@@ -150,13 +150,13 @@ func TestRateLimitDoesNotLeakBetweenKeys(t *testing.T) {
 	if got := identityOf(ctxA); got != "key:aaaaaa" {
 		t.Fatalf("identityOf = %q, want key:aaaaaa", got)
 	}
-	if err := m.throttle(ctxA, nil, "a", "echo"); err != nil {
+	if err := m.throttle(ctxA, "a", "echo"); err != nil {
 		t.Fatalf("первый вызов ключа A: %v", err)
 	}
-	if err := m.throttle(ctxA, nil, "a", "echo"); err == nil {
+	if err := m.throttle(ctxA, "a", "echo"); err == nil {
 		t.Fatal("второй вызов ключа A прошёл мимо лимита")
 	}
-	if err := m.throttle(ctxB, nil, "a", "echo"); err != nil {
+	if err := m.throttle(ctxB, "a", "echo"); err != nil {
 		t.Fatalf("ключ B делит корзину с A: %v", err)
 	}
 }
@@ -182,10 +182,10 @@ func TestRateLimitNamedKeyIgnoresClientInfo(t *testing.T) {
 	if labelOf(ctx, one) == labelOf(ctx, two) {
 		t.Fatal("clientInfo не различает метки — тест не про то")
 	}
-	if err := m.throttle(ctx, one, "a", "echo"); err != nil {
+	if err := m.throttle(ctx, "a", "echo"); err != nil {
 		t.Fatalf("первый вызов: %v", err)
 	}
-	if err := m.throttle(ctx, two, "a", "echo"); err == nil {
+	if err := m.throttle(ctx, "a", "echo"); err == nil {
 		t.Fatal("смена _meta clientInfo дала новую квоту")
 	}
 }
@@ -199,13 +199,13 @@ func TestRateLimitSameSignatureDifferentKeys(t *testing.T) {
 		return stats.WithClientKey(ctx, fp)
 	}
 	first, second := named("aaaaaa"), named("bbbbbb")
-	if err := m.throttle(first, nil, "a", "echo"); err != nil {
+	if err := m.throttle(first, "a", "echo"); err != nil {
 		t.Fatalf("ключ 1, первый вызов: %v", err)
 	}
-	if err := m.throttle(first, nil, "a", "echo"); err == nil {
+	if err := m.throttle(first, "a", "echo"); err == nil {
 		t.Fatal("второй вызов ключа 1 прошёл мимо лимита")
 	}
-	if err := m.throttle(second, nil, "a", "echo"); err != nil {
+	if err := m.throttle(second, "a", "echo"); err != nil {
 		t.Fatalf("ключ 2 с той же подписью делит корзину с ключом 1: %v", err)
 	}
 }
@@ -262,13 +262,13 @@ func TestRateLimitOpenSetBucketsByAddr(t *testing.T) {
 	m := fanManager(t, newFanTracker(), &config.Config{RateLimit: rl}, "a")
 	one := stats.WithClientAddr(context.Background(), "10.0.0.7")
 	two := stats.WithClientAddr(context.Background(), "10.0.0.8")
-	if err := m.throttle(one, clientReq("one"), "a", "echo"); err != nil {
+	if err := m.throttle(one, "a", "echo"); err != nil {
 		t.Fatalf("первый вызов с адреса: %v", err)
 	}
-	if err := m.throttle(one, clientReq("two"), "a", "echo"); err == nil {
+	if err := m.throttle(one, "a", "echo"); err == nil {
 		t.Fatal("новая _meta clientInfo с того же адреса дала квоту")
 	}
-	if err := m.throttle(two, clientReq("one"), "a", "echo"); err != nil {
+	if err := m.throttle(two, "a", "echo"); err != nil {
 		t.Fatalf("второй адрес делит корзину с первым: %v", err)
 	}
 	if got := identityOf(context.Background()); got != "stdin" {
@@ -283,16 +283,18 @@ func TestRateLimitEvictKeepsOtherIdentities(t *testing.T) {
 	m := fanManager(t, newFanTracker(), &config.Config{RateLimit: rl}, "a")
 	victim := stats.WithClientKey(context.Background(), "aaaaaa")
 	flood := stats.WithClientKey(context.Background(), "bbbbbb")
-	if err := m.throttle(victim, nil, "a", "echo"); err != nil {
+	if err := m.throttle(victim, "a", "echo"); err != nil {
 		t.Fatalf("первый вызов жертвы: %v", err)
 	}
-	if err := m.throttle(victim, nil, "a", "echo"); err == nil {
+	if err := m.throttle(victim, "a", "echo"); err == nil {
 		t.Fatal("второй вызов жертвы прошёл мимо лимита")
 	}
 	for i := 0; i < maxBuckets+1; i++ {
-		m.throttle(flood, nil, "a", "tool"+strconv.Itoa(i))
+		if err := m.throttle(flood, "a", "tool"+strconv.Itoa(i)); err != nil && i < maxBuckets {
+			t.Fatalf("поток отказан раньше потолка: %v", err)
+		}
 	}
-	if err := m.throttle(victim, nil, "a", "echo"); err == nil {
+	if err := m.throttle(victim, "a", "echo"); err == nil {
 		t.Fatal("поток чужих имён вернул квоту жертве")
 	}
 	if got := len(m.limits.buckets); got > maxBuckets {

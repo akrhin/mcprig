@@ -80,21 +80,35 @@ runs `mcprig stdio` with no port and no key. Both forms with real output:
 
 ## Architecture
 
-[![mcprig architecture](docs/diagrams/mcprig.architecture.en.png)](docs/diagrams/mcprig.architecture.en.html)
-
 Client → one set endpoint → nine meta-tools (five work with servers, four serve
 resources and prompts) → the downstream servers of that set.
 The panel supervises one `mcprig serve` process per set, so a restart or a crash
-of one set leaves the others serving. The interactive version of the picture
-(themes, zoom, PNG/SVG export) is
-[docs/diagrams/mcprig.architecture.en.html](docs/diagrams/mcprig.architecture.en.html);
-the spec it is generated from is next to it as `.json`.
+of one set leaves the others serving. Every picture below opens interactively
+(themes, zoom, PNG/SVG export) by a click on it, and the spec it is generated
+from sits next to it as `.json`.
 
-What changes when the servers sit behind one endpoint — and what it costs — is a
-second picture: [with and without a proxy](docs/diagrams/mcprig.why.en.html),
-with the feature map in
-[what one binary does](docs/diagrams/mcprig.capabilities.en.html). How it
-compares with other proxies and where it stays weaker:
+<details>
+<summary>Architecture: client, set, servers, panel, state files</summary>
+
+[![mcprig architecture](docs/diagrams/mcprig.architecture.en.png)](docs/diagrams/mcprig.architecture.en.html)
+
+</details>
+
+<details>
+<summary>With a proxy and without: what the context pays, what the operator gets</summary>
+
+[![with and without a proxy](docs/diagrams/mcprig.why.en.png)](docs/diagrams/mcprig.why.en.html)
+
+</details>
+
+<details>
+<summary>What one binary does: serve, protect, observe, operate</summary>
+
+[![what one binary does](docs/diagrams/mcprig.capabilities.en.png)](docs/diagrams/mcprig.capabilities.en.html)
+
+</details>
+
+How it compares with other proxies and where it stays weaker:
 [docs/en/alternatives.md](docs/en/alternatives.md).
 
 ## Configuration

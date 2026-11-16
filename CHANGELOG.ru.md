@@ -10,6 +10,47 @@
 
 ## [Unreleased]
 
+### Изменено
+
+- Проверки и релизы идут в одном месте — в GitHub. `.github/workflows/ci.yml`
+  работает на каждый пуш и pull request (`gofmt`, `go mod tidy -diff`, `go vet`,
+  `go build`, кросс-сборка под `darwin/arm64`, `darwin/amd64` и `linux/arm64`,
+  тесты с `-race`, `golangci-lint` по `.golangci.yml`, `govulncheck`, `gitleaks`
+  по всей истории, `docs-check`, `node --check` и `docker build` обеих целей
+  образа), `codeql.yml` сканирует Go и JavaScript панели, `dependency-review.yml`
+  валит pull request, который добавляет зависимость с уязвимостью высокой
+  важности, а Dependabot раз в неделю предлагает обновления. Gitea держит зеркало
+  кода и не запускает воркфлоу вовсе: её `ci.yml`, `release.yml` и `images.yml`
+  удалены, поэтому тесты, архивы и образы собираются один раз — в GitHub, — а
+  джоба релиза пушит образы в GHCR и в реестр хоста.
+- Конвейер защищён: экшены прибиты к SHA коммитов, права по умолчанию
+  `contents: read`, checkout не оставляет токен (`persist-credentials: false`),
+  pull request не получает секреты репозитория, а сканеры ставят свои инструменты
+  вместо сторонних экшенов.
+
+### Документация
+
+- `docs/ru/dev/release.md` и английское зеркало описывают единственного сборщика,
+  список проверок и то, что держит в безопасности сам конвейер;
+  `docs/ru|en/dev/development.md` ссылается на тот же файл вместо повтора списка
+  джоб.
+
+## [0.6.1] - 2026-11-16
+
+### Исправлено
+
+- Запрос с `Origin: null` и без сессионной cookie — страница из песочницы,
+  `file://` или клиент, который не браузер — снова обслуживается: проверка
+  отбивала его раньше, чем отличала от запроса с cookie, и заодно ломала
+  `POST /api/login` с такой страницы. Отказ остаётся там, где он и нужен:
+  `Origin: null` вместе с сессионной cookie.
+
+### Документация
+
+- [docs/ru/upgrading.md](docs/ru/upgrading.md) и английское зеркало собирают,
+  что после 0.6.0 отвечает иначе, с лечением каждого симптома и откатом;
+  в README все три схемы теперь под спойлерами.
+
 ## [0.6.0] - 2026-11-16
 
 ### Добавлено
@@ -910,7 +951,8 @@
 - Образы Docker (slim и full), релиз Gitea Actions с goreleaser и govulncheck,
   Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
 [0.4.0]: https://github.com/akrhin/mcprig/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/akrhin/mcprig/compare/v0.3.7...v0.3.8

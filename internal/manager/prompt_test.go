@@ -69,7 +69,7 @@ func TestSetPromptPartsOrder(t *testing.T) {
 	iIntro := strings.Index(prompt, "ты — отладчик")
 	iTools := strings.Index(prompt, promptToolsHeading)
 	iTask := strings.Index(prompt, promptTaskHeading)
-	if iIntro < 0 || iTools < 0 || iTask < 0 || !(iIntro < iTools && iTools < iTask) {
+	if iIntro < 0 || iTools < 0 || iTask < 0 || iIntro >= iTools || iTools >= iTask {
 		t.Fatalf("порядок частей нарушен: intro=%d tools=%d task=%d\n%s", iIntro, iTools, iTask, prompt)
 	}
 	if !strings.HasSuffix(prompt, "найди ошибку в логе\n") {

@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -181,7 +182,7 @@ func (b *bao) do(req *http.Request) ([]byte, error) {
 }
 
 func (b *bao) get(name string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, b.dataURL(name), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, b.dataURL(name), nil)
 	if err != nil {
 		return "", err
 	}
@@ -209,7 +210,7 @@ func (b *bao) put(name, value string) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, b.dataURL(name), strings.NewReader(string(payload)))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, b.dataURL(name), strings.NewReader(string(payload)))
 	if err != nil {
 		return err
 	}
@@ -219,7 +220,7 @@ func (b *bao) put(name, value string) error {
 }
 
 func (b *bao) delete(name string) (bool, error) {
-	req, err := http.NewRequest(http.MethodDelete, b.metaURL(name), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, b.metaURL(name), nil)
 	if err != nil {
 		return false, err
 	}

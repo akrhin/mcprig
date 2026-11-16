@@ -146,17 +146,16 @@ done
 
 ## Релиз
 
-Релиз режется внутри Gitea. Тег `v*` прогоняет gofmt, vet, тесты с `-race` и
-govulncheck, затем goreleaser публикует архивы и сам релиз — черновика нет,
+Релиз режется в GitHub. Тег `v*` запускает `.github/workflows/release.yml`:
+проверки, затем goreleaser публикует архивы, страницу релиза и образы
+`slim`/`full` (GHCR, а при заданных секретах — и реестр хоста) — черновика нет,
 нажимать нечего. Release notes — секция `CHANGELOG.md` этого тега, срезанная из
 `## [Unreleased]` коммитом `release:`.
 
-Каждый пуш и каждый pull request гоняет `.gitea/workflows/ci.yml`: gofmt, vet,
-сборку, тесты с `-race`, `scripts/docs-check.sh`, `node --check web/app.js` и
-govulncheck. Gitea не умеет делать проверку обязательной, поэтому красный
-прогон читают перед мержем, а не запрещает сервер.
-
-Публичная сторона — отдельный независимый проход: `.github/workflows/release.yml`
-запускается на тот же тег в репозитории GitHub, собирает те же архивы через
-goreleaser `--skip=publish`, загружает их в GitHub-релиз через `gh` и пушит
-образы `slim`/`full` в GHCR. В Gitea он не публикует ничего.
+Каждый пуш и каждый pull request гоняет `.github/workflows/ci.yml`: gofmt,
+`go mod tidy -diff`, vet, сборку и кросс-сборку, тесты с `-race`,
+`golangci-lint`, `govulncheck`, `gitleaks` по всей истории,
+`scripts/docs-check.sh`, `node --check web/app.js` и `docker build` обеих целей
+образа. `codeql.yml` сканирует Go и JavaScript панели; `dependency-review.yml`
+валит pull request, который добавляет уязвимую зависимость. Gitea воркфлоу не
+запускает: она зеркалит код и хранит релизы и образы, которые в неё запушили.

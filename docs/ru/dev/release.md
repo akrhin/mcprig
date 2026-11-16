@@ -9,29 +9,41 @@
 
 ## Конвейер
 
-1. Тег `vX.Y.Z` на `master`, пуш в оба ремоута (Gitea и GitHub).
-2. Gitea CI гоняет `.gitea/workflows/release.yml` — `go vet`, тесты с `-race`,
-   `govulncheck`, `gofmt` — затем `goreleaser`: четыре платформы,
-   `checksums.txt`, **опубликованный** релиз в Gitea (`.goreleaser.yaml` держит
-   `draft: false`) и образы `slim`/`full` в реестр. Задачи (`job`)
-   сериализованы (`concurrency: mcprig-release`): второй тег ждёт, а не
-   отменяет первый. Руками не публикуется ничего: релиз, оборвавшийся на
-   половине, перезапускают пушем того же тега или `rerun` в интерфейсе Actions.
-3. Воркфлоу GitHub (`.github/workflows/release.yml`) идёт по тому же тегу:
-   пересобирает те же архивы с `goreleaser --skip=publish`, собирает и пушит
-   образы `slim`/`full` в `ghcr.io/akrhin/mcprig`, заливает архивы через `gh` —
-   так `.goreleaser.yaml` остаётся один, с одними `gitea_urls`/`draft`.
-   Тестов и `govulncheck` там нет.
-4. Заметки релиза — раздел `CHANGELOG.md` для тега, вырезает
+Два репозитория, один сборщик. GitHub — источник истины для проверок и релизов;
+Gitea держит зеркало кода и не запускает воркфлоу вовсе.
+
+1. Тег `vX.Y.Z` на `master`, пуш сначала в GitHub, потом в Gitea.
+2. GitHub `ci` идёт на каждый пуш и pull request: `gofmt`, `go mod tidy -diff`,
+   `go vet`, `go build`, кросс-сборка под `darwin/arm64`, `darwin/amd64` и
+   `linux/arm64`, `go test ./... -race -count=1 -p 1` с покрытием в артефакте,
+   `golangci-lint` (`.golangci.yml`: стандартные линтеры плюс `gosec`,
+   `bodyclose`, `errorlint`, `gocritic`, `noctx`, `unparam`), `govulncheck`,
+   `gitleaks` по всей истории, `scripts/docs-check.sh`, `node --check web/app.js`
+   и `docker build` обеих целей образа.
+3. GitHub `codeql` сканирует Go и JavaScript панели на каждый пуш и раз в неделю;
+   `dependency-review` валит pull request, который добавляет зависимость с
+   уязвимостью высокой важности.
+4. GitHub `release` идёт по тегу: `goreleaser` собирает четыре платформы и
+   `checksums.txt`, публикует страницу релиза (`.goreleaser.yaml` держит
+   `draft: false`) и собирает образы `slim`/`full` один раз, пуша их в
+   `ghcr.io/akrhin/mcprig` и — если заданы секреты `REGISTRY`/`REGISTRY_USER`/
+   `REGISTRY_PASSWORD` — ещё и в реестр хоста. Руками ничего не публикуется.
+5. Воркфлоу у Gitea не осталось: она зеркалит код, чтобы репозиторий читался без
+   GitHub, и хранит релизы и образы, которые в неё запушили.
+6. Примечания к релизу — раздел `CHANGELOG.md` тега, его вырезает
    `scripts/release-notes.sh`.
 
-Каждый пуш и каждый pull request гоняет `.gitea/workflows/ci.yml`: `gofmt`,
-`go vet`, `go build`, `go test ./... -race -p 1`, `scripts/docs-check.sh`,
-`node --check web/app.js` и `govulncheck`. Красный прогон сам мерж не
-блокирует — Gitea не умеет обязательные проверки, — поэтому его читают глазами
-до мержа.
+Что держит в безопасности сам конвейер: каждый экшен прибит к SHA коммита с
+версией в комментарии, `permissions` — `contents: read`, если джобе не нужно
+больше, `persist-credentials: false` не оставляет токен checkout в `.git/config`,
+pull request никогда не получает секреты репозитория, а сканеры ставят свои
+инструменты (`gitleaks`, `govulncheck`), а не сторонние экшены. Публичные
+репозитории на стандартных раннерах не тарифицируются, поэтому проверки не
+урезаны ради экономии.
 
-Релиз можно выпустить и руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Красный прогон сам по себе ничего не блокирует: ни один из форжей не включает
+обязательные проверки по умолчанию — прогон читают глазами. Релиз можно выпустить
+и руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
 
 ## Перед тегом
 

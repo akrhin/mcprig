@@ -427,7 +427,7 @@ func TestReloadRetiresDroppedEntry(t *testing.T) {
 	}
 	m.closing.Wait()
 
-	if err := stale.conn.stopErr(); err != errRetired {
+	if err := stale.conn.stopErr(); !errors.Is(err, errRetired) {
 		t.Fatalf("отброшенная запись: %v, want errRetired", err)
 	}
 	if sessionOf(stale) != nil {

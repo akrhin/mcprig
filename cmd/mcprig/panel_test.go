@@ -80,9 +80,11 @@ func TestPanelHeadersWithoutSecret(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	panelHeaders(req, panelCreds{})
-	if _, err := http.DefaultClient.Do(req); err != nil {
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
 		t.Fatal(err)
 	}
+	res.Body.Close()
 	if got["secret"] != "" || got["user"] != "" {
 		t.Fatalf("лишние заголовки: %v", got)
 	}

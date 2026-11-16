@@ -8,6 +8,49 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Changed
+
+- Checks and releases run in one place: GitHub. `.github/workflows/ci.yml` runs
+  on every push and pull request (`gofmt`, `go mod tidy -diff`, `go vet`,
+  `go build`, cross-build for `darwin/arm64`, `darwin/amd64` and `linux/arm64`,
+  tests with `-race`, `golangci-lint` from `.golangci.yml`, `govulncheck`,
+  `gitleaks` over the whole history, `docs-check`, `node --check` and a
+  `docker build` of both image targets), `codeql.yml` scans Go and the panel's
+  JavaScript, `dependency-review.yml` fails a pull request that adds a
+  dependency with a high-severity advisory, and Dependabot proposes updates
+  weekly. Gitea keeps the code mirror and runs no workflows at all: its
+  `ci.yml`, `release.yml` and `images.yml` are gone, so tests, archives and
+  images are built once — on GitHub — and the release job pushes the images to
+  GHCR and to the host registry.
+- The pipeline is hardened: actions are pinned to commit SHAs, permissions
+  default to `contents: read`, checkout leaves no token behind
+  (`persist-credentials: false`), pull requests receive no repository secrets,
+  and the scanners install their own tools instead of pulling third-party
+  actions.
+
+### Docs
+
+- `docs/en/dev/release.md` and `docs/ru/dev/release.md` describe the single
+  builder, the list of checks and what keeps the pipeline itself safe;
+  `docs/en|ru/dev/development.md` points at the same file instead of repeating
+  the job list.
+
+## [0.6.1] - 2026-11-16
+
+### Fixed
+
+- A request with `Origin: null` and no session cookie — a sandboxed frame, a
+  `file://` page, a client that is not a browser — is served again: the check
+  refused it before it could be told apart from a cookie-carrying one, which
+  also broke `POST /api/login` from such a page. The refusal stays for the case
+  it exists for: `Origin: null` with a session cookie.
+
+### Docs
+
+- [docs/en/upgrading.md](docs/en/upgrading.md) and its Russian mirror collect
+  what answers differently after 0.6.0, with the fix for each symptom, and how
+  to roll back; the README now carries all three diagrams under spoilers.
+
 ## [0.6.0] - 2026-11-16
 
 ### Added
@@ -914,7 +957,8 @@ repository the project is built in.
 - Docker images (slim and full), Gitea Actions release with goreleaser and
   govulncheck, Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
 [0.4.0]: https://github.com/akrhin/mcprig/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/akrhin/mcprig/compare/v0.3.7...v0.3.8

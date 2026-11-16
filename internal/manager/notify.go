@@ -157,7 +157,7 @@ func (n *notifier) post(webhook string, body []byte) error {
 		return redactURL(err)
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return fmt.Errorf("вебхук ответил %d", resp.StatusCode)
 	}

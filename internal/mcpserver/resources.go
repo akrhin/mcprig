@@ -160,7 +160,7 @@ func (m *Manager) listResources(ctx context.Context, req *mcp.CallToolRequest) (
 			return errResult(serverProblem(srv))
 		} else if !exposes(srv, config.ExposeResources) {
 			return errResult(notExposed(srv, config.ExposeResources, "ресурсы"))
-		} else if err := m.throttle(ctx, req, srv.Name, "list_resources"); err != nil {
+		} else if err := m.throttle(ctx, srv.Name, "list_resources"); err != nil {
 			return errResult(err)
 		}
 		items, err := m.resourcesOf(ctx, e)
@@ -176,7 +176,7 @@ func (m *Manager) listResources(ctx context.Context, req *mcp.CallToolRequest) (
 		}
 	}
 	return m.jsonTruncResult(ctx, collect(m, ctx, names, func(ctx context.Context, e *entry) ([]resourceInfo, error) {
-		if err := m.throttle(ctx, req, e.server().Name, "list_resources"); err != nil {
+		if err := m.throttle(ctx, e.server().Name, "list_resources"); err != nil {
 			return nil, err
 		}
 		return m.resourcesOf(ctx, e)
@@ -197,7 +197,7 @@ func (m *Manager) readResource(ctx context.Context, req *mcp.CallToolRequest) (*
 	}
 	ctx, cancel := m.callCtx(ctx)
 	defer cancel()
-	e, err := m.exposedEntry(ctx, req, in.Server, config.ExposeResources, "ресурсы", "read_resource", "resource:"+in.URI)
+	e, err := m.exposedEntry(ctx, in.Server, config.ExposeResources, "ресурсы", "read_resource", "resource:"+in.URI)
 	if err != nil {
 		return resOrErr(err)
 	}
@@ -246,7 +246,7 @@ func (m *Manager) listPrompts(ctx context.Context, req *mcp.CallToolRequest) (*m
 			return errResult(serverProblem(srv))
 		} else if !exposes(srv, config.ExposePrompts) {
 			return errResult(notExposed(srv, config.ExposePrompts, "промпты"))
-		} else if err := m.throttle(ctx, req, srv.Name, "list_prompts"); err != nil {
+		} else if err := m.throttle(ctx, srv.Name, "list_prompts"); err != nil {
 			return errResult(err)
 		}
 		items, err := m.promptsOf(ctx, e)
@@ -262,7 +262,7 @@ func (m *Manager) listPrompts(ctx context.Context, req *mcp.CallToolRequest) (*m
 		}
 	}
 	return m.jsonTruncResult(ctx, collect(m, ctx, names, func(ctx context.Context, e *entry) ([]promptInfo, error) {
-		if err := m.throttle(ctx, req, e.server().Name, "list_prompts"); err != nil {
+		if err := m.throttle(ctx, e.server().Name, "list_prompts"); err != nil {
 			return nil, err
 		}
 		return m.promptsOf(ctx, e)
@@ -283,7 +283,7 @@ func (m *Manager) getPrompt(ctx context.Context, req *mcp.CallToolRequest) (*mcp
 	}
 	ctx, cancel := m.callCtx(ctx)
 	defer cancel()
-	e, err := m.exposedEntry(ctx, req, in.Server, config.ExposePrompts, "промпты", "get_prompt", "prompt:"+in.Name)
+	e, err := m.exposedEntry(ctx, in.Server, config.ExposePrompts, "промпты", "get_prompt", "prompt:"+in.Name)
 	if err != nil {
 		return resOrErr(err)
 	}
@@ -311,7 +311,7 @@ func (m *Manager) getPrompt(ctx context.Context, req *mcp.CallToolRequest) (*mcp
 // bucket per server, not per URI — a filesystem server has thousands of URIs);
 // the permission "command" is the addressed name ("resource:<uri>",
 // "prompt:<name>"), so the ordinary rule vocabulary needs no new kind.
-func (m *Manager) exposedEntry(ctx context.Context, req *mcp.CallToolRequest, serverName, kind, what, target, addressed string) (*entry, error) {
+func (m *Manager) exposedEntry(ctx context.Context, serverName, kind, what, target, addressed string) (*entry, error) {
 	e := m.find(serverName)
 	if e == nil {
 		return nil, fmt.Errorf("неизвестный сервер %q", serverName)
@@ -323,7 +323,7 @@ func (m *Manager) exposedEntry(ctx context.Context, req *mcp.CallToolRequest, se
 	if !exposes(srv, kind) {
 		return nil, notExposed(srv, kind, what)
 	}
-	if err := m.throttle(ctx, req, srv.Name, target); err != nil {
+	if err := m.throttle(ctx, srv.Name, target); err != nil {
 		return nil, err
 	}
 	if message, denied := m.gate(ctx, srv.Name, addressed, srv.Permissions); denied {

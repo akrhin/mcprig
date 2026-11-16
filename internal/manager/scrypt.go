@@ -50,7 +50,7 @@ func smix(b []uint32, r, n int) {
 		x, y = y, x
 	}
 	for i := 0; i < n; i++ {
-		j := int(integerify(x, r) & uint64(n-1))
+		j := int(integerify(x, r) & uint64(n-1)) //nolint:gosec // G115: j < n, n — степень двойки, int вмещает
 		for k := 0; k < words; k++ {
 			x[k] ^= v[j*words+k]
 		}

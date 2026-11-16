@@ -2,6 +2,7 @@ package registry
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,7 +43,7 @@ func Open(dir string) (*Store, error) {
 		if uerr := json.Unmarshal(raw, &data); uerr != nil {
 			backup := fmt.Sprintf("%s.corrupt-%d", s.path, time.Now().Unix())
 			if rerr := os.Rename(s.path, backup); rerr != nil {
-				return nil, fmt.Errorf("реестр %s не разобран: %v. Отложить файл не удалось: %w", s.path, uerr, rerr)
+				return nil, fmt.Errorf("реестр %s не разобран: %w. Отложить файл не удалось: %w", s.path, uerr, rerr)
 			}
 		} else {
 			s.data = data
@@ -68,7 +69,7 @@ func Open(dir string) (*Store, error) {
 
 	if len(s.data.Servers) == 0 && len(s.data.Sets) == 0 {
 		if seed := os.Getenv("MANAGER_SEED_FILE"); seed != "" {
-			body, err := os.ReadFile(seed)
+			body, err := os.ReadFile(seed) //nolint:gosec // G703: путь сида задаёт администратор через MANAGER_SEED_FILE
 			if err != nil {
 				return nil, fmt.Errorf("сид %s: %w", seed, err)
 			}
@@ -692,11 +693,11 @@ func (s *Store) allocPortLocked() (int, error) {
 // стартом набора порт может занять кто-то ещё — тогда start вернёт «порт занят»,
 // это осознанно.
 func portBusy(port int) bool {
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return true
 	}
-	ln.Close()
+	_ = ln.Close()
 	return false
 }
 
