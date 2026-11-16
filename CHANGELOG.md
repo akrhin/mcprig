@@ -206,6 +206,9 @@ repository the project is built in.
   server runs without it, with a warning in the set log.
 - A dump created before 0.6.0 has no owner fingerprint, so `/tool-out/<name>`
   answers `404` for it after the upgrade instead of serving the file.
+- Closing a set no longer waits for another init to reap its killed processes:
+  a zombie holds no port and no memory, and in a container it stays around, so
+  the old check spent the whole grace budget on it.
 - The panel refuses a browser request that carries neither `Origin` nor
   `Sec-Fetch-Site` and a `Origin: null` or `Sec-Fetch-Site: cross-site` outright:
   before, a request without those headers skipped the origin check, so a
