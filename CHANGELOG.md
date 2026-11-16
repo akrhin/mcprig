@@ -131,7 +131,7 @@ repository the project is built in.
 - A dump at `/tool-out/<name>` belongs to the key that caused it: the file gets
   a `<name>.owner` fingerprint next to it and another key gets `404`. The
   lifetime of a dump follows the set policy now (`transport.toolOutTtl`) instead
-  of only the panel-wide `MCPRIG_TOOL_OUT_TTL`.
+  of only the panel-wide `MCPRIG_TOOLOUT_TTL`.
 - `GET /api/servers/<id>/authorize` no longer starts the OAuth flow: the flow is
   `POST`, and `GET …/authorize/status` reads it. A `GET` on the starting route
   answers `405` with `Allow: POST`; the panel polls the status route.
@@ -201,7 +201,11 @@ repository the project is built in.
   the server's process group, and the kernel hands it `SIGTERM` when the set
   dies, so it kills the whole group before it exits. A server that wraps its
   work (`sh -c "npx … & wait"`) was previously re-parented to init and kept the
-  upstream connection and the disk lock of a set that no longer existed.
+  upstream connection and the disk lock of a set that no longer existed. If the
+  binary was replaced under a running set, the wrapper cannot be started and the
+  server runs without it, with a warning in the set log.
+- A dump created before 0.6.0 has no owner fingerprint, so `/tool-out/<name>`
+  answers `404` for it after the upgrade instead of serving the file.
 - The panel refuses a browser request that carries neither `Origin` nor
   `Sec-Fetch-Site` and a `Origin: null` or `Sec-Fetch-Site: cross-site` outright:
   before, a request without those headers skipped the origin check, so a
