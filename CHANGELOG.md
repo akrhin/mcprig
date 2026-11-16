@@ -67,6 +67,11 @@ repository the project is built in.
   servers starts and answers the meta-tools (`list_servers` is empty). Deleting
   the last server of a set no longer answers `400` — the set keeps its key and
   port with an empty list.
+- A saved variable that no server of the install references is visible in the
+  panel and in `GET /api/env` with `"used": false`: the **Variables** page lists
+  every stored name, marks the ones nothing references as *not used by any
+  server* and lets them be forgotten, instead of hiding a value that stays on
+  disk. Unreferenced names come last; `used` is new in the answer.
 
 ### Docs
 
@@ -117,6 +122,32 @@ repository the project is built in.
   deny rules that hide a tool from `list_commands` now hide it here as well.
 - `invoke_command` takes the server's slot: a slow upstream no longer lets an
   authenticated client stack calls past the per-server concurrency limit.
+- A registry validation error answers `400` with the reason instead of `500`
+  with "see the log": `internal/registry` now returns a typed `ErrInvalid`
+  carrying the text of the first broken field (`port 9200`, `env.A`), and the
+  panel shows it as it is.
+- A dump at `/tool-out/<name>` belongs to the key that caused it: the file gets
+  a `<name>.owner` fingerprint next to it and another key gets `404`. The
+  lifetime of a dump follows the set policy now (`transport.toolOutTtl`) instead
+  of only the panel-wide `MCPRIG_TOOL_OUT_TTL`.
+- `GET /api/servers/<id>/authorize` no longer starts the OAuth flow: the flow is
+  `POST`, and `GET …/authorize/status` reads it. A `GET` on the starting route
+  answers `405` with `Allow: POST`; the panel polls the status route.
+- `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-For` are trusted only
+  from a loopback peer or from an address in `MCPRIG_TRUSTED_PROXIES` (IP or
+  CIDR, comma-separated), and not because `MCPRIG_PROXY_SECRET` is set. A peer
+  outside the list loses the header silently: the panel answers with its own
+  origin and the login limit counts the peer's address. A value that parses as
+  neither an IP nor a CIDR refuses the start with the offending entry.
+- Behind a trusted proxy the login limit counts the client, not the proxy: five
+  failed attempts from one `X-Forwarded-For` address no longer lock out every
+  other client of the same proxy.
+- A release is published by CI itself: `.goreleaser.yaml` carries
+  `release.draft: false`, so a `v*` tag produces a public release with no human
+  step. Every push and pull request runs `.gitea/workflows/ci.yml` — `gofmt`,
+  `go vet`, `go build`, the race suite, `scripts/docs-check.sh`,
+  `node --check web/app.js` and `govulncheck` — where before only docs were
+  checked.
 
 ### Fixed
 
@@ -163,6 +194,17 @@ repository the project is built in.
   client that cancels the request gets no answer; a start or reload cancelled by
   the client stops the spawned set process instead of leaving it holding the
   port.
+- A `SIGKILL` on a set no longer leaves its servers running: every stdio server
+  starts through a hidden `mcprig child-guard --` wrapper that is the leader of
+  the server's process group, and the kernel hands it `SIGTERM` when the set
+  dies, so it kills the whole group before it exits. A server that wraps its
+  work (`sh -c "npx … & wait"`) was previously re-parented to init and kept the
+  upstream connection and the disk lock of a set that no longer existed.
+- The panel refuses a browser request that carries neither `Origin` nor
+  `Sec-Fetch-Site` and a `Origin: null` or `Sec-Fetch-Site: cross-site` outright:
+  before, a request without those headers skipped the origin check, so a
+  cross-site page could reach an unsafe method over a session cookie. `curl`
+  without a cookie keeps working, and `/api/login` stays outside the check.
 
 ## [0.5.1] - 2026-11-15
 

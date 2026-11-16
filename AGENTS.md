@@ -25,7 +25,12 @@ bash scripts/docs-check.sh        # ворота документации: сс�
 bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
 ```
 
-Go-тулчейн: локально 1.24.4, модуль требует 1.27.4 — `GOTOOLCHAIN=auto` скачивает нужный тулчейн сам (проверено: `GOTOOLCHAIN=go1.27.4 go version`).
+Пакет, чьи тесты поднимают stdio-серверы, обязан иметь `TestMain` с
+`downstream.RunChildGuardMode(os.Args)`: сторож — это `os.Executable()`, и без
+перехвата тестовый бинарник вместо сервера запускает тесты (песочница при этом
+молча «протекает»).
+
+Go-тулчейн: модуль требует 1.27.4, и столько же стоит на хосте разработки; `GOTOOLCHAIN=auto` подтянет нужный тулчейн, если локальный отстал (проверено: `GOTOOLCHAIN=go1.27.4 go version`).
 
 ## Диаграммы и картинки
 
@@ -34,7 +39,7 @@ Go-тулчейн: локально 1.24.4, модуль требует 1.27.4 �
 
 ```bash
 archify finalize architecture docs/diagrams/mcprig.why.en.json docs/diagrams/mcprig.why.en.html \
-  --quality showcase --out-dir /tmp/opencode/review --json
+  --quality showcase --out-dir .tmp/diagrams --json
 ```
 
 `finalize` прогоняет validate → deliver → check → browser-check; второй прогон в тот же

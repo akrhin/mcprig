@@ -68,15 +68,8 @@ all — treat it as unknown, not as absent.
 | --- | --- |
 | one operator | a single panel password, no roles, no per-user accounts; the modes are none, password, proxy and both |
 | Russian text inside | CLI help, diagnostics and log lines are Russian in this build |
-| `/tool-out/<hex>` | the name is a 64-bit capability; it is not bound to the client that asked and carries no TTL |
 | `X-MCPRig-Caller` | an ordinary header: a client that sets it hides its own calls from the statistics |
-| CSRF | without `Origin` and without a cookie the panel accepts the request (decision 0005) |
-| `GET …/authorize` | starts OAuth and a set restart, so a GET changes state (decision 0005) |
-| proxy headers | with `MCPRIG_PROXY_SECRET` set, `X-Forwarded-Host` and `-Proto` are trusted without checking the peer (decision 0005) |
-| login limit | counted per proxy IP, so behind a proxy five failures a minute lock out every user (decision 0005) |
 | sandbox scope | CPU, the memory of the whole process subtree and network egress are not limited; `allow` is all or nothing |
-| orphaned children | `SIGKILL` of a set process without a graceful shutdown leaves its stdio children running (D27) |
-| invisible variable | a `${VAR}` no server mentions is stored but shown neither in the panel nor in `/api/env` (D28) |
 | no typed API | a client does not see a tool schema until it calls `describe_commands` |
 
 The full debt list with priorities is in
