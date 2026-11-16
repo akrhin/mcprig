@@ -108,3 +108,6 @@ jobs:
             gh release create "$tag" --title "$tag" --notes-file "$notes" \
               dist/*.tar.gz dist/checksums.txt
           fi
+          # Тег могут переставить; GitHub тогда оставляет релиз черновиком.
+          # Публикация — дело воркфлоу, а не человека.
+          gh release edit "$tag" --draft=false --latest
