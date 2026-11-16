@@ -10,11 +10,20 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-16
+
 ### Изменено
 
 - Сборка образа в `ci.yml` идёт только на pull request и только когда менялись
   `Dockerfile`, `.dockerignore`, `go.mod`/`go.sum` или `docker/`: пуш в `master`
   больше не пересобирает образ, который всё равно соберёт тег.
+
+### Исправлено
+
+- `GET …/authorize/status` отвечает `404` на несуществующий набор или сервер,
+  как и маршрут запуска, вместо `200 idle`.
+- `mcprig --help` печатает `Usage of mcprig:` — раньше говорил `Usage of serve:`
+  даже когда подкоманды не было.
 
 ## [0.6.2] - 2026-11-16
 
@@ -960,7 +969,8 @@
 - Образы Docker (slim и full), релиз Gitea Actions с goreleaser и govulncheck,
   Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/akrhin/mcprig/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/akrhin/mcprig/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
