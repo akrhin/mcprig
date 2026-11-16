@@ -652,6 +652,23 @@ func TestSetSnapshots(t *testing.T) {
 	}
 }
 
+// Порт, занятый другим набором, — ErrPortBusy: менеджер отвечает 409 через
+// errors.Is, не разбирая текст ошибки.
+func TestUpdateSetPortBusyIsTyped(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
+	addSet(t, store, `{"name":"a","servers":["fs"]}`)
+	addSet(t, store, `{"name":"b","servers":["fs"]}`)
+	busy := store.Set("a").Port
+	_, err := store.UpdateSet("b", json.RawMessage(`{"port":`+strconv.Itoa(busy)+`}`))
+	if !errors.Is(err, ErrPortBusy) {
+		t.Fatalf("ошибка = %v, ждали ErrPortBusy", err)
+	}
+	if want := fmt.Sprintf("порт %d занят набором a", busy); err.Error() != want {
+		t.Fatalf("текст ошибки = %q, ждали %q", err.Error(), want)
+	}
+}
+
 func TestSetValidation(t *testing.T) {
 	store := openStore(t, t.TempDir())
 	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)

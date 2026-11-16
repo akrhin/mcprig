@@ -14,6 +14,16 @@ import (
 
 var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 
+// ErrPortBusy — порт занят другим набором или процессом; вызывающий отличает её
+// через errors.Is, не разбирая сообщение. Текст ошибки при этом прежний, поэтому
+// метку несёт тип, а не приписка к сообщению.
+var ErrPortBusy = errors.New("порт занят")
+
+type busyErr struct{ msg string }
+
+func (e busyErr) Error() string        { return e.msg }
+func (e busyErr) Is(target error) bool { return target == ErrPortBusy }
+
 func isNull(raw json.RawMessage) bool {
 	trimmed := bytes.TrimSpace(raw)
 	return len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null"))
@@ -400,13 +410,13 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	}
 	for _, other := range s.data.Sets {
 		if other.ID != out.ID && other.Port == out.Port {
-			return nil, fmt.Errorf("порт %d занят набором %s", out.Port, other.ID)
+			return nil, busyErr{fmt.Sprintf("порт %d занят набором %s", out.Port, other.ID)}
 		}
 	}
 	// Порт из тела при правке: незанятый в реестре ещё не значит свободный в
 	// системе, иначе рестарт набора упадёт уже после записи.
 	if cur != nil && explicitPort && cur.Port != out.Port && portBusy(out.Port) {
-		return nil, fmt.Errorf("порт %d занят процессом — выберите другой", out.Port)
+		return nil, busyErr{fmt.Sprintf("порт %d занят процессом — выберите другой", out.Port)}
 	}
 
 	if autostart, present, err := strictBool(in, "autostart"); err != nil {

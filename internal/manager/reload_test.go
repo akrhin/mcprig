@@ -415,21 +415,39 @@ func TestSetUpdateKeepsEditWhenReloadFails(t *testing.T) {
 // needsRestart — развилка «перезапуск или reload» по полям набора.
 func TestNeedsRestart(t *testing.T) {
 	base := &registry.Set{ID: "s", Port: 9101, Token: "t", Open: false}
-	if restart, _ := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t"}); restart {
+	none := []registry.Server{}
+	if restart, _ := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t"}, none); restart {
 		t.Fatal("неизменный транспорт потребовал перезапуска")
 	}
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9102, Token: "t"}); !restart || why != "порт" {
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9102, Token: "t"}, none); !restart || why != "порт" {
 		t.Fatalf("порт: %v %q", restart, why)
 	}
 	// Смена ключа больше не требует перезапуска: список токенов доезжает
 	// reload'ом, поэтому решение о перезапуске его не трогает.
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "u"}); restart {
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "u"}, none); restart {
 		t.Fatalf("ключ: %v %q", restart, why)
 	}
 	// Открытость перезапуска не требует: слушатель меняет её живьём
 	// (SetAuth), как и список ключей.
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t", Open: true}); restart {
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t", Open: true}, none); restart {
 		t.Fatalf("открытость: %v %q", restart, why)
+	}
+}
+
+// Сервер с новой ${VAR} в составе набора: окружение процесса зафиксировано при
+// старте, поэтому без перезапуска переменная осталась бы пустой.
+func TestNeedsRestartOnNewEnvRef(t *testing.T) {
+	servers := []registry.Server{
+		{Name: "plain", Transport: "stdio", Command: []string{"/bin/true"}},
+		{Name: "wants", Transport: "stdio", Command: []string{"/bin/true"}, Env: map[string]string{"TOKEN": "${NEW}"}},
+	}
+	old := &registry.Set{ID: "s", Port: 9101, Servers: []string{"plain"}}
+	if restart, why := needsRestart(old, &registry.Set{ID: "s", Port: 9101, Servers: []string{"plain", "wants"}}, servers); !restart || !strings.Contains(why, "NEW") {
+		t.Fatalf("новая переменная: %v %q", restart, why)
+	}
+	// Тот же сервер без ссылок на переменные перезапуска не требует.
+	if restart, why := needsRestart(old, &registry.Set{ID: "s", Port: 9101, Servers: []string{"plain"}}, servers); restart {
+		t.Fatalf("без новых переменных: %v %q", restart, why)
 	}
 }
 

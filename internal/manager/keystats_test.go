@@ -2,14 +2,16 @@ package manager
 
 import (
 	"net/http"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/akrhin/mcprig/internal/stats"
 )
 
 // D17: строку статистики `key:<6 hex>` обязана находить панель.
-// /api/state отдаёт тот же отпечаток основного ключа (`keyMark`); у открытого
-// набора ключа нет — поле пустое.
+// /api/state отдаёт ту же метку основного ключа (`keyMark`) — отпечаток, а у
+// подписанного ключа подпись; у открытого набора ключа нет — поле пустое.
 func TestStateKeyMarkMatchesStatsLabel(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServer(t, "fake")
@@ -21,7 +23,7 @@ func TestStateKeyMarkMatchesStatsLabel(t *testing.T) {
 		Token   string `json:"token"`
 		KeyMark string `json:"keyMark"`
 	}](t, w)
-	want := stats.Fingerprint(created.Token)
+	want := "key:" + stats.Fingerprint(created.Token)
 	if created.KeyMark != want {
 		t.Fatalf("keyMark на создании = %q, ждали %q", created.KeyMark, want)
 	}
@@ -51,5 +53,59 @@ func TestStateKeyMarkMatchesStatsLabel(t *testing.T) {
 				t.Fatalf("у открытого набора keyMark = %q, ждали пусто", set.KeyMark)
 			}
 		}
+	}
+}
+
+// Подписанный ключ виден в статистике подписью (её подставляет сам набор), и
+// keyMark обязан быть той же строкой, а не отпечатком.
+func TestStateKeyMarkUsesKeyLabel(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "signed", "fake")
+
+	w := e.do(t, http.MethodGet, "/api/sets/"+id+"/keys", nil)
+	status(t, w, http.StatusOK)
+	keys := decode[struct {
+		Keys []struct {
+			ID string `json:"id"`
+		} `json:"keys"`
+	}](t, w)
+	if len(keys.Keys) == 0 {
+		t.Fatal("у набора нет ключа")
+	}
+	status(t, e.do(t, http.MethodPatch, "/api/sets/"+id+"/keys/"+keys.Keys[0].ID, map[string]any{"note": "ci"}), http.StatusOK)
+
+	writeHistory(t, filepath.Join(e.dir, "sets", id, "stats"), time.Now(),
+		map[string]any{"client": "ci", "server": "fake", "tool": "echo", "ms": 5, "failed": false},
+	)
+
+	state := decode[struct {
+		Sets []struct {
+			ID      string `json:"id"`
+			KeyMark string `json:"keyMark"`
+		} `json:"sets"`
+	}](t, e.do(t, http.MethodGet, "/api/state", nil))
+	mark := ""
+	for _, set := range state.Sets {
+		if set.ID == id {
+			mark = set.KeyMark
+		}
+	}
+	if mark != "ci" {
+		t.Fatalf("keyMark = %q, ждали подпись ci", mark)
+	}
+
+	w = e.do(t, http.MethodGet, "/api/stats?set="+id+"&period=today", nil)
+	status(t, w, http.StatusOK)
+	got := decode[struct {
+		Totals struct {
+			Calls int64 `json:"calls"`
+		} `json:"totals"`
+		Clients []struct {
+			Client string `json:"client"`
+		} `json:"clients"`
+	}](t, w)
+	if got.Totals.Calls != 1 || len(got.Clients) != 1 || got.Clients[0].Client != mark {
+		t.Fatalf("статистика %+v не совпала с keyMark %q", got, mark)
 	}
 }

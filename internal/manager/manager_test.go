@@ -587,6 +587,13 @@ func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
 
 	w := e.do(t, http.MethodPut, "/api/env/DB_PASSWORD", map[string]any{"value": "s3cret"})
 	status(t, w, http.StatusOK)
+	out := decode[struct {
+		Restarted []string         `json:"restarted"`
+		Skipped   []skippedRestart `json:"skipped"`
+	}](t, w)
+	if len(out.Restarted) != 1 || out.Restarted[0] != dbSet || len(out.Skipped) != 0 {
+		t.Fatalf("ответ на PUT: restarted=%v skipped=%+v", out.Restarted, out.Skipped)
+	}
 
 	// Перезапуск после ответа — в горутине: ждём замену процесса. Во время
 	// рестарта запись набора на мгновение отсутствует, поэтому ждём непустой.
@@ -702,6 +709,20 @@ func TestUpdateSetRejectsBusyPort(t *testing.T) {
 	w := e.do(t, http.MethodPut, "/api/sets/"+id, map[string]any{"port": 9150})
 	status(t, w, http.StatusConflict)
 	if msg := decode[map[string]string](t, w)["error"]; !strings.Contains(msg, "занят процессом") {
+		t.Fatalf("ошибка = %q", msg)
+	}
+}
+
+// Порт другого набора в правке — 409 через ErrPortBusy, а не 500.
+func TestUpdateSetRejectsPortOfAnotherSet(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	one := e.addSet(t, "one", "a")
+	two := e.addSet(t, "two", "a")
+
+	w := e.do(t, http.MethodPut, "/api/sets/"+two, map[string]any{"port": e.m.store.Set(one).Port})
+	status(t, w, http.StatusConflict)
+	if msg := decode[map[string]string](t, w)["error"]; !strings.Contains(msg, "занят набором one") {
 		t.Fatalf("ошибка = %q", msg)
 	}
 }

@@ -870,9 +870,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 type setView struct {
 	registry.PublicSetEntry
 	Runtime RuntimeStatus `json:"runtime"`
-	// KeyMark — отпечаток основного ключа ровно в той форме, в какой он уходит
-	// в статистику (`key:<mark>`): панель сопоставляет строку статистики с
-	// ключом. Пусто у открытого набора: ключа нет, метки нет.
+	// KeyMark — метка основного ключа ровно в той форме, в какой он уходит
+	// в статистику: подпись ключа, иначе `key:<mark>`. Панель сопоставляет
+	// строку статистики с ключом. Пусто у открытого набора: ключа нет, метки нет.
 	KeyMark string `json:"keyMark"`
 	// ReloadError — правка уже в реестре, но процесс набора не применил её без
 	// перезапуска: ответ 200 отдаёт причину полем, а не теряет правку.
@@ -882,7 +882,13 @@ type setView struct {
 func (m *Manager) setView(set *registry.Set) setView {
 	v := setView{PublicSetEntry: registry.PublicSet(set), Runtime: m.rt.status(set)}
 	if tokens := registry.ActiveTokens(set.Keys); !set.Open && len(tokens) > 0 {
-		v.KeyMark = stats.Fingerprint(tokens[0])
+		fp := stats.Fingerprint(tokens[0])
+		// keyMark — ровно та метка, под которой ключ виден в статистике:
+		// подпись ключа (её набор ставит клиентом), иначе отпечаток.
+		v.KeyMark = "key:" + fp
+		if name := clientNames(set.Keys)[fp]; name != "" {
+			v.KeyMark = name
+		}
 	}
 	return v
 }
@@ -1027,9 +1033,9 @@ func (m *Manager) apiEnvPut(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted := m.restartSetsUsingEnv(name)
+	restarted, skipped := m.restartSetsUsingEnv(name)
 	writeJSON(req.w, http.StatusOK, map[string]any{
-		"name": name, "set": true, "source": source, "restarted": restarted,
+		"name": name, "set": true, "source": source, "restarted": restarted, "skipped": skipped,
 	})
 	return nil
 }
@@ -1040,9 +1046,9 @@ func (m *Manager) apiEnvDelete(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted := m.restartSetsUsingEnv(name)
+	restarted, skipped := m.restartSetsUsingEnv(name)
 	writeJSON(req.w, http.StatusOK, map[string]any{
-		"name": name, "removed": removed, "source": source, "restarted": restarted,
+		"name": name, "removed": removed, "source": source, "restarted": restarted, "skipped": skipped,
 	})
 	return nil
 }
@@ -1403,7 +1409,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	}
 	set, err := m.store.UpdateSet(id, json.RawMessage(body))
 	if err != nil {
-		if strings.Contains(err.Error(), "занят") {
+		if errors.Is(err, registry.ErrPortBusy) {
 			return conflict(err.Error())
 		}
 		return err
@@ -1411,7 +1417,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	if running {
 		// Порт набор читает только при старте; ключи, открытость и правила
 		// применяются живьём, по SIGHUP.
-		if restart, why := needsRestart(old, set); restart {
+		if restart, why := needsRestart(old, set, m.store.Servers()); restart {
 			m.log.Info("набор "+id+": правка транспорта — перезапуск", "причина", why)
 			if _, err := m.RestartSet(context.Background(), set); err != nil {
 				return err
@@ -1430,12 +1436,27 @@ func (m *Manager) apiSetUpdate(req *request) error {
 }
 
 // needsRestart — меняется ли в наборе то, что процесс применяет только при
-// старте: порт. Список ключей и открытость сюда не входят: их доставляет
-// reload (ключи и открытость — SetAuth живого слушателя), поэтому выдача,
-// отзыв ключа и переход «открытый набор ± ключ» набор не перезапускают.
-func needsRestart(old, new *registry.Set) (bool, string) {
+// старте: порт и состав переменных `${VAR}`. Список ключей и открытость сюда
+// не входят: их доставляет reload (ключи и открытость — SetAuth живого
+// слушателя), поэтому выдача, отзыв ключа и переход «открытый набор ± ключ»
+// набор не перезапускают. Окружение процесс набора получает при старте, и
+// новая переменная без перезапуска осталась бы пустой.
+func needsRestart(old, new *registry.Set, servers []registry.Server) (bool, string) {
 	if old.Port != new.Port {
 		return true, "порт"
+	}
+	had := map[string]bool{}
+	for _, name := range envRefs(setServers(old, servers)) {
+		had[name] = true
+	}
+	added := []string{}
+	for _, name := range envRefs(setServers(new, servers)) {
+		if !had[name] {
+			added = append(added, name)
+		}
+	}
+	if len(added) > 0 {
+		return true, "новые переменные: " + strings.Join(added, ", ")
 	}
 	return false, ""
 }
@@ -1901,22 +1922,40 @@ func keyByToken(set *registry.Set, token string) any {
 
 // ─── вспомогательные ────────────────────────────────────────────────────────
 
-// restartSetsUsingEnv возвращает id работающих наборов, где встречается
-// ${name}, и перезапускает их в фоне: правка секрета не должна ждать до ~40 s
-// двух больных наборов. Ошибки рестарта — в лог, не в ответ.
-func (m *Manager) restartSetsUsingEnv(name string) []string {
-	out := []string{}
+// skippedRestart — работающий набор, оставленный на старом окружении: после
+// перезапуска ему не хватило бы переменной, и он встал бы остановленным.
+type skippedRestart struct {
+	Set    string `json:"set"`
+	Reason string `json:"reason"`
+}
+
+// restartSetsUsingEnv перезапускает работающие наборы, чьи серверы ссылаются на
+// переменную. Набор, которому после правки не хватит переменных, не трогаем:
+// он продолжает работать со старым окружением, а ответ называет причину.
+// Перезапуск идёт в фоне: правка секрета не должна ждать до ~40 s двух больных
+// наборов; ошибки рестарта — в лог, не в ответ.
+func (m *Manager) restartSetsUsingEnv(name string) ([]string, []skippedRestart) {
+	restarted := []string{}
+	skipped := []skippedRestart{}
 	sets := []*registry.Set{}
 	servers := m.store.Servers()
 	for _, set := range m.store.Sets() {
-		if !containsName(envRefs(setServers(set, servers)), name) || !m.rt.status(set).Running {
+		srv := setServers(set, servers)
+		if !containsName(envRefs(srv), name) || !m.rt.status(set).Running {
 			continue
 		}
-		out = append(out, set.ID)
+		if missing := unresolvedEnvRefs(srv, m.sec); len(missing) > 0 {
+			skipped = append(skipped, skippedRestart{
+				Set:    set.ID,
+				Reason: "нет переменной " + strings.Join(missing, ", "),
+			})
+			continue
+		}
+		restarted = append(restarted, set.ID)
 		sets = append(sets, set)
 	}
 	if len(sets) == 0 {
-		return out
+		return restarted, skipped
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(m.ctx, restartTimeout)
@@ -1930,7 +1969,7 @@ func (m *Manager) restartSetsUsingEnv(name string) []string {
 			}
 		}
 	}()
-	return out
+	return restarted, skipped
 }
 
 // envChanged — окружение процесса набора фиксируется при старте
