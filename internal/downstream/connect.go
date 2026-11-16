@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -165,9 +164,8 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		cmd := exec.Command(argv[0], argv[1:]...)
 		cmd.Dir = srv.Cwd
 		// Своя группа: иначе гасится только прямой ребёнок, а внуки сервера
-		// остаются в системе (см. groupTransport). Pdeathsig — сигнал сторожу,
-		// что набор умер.
-		cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM, Setpgid: true}
+		// остаются в системе (см. groupTransport).
+		cmd.SysProcAttr = childAttr()
 		tail := &stderrTail{}
 		cmd.Stderr = tail
 		// A set runs with an env already narrowed by the manager; the server's
