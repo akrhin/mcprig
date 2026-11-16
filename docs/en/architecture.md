@@ -134,6 +134,14 @@ from its raw journal on disk over the last 7 days instead. A running set that
 does not answer is reported only by id. Tokens are not counted, because MCP
 responses carry no standard usage field.
 
+The panel's own requests to a set — the health probe and the live catalog the
+prompt builder reads — carry `X-MCPRig-Caller: panel` and are counted nowhere:
+no counters, no tail, no history. The set's HTTP transport reads that header and
+marks the call, and the recorder skips a marked one both for the meta-tools and
+for `invoke_command`/`invoke_many`. The header is what the client sets, so a key
+holder can send it as well and keep its calls out of the statistics — a
+deliberate shortcut; a signed marker would close it if that ever matters.
+
 ## HTTP transport
 
 Each set serves one stateless endpoint:

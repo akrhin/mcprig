@@ -220,6 +220,15 @@ expands it from its own environment, which includes the manager's secret
 chain (OpenBao → `env.json` → process environment; `MCPRIG_*`, `BAO_*` and
 `OPENBAO_*` are reserved and never handed to a downstream).
 
+A set does not start on a half-empty environment: when a server references a
+variable that no source has, `POST /api/sets/<id>/start` answers `409` and names
+it (`переменная VAR: источник не найден (OpenBao, env.json, окружение); набор S
+не запущен`). Only `${NAME}` is a reference — `${NAME:-default}` is not a default
+form, nothing matches it, and the text reaches the server as written. An edit
+that brings a new `${VAR}` through a new server restarts the set, because the
+environment is fixed at start; an ordinary composition edit is applied by reload
+(see [panel.md](panel.md#set-composition)).
+
 ## transport
 
 | field | default | meaning |

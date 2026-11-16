@@ -19,6 +19,7 @@ key, and manages the whole registry from a web panel.
 - Five meta-tools instead of a whole tool catalogue
 - One endpoint, one key per named set
 - Registry, keys and live call tail in the panel
+- Set composition, import/export, and a ready-to-paste agent prompt built from a set's tools
 - Sandbox for stdio servers, OAuth for remote ones
 - One static binary, no runtime dependencies
 

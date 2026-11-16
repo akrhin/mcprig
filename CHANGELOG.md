@@ -33,6 +33,14 @@ repository the project is built in.
   `GET /api/state`; a refusal shows under the block, an empty set says it will
   serve no tools, and the hint states that a running set takes the change by
   reload, not by restart.
+- **Import / Export** is a dialog of its own, opened from the head of a set and
+  from the empty state: the whole registry or one set as JSON with **Download
+  JSON** and **Copy**, and an import from a JSON file or a pasted `mcpServers`
+  object behind a preview that names the servers to be added — sets found in the
+  file are skipped with a note, because sets are made in the panel.
+- The head of a set carries a red **Delete set** button: the confirmation names
+  the endpoint and the directory that go away, and the panel returns to the
+  empty state afterwards.
 - **Prompt** in the head of the set opens a dialog over the endpoint below: the
   task is required, the introduction and the server subset are optional, and the
   built text comes back monospaced with **copy** and **download .md**; `notes`

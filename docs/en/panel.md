@@ -19,11 +19,12 @@ CSP: no inline scripts or styles.
 | top bar | breadcrumbs `mcprig / <page or set>`, the endpoint with a copy button, colour scheme, language, user |
 | left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
 | pages | **Sets**, **All servers** and **Variables** as pills at the top of the content, at `#/sets`, `#/servers` and `#/vars`; **Statistics** keeps `#/stats/<period>` and a set keeps `#/set/<id>`, so a reload or a shared link lands where it left off |
-| set head | name, port chip, state badge, **Keys**, **Prompt**, **Restart**, **Start/Stop**; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
+| set head | name, port chip, state badge, **Import / Export**, **Keys**, **Prompt**, **Restart**, **Start/Stop**, and the red **Delete set** that removes the set and its directory; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
 | tabs | **Overview**, **Calls**, **Statistics** — of the open set, on the **Sets** page |
 | KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days, as a one-line summary under the servers table |
 | servers of the set | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check**, **Log**, **Tools**, **Edit** and the **×** that detaches the server from the set; under the table sit the registry picker and **add to set** |
 | all servers page | the whole registry of the host: name with the daemon's reason on the second line, type, health, tool count from the last **Check**, the sets the server belongs to, and **Check**, **Authorize**, **Log**, **Edit** and the **×** that deletes it from the registry; **Add server** sits in the head |
+| import and export | the **Import / Export** dialog: the whole registry or one set as JSON, with **Download JSON** and **Copy**; import from a JSON file or a pasted `mcpServers` object — the preview names the servers that will be added, sets found in the file are skipped with a note (sets are made in the panel), and `env` and `headers` go out and come in as written |
 | calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
 | variables page | every `${NAME}` your servers reference with whether a value is set and where it comes from, a form that writes a value, and the **×** that forgets it |
 | details drawer | the log tail of the set; opens from the header and covers the panel width on a phone |
@@ -99,7 +100,7 @@ profile as a badge. A set without profiles keeps the form as it was. The note of
 an existing key is edited in
 place: the row has a label field and a **Save** button that appears once the
 value differs from the stored one; the panel sends `PATCH` with `{"note":…}`,
-redraws the list and shows a `restartError` of the set as its own warning rather
+redraws the list and shows a `reloadError` of the set as its own warning rather
 than swallowing it. A newly issued token is displayed once, and
 so is the token of a newly created closed set: `POST /api/sets` returns it in
 the `201` body, while `GET /api/sets` never repeats it. Issuing a key neither
@@ -229,16 +230,24 @@ the `isolation` field, refusals shown in the form — are displayed as they are.
 
 ## Routes
 
-Static panel files are served for `GET`/`HEAD` after authentication. The API:
+Static panel files are served for `GET`/`HEAD` after authentication. The API
+answers every refusal as JSON with `error`. `400` is a request that cannot be
+used as sent — a broken body, a missing field, an unknown name. `409` is the
+state saying no to a valid request: the port is taken by another process or
+another set, the set did not come up, the set has no active key, or a `${VAR}` of
+the set has no source ([secrets](configuration.md#secrets)). `500` is an
+unclassified failure: the body carries a generic line, never the cause, and the
+cause goes to the panel log — `journalctl --user -u mcprig.service` under the
+shipped unit, the panel's stdout in a foreground run.
 
 | method and path | purpose |
 | --- | --- |
 | `GET /healthz` | public liveness probe |
 | `GET /` | panel (redirects to `/login` when auth is on and there is no session) |
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
-| `GET /api/state` | servers, sets, `firstPort` — the first paint. A set's `keyMark` is the label its primary key carries in the statistics: the key's label when it has one, otherwise `key:<mark>`; empty for an open set |
+| `GET /api/state` | servers, sets, `firstPort` and `version` of the running binary (the footer prints it) — the first paint. A set's `keyMark` is the label its primary key carries in the statistics: the key's label when it has one, otherwise `key:<mark>`; empty for an open set |
 | `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
-| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port` or `open` restarts the set. A `token` in the body replaces the primary key and creates one when the set has no active key |
+| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port`, or a new `${VAR}` brought by a new server, restarts the set; `open` reaches the live listener by reload. A `token` in the body replaces the primary key and creates one when the set has no active key |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
 | `POST /api/sets/<id>/reload` | apply `servers.json` without a restart: `{"reloaded":true,"generation":N,"applied":[…],"restartNeeded":[…],"error":"…"}`. A stopped set answers `{"reloaded":false,"reason":"набор не запущен"}` and the file is written anyway. A non-empty `restartNeeded` or a set `error` gives `reloaded:false` with the cause in `reason`; a write failure is `500` |
 | `GET /api/sets/<id>/servers` | per-server health for one set |
@@ -250,7 +259,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `POST /api/sets/<id>/keys` | issue a key; the response contains the only copy of the token. Earlier keys stay active, so issuing does not revoke the old one; the set serves up to 8 active keys, the ninth answers `409`. An optional `{"label":"hermes","profile":"reader"}` names and narrows the key to that profile of the set — an unknown name is `400` listing the profiles, a set without `profiles` is `400` with a hint to add the block. A running set gets the new key by reloading, not restarting; when the process did not apply it, the answer carries `reloadError` (and `restartError`, its older name) |
 | `GET /api/sets/<id>/keys` | `{"keys":[…]}` — `id`, `label`, `profile`, `createdAt`, `revokedAt` of every key, revoked ones included; never a token or a hash |
 | `DELETE /api/sets/<id>/keys/<keyID>` | revoke one key; the rest keep working. Revoking the last active key stops the set and the answer carries `stopped: true` and `activeKeys: 0` |
-| `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"label":"hermes"}` (`{"note":…}` still accepted); the label becomes the client's label in the statistics, an empty string clears it, a running set restarts — the listener reads client labels at start — and a failed restart answers `restartError` |
+| `PATCH /api/sets/<id>/keys/<keyID>` | sign a key: `{"label":"hermes"}` (`{"note":…}` still accepted); the label becomes the client's label in the statistics, an empty string clears it; a running set takes the label by reloading, not restarting, and a reload the set did not accept carries `reloadError` (`restartError` is its older name) |
 | `GET /api/servers`, `POST /api/servers` | list and add downstream servers |
 | `PUT /api/servers/<name>` | update; running sets reload instead of restarting, and the answer carries `reloaded` (set ids, repeated as `restarted` for one release) plus `reloadErrors` (id → cause) when a process did not apply it |
 | `DELETE /api/servers/<name>` | delete; running sets that use it are stopped, because the deleted server's session goes with it. Deleting the last server of a set leaves the set with an empty list — its key and port stay |
@@ -285,8 +294,9 @@ its session closed, unchanged servers keep their sessions, changed `command`,
 `profiles` come from the new file. A call already in flight to the server being
 recreated fails with «сервер изменён перезагрузкой конфига — вызов не выполнен,
 повторите» instead of waiting for its old process. The transport is read only at
-startup. An edit through `PUT /api/sets/<id>` of `port` or `open` — and a new
-active key through the key endpoints — restarts the set; a hand edit of
+startup. An edit through `PUT /api/sets/<id>` of `port`, or a new `${VAR}` a new
+server brings, restarts the set; `open` and a new active key reach the running
+listener by reload; a hand edit of
 `servers.json` touching `path`, `host` or `allowedHosts` comes back in
 `restartNeeded`, and the set then has to be restarted by hand
 (`POST /api/sets/<id>/restart`). `POST /api/sets/<id>/reload` never restarts

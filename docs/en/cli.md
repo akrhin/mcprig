@@ -234,6 +234,13 @@ wildcard resolves to loopback); the panel address comes from `MCPRIG_HOST` and
 behind `https` is a problem, because an identity provider cannot send the code
 there.
 
+An install that has not been made yet is not a fault: when neither the client
+config nor the registry exists, `doctor` prints one line — `установка пуста:
+конфиг … и реестр … не созданы, запустите mcprig init` — then `итог: 0 проблем`
+and exit code `0`. A registry that is there but does not parse is still a
+problem (exit `1`). Under `-json` the empty sections are `[]`, not `null`, so a
+consumer does not have to tell "nothing yet" from "not read".
+
 With `MCPRIG_AUTH=off` and neither `MCPRIG_PASSWORD` nor `MCPRIG_PASSWORD_HASH`
 set, the services section adds a warning line — `предупреждение: панель без пароля …`
 — because an open panel is reachable by anyone who gets to the port; it counts
