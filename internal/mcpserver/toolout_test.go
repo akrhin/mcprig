@@ -1,12 +1,16 @@
 package mcpserver
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/akrhin/mcprig/internal/stats"
+	"github.com/akrhin/mcprig/internal/toolout"
 )
 
 // dumpDir points the dump at a test directory and restores it afterwards.
@@ -48,7 +52,7 @@ func TestTruncateResultWritesWholeAnswer(t *testing.T) {
 	const payload = 6*1024*1024 + 12345
 	const tail = "zeta"
 	body := strings.Repeat("x", payload-len(tail)) + tail
-	res, err := (&Manager{}).truncateResult(&mcp.CallToolResult{
+	res, err := (&Manager{}).truncateResult(context.Background(), &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: body}},
 	}, defaultMaxBytes)
 	if err != nil {
@@ -79,7 +83,7 @@ func TestTruncateResultLeavesNoFileOnWriteError(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
-	if _, err := (&Manager{}).truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes); err == nil {
+	if _, err := (&Manager{}).truncateResult(context.Background(), textResult(defaultMaxBytes+1), defaultMaxBytes); err == nil {
 		t.Fatal("ожидалась ошибка записи полного ответа")
 	}
 	entries, err := os.ReadDir(dir)
@@ -97,7 +101,7 @@ func TestTruncateResultReportsDumpDirError(t *testing.T) {
 	}
 	dumpDir(t, filepath.Join(blocker, "sub"))
 
-	_, err := (&Manager{}).truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes)
+	_, err := (&Manager{}).truncateResult(context.Background(), textResult(defaultMaxBytes+1), defaultMaxBytes)
 	if err == nil || !strings.Contains(err.Error(), "каталог выгрузки") {
 		t.Fatalf("ожидалась ошибка каталога выгрузки, получено %v", err)
 	}
@@ -110,12 +114,12 @@ func TestTruncateMarkerNamesToolOutURL(t *testing.T) {
 	dumpDir(t, dir)
 
 	m := &Manager{ToolOutURL: true}
-	res, err := m.truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes)
+	res, err := m.truncateResult(context.Background(), textResult(defaultMaxBytes+1), defaultMaxBytes)
 	if err != nil {
 		t.Fatalf("truncateResult: %v", err)
 	}
 	text := res.Content[0].(*mcp.TextContent).Text
-	if !strings.Contains(text, "/tool-out/") || !strings.Contains(text, "тот же ключ, что у /mcp") {
+	if !strings.Contains(text, "/tool-out/") || !strings.Contains(text, "тот же ключ, которым вызван инструмент") {
 		t.Fatalf("в маркере нет адреса: %q", text)
 	}
 	if strings.Contains(text, dir) {
@@ -132,7 +136,7 @@ func TestTruncateMarkerKeepsPathWithoutHTTP(t *testing.T) {
 	dir := t.TempDir()
 	dumpDir(t, dir)
 
-	res, err := (&Manager{}).truncateResult(textResult(defaultMaxBytes+1), defaultMaxBytes)
+	res, err := (&Manager{}).truncateResult(context.Background(), textResult(defaultMaxBytes+1), defaultMaxBytes)
 	if err != nil {
 		t.Fatalf("truncateResult: %v", err)
 	}
@@ -142,6 +146,42 @@ func TestTruncateMarkerKeepsPathWithoutHTTP(t *testing.T) {
 	}
 	if got := dumpPath(t, text); !strings.HasPrefix(got, dir) {
 		t.Errorf("путь в маркере %q, ожидался под %q", got, dir)
+	}
+}
+
+// A dump belongs to the key whose call produced it: the sidecar carries that
+// key's fingerprint, so another key cannot read the answer by name alone.
+func TestTruncateWritesOwnerFingerprint(t *testing.T) {
+	dir := t.TempDir()
+	dumpDir(t, dir)
+
+	ctx := stats.WithClientKey(context.Background(), "abc123")
+	res, err := (&Manager{}).truncateResult(ctx, textResult(defaultMaxBytes+1), defaultMaxBytes)
+	if err != nil {
+		t.Fatalf("truncateResult: %v", err)
+	}
+	path := dumpPath(t, res.Content[0].(*mcp.TextContent).Text)
+	owner, err := os.ReadFile(toolout.OwnerPath(path))
+	if err != nil {
+		t.Fatalf("владелец: %v", err)
+	}
+	if got := strings.TrimSpace(string(owner)); got != "abc123" {
+		t.Fatalf("владелец %q, ожидался отпечаток ключа", got)
+	}
+
+	// Без ключа (открытый набор, stdio) владелец — аноним: такой выгрузкой
+	// распоряжается тот, у кого ключа тоже нет.
+	res, err = (&Manager{}).truncateResult(context.Background(), textResult(defaultMaxBytes+1), defaultMaxBytes)
+	if err != nil {
+		t.Fatalf("truncateResult без ключа: %v", err)
+	}
+	path = dumpPath(t, res.Content[0].(*mcp.TextContent).Text)
+	owner, err = os.ReadFile(toolout.OwnerPath(path))
+	if err != nil {
+		t.Fatalf("владелец: %v", err)
+	}
+	if got := strings.TrimSpace(string(owner)); got != toolout.AnonymousOwner {
+		t.Fatalf("владелец %q, ожидался %q", got, toolout.AnonymousOwner)
 	}
 }
 

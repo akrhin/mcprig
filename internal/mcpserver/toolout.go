@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -14,8 +15,17 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/akrhin/mcprig/internal/toolout"
 )
+
+// dumpOwner is the caller's key fingerprint, the same value the counters use.
+func dumpOwner(ctx context.Context) string {
+	if fp := stats.ClientKey(ctx); fp != "" {
+		return fp
+	}
+	return toolout.AnonymousOwner
+}
 
 const (
 	// defaultMaxBytes keeps a typical 50–200 KB search answer out of the
@@ -33,11 +43,12 @@ var toolOutDir = func() string { return toolout.Dir(toolout.Base()) }
 // one. An answer that fits is returned untouched: no file, no marker. Nothing
 // is buffered whole: the head that the caller sees is kept in memory, the rest
 // streams to the file. The marker names the file by path, or by its /tool-out
-// URL when the manager serves HTTP with a key.
-func (m *Manager) truncateResult(res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult, error) {
+// URL when the manager serves HTTP with a key. The dump remembers the caller's
+// key fingerprint, so another key cannot read it by name alone.
+func (m *Manager) truncateResult(ctx context.Context, res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult, error) {
 	// headLimit carries maxBytes plus one rune of slack: the cut may land
 	// inside a multi-byte rune and the check needs the byte after it.
-	w := &spillWriter{headLimit: maxBytes + utf8.UTFMax}
+	w := &spillWriter{headLimit: maxBytes + utf8.UTFMax, owner: dumpOwner(ctx)}
 	if err := writePayload(w, res); err != nil {
 		w.abort()
 		return nil, err
@@ -81,13 +92,13 @@ func (m *Manager) toolOutRef(path string) string {
 		return path
 	}
 	name := strings.TrimSuffix(filepath.Base(path), ".txt")
-	return "/tool-out/" + name + " (тот же ключ, что у /mcp)"
+	return "/tool-out/" + name + " (тот же ключ, которым вызван инструмент)"
 }
 
 // truncateValue applies the invoke_command cap and hands back what a caller
 // would see: the text of a single text item, anything else serialized.
-func (m *Manager) truncateValue(res *mcp.CallToolResult, maxBytes int) (any, error) {
-	cut, err := m.truncateResult(res, maxBytes)
+func (m *Manager) truncateValue(ctx context.Context, res *mcp.CallToolResult, maxBytes int) (any, error) {
+	cut, err := m.truncateResult(ctx, res, maxBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +151,7 @@ func writePayload(w io.Writer, res *mcp.CallToolResult) error {
 type spillWriter struct {
 	head      []byte
 	headLimit int
+	owner     string // fingerprint of the calling key, written beside the dump
 	file      *os.File
 	total     int64 // bytes offered by the source
 }
@@ -170,7 +182,7 @@ func (w *spillWriter) ensureFile() error {
 	if w.file != nil {
 		return nil
 	}
-	f, err := createToolOut()
+	f, err := createToolOut(w.owner)
 	if err != nil {
 		return err
 	}
@@ -198,10 +210,11 @@ func (w *spillWriter) abort() {
 	if w.file != nil {
 		_ = w.file.Close()
 		_ = os.Remove(w.file.Name())
+		_ = os.Remove(toolout.OwnerPath(w.file.Name()))
 	}
 }
 
-func createToolOut() (*os.File, error) {
+func createToolOut(owner string) (*os.File, error) {
 	dir := toolOutDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("усечение: каталог выгрузки: %w", err)
@@ -214,6 +227,13 @@ func createToolOut() (*os.File, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("усечение: запись полного ответа: %w", err)
+	}
+	// Владелец пишется до тела: без него выгрузка не отдаётся никому, и
+	// недописанная пара не должна остаться на диске.
+	if err := os.WriteFile(toolout.OwnerPath(path), []byte(owner+"\n"), 0o600); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return nil, fmt.Errorf("усечение: владелец выгрузки: %w", err)
 	}
 	return f, nil
 }

@@ -778,6 +778,11 @@ type HTTPTransport struct {
 	// ограничен ничем, кроме permissions. Отпечаток, а не метка: метку клиент
 	// называет сам.
 	KeyProfiles map[string]string `json:"keyProfiles,omitempty"`
+	// ToolOutTTL — сколько живёт выгрузка усечённого ответа, длительностью
+	// ("24h"). Маркер обещает файл на этот срок, поэтому набор берёт его из
+	// реестра: у набора под панелью MCPRIG_TOOLOUT_TTL не доезжает. Пусто —
+	// переменная окружения, затем DefaultTTL.
+	ToolOutTTL string `json:"toolOutTtl,omitempty"`
 }
 
 type HealthMonitor struct {
