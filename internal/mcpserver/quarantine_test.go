@@ -363,3 +363,34 @@ func TestQuarantineFailsClosedOnWriteError(t *testing.T) {
 		t.Fatalf("отказ не назвал причину: %s", text)
 	}
 }
+
+// Сбой записи — не приговор: следующий обход каталога, когда файл снова
+// пишется, снимает запрет без перезапуска процесса. Иначе одна неудачная
+// запись запирала бы все вызовы набора до рестарта.
+func TestQuarantineRecoversAfterWriteError(t *testing.T) {
+	dir := t.TempDir()
+	lock := filepath.Join(dir, "tools.lock.json")
+	if err := toollock.Write(lock, toollock.File{Tools: map[string]toollock.Entry{}}); err != nil {
+		t.Fatalf("подготовка файла: %v", err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("запрет записи: %v", err)
+	}
+
+	cs := clientFor(t, descriptorManager(t, "v1", lock).Server())
+	catalog(t, cs)
+	if res := invoke(t, cs, "echo"); !res.IsError {
+		t.Fatalf("вызов прошёл при неудавшейся записи: %s", resultText(t, res))
+	}
+
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatalf("возврат записи: %v", err)
+	}
+	// Новое соединение: обход каталога у уже подключённого клиента кэширован,
+	// и второй catalog по тому же клиенту observe не вызовет.
+	cs2 := clientFor(t, descriptorManager(t, "v1", lock).Server())
+	catalog(t, cs2)
+	if res := invoke(t, cs2, "echo"); res.IsError {
+		t.Fatalf("запрет не снялся после успешной записи: %s", resultText(t, res))
+	}
+}

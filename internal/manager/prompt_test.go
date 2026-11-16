@@ -106,6 +106,21 @@ func TestSetPromptServersFilter(t *testing.T) {
 	}
 }
 
+// Имя сервера не из набора — отказ, а не молчаливое сужение: иначе в промт
+// попали бы инструменты чужого набора.
+func TestSetPromptRejectsForeignServer(t *testing.T) {
+	p := newPromptEnv(t)
+	p.catalogOf(func(name string) promptTool { return promptTool{Name: "run_" + name} })
+
+	w := p.do(t, http.MethodPost, "/api/sets/"+p.id+"/prompt", map[string]any{
+		"task": "задача", "servers": []string{"чужой"},
+	})
+	status(t, w, http.StatusBadRequest)
+	if body := w.Body.String(); !strings.Contains(body, "не входит") {
+		t.Fatalf("отказ не назвал причину: %s", body)
+	}
+}
+
 // Схема длиннее потолка обрезается с многоточием, и это видно в заметках.
 func TestSetPromptTrimsSchema(t *testing.T) {
 	p := newPromptEnv(t)

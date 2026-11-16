@@ -46,9 +46,14 @@ func TestFetchSetHealthLeavesStatsEmpty(t *testing.T) {
 		t.Fatalf("port: %v", err)
 	}
 
-	got := fetchSetHealth(context.Background(), host, port, "probe-token", false, nil, "test")
-	if !got.Running || len(got.Servers) != 0 {
+	// Имя, которого в наборе нет, получает отметку только после настоящего
+	// обмена list_servers: без него «ноль в статистике» ничего не доказывает.
+	got := fetchSetHealth(context.Background(), host, port, "probe-token", false, []string{"ghost"}, "test")
+	if !got.Running || len(got.Servers) != 1 {
 		t.Fatalf("проба не дошла до набора: %+v", got)
+	}
+	if got.Servers[0].Error == "" {
+		t.Fatalf("list_servers ответил, но имя ghost не помечено: %+v", got.Servers[0])
 	}
 
 	snap := rec.Snapshot()
