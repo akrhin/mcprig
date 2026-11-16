@@ -8,11 +8,20 @@ repository the project is built in.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-16
+
 ### Changed
 
 - The image build in `ci.yml` runs on a pull request only, and only when the
   `Dockerfile`, `.dockerignore`, `go.mod`/`go.sum` or `docker/` changed: a push
   to `master` no longer rebuilds an image the tag will build anyway.
+
+### Fixed
+
+- `GET …/authorize/status` answers `404` for a set or server that does not
+  exist, like the launch route, instead of `200 idle`.
+- `mcprig --help` prints `Usage of mcprig:` — it used to say `Usage of serve:`
+  even when no subcommand was given.
 
 ## [0.6.2] - 2026-11-16
 
@@ -966,7 +975,8 @@ repository the project is built in.
 - Docker images (slim and full), Gitea Actions release with goreleaser and
   govulncheck, Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/akrhin/mcprig/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/akrhin/mcprig/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
