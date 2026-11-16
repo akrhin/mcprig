@@ -52,7 +52,7 @@ SEC-12), остальные пять первая редакция этого д
   получает `405`; панель обновлена вместе с сервером. Клиент с чужим ключом,
   читавший `/tool-out/<hex>` по угаданному имени, получает `404`.
 - **Документация.** `docs/en|ru/panel.md` (статус OAuth, выгрузки),
-  `docs/en|ru/cli.md` (`MCPRIG_TRUSTED_PROXIES`), `docs/en|ru/configuration.md`,
+  `docs/en|ru/cli.md` (`MCPRIG_TRUSTED_PROXIES`),
   `CHANGELOG.md`/`CHANGELOG.ru.md`.
 - **Риск.** Пир за прокси, у которого адрес не loopback и не вписан в список,
   молча теряет forwarded-заголовки: публичное имя и https в проверке Origin

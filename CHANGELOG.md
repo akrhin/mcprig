@@ -8,6 +8,8 @@ repository the project is built in.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-16
+
 ### Added
 
 - The panel has pages of its own instead of one long **Overview**: `#/sets`,
@@ -897,7 +899,8 @@ repository the project is built in.
 - Docker images (slim and full), Gitea Actions release with goreleaser and
   govulncheck, Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
 [0.4.0]: https://github.com/akrhin/mcprig/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/akrhin/mcprig/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/akrhin/mcprig/compare/v0.3.6...v0.3.7
