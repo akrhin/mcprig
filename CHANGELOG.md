@@ -8,6 +8,17 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Fixed
+
+- A first OAuth connect no longer fails with `<server>: context deadline
+  exceeded` on a loaded machine: the token cache is written atomically without
+  `fsync`. Two `fsync`s of 300-byte files took up to seconds on a busy disk
+  (measured 5.3 s and 7.6 s here), and the SDK makes that write inside the
+  connect whose deadline then expired — the `TestOAuthFlowAgainstFakeAS` flake
+  reproduced as 1 failure in 40 runs before the change and 0 in 90 after.
+  A machine crash may now lose the last token written; the next call
+  authorizes again.
+
 ## [0.6.0] - 2026-11-16
 
 ### Added

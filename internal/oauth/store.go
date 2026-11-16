@@ -176,12 +176,15 @@ func (s *Store) SaveClient(key string, info ClientInfo) error {
 }
 
 // writeAtomic пишет файл целиком атомарной заменой. Вызывать под s.mu.
+// Без fsync: кэш токенов восстановим повторной авторизацией, а fsync на
+// загруженном диске занимает секунды и срывает срок Connect, внутри которого
+// SDK вызывает NewTokenSource.
 func (s *Store) writeAtomic(path string, v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return fmt.Errorf("oauth: сериализовать %s: %w", path, err)
 	}
-	if err := atomicfile.Write(path, data); err != nil {
+	if err := atomicfile.WriteNoSync(path, data); err != nil {
 		return fmt.Errorf("oauth: записать %s: %w", path, err)
 	}
 	return nil
