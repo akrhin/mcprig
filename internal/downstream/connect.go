@@ -146,11 +146,22 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		if res.Applied && c.OnSandboxApplied != nil {
 			c.OnSandboxApplied(srv)
 		}
-		cmd := exec.Command(res.Argv[0], res.Argv[1:]...)
+		// Прямой ребёнок набора — сторож (child-guard), а не сервер: убитый
+		// SIGKILL набор не успевает погасить группу, обработчика у него нет.
+		// Сторож переживает набор и добивает внуков по Pdeathsig.
+		exe, err := os.Executable()
+		if err != nil {
+			return nil, nil, fmt.Errorf("child-guard: путь к исполняемому файлу: %w", err)
+		}
+		argv := make([]string, 0, len(res.Argv)+3)
+		argv = append(argv, exe, "child-guard", "--")
+		argv = append(argv, res.Argv...)
+		cmd := exec.Command(argv[0], argv[1:]...)
 		cmd.Dir = srv.Cwd
 		// Своя группа: иначе гасится только прямой ребёнок, а внуки сервера
-		// остаются в системе (см. groupTransport).
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		// остаются в системе (см. groupTransport). Pdeathsig — сигнал сторожу,
+		// что набор умер.
+		cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM, Setpgid: true}
 		tail := &stderrTail{}
 		cmd.Stderr = tail
 		// A set runs with an env already narrowed by the manager; the server's
