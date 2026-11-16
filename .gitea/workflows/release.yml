@@ -1,7 +1,7 @@
 name: release
 # Тег v* → проверки (vet, тесты с -race, govulncheck, gofmt) → goreleaser: четыре
-# платформы, checksums, черновик релиза в Gitea → образы slim и full в реестр.
-# Публикацию черновика делает человек.
+# платформы, checksums, опубликованный релиз в Gitea → образы slim и full в реестр.
+# Руками не делать ничего: черновика больше нет, `draft: false` в .goreleaser.yaml.
 on:
   push:
     tags:

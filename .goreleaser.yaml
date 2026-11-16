@@ -48,8 +48,9 @@ changelog:
       - "^test:"
 
 release:
-  # Черновик: артефакты загружены, публикация — вручную в интерфейсе Gitea.
-  draft: true
+  # Публикуется сразу: черновик требовал человека в интерфейсе Gitea, а
+  # релиз обязан закрываться сам (issue-трекер живёт на GitHub, тег туда же).
+  draft: false
   gitea:
     owner: sintez
     name: mcprig
