@@ -40,3 +40,40 @@ func TestWriteReplaces(t *testing.T) {
 		t.Errorf("после записи остались лишние файлы: %v", entries)
 	}
 }
+
+// WriteNoSync обязан давать ту же видимую читателю замену файла, что и Write:
+// права 0600, целое содержимое и никаких временных файлов рядом.
+func TestWriteNoSyncReplaces(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "file.json")
+
+	if err := WriteNoSync(path, []byte("one")); err != nil {
+		t.Fatalf("WriteNoSync: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Errorf("права: want 0600, got %o", got)
+	}
+
+	if err := WriteNoSync(path, []byte("two")); err != nil {
+		t.Fatalf("WriteNoSync: %v", err)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "two" {
+		t.Errorf("содержимое: want two, got %q", body)
+	}
+
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("после записи остались лишние файлы: %v", entries)
+	}
+}

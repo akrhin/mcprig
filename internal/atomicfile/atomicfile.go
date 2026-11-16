@@ -10,6 +10,18 @@ import (
 // rename over path, then fsync of the directory. The result is 0600 and the
 // directory is created with 0700 when missing.
 func Write(path string, data []byte) error {
+	return replace(path, data, true)
+}
+
+// WriteNoSync — то же, что Write, но без fsync: атомарная замена (временный
+// файл и rename) сохраняется, а запись не ждёт диска. Цена — падение машины
+// может потерять последнюю запись; годится для восстановимых данных, которые
+// восстанавливаются не из файла: кэш токенов, снимки, метрики.
+func WriteNoSync(path string, data []byte) error {
+	return replace(path, data, false)
+}
+
+func replace(path string, data []byte, sync bool) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -29,15 +41,20 @@ func Write(path string, data []byte) error {
 		tmp.Close()
 		return err
 	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
+	if sync {
+		if err := tmp.Sync(); err != nil {
+			tmp.Close()
+			return err
+		}
 	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
 	if err := os.Rename(name, path); err != nil {
 		return err
+	}
+	if !sync {
+		return nil
 	}
 	if d, err := os.Open(dir); err == nil {
 		_ = d.Sync() // ENOTSUP on some filesystems is not a write failure

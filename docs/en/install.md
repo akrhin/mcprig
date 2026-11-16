@@ -194,6 +194,10 @@ one. The set log and the call history are appended in place (`O_APPEND`, `0600`)
 and may end with a partial last line. Never copy `registry.json` while the panel
 is running.
 
+The OAuth files are replaced without `fsync`: a machine crash may lose the last
+token written, and the next call authorizes again. `fsync` on a loaded disk can
+take seconds, and the write happens inside the connect it would stall.
+
 ## See also
 
 - [configuration.md](configuration.md) — the `servers.json` a set runs from.
