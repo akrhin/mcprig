@@ -167,7 +167,7 @@ func (m *Manager) listResources(ctx context.Context, req *mcp.CallToolRequest) (
 		if err != nil {
 			return errResult(err)
 		}
-		return m.jsonTruncResult(items, maxBytes)
+		return m.jsonTruncResult(ctx, items, maxBytes)
 	}
 	names := make([]string, 0, len(m.allEntries()))
 	for _, e := range m.allEntries() {
@@ -175,7 +175,7 @@ func (m *Manager) listResources(ctx context.Context, req *mcp.CallToolRequest) (
 			names = append(names, srv.Name)
 		}
 	}
-	return m.jsonTruncResult(collect(m, ctx, names, func(ctx context.Context, e *entry) ([]resourceInfo, error) {
+	return m.jsonTruncResult(ctx, collect(m, ctx, names, func(ctx context.Context, e *entry) ([]resourceInfo, error) {
 		if err := m.throttle(ctx, req, e.server().Name, "list_resources"); err != nil {
 			return nil, err
 		}
@@ -219,7 +219,7 @@ func (m *Manager) readResource(ctx context.Context, req *mcp.CallToolRequest) (*
 	if err != nil {
 		return res, err
 	}
-	return m.truncateResult(scrubSecrets(res, e.secrets), maxBytes)
+	return m.truncateResult(ctx, scrubSecrets(res, e.secrets), maxBytes)
 }
 
 func (m *Manager) listPrompts(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -253,7 +253,7 @@ func (m *Manager) listPrompts(ctx context.Context, req *mcp.CallToolRequest) (*m
 		if err != nil {
 			return errResult(err)
 		}
-		return m.jsonTruncResult(items, maxBytes)
+		return m.jsonTruncResult(ctx, items, maxBytes)
 	}
 	names := make([]string, 0, len(m.allEntries()))
 	for _, e := range m.allEntries() {
@@ -261,7 +261,7 @@ func (m *Manager) listPrompts(ctx context.Context, req *mcp.CallToolRequest) (*m
 			names = append(names, srv.Name)
 		}
 	}
-	return m.jsonTruncResult(collect(m, ctx, names, func(ctx context.Context, e *entry) ([]promptInfo, error) {
+	return m.jsonTruncResult(ctx, collect(m, ctx, names, func(ctx context.Context, e *entry) ([]promptInfo, error) {
 		if err := m.throttle(ctx, req, e.server().Name, "list_prompts"); err != nil {
 			return nil, err
 		}
@@ -303,7 +303,7 @@ func (m *Manager) getPrompt(ctx context.Context, req *mcp.CallToolRequest) (*mcp
 	if err != nil {
 		return res, err
 	}
-	return m.truncateResult(scrubSecrets(res, e.secrets), maxBytes)
+	return m.truncateResult(ctx, scrubSecrets(res, e.secrets), maxBytes)
 }
 
 // exposedEntry does what invoke_command does before a session: find, usable,
