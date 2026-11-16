@@ -724,15 +724,29 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 	origin := r.Header.Get("Origin")
 	switch {
 	case origin == "null":
-		// null значит «источник неизвестен» — песочница или data:-страница;
-		// это не отсутствие заголовка, и доверия такому запросу нет.
-		return &httpError{http.StatusForbidden, "Origin: null не принимается — откройте панель по её адресу"}
+		// null значит «источник неизвестен» — песочница, file:// или клиент,
+		// который не браузер. Украсть можно только неявную власть, а она у
+		// запроса одна — сессионная cookie; без неё запрос равен запросу без
+		// Origin и проходит, с ней — отказ.
+		if r.URL.Path == "/api/login" {
+			break
+		}
+		if _, err := r.Cookie(sessionCookie); err == nil {
+			m.log.Warn("csrf: Origin: null с сессионной cookie", "path", r.URL.Path,
+				"ua", r.UserAgent())
+			return &httpError{http.StatusForbidden, "Origin: null не принимается — откройте панель по её адресу"}
+		}
+		// null без cookie — источник неизвестен, но власти у запроса нет:
+		// в лог, чтобы такой клиент было видно, и дальше по общему пути.
+		m.log.Info("csrf: Origin: null без cookie — запрос обслужен", "path", r.URL.Path,
+			"ua", r.UserAgent())
 	case origin != "":
 		u, err := url.Parse(origin)
 		if err != nil || !m.originMatches(u, r) {
 			// Значения в лог: без них отказ не отладить с чужой машины.
 			m.log.Warn("csrf: origin не совпал", "origin", origin, "host", r.Host,
-				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
+				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path,
+				"ua", r.UserAgent())
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
 	case r.URL.Path != "/api/login":

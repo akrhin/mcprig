@@ -10,6 +10,22 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-16
+
+### Исправлено
+
+- Запрос с `Origin: null` и без сессионной cookie — страница из песочницы,
+  `file://` или клиент, который не браузер — снова обслуживается: проверка
+  отбивала его раньше, чем отличала от запроса с cookie, и заодно ломала
+  `POST /api/login` с такой страницы. Отказ остаётся там, где он и нужен:
+  `Origin: null` вместе с сессионной cookie.
+
+### Документация
+
+- [docs/ru/upgrading.md](docs/ru/upgrading.md) и английское зеркало собирают,
+  что после 0.6.0 отвечает иначе, с лечением каждого симптома и откатом;
+  в README все три схемы теперь под спойлерами.
+
 ## [0.6.0] - 2026-11-16
 
 ### Добавлено
@@ -910,7 +926,8 @@
 - Образы Docker (slim и full), релиз Gitea Actions с goreleaser и govulncheck,
   Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
 [0.4.0]: https://github.com/akrhin/mcprig/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/akrhin/mcprig/compare/v0.3.7...v0.3.8

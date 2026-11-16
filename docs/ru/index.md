@@ -39,6 +39,7 @@ mcprig — один статический бинарник, который ст
 | [architecture.md](architecture.md) | как процессы стыкуются, почему каждый набор — свой процесс, здоровье, статистика, OAuth |
 | [alternatives.md](alternatives.md) | другие прокси и шлюзы, честное сравнение и где mcprig слабее |
 | [troubleshooting.md](troubleshooting.md) | симптом → причина → что сделать, из реальных случаев |
+| [upgrading.md](upgrading.md) | что отвечает иначе после 0.6.0, симптом → лечение, и откат |
 | [glossary.md](glossary.md) | набор/set, мета-тул, downstream/upstream, tool-out, sandbox, hook, warm |
 | [dev/development.md](dev/development.md) | требования, сборка, тестовые ворота, контрактный набор, живой стенд |
 | [dev/release.md](dev/release.md) | тег → CI → архивы → зеркало, чек-листом |
