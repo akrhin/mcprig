@@ -54,7 +54,7 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:9100/heal
 ENTRYPOINT ["/usr/local/bin/mcprig"]
 CMD ["serve", "--config", "/config/servers.json"]
 
-FROM alpine:3.21 AS slim
+FROM alpine:3.24 AS slim
 ARG VERSION=dev
 ARG REVISION=dev
 LABEL org.opencontainers.image.title="mcprig (slim)" \
