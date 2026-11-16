@@ -3,6 +3,8 @@ package manager
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -10,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/akrhin/mcprig/internal/registry"
 )
 
 // Занятый порт — 409 с прежним текстом: это состояние, а не кривой запрос.
@@ -58,6 +62,29 @@ func TestFailUnknownErrorIs500AndLogged(t *testing.T) {
 	if !strings.Contains(buf.String(), "с3крет") {
 		t.Fatalf("в логе нет причины: %s", buf.String())
 	}
+}
+
+// Данные реестра не прошли проверку — 400 с текстом причины, без обезличивания.
+func TestFailInvalidRegistryIs400(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	w := httptest.NewRecorder()
+	e.m.fail(w, httptest.NewRequest(http.MethodPost, "/api/servers", nil),
+		fmt.Errorf("сервер a: %w", registry.ErrInvalid))
+
+	status(t, w, http.StatusBadRequest)
+	if !strings.Contains(w.Body.String(), "сервер a") {
+		t.Fatalf("причины нет в ответе: %s", w.Body.String())
+	}
+}
+
+// Сбой файловой системы остаётся 500: это не кривой запрос клиента.
+func TestFailPathErrorIs500(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	w := httptest.NewRecorder()
+	e.m.fail(w, httptest.NewRequest(http.MethodGet, "/api/state", nil),
+		&fs.PathError{Op: "open", Path: "env.json", Err: fs.ErrNotExist})
+
+	status(t, w, http.StatusInternalServerError)
 }
 
 // Неразрешённая ${VAR} отбивает старт с именем переменной.

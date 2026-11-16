@@ -24,6 +24,20 @@ type busyErr struct{ msg string }
 func (e busyErr) Error() string        { return e.msg }
 func (e busyErr) Is(target error) bool { return target == ErrPortBusy }
 
+// ErrInvalid — тело запроса не прошло проверку реестра: API отвечает 400 с
+// причиной, а не 500. Сбои диска и записи этой метки не несут.
+var ErrInvalid = errors.New("неверные данные реестра")
+
+// invalidErr несёт текст причины как есть: клиенту нужна она, а не слово «ошибка».
+type invalidErr struct{ msg string }
+
+func (e invalidErr) Error() string        { return e.msg }
+func (e invalidErr) Is(target error) bool { return target == ErrInvalid }
+
+func invalidf(format string, args ...any) error {
+	return invalidErr{fmt.Sprintf(format, args...)}
+}
+
 func isNull(raw json.RawMessage) bool {
 	trimmed := bytes.TrimSpace(raw)
 	return len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null"))
@@ -33,11 +47,11 @@ func isNull(raw json.RawMessage) bool {
 // present field can be told from an absent one.
 func decodeObject(raw json.RawMessage) (map[string]json.RawMessage, error) {
 	if isNull(raw) {
-		return nil, errors.New("ожидался JSON-объект")
+		return nil, invalidf("ожидался JSON-объект")
 	}
 	var out map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, errors.New("ожидался JSON-объект")
+		return nil, invalidf("ожидался JSON-объект")
 	}
 	return out, nil
 }
@@ -49,7 +63,7 @@ func optionalString(in map[string]json.RawMessage, key string) (string, error) {
 	}
 	var v string
 	if err := json.Unmarshal(raw, &v); err != nil {
-		return "", fmt.Errorf("%s: ожидалась строка", key)
+		return "", invalidf("%s: ожидалась строка", key)
 	}
 	return strings.TrimSpace(v), nil
 }
@@ -60,7 +74,7 @@ func requiredString(in map[string]json.RawMessage, key string) (string, error) {
 		return "", err
 	}
 	if v == "" {
-		return "", fmt.Errorf("%s: обязательное поле — заполните его", key)
+		return "", invalidf("%s: обязательное поле — заполните его", key)
 	}
 	return v, nil
 }
@@ -74,7 +88,7 @@ func stringMapStrict(in map[string]json.RawMessage, key string) (map[string]stri
 	}
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &obj); err != nil {
-		return nil, fmt.Errorf("%s: ожидался объект", key)
+		return nil, invalidf("%s: ожидался объект", key)
 	}
 	if len(obj) == 0 {
 		return nil, nil
@@ -83,7 +97,7 @@ func stringMapStrict(in map[string]json.RawMessage, key string) (map[string]stri
 	for k, v := range obj {
 		var str string
 		if err := json.Unmarshal(v, &str); err != nil {
-			return nil, fmt.Errorf("%s.%s: ожидалась строка", key, k)
+			return nil, invalidf("%s.%s: ожидалась строка", key, k)
 		}
 		out[k] = str
 	}
@@ -97,7 +111,7 @@ func stringSliceStrict(in map[string]json.RawMessage, key string) ([]string, err
 	}
 	var out []string
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("%s: ожидался массив строк", key)
+		return nil, invalidf("%s: ожидался массив строк", key)
 	}
 	return out, nil
 }
@@ -112,7 +126,7 @@ func commandOf(in map[string]json.RawMessage) ([]string, error) {
 		if err := json.Unmarshal(raw, &command); err != nil {
 			var one string
 			if err := json.Unmarshal(raw, &one); err != nil {
-				return nil, errors.New("command: ожидалась строка или массив строк")
+				return nil, invalidf("command: ожидалась строка или массив строк")
 			}
 			command = []string{one}
 		}
@@ -128,7 +142,7 @@ func commandOf(in map[string]json.RawMessage) ([]string, error) {
 // and never comes from the body.
 func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if !namePattern.MatchString(name) {
-		return nil, errors.New("в имени допустимы строчные латинские буквы, цифры, дефис и подчёркивание")
+		return nil, invalidf("в имени допустимы строчные латинские буквы, цифры, дефис и подчёркивание")
 	}
 	srv := &config.Server{Name: name, Enabled: true}
 
@@ -137,7 +151,7 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 		return nil, err
 	}
 	if transport != "" && transport != "stdio" && transport != "http" {
-		return nil, errors.New("транспорт: только stdio или http")
+		return nil, invalidf("транспорт: только stdio или http")
 	}
 	command, err := commandOf(in)
 	if err != nil {
@@ -169,10 +183,10 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if raw, ok := in["sandbox"]; ok && !isNull(raw) {
 		var sb config.Sandbox
 		if err := json.Unmarshal(raw, &sb); err != nil {
-			return nil, fmt.Errorf("sandbox: ожидался объект")
+			return nil, invalidf("sandbox: ожидался объект")
 		}
 		if unknown := config.UnknownSandboxKeys(raw); len(unknown) > 0 {
-			return nil, fmt.Errorf("sandbox: неизвестные поля: %s", strings.Join(unknown, ", "))
+			return nil, invalidf("sandbox: неизвестные поля: %s", strings.Join(unknown, ", "))
 		}
 		sandbox = &sb
 	}
@@ -190,7 +204,7 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if raw, ok := in["permissions"]; ok && !isNull(raw) {
 		p, msg := config.ParsePermissions(raw)
 		if msg != "" {
-			return nil, errors.New(msg)
+			return nil, invalidf("%s", msg)
 		}
 		perms = p
 	}
@@ -201,17 +215,17 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if raw, ok := in["expose"]; ok && !isNull(raw) {
 		list, msg := config.ParseExpose(raw)
 		if msg != "" {
-			return nil, errors.New(msg)
+			return nil, invalidf("%s", msg)
 		}
 		expose = list
 	}
 
 	hasCommand, hasURL := len(command) > 0, url != ""
 	if hasCommand && hasURL {
-		return nil, errors.New("нужен ровно один из них: command[] или url")
+		return nil, invalidf("нужен ровно один из них: command[] или url")
 	}
 	if !hasCommand && !hasURL {
-		return nil, errors.New("нужен ровно один из них: command[] или url")
+		return nil, invalidf("нужен ровно один из них: command[] или url")
 	}
 	if transport == "" {
 		if hasURL {
@@ -223,21 +237,21 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	switch transport {
 	case "stdio":
 		if !hasCommand {
-			return nil, errors.New("для транспорта stdio нужен command[]")
+			return nil, invalidf("для транспорта stdio нужен command[]")
 		}
 	case "http":
 		if !hasURL {
-			return nil, errors.New("для транспорта http нужен url")
+			return nil, invalidf("для транспорта http нужен url")
 		}
 		if _, ok := in["cwd"]; ok && !isNull(in["cwd"]) {
-			return nil, errors.New("cwd допустим только для транспорта stdio")
+			return nil, invalidf("cwd допустим только для транспорта stdio")
 		}
 	}
 
 	enabled := true
 	if raw, ok := in["enabled"]; ok && !isNull(raw) {
 		if err := json.Unmarshal(raw, &enabled); err != nil {
-			return nil, errors.New("enabled: ожидалось true или false")
+			return nil, invalidf("enabled: ожидалось true или false")
 		}
 	}
 
@@ -257,7 +271,7 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	// Те же правила, что у config.Load, включая запрет untrusted без песочницы:
 	// иначе API отвечает 200 и сервер живёт без изоляции.
 	if msg := srv.Check(); msg != "" {
-		return nil, errors.New(msg)
+		return nil, invalidf("%s", msg)
 	}
 	return srv, nil
 }
@@ -309,7 +323,7 @@ func slugify(v string) string {
 
 func checkPort(port int) error {
 	if port < FirstPort || port > LastPort {
-		return fmt.Errorf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
+		return invalidf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
 	}
 	return nil
 }
@@ -321,7 +335,7 @@ func strictBool(in map[string]json.RawMessage, key string) (value, present bool,
 	}
 	var b bool
 	if err := json.Unmarshal(raw, &b); err != nil {
-		return false, true, fmt.Errorf("%s: ожидалось true или false", key)
+		return false, true, invalidf("%s: ожидалось true или false", key)
 	}
 	return b, true, nil
 }
@@ -348,7 +362,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		}
 		out.ID = slugify(id)
 		if !namePattern.MatchString(out.ID) {
-			return nil, errors.New("имя набора: строчные латинские буквы, цифры, дефис и подчёркивание")
+			return nil, invalidf("имя набора: строчные латинские буквы, цифры, дефис и подчёркивание")
 		}
 	}
 
@@ -369,7 +383,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	if raw, ok := in["servers"]; ok && !isNull(raw) {
 		var names []string
 		if err := json.Unmarshal(raw, &names); err != nil {
-			return nil, errors.New("servers: ожидался массив имён")
+			return nil, invalidf("servers: ожидался массив имён")
 		}
 		var missing []string
 		for _, name := range names {
@@ -378,7 +392,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 			}
 		}
 		if len(missing) > 0 {
-			return nil, fmt.Errorf("в реестре нет серверов: %s", strings.Join(missing, ", "))
+			return nil, invalidf("в реестре нет серверов: %s", strings.Join(missing, ", "))
 		}
 		out.Servers = names
 	}
@@ -393,7 +407,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	if raw, ok := in["port"]; ok && !isNull(raw) {
 		var port int
 		if err := json.Unmarshal(raw, &port); err != nil {
-			return nil, fmt.Errorf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
+			return nil, invalidf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
 		}
 		out.Port = port
 		explicitPort = true
@@ -439,10 +453,10 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		} else {
 			var n Notify
 			if err := json.Unmarshal(raw, &n); err != nil {
-				return nil, errors.New(`notify: ожидался объект {"webhook": "https://…"}`)
+				return nil, invalidf(`notify: ожидался объект {"webhook": "https://…"}`)
 			}
 			if msg := n.Check(); msg != "" {
-				return nil, errors.New(msg)
+				return nil, invalidf("%s", msg)
 			}
 			if strings.TrimSpace(n.Webhook) == "" {
 				out.Notify = nil
@@ -461,10 +475,10 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		} else {
 			var rl config.RateLimit
 			if err := rl.Decode(raw); err != nil {
-				return nil, fmt.Errorf(`rateLimit: ожидался объект {"perMinute": 120, "burst": 20, "perTool": {"server/tool": {"perMinute": 10, "burst": 2}}}: %w`, err)
+				return nil, invalidf(`rateLimit: ожидался объект {"perMinute": 120, "burst": 20, "perTool": {"server/tool": {"perMinute": 10, "burst": 2}}}: %v`, err)
 			}
 			if msg := rl.Check(); msg != "" {
-				return nil, errors.New(msg)
+				return nil, invalidf("%s", msg)
 			}
 			if rl.Empty() {
 				out.RateLimit = nil
@@ -483,7 +497,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 		} else {
 			profiles, err := config.ParseProfiles(raw)
 			if err != nil {
-				return nil, err
+				return nil, invalidf("%s", err)
 			}
 			out.Profiles = profiles
 		}
@@ -495,7 +509,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 	if raw, ok := in["token"]; ok && !isNull(raw) {
 		var token string
 		if err := json.Unmarshal(raw, &token); err != nil {
-			return nil, fmt.Errorf("token: ожидался токен строкой")
+			return nil, invalidf("token: ожидался токен строкой")
 		}
 		token = strings.TrimSpace(token)
 		if token != "" {

@@ -89,14 +89,15 @@
       'vars.needName': 'name: latin letters, digits and _, not starting with a digit',
       'vars.needValue': 'the value cannot be empty',
       'vars.saved': 'value saved for {name} · {source}',
-      'vars.savedUnref': 'no server mentions {name} yet, so the name stays out of the list',
+      'vars.savedUnref': '{name} is saved; OpenBao values are listed only when a server references them',
+      'vars.unused': 'not used by any server',
       'vars.forgot': '{name} forgotten',
       'vars.restarted': 'restarted: {list}',
       'vars.skippedOne': '{set} stays on its old value: {what}',
       'vars.skippedMissing': 'missing {names}',
       'vars.del': 'forget the value',
       'vars.delConfirm': 'Forget {name}? A running set keeps the value it started with; only sets that no longer need it restart.',
-      'vars.honest': 'Values live in OpenBao or in a file only this host can read: the panel shows a name, whether it is set and where it comes from, never a value. A name no server references stays out of the list until some server mentions it.',
+      'vars.honest': 'Values live in OpenBao or in a file only this host can read: the panel shows a name, whether it is set and where it comes from, never a value. A name saved here stays in the list even when no server mentions it, marked as unused.',
       'kpi.calls': 'calls · 7 days',
       'kpi.errRate': 'error rate',
       'kpi.p50': 'p50',
@@ -419,14 +420,15 @@
       'vars.needName': 'имя: латинские буквы, цифры и _, не с цифры',
       'vars.needValue': 'значение не может быть пустым',
       'vars.saved': 'значение {name} сохранено · {source}',
-      'vars.savedUnref': 'ни один сервер пока не упоминает {name}, поэтому в списке имени нет',
+      'vars.savedUnref': 'значение {name} сохранено; значения OpenBao видны, только когда сервер на них ссылается',
+      'vars.unused': 'не используется ни одним сервером',
       'vars.forgot': 'значение {name} забыто',
       'vars.restarted': 'перезапущены: {list}',
       'vars.skippedOne': '{set} остался на прежнем значении: {what}',
       'vars.skippedMissing': 'нет переменной {names}',
       'vars.del': 'забыть значение',
       'vars.delConfirm': 'Забыть {name}? Работающий набор остаётся со значением, с которым запустился; перезапускаются только наборы, которым это значение больше не нужно.',
-      'vars.honest': 'Значения живут в OpenBao или в файле, который читает только этот хост: видно имя, стоит ли значение и откуда оно берётся, — но не само значение. Имя, которое не упоминает ни один сервер, в списке не появится.',
+      'vars.honest': 'Значения живут в OpenBao или в файле, который читает только этот хост: видно имя, стоит ли значение и откуда оно берётся, — но не само значение. Имя, сохранённое здесь, остаётся в списке, даже если его не упоминает ни один сервер, — с пометкой «не используется».',
       'kpi.calls': 'вызовов · 7 дней',
       'kpi.errRate': 'доля ошибок',
       'kpi.p50': 'p50',
@@ -1116,16 +1118,18 @@
           // ответ как у apiEnvDelete: removed и source — откуда ушло значение
           var had = !!row && !!row.set;
           var was = (row && row.source) || '';
-          // строка остаётся: живой /api/env перечисляет все ${VAR} серверов, а
-          // «не задана» — это set:false, а не исчезнувшее имя
-          if (row) { row.set = false; row.source = ''; }
+          // строка остаётся, только если на имя ссылается сервер: у сохранённого
+          // без ссылок живой /api/env после забывания строку больше не отдаёт
+          if (row && row.used === false) {
+            d.vars = d.vars.filter(function (v) { return v.name !== envName; });
+          } else if (row) { row.set = false; row.source = ''; }
           return { name: envName, removed: had, source: was, restarted: [] };
         }
         // source — из store тела, как storeName в secrets.go: local и пусто → file
         var from = String((body && (body.store || body.source)) || 'file');
         var source = from === 'local' || from === 'automatic' ? 'file' : from;
         if (row) { row.set = true; row.source = source; }
-        else { d.vars.push({ name: envName, set: true, source: source }); }
+        else { d.vars.push({ name: envName, set: true, used: false, source: source }); }
         return { name: envName, set: true, source: source, restarted: [] };
       });
     }
@@ -2722,6 +2726,7 @@
         code.title = v.name;
         li.querySelector('.v-state').textContent = (v.set ? t('env.set') : t('env.unset')) +
           (v.source ? ' · ' + v.source : '') +
+          (v.used === false ? ' · ' + t('vars.unused') : '') +
           (!v.set && st.envRemoteError ? ' · ' + st.envRemoteError : '');
         var del = li.querySelector('[data-envdel]');
         del.dataset.envdel = v.name;

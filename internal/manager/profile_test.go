@@ -74,8 +74,8 @@ func TestSetUpdateProfiles(t *testing.T) {
 	w = e.do(t, http.MethodPut, "/api/sets/"+id, map[string]any{
 		"profiles": map[string]any{"reader": map[string]any{"denny": []string{"*"}}},
 	})
-	// Ошибка валидации реестра не типизирована — API отвечает 500.
-	status(t, w, http.StatusInternalServerError)
+	// Ошибка валидации реестра типизирована — API отвечает 400 с причиной.
+	status(t, w, http.StatusBadRequest)
 	w = e.do(t, http.MethodGet, "/api/sets", nil)
 	status(t, w, http.StatusOK)
 	if !strings.Contains(w.Body.String(), `"reader"`) {

@@ -41,9 +41,8 @@ func TestExposeRoundTripThroughAPI(t *testing.T) {
 	}
 
 	w = e.do(t, http.MethodPut, "/api/servers/alpha", map[string]any{"expose": []string{"ressources"}})
-	// Ошибка валидации реестра не типизирована: тело обезличено, перечня
-	// допустимых видов в ответе больше нет (см. отчёт).
-	status(t, w, http.StatusInternalServerError)
+	// Кривой вид поверхности — 400: причина в теле, клиент знает, что править.
+	status(t, w, http.StatusBadRequest)
 
 	w = e.do(t, http.MethodPut, "/api/servers/alpha", map[string]any{"expose": nil})
 	status(t, w, http.StatusOK)

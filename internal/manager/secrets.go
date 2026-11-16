@@ -82,6 +82,18 @@ func (f *envFile) delete(name string) (bool, error) {
 	return true, f.saveLocked()
 }
 
+// names — копия ключей файла: панель показывает и те, на которые уже никто не
+// ссылается, иначе забыть значение можно только помня имя наизусть.
+func (f *envFile) names() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]string, 0, len(f.values))
+	for name := range f.values {
+		out = append(out, name)
+	}
+	return out
+}
+
 func (f *envFile) saveLocked() error {
 	body, err := json.MarshalIndent(f.values, "", "  ")
 	if err != nil {
@@ -260,6 +272,10 @@ func (s *Secrets) RemoteError() string {
 	}
 	return ""
 }
+
+// StoredNames — имена, сохранённые в env.json. OpenBao не перечисляем: дешёвого
+// list у KV v2 нет, и придумывать его ради списка не будем.
+func (s *Secrets) StoredNames() []string { return s.local.names() }
 
 // reservedSecret: переменные самого менеджера. Их нельзя подставлять в
 // сервер набора — иначе чужой конфиг унесёт пароль панели или токен OpenBao.

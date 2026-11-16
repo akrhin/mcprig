@@ -691,6 +691,9 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status, msg = http.StatusNotFound, errBrowseGone.Error()
 	case errors.As(err, &ce):
 		status, msg = http.StatusConflict, ce.msg
+	case errors.Is(err, registry.ErrInvalid):
+		// Кривое тело — вина клиента: причина в ответе, чтобы он её исправил.
+		status, msg = http.StatusBadRequest, err.Error()
 	case errors.As(err, &pathErr):
 		status, msg = http.StatusInternalServerError, "внутренняя ошибка — повторите; если повторяется, смотрите лог панели"
 	case errors.Is(err, context.Canceled):
@@ -905,6 +908,7 @@ func (m *Manager) setViews() []setView {
 type envVar struct {
 	Name   string `json:"name"`
 	Set    bool   `json:"set"`
+	Used   bool   `json:"used"`
 	Source string `json:"source,omitempty"`
 }
 
@@ -1004,10 +1008,28 @@ func (m *Manager) apiExportSet(req *request) error {
 
 func (m *Manager) apiEnvList(req *request) error {
 	names := envRefs(m.store.Servers())
+	used := make(map[string]bool, len(names))
+	for _, name := range names {
+		used[name] = true
+	}
+	// Сохранённое имя без ссылок тоже в списке: иначе забыть его можно только
+	// зная наизусть, а значение так и живёт в env.json.
+	for _, name := range m.sec.StoredNames() {
+		if !containsName(names, name) {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
 	got := m.sec.Resolve(names)
 	vars := make([]envVar, 0, len(names))
-	for i, name := range names {
-		vars = append(vars, envVar{Name: name, Set: got[i].value != "", Source: got[i].source})
+	// Используемые — сверху: остальные это хвост, который пора забыть.
+	for _, wantUsed := range []bool{true, false} {
+		for i, name := range names {
+			if used[name] != wantUsed {
+				continue
+			}
+			vars = append(vars, envVar{Name: name, Set: got[i].value != "", Used: used[name], Source: got[i].source})
+		}
 	}
 	resp := map[string]any{"vars": vars}
 	if remoteErr := m.sec.RemoteError(); remoteErr != "" {

@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
 )
 
@@ -25,6 +26,9 @@ import (
 var fakeBin string
 
 func TestMain(m *testing.M) {
+	// Набор спавнит stdio-серверы сторожем child-guard: в тестах
+	// os.Executable() — этот бинарник, поэтому режим перехватывается здесь.
+	downstream.RunChildGuardMode(os.Args)
 	dir, err := os.MkdirTemp("", "manager-test-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -57,6 +61,11 @@ func newEnvLog(t *testing.T, auth AuthOptions, log *slog.Logger) *env {
 	// только loopback, поэтому тестовому менеджеру нужен явный хост.
 	if auth.AllowedHosts == nil {
 		auth.AllowedHosts = []string{"example.com"}
+	}
+	// httptest ставит пиру 192.0.2.1: в тестах он изображает обратный прокси —
+	// иначе доверие к X-Forwarded-* пришлось бы прописывать в каждом.
+	if auth.ProxySecret != "" && auth.TrustedProxies == "" {
+		auth.TrustedProxies = "192.0.2.1"
 	}
 	if log == nil {
 		log = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -296,9 +305,11 @@ func TestRouteErrors(t *testing.T) {
 func TestEnvValueMustBeString(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	w := e.do(t, http.MethodPost, "/api/servers", `{"name":"a","transport":"stdio","command":["/bin/true"],"env":{"A":1}}`)
-	// Ошибка валидации реестра не типизирована: для API это неизвестная
-	// ошибка — 500 без текста. Типизация в registry вернёт 400 (см. отчёт).
-	status(t, w, http.StatusInternalServerError)
+	// Кривое поле — вина тела: 400 с причиной, и клиент знает, что править.
+	status(t, w, http.StatusBadRequest)
+	if body := w.Body.String(); !strings.Contains(body, "env.A") || !strings.Contains(body, "ожидалась строка") {
+		t.Fatalf("причина не в ответе: %s", body)
+	}
 
 	status(t, e.do(t, http.MethodPost, "/api/servers", "не json"), http.StatusBadRequest)
 }
@@ -308,7 +319,10 @@ func TestPortOutOfRange(t *testing.T) {
 	e.addServer(t, "a")
 
 	w := e.do(t, http.MethodPost, "/api/sets", map[string]any{"name": "s", "servers": []string{"a"}, "port": 9200})
-	status(t, w, http.StatusInternalServerError)
+	status(t, w, http.StatusBadRequest)
+	if body := w.Body.String(); !strings.Contains(body, "диапазоне") {
+		t.Fatalf("диапазон не назван: %s", body)
+	}
 }
 
 func TestSetsHideToken(t *testing.T) {
