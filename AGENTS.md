@@ -27,6 +27,28 @@ bash scripts/dev-real-set.sh      # стенд на живых серверах:
 
 Go-тулчейн: локально 1.24.4, модуль требует 1.27.4 — `GOTOOLCHAIN=auto` скачивает нужный тулчейн сам (проверено: `GOTOOLCHAIN=go1.27.4 go version`).
 
+## Диаграммы и картинки
+
+`docs/diagrams/` — по файлу `.json` (спецификация) → `.html` (archify) → `.png` (растр)
+на каждом языке. Правится только `.json`, остальное перегенерируется:
+
+```bash
+archify finalize architecture docs/diagrams/mcprig.why.en.json docs/diagrams/mcprig.why.en.html \
+  --quality showcase --out-dir /tmp/opencode/review --json
+```
+
+`finalize` прогоняет validate → deliver → check → browser-check; второй прогон в тот же
+каталог падает на `viewer/evidence-path-conflict` — каждому прогону свой `--out-dir`, а
+`*.delivery.json` и `.review/` в репозиторий не коммитятся. PNG снимается headless-Chrome
+с `--force-device-scale-factor=2`, из копии `.html` с добавленным в `<head>` стилем
+`.toolbar,.diagram-nav{display:none!important}` (иначе в кадр попадают кнопки вьюера), в
+тёмной теме: `"…?theme=dark"`. Карточки-подсказки в режиме `?embed=1` не рисуются —
+для PNG этот параметр не ставить.
+
+Скриншот панели для README (`design/ui/panel.png`) — живая панель под
+`systemd-run --user` на отдельном порту, тёмная тема, EN, 1280 CSS px при DPR 2;
+прежний кадр уезжает в `design/ui/archive/panel-<версия>.png`.
+
 ## Ссылки
 
 - Стенд на настоящих серверах: `docs/dev-real-servers.md` (serena, socraticode, xerj).
