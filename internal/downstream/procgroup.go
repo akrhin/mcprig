@@ -2,6 +2,9 @@ package downstream
 
 import (
 	"context"
+	"os"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -86,7 +89,7 @@ func killGroup(pgid int) {
 func groupGone(pgid int, d time.Duration) bool {
 	deadline := time.Now().Add(d)
 	for {
-		if err := syscall.Kill(-pgid, 0); err != nil {
+		if !groupAlive(pgid) {
 			return true
 		}
 		if time.Now().After(deadline) {
@@ -94,4 +97,48 @@ func groupGone(pgid int, d time.Duration) bool {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+// groupAlive отвечает, есть ли в группе живой процесс. Зомби не считаются:
+// kill(0) считает их живыми, а пожинает их чужой PID 1 — в контейнере он этого
+// не делает, и закрытие ждало бы весь бюджет впустую.
+func groupAlive(pgid int) bool {
+	if err := syscall.Kill(-pgid, 0); err != nil {
+		return false
+	}
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return true // группу не посмотреть — считаем живой, бюджет всё равно ограничен
+	}
+	for _, e := range entries {
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil {
+			continue
+		}
+		if state, _, grp, ok := procInfo(pid); ok && grp == pgid && state != "Z" {
+			return true
+		}
+	}
+	return false
+}
+
+// procInfo читает состояние, родителя и группу процесса. comm в скобках может
+// содержать пробелы, поэтому поля считаются после последней «) ».
+func procInfo(pid int) (state string, ppid, pgid int, ok bool) {
+	b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return "", 0, 0, false
+	}
+	s := string(b)
+	i := strings.LastIndex(s, ") ")
+	if i < 0 {
+		return "", 0, 0, false
+	}
+	f := strings.Fields(s[i+2:])
+	if len(f) < 3 {
+		return "", 0, 0, false
+	}
+	ppid, _ = strconv.Atoi(f[1])
+	pgid, _ = strconv.Atoi(f[2])
+	return f[0], ppid, pgid, true
 }

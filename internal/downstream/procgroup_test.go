@@ -2,11 +2,8 @@ package downstream
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
-	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -78,7 +75,7 @@ func startTree(t *testing.T, ctx context.Context) (conn mcp.Connection, pid int,
 func assertTreeGone(t *testing.T, pid int, tree []int) {
 	t.Helper()
 	for _, p := range tree[1:] {
-		if _, pgid, ok := procStat(p); ok && pgid != pid {
+		if _, _, pgid, ok := procInfo(p); ok && pgid != pid {
 			t.Errorf("процесс %d не в группе %d: сервер обязан жить в своей группе", p, pid)
 		}
 	}
@@ -119,7 +116,7 @@ func descendants(pid int) []int {
 		if err != nil {
 			continue
 		}
-		if ppid, _, ok := procStat(p); ok {
+		if _, ppid, _, ok := procInfo(p); ok {
 			kids[ppid] = append(kids[ppid], p)
 		}
 	}
@@ -130,32 +127,13 @@ func descendants(pid int) []int {
 	return out
 }
 
-// procStat читает ppid и pgid. comm в скобках может содержать пробелы, поэтому
-// поля считаются после последней «) », а не от начала строки.
-func procStat(pid int) (ppid, pgid int, ok bool) {
-	b, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-	if err != nil {
-		return 0, 0, false
-	}
-	s := string(b)
-	i := strings.LastIndex(s, ") ")
-	if i < 0 {
-		return 0, 0, false
-	}
-	f := strings.Fields(s[i+2:])
-	if len(f) < 3 {
-		return 0, 0, false
-	}
-	ppid, _ = strconv.Atoi(f[1])
-	pgid, _ = strconv.Atoi(f[2])
-	return ppid, pgid, true
-}
-
-// gone ждёт смерти процесса не дольше wait.
+// gone ждёт смерти процесса не дольше wait. Зомби мёртв: пожинает его чужой
+// PID 1, а в контейнере он этого не делает — kill(0) такого процесса отвечает
+// «жив» вечно.
 func gone(pid int, wait time.Duration) bool {
 	deadline := time.Now().Add(wait)
 	for {
-		if err := syscall.Kill(pid, 0); err != nil {
+		if state, _, _, ok := procInfo(pid); !ok || state == "Z" {
 			return true
 		}
 		if time.Now().After(deadline) {
