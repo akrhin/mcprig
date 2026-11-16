@@ -30,8 +30,12 @@ func TestProbeEnvHasNoManagerSecrets(t *testing.T) {
 	srv := &config.Server{
 		Name:      "probe",
 		Transport: config.TransportStdio,
-		Command:   []string{"sh", "-c", "env > " + out + "; exit 1"},
-		Env:       map[string]string{"OWN": "${REF}"},
+		// Переменная пишется встроенной командой оболочки, а полный env —
+		// отдельным процессом: на занятом раннере срок соединения истекает,
+		// набор гасится, и `env` до файла не доходит — тест падал на пустом
+		// файле, хотя окружение было верным.
+		Command: []string{"sh", "-c", "printf 'OWN=%s\\n' \"$OWN\" > " + out + "; env >> " + out + "; exit 1"},
+		Env:     map[string]string{"OWN": "${REF}"},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
