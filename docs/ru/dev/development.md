@@ -120,7 +120,9 @@ bash scripts/dev-real-set.sh stop
 заметки релиза — раздел `CHANGELOG.md` для тега
 через `scripts/release-notes.sh`. Сам `goreleaser` на хосте разработки не
 установлен. Каждый пуш и каждый pull request гоняет `.gitea/workflows/ci.yml` —
-те же проверки, что у конвейера тега, без `goreleaser`.
+те же проверки, что у конвейера тега, без `goreleaser`, плюс кросс-сборка под
+`darwin` (`GOOS=darwin go build ./...`): архивы собираются и для macOS, а
+Linux-специфичное поле ломает их, не ломая сборку под Linux.
 
 ## См. также
 

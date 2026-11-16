@@ -118,7 +118,9 @@ Logs: the panel writes `$DATA/panel.log`, the set writes
 release notes are the tag's `CHANGELOG.md` section
 via `scripts/release-notes.sh`. `goreleaser` itself is not installed on the
 development host. Every push and pull request runs `.gitea/workflows/ci.yml` —
-the same checks as the tag pipeline minus `goreleaser`.
+the same checks as the tag pipeline minus `goreleaser`, plus a cross-build for
+`darwin` (`GOOS=darwin go build ./...`): the archives target macOS too, and a
+Linux-only field breaks them without failing a Linux build.
 
 ## See also
 
