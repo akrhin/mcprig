@@ -81,13 +81,14 @@ func FromEnv(version string) Options {
 		SeedFile:  os.Getenv("MCPRIG_SEED_FILE"),
 		Version:   version,
 		Auth: AuthOptions{
-			Password:     os.Getenv("MCPRIG_PASSWORD"),
-			PasswordHash: os.Getenv("MCPRIG_PASSWORD_HASH"),
-			ProxySecret:  os.Getenv("MCPRIG_PROXY_SECRET"),
-			User:         os.Getenv("MCPRIG_USER"),
-			UserHeader:   os.Getenv("MCPRIG_USER_HEADER"),
-			AllowedHosts: splitList(os.Getenv("MCPRIG_ALLOWED_HOSTS")),
-			Off:          os.Getenv("MCPRIG_AUTH") == "off",
+			Password:       os.Getenv("MCPRIG_PASSWORD"),
+			PasswordHash:   os.Getenv("MCPRIG_PASSWORD_HASH"),
+			ProxySecret:    os.Getenv("MCPRIG_PROXY_SECRET"),
+			TrustedProxies: os.Getenv("MCPRIG_TRUSTED_PROXIES"),
+			User:           os.Getenv("MCPRIG_USER"),
+			UserHeader:     os.Getenv("MCPRIG_USER_HEADER"),
+			AllowedHosts:   splitList(os.Getenv("MCPRIG_ALLOWED_HOSTS")),
+			Off:            os.Getenv("MCPRIG_AUTH") == "off",
 		},
 	}
 }
@@ -613,7 +614,10 @@ func (m *Manager) buildRoutes() []route {
 		}),
 		mk(`^/api/sets/`+setPattern+`/servers$`, map[string]handlerFunc{http.MethodGet: m.apiSetServers}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/authorize$`, map[string]handlerFunc{
-			http.MethodPost: m.apiServerAuthorize, http.MethodGet: m.apiServerAuthorize,
+			http.MethodPost: m.apiServerAuthorize,
+		}),
+		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/authorize/status$`, map[string]handlerFunc{
+			http.MethodGet: m.apiAuthorizeStatus,
 		}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiServerLogs}),
 		mk(`^/api/sets/`+setPattern+`/tools$`, map[string]handlerFunc{http.MethodGet: m.apiSetTools}),
@@ -713,11 +717,17 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
 		return nil
 	}
-	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+	site := r.Header.Get("Sec-Fetch-Site")
+	if site == "cross-site" {
 		return &httpError{http.StatusForbidden, "запрос пришёл с чужого сайта — откройте панель по её адресу"}
 	}
 	origin := r.Header.Get("Origin")
-	if origin != "" && origin != "null" {
+	switch {
+	case origin == "null":
+		// null значит «источник неизвестен» — песочница или data:-страница;
+		// это не отсутствие заголовка, и доверия такому запросу нет.
+		return &httpError{http.StatusForbidden, "Origin: null не принимается — откройте панель по её адресу"}
+	case origin != "":
 		u, err := url.Parse(origin)
 		if err != nil || !m.originMatches(u, r) {
 			// Значения в лог: без них отказ не отладить с чужой машины.
@@ -725,11 +735,18 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
-	} else if _, err := r.Cookie(sessionCookie); err == nil && r.URL.Path != "/api/login" {
-		// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
-		// сессионной cookie — подделка. Вход сюда не попадает: пароль всё равно
-		// проверяется, а старая cookie не должна превращать вход в 403.
-		return &httpError{http.StatusForbidden, "не хватает заголовка Origin"}
+	case r.URL.Path != "/api/login":
+		if _, err := r.Cookie(sessionCookie); err == nil {
+			// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
+			// сессионной cookie — подделка. Вход сюда не попадает: пароль всё равно
+			// проверяется, а старая cookie не должна превращать вход в 403.
+			return &httpError{http.StatusForbidden, "не хватает заголовка Origin"}
+		}
+		if site != "" {
+			// Sec-Fetch-Site ставят только браузеры, и они же всегда шлют Origin:
+			// пара «fetch-заголовок есть, Origin нет» — не браузер, а подделка.
+			return &httpError{http.StatusForbidden, "браузерный запрос без Origin — отказ"}
+		}
 	}
 	if r.ContentLength != 0 && r.URL.Path != "/api/login" && !isJSON(r.Header.Get("Content-Type")) {
 		return badRequest("тело запроса должно быть JSON")
@@ -777,13 +794,13 @@ func (m *Manager) originMatches(u *url.URL, r *http.Request) bool {
 
 // requestAuthorities — origin'ы, которыми клиент видит запрос: сам Host и
 // публичное имя прокси. За TLS-прокси до Go доходит http, поэтому https-схема
-// считается своей при доверенном прокси (задан MCPRIG_PROXY_SECRET) либо при
-// собственном TLS панели; иначе https-Origin на http-запросе — отказ.
-// X-Forwarded-* без доверенного прокси игнорируются: иначе любой клиент
-// подделал бы публичное имя и снял проверку Origin.
+// считается своей при доверенном пире (см. trustsProxy) либо при собственном
+// TLS панели; иначе https-Origin на http-запросе — отказ.
+// X-Forwarded-* от прочих пиров игнорируются: иначе любой клиент подделал бы
+// публичное имя и снял проверку Origin.
 // Как только https признан своим, http-Origin отбрасывается целиком.
 func (m *Manager) requestAuthorities(r *http.Request) []originAuthority {
-	trustProxy := m.auth.proxySecret != ""
+	trustProxy := m.auth.trustsProxy(r)
 	scheme := "http"
 	if secureRequest(r, trustProxy) || trustProxy {
 		scheme = "https"
@@ -807,13 +824,13 @@ func hasPort(hostport string) bool {
 
 // hostAllowed — то же послабление для самого Host: прокси переписывает его на
 // внутренний адрес, а публичное имя приходит в X-Forwarded-Host. Заголовку
-// верим только при доверенном прокси (MCPRIG_PROXY_SECRET): без него Host
-// проверяется как есть, иначе подделанный заголовок снял бы защиту от rebinding.
+// верим только от доверенного пира (trustsProxy): иначе подделанный заголовок
+// снял бы защиту от rebinding.
 func (m *Manager) hostAllowed(r *http.Request) bool {
 	if m.auth.hostOK(r.Host) {
 		return true
 	}
-	if m.auth.proxySecret == "" {
+	if !m.auth.trustsProxy(r) {
 		return false
 	}
 	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {

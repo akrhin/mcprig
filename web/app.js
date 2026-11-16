@@ -2010,7 +2010,7 @@
     var flow = authFlow;
     if (!flow) { return; }
     clearTimeout(authPoll);
-    get(authPath(flow.id, flow.name)).then(function (v) {
+    get(authPath(flow.id, flow.name) + '/status').then(function (v) {
       if (authFlow !== flow) { return; }
       if (showAuth(v)) { authPoll = setTimeout(pollAuth, 1500); }
       else if (v && v.state === 'ok') { setTimeout(loadHealth, 1500); }

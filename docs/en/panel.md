@@ -188,8 +188,10 @@ A remote server that answers `401` shows **authorize** in its row on the **All
 servers** page, as long as the server belongs to the open set. The button starts
 the authorization-code flow inside the daemon
 and draws a dialog with the link; the browser is the user's, so the panel never
-waits for it in a request — the state is polled with
-`GET /api/sets/<set>/servers/<name>/authorize`.
+waits for it in a request — the flow is started with
+`POST /api/sets/<set>/servers/<name>/authorize` and its state is polled with
+`GET /api/sets/<set>/servers/<name>/authorize/status`. A `GET` on the starting
+route answers `405`: only the POST changes anything.
 
 | item | value |
 | --- | --- |
@@ -483,20 +485,25 @@ Writes (`POST`/`PUT`/`DELETE`) are rejected when `Sec-Fetch-Site` is
 `cross-site`, when `Origin` does not match `Host`, or when the body is not
 JSON. A cookie-authenticated write must also carry `Origin`: without it the
 request gets `403` "не хватает заголовка Origin" — a browser sends it on every such
-request, a forged one from another site does not. Header-based proxy auth and
-login (`POST /api/login`, no cookie yet) are exempt.
+request, a forged one from another site does not. `Origin: null` (a sandboxed or
+`data:` page) is refused the same way, and so is a request that carries
+`Sec-Fetch-Site` without `Origin`: browsers always send both. Header-based proxy
+auth and login (`POST /api/login`, no cookie yet) are exempt.
 
 `Origin` is compared in full — scheme, host and port; `MCPRIG_ALLOWED_HOSTS` is
-not a list of sources (it names the panel itself). `X-Forwarded-Proto` and
-`X-Forwarded-Host` are trusted only when `MCPRIG_PROXY_SECRET` is set: a
-trusted proxy then makes an `https` request count as secure and a forwarded
-host count as the panel's public name, so an `https` Origin matches. Without the
-secret both headers are ignored — otherwise any client could claim `https` and
-spoof the check. Trust is switched on by *setting* `MCPRIG_PROXY_SECRET`, not by
-verifying the peer: keep the panel port unreachable except through the proxy.
-With an `http` panel behind the secret, browser writes are rejected because the
-request counts as `https` — set `MCPRIG_PUBLIC_URL=https://…` to match what the
-browser sees.
+not a list of sources (it names the panel itself). `X-Forwarded-Proto`,
+`X-Forwarded-Host` and `X-Forwarded-For` are trusted only when
+`MCPRIG_PROXY_SECRET` is set *and* the peer is loopback or listed in
+`MCPRIG_TRUSTED_PROXIES` (an IP or a CIDR, comma-separated): a trusted proxy
+makes an `https` request count as secure and a forwarded host count as the
+panel's public name, so an `https` Origin matches.
+From any other peer the headers are ignored — otherwise any client could claim
+`https` and spoof the check, or step around the login limit by naming a fresh
+`X-Forwarded-For`. A value that parses as neither an IP nor a CIDR refuses the
+start with the offending entry named.
+With an `http` panel behind a trusted proxy, browser writes are rejected because
+the request counts as `https` — set `MCPRIG_PUBLIC_URL=https://…` to match what
+the browser sees.
 
 The OAuth redirect is taken from `MCPRIG_PUBLIC_URL` alone when set
 (`<publicUrl>/oauth/callback`, path prefix kept); without it the panel builds it

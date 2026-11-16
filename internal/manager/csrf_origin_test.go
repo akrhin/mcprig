@@ -2,6 +2,7 @@ package manager
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -97,7 +98,7 @@ func TestCSRFScheme(t *testing.T) {
 		{"tls, origin https", "https://example.com", "", true, http.StatusOK, ""},
 		{"X-Forwarded-Proto без секрета не делает запрос https, Origin сверяется с Host", "http://example.com", "https", false, http.StatusOK, ""},
 		{"http запрос, origin https", "https://example.com", "", false, http.StatusForbidden, "origin не совпадает с хостом"},
-		{"origin null с cookie", "null", "", false, http.StatusForbidden, "не хватает заголовка Origin"},
+		{"origin null с cookie", "null", "", false, http.StatusForbidden, "Origin: null не принимается"},
 		{"без origin с cookie", "", "", false, http.StatusForbidden, "не хватает заголовка Origin"},
 	}
 	for _, c := range cases {
@@ -154,6 +155,54 @@ func TestCSRFTrustedProxyNoXFP(t *testing.T) {
 	}
 	if w := post("https://example.com:3000"); w.Code != http.StatusForbidden {
 		t.Fatalf("чужой порт прошёл: %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+// SEC-06: Origin: null значит песочницу, а не «заголовка нет»; пара «браузерный
+// Sec-Fetch-Site без Origin» — тоже подделка. Скрипт без браузерных заголовков
+// и без cookie работает как раньше.
+func TestCSRFNullOriginAndFetchSite(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	cookie := &http.Cookie{Name: sessionCookie, Value: "test"}
+
+	cases := []struct {
+		name   string
+		origin string
+		site   string
+		cookie bool
+		want   string // пусто — отказ не ожидается
+	}{
+		{"origin null", "null", "", false, "Origin: null не принимается"},
+		{"Sec-Fetch-Site без Origin", "", "same-origin", false, "браузерный запрос без Origin"},
+		{"ни Origin, ни Sec-Fetch, ни cookie", "", "", false, ""},
+		{"cookie без Origin", "", "", true, "не хватает заголовка Origin"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/import", strings.NewReader(`{"mcpServers":{}}`))
+			req.Host = "example.com"
+			req.Header.Set("Content-Type", "application/json")
+			if c.origin != "" {
+				req.Header.Set("Origin", c.origin)
+			}
+			if c.site != "" {
+				req.Header.Set("Sec-Fetch-Site", c.site)
+			}
+			if c.cookie {
+				req.AddCookie(cookie)
+			}
+			err := e.m.checkCSRF(req)
+			if c.want == "" {
+				if err != nil {
+					t.Fatalf("%s: отказ без причины: %v", c.name, err)
+				}
+				return
+			}
+			var he *httpError
+			if !errors.As(err, &he) || he.status != http.StatusForbidden || !strings.Contains(he.msg, c.want) {
+				t.Fatalf("%s: ожидался 403 %q, получено %v", c.name, c.want, err)
+			}
+		})
 	}
 }
 

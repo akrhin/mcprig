@@ -8,6 +8,61 @@ import (
 	"time"
 )
 
+// SEC-07: вход перезапускает набор, поэтому запуск — только POST. GET получает
+// 405, состояние не меняется и набор не перезапускается; панель опрашивает
+// состояние отдельным GET .../authorize/status.
+func TestAuthorizeIsPostOnly(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	addServer(t, e, `{"name":"remote","transport":"http","url":"http://127.0.0.1:1/mcp","enabled":true}`)
+	set, err := e.m.store.AddSet(json.RawMessage(`{"id":"s1","name":"s1","servers":["remote"]}`))
+	if err != nil {
+		t.Fatalf("AddSet: %v", err)
+	}
+	key := authKey("s1", "remote")
+	before := e.m.rt.status(set)
+
+	rec := e.do(t, http.MethodGet, "/api/sets/s1/servers/remote/authorize", nil)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET: код %d, ожидался 405: %s", rec.Code, rec.Body)
+	}
+	if got := rec.Header().Get("Allow"); got != http.MethodPost {
+		t.Fatalf("Allow: %q, ожидался POST", got)
+	}
+	if st := e.m.flowView(key); st.State != "idle" {
+		t.Fatalf("GET завёл вход: %+v", st)
+	}
+	if after := e.m.rt.status(set); after.Running != before.Running || after.PID != before.PID {
+		t.Fatalf("GET перезапустил набор: было %+v, стало %+v", before, after)
+	}
+
+	rec = e.do(t, http.MethodGet, "/api/sets/s1/servers/remote/authorize/status", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET status: код %d, ожидался 200: %s", rec.Code, rec.Body)
+	}
+
+	rec = e.do(t, http.MethodPost, "/api/sets/s1/servers/remote/authorize", nil)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("POST: код %d, ожидался 202: %s", rec.Code, rec.Body)
+	}
+	var got authFlow
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("ответ POST: %v (%s)", err, rec.Body)
+	}
+	if got.State != "pending" {
+		t.Fatalf("POST не завёл вход: %+v", got)
+	}
+
+	// Горутина входа пишет токен в каталог данных: без ожидания t.TempDir
+	// не удалится, а тест прочитает чужой незакрытый поток.
+	deadline := time.Now().Add(5 * time.Second)
+	for e.m.flowView(key).State == "pending" && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if st := e.m.flowView(key); st.State == "pending" {
+		t.Fatalf("вход не завершился за 5 с: %+v", st)
+	}
+}
+
 // addServer кладёт сервер в реестр так же, как это делает панель.
 func addServer(t *testing.T, e *env, raw string) {
 	t.Helper()

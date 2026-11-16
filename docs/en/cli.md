@@ -148,13 +148,19 @@ No flags. Everything is environment:
 | `MCPRIG_PASSWORD` | empty | panel password |
 | `MCPRIG_PASSWORD_HASH` | empty | `scrypt$N$r$p$salt$hash`; when set, the plain password is ignored |
 | `MCPRIG_PROXY_SECRET` | empty | shared secret for proxy auth; a value shorter than 32 characters logs a warning |
+| `MCPRIG_TRUSTED_PROXIES` | loopback | comma-separated IPs or CIDRs whose `X-Forwarded-*` are believed; an entry that is neither stops the panel at startup |
 | `MCPRIG_USER` | `admin` | login name |
 | `MCPRIG_USER_HEADER` | `Remote-User` | header carrying the user name from a trusted proxy |
 | `MCPRIG_ALLOWED_HOSTS` | loopback only | comma-separated `Host` allowlist |
 | `MCPRIG_AUTH` | empty | `off` disables panel auth |
 
-Setting `MCPRIG_PROXY_SECRET` is what makes `X-Forwarded-*` trusted — the peer
-is not verified — so keep the panel port unreachable except through the proxy.
+Setting `MCPRIG_PROXY_SECRET` is what makes `X-Forwarded-*` trusted, and only
+from a peer the panel believes: loopback, or an address in
+`MCPRIG_TRUSTED_PROXIES`. A request from any other peer is treated as if the
+headers were absent — no public name, no `https`, no client address for the login
+limit. Trusting a proxy on another host therefore takes both the secret and its
+address, and a mismatch shows up as `403` on the origin check with the proxy
+serving the panel correctly.
 With an `http` panel behind the secret, browser writes are rejected because the
 request counts as `https`; set `MCPRIG_PUBLIC_URL=https://…` to match.
 
@@ -191,7 +197,8 @@ With `MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` the panel serves https itself; the
 session cookie is `Secure` whenever the public address is `https` or the panel
 has its own certificate, even though a TLS reverse proxy hands the process plain
 http. `X-Forwarded-Proto` and `X-Forwarded-Host` are trusted only when
-`MCPRIG_PROXY_SECRET` is set — without it they are ignored: they neither mark a
+`MCPRIG_PROXY_SECRET` is set **and** the peer is loopback or listed in
+`MCPRIG_TRUSTED_PROXIES` — otherwise they are ignored: they neither mark a
 request `https` nor name the panel for the Host and Origin checks, and the OAuth
 redirect never depends on them.
 
