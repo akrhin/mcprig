@@ -63,9 +63,11 @@ func TestHeadersAreApplied(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rt.RoundTrip(req); err != nil {
+	res, err := rt.RoundTrip(req)
+	if err != nil {
 		t.Fatal(err)
 	}
+	res.Body.Close()
 	if got := seen.Get("X-Token"); got != "abc" {
 		t.Fatalf("header not applied, got %q", got)
 	}
@@ -158,8 +160,12 @@ func TestConnectKeepsChildStderr(t *testing.T) {
 // копить stderr в памяти.
 func TestStderrTailKeepsLast(t *testing.T) {
 	var tail stderrTail
-	tail.Write([]byte(strings.Repeat("a", stderrLimit)))
-	tail.Write([]byte("конец"))
+	if _, err := tail.Write([]byte(strings.Repeat("a", stderrLimit))); err != nil {
+		t.Fatalf("запись в хвост: %v", err)
+	}
+	if _, err := tail.Write([]byte("конец")); err != nil {
+		t.Fatalf("запись в хвост: %v", err)
+	}
 	got := tail.String()
 	if len(got) != stderrLimit || !strings.HasSuffix(got, "конец") {
 		t.Fatalf("хвост %d байт, suffix %q", len(got), got[len(got)-10:])

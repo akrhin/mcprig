@@ -113,7 +113,11 @@ func TestTruncatedStructuredAnswerNamesFile(t *testing.T) {
 		t.Fatalf("нет маркера усечения: %q", text)
 	}
 	rest := text[i+len(marker):]
-	path := rest[:strings.Index(rest, "]")]
+	end := strings.Index(rest, "]")
+	if end < 0 {
+		t.Fatalf("нет конца пути в маркере: %q", rest)
+	}
+	path := rest[:end]
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("полный ответ не выгружен: %v", err)

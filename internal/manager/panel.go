@@ -54,6 +54,6 @@ func (m *Manager) servePanel(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method == http.MethodHead {
 		return true
 	}
-	_, _ = w.Write(body)
+	_, _ = w.Write(body) //nolint:gosec // G705: body — файл встроенной панели, а не ввод пользователя
 	return true
 }

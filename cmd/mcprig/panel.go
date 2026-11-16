@@ -64,7 +64,7 @@ func newPanelClient(ctx context.Context, base string, c panelCreds) (*http.Clien
 		return nil, fmt.Errorf("панель %s: %w", base, err)
 	}
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-	res.Body.Close()
+	_ = res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		fmt.Fprintf(os.Stderr, "ответ панели: %s\n", strings.TrimSpace(string(raw)))
 		return nil, fmt.Errorf("панель %s не приняла вход: HTTP %d", base, res.StatusCode)

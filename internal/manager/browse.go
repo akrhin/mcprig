@@ -233,7 +233,7 @@ func (b *browser) release(s *browseSession) {
 	closeNow := s.closing && s.refs <= 0
 	b.mu.Unlock()
 	if closeNow {
-		s.sess.Close()
+		_ = s.sess.Close()
 	}
 }
 
@@ -421,6 +421,6 @@ func (b *browser) closeAll() {
 	}
 	b.mu.Unlock()
 	for _, s := range closeNow {
-		s.sess.Close()
+		_ = s.sess.Close()
 	}
 }

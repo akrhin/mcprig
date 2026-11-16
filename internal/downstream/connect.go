@@ -161,7 +161,8 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 			exe = ""
 		}
 		argv := guardArgv(res.Argv, exe)
-		cmd := exec.Command(argv[0], argv[1:]...)
+		// Значения ctx нужны, отмена — нет: сервер живёт дольше запроса.
+		cmd := exec.CommandContext(context.WithoutCancel(ctx), argv[0], argv[1:]...)
 		cmd.Dir = srv.Cwd
 		// Своя группа: иначе гасится только прямой ребёнок, а внуки сервера
 		// остаются в системе (см. groupTransport).

@@ -108,7 +108,8 @@ func runWarm(args []string) error {
 		if err != nil {
 			return err
 		}
-		out = append(body, '\n')
+		body = append(body, '\n')
+		out = body
 	} else {
 		out = renderWarm(results)
 	}

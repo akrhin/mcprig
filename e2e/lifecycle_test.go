@@ -230,13 +230,22 @@ func (l *lifecycle) start() {
 func (l *lifecycle) close() {
 	if l.cmd != nil && l.cmd.Process != nil {
 		defer func() { l.cmd = nil }()
-		l.cmd.Process.Signal(os.Interrupt)
+		if err := l.cmd.Process.Signal(os.Interrupt); err != nil {
+			l.t.Logf("SIGINT панели: %v", err)
+		}
 		done := make(chan struct{})
-		go func() { l.cmd.Wait(); close(done) }()
+		go func() {
+			if err := l.cmd.Wait(); err != nil {
+				l.t.Logf("ожидание панели: %v", err)
+			}
+			close(done)
+		}()
 		select {
 		case <-done:
 		case <-time.After(10 * time.Second):
-			l.cmd.Process.Kill()
+			if err := l.cmd.Process.Kill(); err != nil {
+				l.t.Logf("SIGKILL панели: %v", err)
+			}
 		}
 	}
 }

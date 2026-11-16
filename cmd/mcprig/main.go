@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec // G108: обработчики регистрируются всегда, но слушает их только MCPRIG_PPROF
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -39,8 +39,11 @@ func startPprof() {
 	if addr == "" {
 		return
 	}
+	// Свои таймауты: у pprof-сервера нет ни WriteTimeout (профиль снимается
+	// десятками секунд), ни бюджета заголовков по умолчанию.
+	srv := &http.Server{Addr: addr, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
-		if err := http.ListenAndServe(addr, nil); err != nil {
+		if err := srv.ListenAndServe(); err != nil {
 			fmt.Fprintln(os.Stderr, "mcprig: pprof:", err)
 		}
 	}()
@@ -72,7 +75,8 @@ func exitCode(err error) int {
 	if errors.Is(err, flag.ErrHelp) {
 		return 0
 	}
-	if _, ok := err.(*usageError); ok {
+	var ue *usageError
+	if errors.As(err, &ue) {
 		return 2
 	}
 	return 1
@@ -192,12 +196,12 @@ var tooloutInterval = toolout.Interval
 // startToolout sweeps the tool-out directory now and then periodically until ctx
 // is done. serve and stdio share one base directory — the same one the proxy
 // writes truncated answers into — so stdio's files are cleaned too.
-func startToolout(ctx context.Context, log *slog.Logger) <-chan struct{} {
+func startToolout(ctx context.Context, log *slog.Logger) {
 	cfg, warns := toolout.FromEnv()
 	for _, w := range warns {
 		log.Warn("tool-out: " + w)
 	}
-	return toolout.Run(ctx, toolout.Base(), cfg, tooloutInterval, log)
+	toolout.Run(ctx, toolout.Base(), cfg, tooloutInterval, log)
 }
 
 func run() error {
@@ -457,11 +461,11 @@ func writeReloadStatus(path string, res mcpserver.ReloadResult, nonce string) er
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
 	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
+		_ = tmp.Close() // первична ошибка Chmod
 		return err
 	}
 	if _, err := tmp.Write(body); err != nil {
-		tmp.Close()
+		_ = tmp.Close() // первична ошибка Write
 		return err
 	}
 	if err := tmp.Close(); err != nil {

@@ -159,16 +159,20 @@ func TestApproveThroughPanelWithAuth(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { res.Body.Close() })
 		return res
 	}
-	if res := post("/api/login", map[string]string{"user": "admin", "password": "pw"}, false); res.StatusCode != http.StatusOK {
-		t.Fatalf("вход: %d", res.StatusCode)
+	login := post("/api/login", map[string]string{"user": "admin", "password": "pw"}, false)
+	defer login.Body.Close()
+	if login.StatusCode != http.StatusOK {
+		t.Fatalf("вход: %d", login.StatusCode)
 	}
-	if res := post("/api/servers", map[string]any{"name": "alpha", "command": []string{"downstream"}}, true); res.StatusCode != http.StatusCreated {
-		t.Fatalf("сервер: %d", res.StatusCode)
+	added := post("/api/servers", map[string]any{"name": "alpha", "command": []string{"downstream"}}, true)
+	defer added.Body.Close()
+	if added.StatusCode != http.StatusCreated {
+		t.Fatalf("сервер: %d", added.StatusCode)
 	}
 	res := post("/api/sets", map[string]any{"name": "quar", "servers": []string{"alpha"}}, true)
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusCreated {
 		t.Fatalf("набор: %d", res.StatusCode)
 	}

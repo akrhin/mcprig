@@ -117,12 +117,12 @@ func lock(path string) (func(), error) {
 		return nil, err
 	}
 	if err := syscall.Flock(int(fh.Fd()), syscall.LOCK_EX); err != nil {
-		fh.Close()
+		_ = fh.Close() // первична ошибка flock
 		return nil, err
 	}
 	return func() {
-		syscall.Flock(int(fh.Fd()), syscall.LOCK_UN)
-		fh.Close()
+		_ = syscall.Flock(int(fh.Fd()), syscall.LOCK_UN) // снимется и закрытием файла
+		_ = fh.Close()
 	}, nil
 }
 

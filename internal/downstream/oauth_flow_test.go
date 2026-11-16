@@ -93,7 +93,9 @@ func newEchoServer() *mcp.Server {
 func (f *fakeAS) writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		f.t.Errorf("ответ сервера авторизации: %v", err)
+	}
 }
 
 // problem запоминает причину отказа, чтобы тест напечатал её при падении.
@@ -337,7 +339,9 @@ func TestOAuthFlowAgainstFakeAS(t *testing.T) {
 			return err
 		}
 		defer resp.Body.Close()
-		io.Copy(io.Discard, resp.Body)
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			return err
+		}
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("страница приёмника: %s", resp.Status)
 		}

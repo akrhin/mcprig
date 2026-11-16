@@ -21,7 +21,9 @@ func captureStdout(t *testing.T, fn func()) string {
 	done := make(chan string, 1)
 	go func() {
 		var b strings.Builder
-		io.Copy(&b, r)
+		if _, err := io.Copy(&b, r); err != nil {
+			t.Errorf("чтение перехваченного вывода: %v", err)
+		}
 		done <- b.String()
 	}()
 	fn()
@@ -130,7 +132,12 @@ func TestInitKeyFromStdin(t *testing.T) {
 	}
 	os.Stdin = r
 	defer func() { os.Stdin = old; r.Close() }()
-	go func() { io.WriteString(w, "stdin-key\n"); w.Close() }()
+	go func() {
+		if _, err := io.WriteString(w, "stdin-key\n"); err != nil {
+			t.Errorf("ключ в stdin: %v", err)
+		}
+		w.Close()
+	}()
 
 	out := captureStdout(t, func() {
 		if err := runInit([]string{"--client", "claude", "--remote", "http://127.0.0.1:9100/mcp", "--key", "-"}); err != nil {

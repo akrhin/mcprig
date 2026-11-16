@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -103,7 +104,8 @@ func runDoctor(args []string) error {
 		if err != nil {
 			return err
 		}
-		out = append(body, '\n')
+		body = append(body, '\n')
+		out = body
 	} else {
 		out = renderDoctor(rep)
 	}
@@ -251,7 +253,7 @@ func readRegistry(dataDir string) (*registry.Data, []byte, error) {
 	}
 	var data registry.Data
 	if err := json.Unmarshal(raw, &data); err != nil {
-		return nil, raw, fmt.Errorf("реестр %s: %v", path, err)
+		return nil, raw, fmt.Errorf("реестр %s: %w", path, err)
 	}
 	return &data, raw, nil
 }
@@ -615,7 +617,12 @@ func activeKey(keys []registry.Key) (prefix string, ok bool) {
 var doctorClient = &http.Client{Timeout: 2 * time.Second}
 
 func healthz(addr string) (int, error) {
-	res, err := doctorClient.Get("http://" + addr + "/healthz")
+	// Отмены у doctor нет: срок задаёт таймаут клиента.
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr+"/healthz", nil)
+	if err != nil {
+		return 0, err
+	}
+	res, err := doctorClient.Do(req)
 	if err != nil {
 		return 0, err
 	}
@@ -632,11 +639,11 @@ func httpStatus(code int, err error) string {
 }
 
 func portOpen(addr string) bool {
-	conn, err := net.DialTimeout("tcp", addr, 500*time.Millisecond)
+	conn, err := (&net.Dialer{Timeout: 500 * time.Millisecond}).DialContext(context.Background(), "tcp", addr)
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 

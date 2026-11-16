@@ -62,7 +62,7 @@ func NewCallback(addr, state string) (*Callback, error) {
 	if port == "" {
 		port = "0"
 	}
-	ln, err := net.Listen("tcp", net.JoinHostPort(host, port))
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", net.JoinHostPort(host, port))
 	if err != nil {
 		return nil, fmt.Errorf("oauth: занять порт %s для приёма кода: %w (занят? смените callbackPort в настройках)", addr, err)
 	}
@@ -75,7 +75,7 @@ func NewCallback(addr, state string) (*Callback, error) {
 	}
 	_, actualPort, err := net.SplitHostPort(ln.Addr().String())
 	if err != nil {
-		ln.Close()
+		_ = ln.Close()
 		return nil, fmt.Errorf("oauth: определить порт приёмника: %w", err)
 	}
 	c.url = "http://" + net.JoinHostPort(host, actualPort) + "/callback"
@@ -83,7 +83,7 @@ func NewCallback(addr, state string) (*Callback, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", c.handleCallback)
 	c.srv = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	go c.srv.Serve(ln)
+	go func() { _ = c.srv.Serve(ln) }() // ErrServerClosed после Close — штатный конец
 	return c, nil
 }
 

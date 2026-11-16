@@ -116,7 +116,7 @@ func (m *Manager) authorize(setID string, srv *config.Server, redirect string) {
 	}
 	session, err := conn.Connect(ctx, &target)
 	if err == nil {
-		session.Close()
+		_ = session.Close()
 	}
 	if err != nil {
 		m.finishFlow(key, err)

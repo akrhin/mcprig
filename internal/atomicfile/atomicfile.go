@@ -34,16 +34,16 @@ func replace(path string, data []byte, sync bool) error {
 	// After a successful rename this removes nothing.
 	defer os.Remove(name)
 	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
+		_ = tmp.Close() // первична ошибка Chmod
 		return err
 	}
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close() // первична ошибка Write
 		return err
 	}
 	if sync {
 		if err := tmp.Sync(); err != nil {
-			tmp.Close()
+			_ = tmp.Close() // первична ошибка Sync
 			return err
 		}
 	}

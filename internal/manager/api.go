@@ -168,7 +168,7 @@ func New(opts Options) (*Manager, error) {
 	}
 	if opts.SeedFile != "" {
 		// registry.Open берёт сид из окружения — другого входа у чужого пакета нет.
-		os.Setenv("MANAGER_SEED_FILE", opts.SeedFile)
+		_ = os.Setenv("MANAGER_SEED_FILE", opts.SeedFile)
 	}
 	store, err := registry.Open(opts.DataDir)
 	if err != nil {
@@ -379,8 +379,8 @@ func lockDataDir(dir string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Fprintf(f, "%d\n", os.Getpid())
-	f.Close()
+	_, _ = fmt.Fprintf(f, "%d\n", os.Getpid())
+	_ = f.Close()
 	return func() { _ = os.Remove(path) }, nil
 }
 
@@ -428,7 +428,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok := m.auth.check(r); !ok {
+	if !m.auth.check(r) {
 		m.unauthorized(w, r)
 		return
 	}
@@ -453,7 +453,7 @@ func (m *Manager) unauthorized(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusUnauthorized)
-	json.NewEncoder(w).Encode(map[string]any{"error": "нужна авторизация", "login": true})
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": "нужна авторизация", "login": true}) // ответ уже отправлен
 }
 
 func (m *Manager) handleLoginPage(w http.ResponseWriter, r *http.Request) {
@@ -465,7 +465,7 @@ func (m *Manager) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		m.methodNotAllowed(w, []string{http.MethodGet})
 		return
 	}
-	if _, ok := m.auth.check(r); ok {
+	if m.auth.check(r) {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -540,11 +540,7 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m.auth.loginOK(ips)
-	name, err := m.auth.startSession(w, r)
-	if err != nil {
-		m.fail(w, r, err)
-		return
-	}
+	name := m.auth.startSession(w, r)
 	if isForm {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
@@ -710,7 +706,7 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg}) // ответ уже отправлен
 }
 
 func (m *Manager) checkCSRF(r *http.Request) error {
@@ -1232,7 +1228,7 @@ func (m *Manager) apiBrowseCall(req *request) error {
 func checkReservedRefs(raw json.RawMessage) error {
 	var srv config.Server
 	if err := json.Unmarshal(raw, &srv); err != nil {
-		return nil // кривой JSON отклонит store
+		return nil //nolint:nilerr // кривой JSON отклонит store
 	}
 	if names := reservedRefs(&srv); len(names) > 0 {
 		return reservedRefError(names[0])
@@ -1711,7 +1707,7 @@ func (m *Manager) apiSetServers(req *request) error {
 		// Клиент ушёл — ответа ему не нужно: пустой 200 он не прочтёт, а в
 		// журнал недоставка не идёт.
 		if req.r.Context().Err() != nil {
-			return nil
+			return nil //nolint:nilerr // клиент ушёл, ответ писать некуда
 		}
 		// Проба не дала ответа: серверы остаются в списке с ошибкой, а не
 		// исчезают из ответа (200 с servers: null панель читает как «их нет»).

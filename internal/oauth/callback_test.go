@@ -222,7 +222,9 @@ func TestCallbackSecondWaitRejected(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		cb.Wait(ctx)
+		if _, err := cb.Wait(ctx); err != nil {
+			t.Logf("Wait по отменённому ctx: %v", err)
+		}
 		close(done)
 	}()
 	waitUntilWaiting(t, cb)

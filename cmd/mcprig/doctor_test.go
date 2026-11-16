@@ -185,7 +185,9 @@ func TestBuildDoctorReportGreen(t *testing.T) {
 	panel := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" {
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, `{"status":"ok","sets":1}`)
+			if _, err := io.WriteString(w, `{"status":"ok","sets":1}`); err != nil {
+				t.Errorf("ответ панели: %v", err)
+			}
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -417,7 +419,9 @@ func TestDoctorWarnsPanelWithoutPassword(t *testing.T) {
 
 	panel := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, `{"status":"ok","sets":0}`)
+		if _, err := io.WriteString(w, `{"status":"ok","sets":0}`); err != nil {
+			t.Errorf("ответ панели: %v", err)
+		}
 	}))
 	defer panel.Close()
 	host, portText, err := net.SplitHostPort(strings.TrimPrefix(panel.URL, "http://"))

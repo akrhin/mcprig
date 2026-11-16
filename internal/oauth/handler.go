@@ -263,5 +263,5 @@ func openBrowser(raw string) error {
 	default:
 		return fmt.Errorf("открытие браузера не поддерживается на %s", runtime.GOOS)
 	}
-	return exec.Command(name, raw).Start()
+	return exec.CommandContext(context.Background(), name, raw).Start()
 }

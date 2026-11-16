@@ -88,7 +88,7 @@ func runLogsContext(ctx context.Context, o *logsConfig) error {
 	if err != nil {
 		// Ctrl-C во время первого запроса — такой же штатный выход, как в цикле.
 		if ctx.Err() != nil {
-			return nil
+			return nil //nolint:nilerr // Ctrl-C — штатный выход, а не ошибка
 		}
 		return err
 	}
@@ -105,7 +105,7 @@ func runLogsContext(ctx context.Context, o *logsConfig) error {
 		cur, err := fetch(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil
+				return nil //nolint:nilerr // Ctrl-C — штатный выход, а не ошибка
 			}
 			return err
 		}

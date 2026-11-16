@@ -34,15 +34,17 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	defer os.RemoveAll(dir)
 	fakeBin = filepath.Join(dir, "fakeset")
 	cmd := exec.Command("go", "build", "-o", fakeBin, "./testdata/fakeset")
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		os.RemoveAll(dir)
 		fmt.Fprintf(os.Stderr, "сборка фейкового набора: %v\n", err)
 		os.Exit(1)
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
 }
 
 type env struct {
