@@ -30,7 +30,7 @@ ARG VERSION=dev
 RUN case "$VERSION" in v*) echo "VERSION должен быть без ведущего v, получено $VERSION" >&2; exit 1;; esac
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/mcprig ./cmd/mcprig
 
-FROM node:22-alpine AS full
+FROM node:26-alpine AS full
 # REVISION — git-коммит, из которого собрано (метка image.revision).
 ARG VERSION=dev
 ARG REVISION=dev
