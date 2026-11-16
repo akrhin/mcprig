@@ -20,10 +20,11 @@ repository the project is built in.
   `docker build` of both image targets), `codeql.yml` scans Go and the panel's
   JavaScript, `dependency-review.yml` fails a pull request that adds a
   dependency with a high-severity advisory, and Dependabot proposes updates
-  weekly. Gitea keeps the code mirror and runs no workflows at all: its
-  `ci.yml`, `release.yml` and `images.yml` are gone, so tests, archives and
-  images are built once — on GitHub — and the release job pushes the images to
-  GHCR and to the host registry.
+  weekly. Gitea keeps the code mirror and one workflow, `images`, which builds
+  `slim`/`full` on a tag and pushes them to the host registry — GitHub cannot
+  log in there (`403`). Its `ci.yml` and `release.yml` are gone, so tests and
+  release archives are built once, on GitHub, and the release publishes them
+  together with the GHCR images.
 - The pipeline is hardened: actions are pinned to commit SHAs, permissions
   default to `contents: read`, checkout leaves no token behind
   (`persist-credentials: false`), pull requests receive no repository secrets,

@@ -10,7 +10,8 @@ this page does not repeat those numbers.
 ## Pipeline
 
 Two repositories, one builder. GitHub is the source of truth for checks and
-releases; Gitea keeps a mirror of the code and runs no workflows at all.
+releases; Gitea keeps a mirror of the code and runs exactly one workflow,
+`images`, because the host registry cannot be reached from GitHub.
 
 1. Tag `vX.Y.Z` on `master`, push to GitHub first, then to Gitea.
 2. GitHub `ci` runs on every push and pull request: `gofmt`, `go mod tidy -diff`,
@@ -26,11 +27,12 @@ releases; Gitea keeps a mirror of the code and runs no workflows at all.
 4. GitHub `release` runs on the tag: `goreleaser` builds four platforms and
    `checksums.txt`, publishes the release page (`.goreleaser.yaml` keeps
    `draft: false`) and builds the `slim`/`full` images once, pushing them to
-   `ghcr.io/akrhin/mcprig` and, when `REGISTRY`/`REGISTRY_USER`/
-   `REGISTRY_PASSWORD` secrets are set, to the host registry as well. Nothing is
-   published by hand.
-5. Gitea has no workflows left: it mirrors the code so the repository stays
-   readable without GitHub, and holds the releases and images pushed to it.
+   `ghcr.io/akrhin/mcprig`. Nothing is published by hand.
+5. Gitea `images` runs on the same tag and does one thing: builds `slim` and
+   `full` and pushes them to the host registry from `secrets.REGISTRY`. A
+   GitHub runner cannot push there — `docker login` to that registry answers
+   `403` — so the images for the host come from Gitea, the release does not wait
+   for them.
 6. Release notes are the tag's `CHANGELOG.md` section, cut by
    `scripts/release-notes.sh`.
 

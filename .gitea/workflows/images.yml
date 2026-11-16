@@ -1,0 +1,58 @@
+name: images
+# Единственный воркфлоу Gitea. Проверки и релиз выходят на GitHub
+# (.github/workflows/): .gitea/workflows/images.yml собирает образы.
+# Причина — реестр хоста: с GitHub login отвечает 403, а раннер Gitea живёт
+# рядом с реестром и пушит туда без вопросов.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcprig-images
+  cancel-in-progress: false
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Образы
+        env:
+          REGISTRY: ${{ secrets.REGISTRY }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${REGISTRY:-}" ] || [ -z "${REGISTRY_USER:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
+            echo "secrets.REGISTRY/REGISTRY_USER/REGISTRY_PASSWORD не заданы — образы не публикуются"
+            exit 0
+          fi
+          # job-контейнер act-runner получает docker.sock, только если он добавлен
+          # в container.options; без него шаг не краснит прогон.
+          if ! command -v docker >/dev/null 2>&1 || [ ! -S /var/run/docker.sock ]; then
+            echo "в job-контейнере нет docker или /var/run/docker.sock — образы собираются вручную (см. CONTRIBUTING)"
+            exit 0
+          fi
+          # Версия без v — та же форма, что у goreleaser и в main.version.
+          ref="${{ gitea.ref_name }}"
+          ver=$(printf '%s' "${ref:-dev}" | sed 's/^v//')
+          revision=$(git rev-parse --short HEAD)
+          repo="$REGISTRY/sintez/mcprig"
+          printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin
+          for target in slim full; do
+            case "$target" in full) latest=latest-full ;; *) latest=latest ;; esac
+            docker build --target "$target" \
+              --build-arg VERSION="$ver" --build-arg REVISION="$revision" \
+              -t "$repo:$ver-$target" -t "$repo:$latest" .
+            docker push "$repo:$ver-$target"
+            docker push "$repo:$latest"
+          done
