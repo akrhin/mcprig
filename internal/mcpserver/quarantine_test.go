@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -316,5 +317,97 @@ func TestSeenClearsWhenDescriptorReverts(t *testing.T) {
 	}
 	if res := invoke(t, cs, "echo"); res.IsError {
 		t.Fatalf("рабочий v1 заперт: %s", resultText(t, res))
+	}
+}
+
+// Файл одобрений не читается (на его месте каталог) — вызов не идёт: состояние
+// карантина неизвестно, и тихо разрешать его нельзя.
+func TestQuarantineFailsClosedOnUnreadableLock(t *testing.T) {
+	lock := filepath.Join(t.TempDir(), "tools.lock.json")
+	if err := os.Mkdir(lock, 0o700); err != nil {
+		t.Fatalf("каталог вместо файла: %v", err)
+	}
+	cs := clientFor(t, descriptorManager(t, "v1", lock).Server())
+	catalog(t, cs)
+
+	res := invoke(t, cs, "echo")
+	if !res.IsError {
+		t.Fatalf("вызов прошёл при нечитаемом файле: %s", resultText(t, res))
+	}
+	if text := resultText(t, res); !strings.Contains(text, "не прочитан") {
+		t.Fatalf("отказ не назвал причину: %s", text)
+	}
+}
+
+// denyWrite отнимает у каталога право записи и отвечает, вышло ли это: под
+// root права не мешают, и сбой записи так не смоделировать.
+func denyWrite(t *testing.T, dir string) bool {
+	t.Helper()
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("запрет записи: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	probe := filepath.Join(dir, ".write-probe")
+	err := os.WriteFile(probe, []byte("x"), 0o600)
+	if err == nil {
+		_ = os.Remove(probe)
+		return false
+	}
+	return true
+}
+
+// Запись файла не удалась — вызов не идёт: одобрение нового инструмента в файл
+// не попало, и решать по устаревшему карантину нельзя.
+func TestQuarantineFailsClosedOnWriteError(t *testing.T) {
+	dir := t.TempDir()
+	lock := filepath.Join(dir, "tools.lock.json")
+	if err := toollock.Write(lock, toollock.File{Tools: map[string]toollock.Entry{}}); err != nil {
+		t.Fatalf("подготовка файла: %v", err)
+	}
+	if !denyWrite(t, dir) {
+		t.Skip("каталог пишется даже без права записи (тесты под root): сбой записи не смоделировать")
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	cs := clientFor(t, descriptorManager(t, "v1", lock).Server())
+	catalog(t, cs) // observe не открыл <lock>.lock: запись не состоялась
+
+	res := invoke(t, cs, "echo")
+	if !res.IsError {
+		t.Fatalf("вызов прошёл при неудавшейся записи: %s", resultText(t, res))
+	}
+	if text := resultText(t, res); !strings.Contains(text, "не записан") {
+		t.Fatalf("отказ не назвал причину: %s", text)
+	}
+}
+
+// Сбой записи — не приговор: следующий обход каталога, когда файл снова
+// пишется, снимает запрет без перезапуска процесса. Иначе одна неудачная
+// запись запирала бы все вызовы набора до рестарта.
+func TestQuarantineRecoversAfterWriteError(t *testing.T) {
+	dir := t.TempDir()
+	lock := filepath.Join(dir, "tools.lock.json")
+	if err := toollock.Write(lock, toollock.File{Tools: map[string]toollock.Entry{}}); err != nil {
+		t.Fatalf("подготовка файла: %v", err)
+	}
+	if !denyWrite(t, dir) {
+		t.Skip("каталог пишется даже без права записи (тесты под root): сбой записи не смоделировать")
+	}
+
+	cs := clientFor(t, descriptorManager(t, "v1", lock).Server())
+	catalog(t, cs)
+	if res := invoke(t, cs, "echo"); !res.IsError {
+		t.Fatalf("вызов прошёл при неудавшейся записи: %s", resultText(t, res))
+	}
+
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatalf("возврат записи: %v", err)
+	}
+	// Новое соединение: обход каталога у уже подключённого клиента кэширован,
+	// и второй catalog по тому же клиенту observe не вызовет.
+	cs2 := clientFor(t, descriptorManager(t, "v1", lock).Server())
+	catalog(t, cs2)
+	if res := invoke(t, cs2, "echo"); res.IsError {
+		t.Fatalf("запрет не снялся после успешной записи: %s", resultText(t, res))
 	}
 }

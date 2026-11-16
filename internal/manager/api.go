@@ -81,13 +81,14 @@ func FromEnv(version string) Options {
 		SeedFile:  os.Getenv("MCPRIG_SEED_FILE"),
 		Version:   version,
 		Auth: AuthOptions{
-			Password:     os.Getenv("MCPRIG_PASSWORD"),
-			PasswordHash: os.Getenv("MCPRIG_PASSWORD_HASH"),
-			ProxySecret:  os.Getenv("MCPRIG_PROXY_SECRET"),
-			User:         os.Getenv("MCPRIG_USER"),
-			UserHeader:   os.Getenv("MCPRIG_USER_HEADER"),
-			AllowedHosts: splitList(os.Getenv("MCPRIG_ALLOWED_HOSTS")),
-			Off:          os.Getenv("MCPRIG_AUTH") == "off",
+			Password:       os.Getenv("MCPRIG_PASSWORD"),
+			PasswordHash:   os.Getenv("MCPRIG_PASSWORD_HASH"),
+			ProxySecret:    os.Getenv("MCPRIG_PROXY_SECRET"),
+			TrustedProxies: os.Getenv("MCPRIG_TRUSTED_PROXIES"),
+			User:           os.Getenv("MCPRIG_USER"),
+			UserHeader:     os.Getenv("MCPRIG_USER_HEADER"),
+			AllowedHosts:   splitList(os.Getenv("MCPRIG_ALLOWED_HOSTS")),
+			Off:            os.Getenv("MCPRIG_AUTH") == "off",
 		},
 	}
 }
@@ -122,6 +123,10 @@ type Manager struct {
 	healthOnce  sync.Once
 	healthEvery time.Duration
 	probe       func(context.Context, *registry.Set) setHealth
+	// catalog — живой каталог набора для промта агента; running — запущен ли
+	// он. Оба поля — дырки для тестов, как probe у здоровья.
+	catalog func(context.Context, *registry.Set, []string) promptCatalog
+	running func(*registry.Set) bool
 
 	// вход по OAuth: состояние по серверу набора и ожидающие приёмники по state
 	authMu    sync.Mutex
@@ -195,6 +200,11 @@ func New(opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Открытая панель — осознанный выбор MCPRIG_AUTH=off, но молчать о нём
+	// нельзя: порт может оказаться доступен всей сети.
+	if a.mode == modeNone {
+		log.Warn("панель без пароля (MCPRIG_AUTH=off): доступна всем, кто дотянется до порта; задайте MCPRIG_PASSWORD")
+	}
 	if len(a.allowedHosts) == 0 {
 		log.Warn("менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты")
 	}
@@ -247,6 +257,11 @@ func New(opts Options) (*Manager, error) {
 			return fetchSetHealth(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, set.Servers, m.version)
 		}
 	}
+	// Поле, а не прямой вызов: тест подставляет каталог без запуска набора.
+	m.catalog = func(ctx context.Context, set *registry.Set, names []string) promptCatalog {
+		return fetchSetCatalog(ctx, m.rt.probeAddr, set.Port, set.Token, set.Open, names, m.version)
+	}
+	m.running = func(set *registry.Set) bool { return m.rt.status(set).Running }
 	m.startHealthLoop()
 	return m, nil
 }
@@ -599,11 +614,15 @@ func (m *Manager) buildRoutes() []route {
 		}),
 		mk(`^/api/sets/`+setPattern+`/servers$`, map[string]handlerFunc{http.MethodGet: m.apiSetServers}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/authorize$`, map[string]handlerFunc{
-			http.MethodPost: m.apiServerAuthorize, http.MethodGet: m.apiServerAuthorize,
+			http.MethodPost: m.apiServerAuthorize,
+		}),
+		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/authorize/status$`, map[string]handlerFunc{
+			http.MethodGet: m.apiAuthorizeStatus,
 		}),
 		mk(`^/api/sets/`+setPattern+`/servers/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiServerLogs}),
 		mk(`^/api/sets/`+setPattern+`/tools$`, map[string]handlerFunc{http.MethodGet: m.apiSetTools}),
 		mk(`^/api/sets/`+setPattern+`/tools/approve$`, map[string]handlerFunc{http.MethodPost: m.apiSetToolsApprove}),
+		mk(`^/api/sets/`+setPattern+`/prompt$`, map[string]handlerFunc{http.MethodPost: m.apiSetPrompt}),
 		mk(`^/api/sets/`+setPattern+`/logs$`, map[string]handlerFunc{http.MethodGet: m.apiSetLogs}),
 		mk(`^/api/sets/`+setPattern+`/reload$`, map[string]handlerFunc{http.MethodPost: m.apiSetReload}),
 		mk(`^/api/sets/`+setPattern+`/(start|stop|restart)$`, map[string]handlerFunc{http.MethodPost: m.apiSetAction}),
@@ -663,25 +682,31 @@ func serverError(msg string) error {
 }
 
 func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
-	status, msg := http.StatusBadRequest, "запрос не разобран"
+	// Неизвестная ошибка — не «кривой запрос»: 400 с её текстом отдавал
+	// клиенту внутренности, а в лог не писал ничего.
+	status, msg := http.StatusInternalServerError, "внутренняя ошибка, подробности в логе"
 	var he *httpError
+	var ce *conflictErr
 	var pathErr *fs.PathError
 	switch {
 	case errors.As(err, &he):
 		status, msg = he.status, he.msg
 	case errors.Is(err, errBrowseGone):
 		status, msg = http.StatusNotFound, errBrowseGone.Error()
+	case errors.As(err, &ce):
+		status, msg = http.StatusConflict, ce.msg
+	case errors.Is(err, registry.ErrInvalid):
+		// Кривое тело — вина клиента: причина в ответе, чтобы он её исправил.
+		status, msg = http.StatusBadRequest, err.Error()
 	case errors.As(err, &pathErr):
 		status, msg = http.StatusInternalServerError, "внутренняя ошибка — повторите; если повторяется, смотрите лог панели"
-	default:
-		msg = "запрос не разобран: " + err.Error()
+	case errors.Is(err, context.Canceled):
+		// Клиент ушёл посреди запроса: ответа ждать некому, а недоставка —
+		// не ошибка сервера и в журнал не идёт.
+		return
 	}
 	if status >= 500 {
 		m.log.Error("ошибка API", "method", r.Method, "path", r.URL.Path, "status", status, "err", err)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(status)
-		json.NewEncoder(w).Encode(map[string]string{"error": msg})
-		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -692,11 +717,17 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
 		return nil
 	}
-	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+	site := r.Header.Get("Sec-Fetch-Site")
+	if site == "cross-site" {
 		return &httpError{http.StatusForbidden, "запрос пришёл с чужого сайта — откройте панель по её адресу"}
 	}
 	origin := r.Header.Get("Origin")
-	if origin != "" && origin != "null" {
+	switch {
+	case origin == "null":
+		// null значит «источник неизвестен» — песочница или data:-страница;
+		// это не отсутствие заголовка, и доверия такому запросу нет.
+		return &httpError{http.StatusForbidden, "Origin: null не принимается — откройте панель по её адресу"}
+	case origin != "":
 		u, err := url.Parse(origin)
 		if err != nil || !m.originMatches(u, r) {
 			// Значения в лог: без них отказ не отладить с чужой машины.
@@ -704,11 +735,18 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path)
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
-	} else if _, err := r.Cookie(sessionCookie); err == nil && r.URL.Path != "/api/login" {
-		// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
-		// сессионной cookie — подделка. Вход сюда не попадает: пароль всё равно
-		// проверяется, а старая cookie не должна превращать вход в 403.
-		return &httpError{http.StatusForbidden, "не хватает заголовка Origin"}
+	case r.URL.Path != "/api/login":
+		if _, err := r.Cookie(sessionCookie); err == nil {
+			// Браузер шлёт Origin на каждый небезопасный запрос; его отсутствие при
+			// сессионной cookie — подделка. Вход сюда не попадает: пароль всё равно
+			// проверяется, а старая cookie не должна превращать вход в 403.
+			return &httpError{http.StatusForbidden, "не хватает заголовка Origin"}
+		}
+		if site != "" {
+			// Sec-Fetch-Site ставят только браузеры, и они же всегда шлют Origin:
+			// пара «fetch-заголовок есть, Origin нет» — не браузер, а подделка.
+			return &httpError{http.StatusForbidden, "браузерный запрос без Origin — отказ"}
+		}
 	}
 	if r.ContentLength != 0 && r.URL.Path != "/api/login" && !isJSON(r.Header.Get("Content-Type")) {
 		return badRequest("тело запроса должно быть JSON")
@@ -756,13 +794,13 @@ func (m *Manager) originMatches(u *url.URL, r *http.Request) bool {
 
 // requestAuthorities — origin'ы, которыми клиент видит запрос: сам Host и
 // публичное имя прокси. За TLS-прокси до Go доходит http, поэтому https-схема
-// считается своей при доверенном прокси (задан MCPRIG_PROXY_SECRET) либо при
-// собственном TLS панели; иначе https-Origin на http-запросе — отказ.
-// X-Forwarded-* без доверенного прокси игнорируются: иначе любой клиент
-// подделал бы публичное имя и снял проверку Origin.
+// считается своей при доверенном пире (см. trustsProxy) либо при собственном
+// TLS панели; иначе https-Origin на http-запросе — отказ.
+// X-Forwarded-* от прочих пиров игнорируются: иначе любой клиент подделал бы
+// публичное имя и снял проверку Origin.
 // Как только https признан своим, http-Origin отбрасывается целиком.
 func (m *Manager) requestAuthorities(r *http.Request) []originAuthority {
-	trustProxy := m.auth.proxySecret != ""
+	trustProxy := m.auth.trustsProxy(r)
 	scheme := "http"
 	if secureRequest(r, trustProxy) || trustProxy {
 		scheme = "https"
@@ -786,13 +824,13 @@ func hasPort(hostport string) bool {
 
 // hostAllowed — то же послабление для самого Host: прокси переписывает его на
 // внутренний адрес, а публичное имя приходит в X-Forwarded-Host. Заголовку
-// верим только при доверенном прокси (MCPRIG_PROXY_SECRET): без него Host
-// проверяется как есть, иначе подделанный заголовок снял бы защиту от rebinding.
+// верим только от доверенного пира (trustsProxy): иначе подделанный заголовок
+// снял бы защиту от rebinding.
 func (m *Manager) hostAllowed(r *http.Request) bool {
 	if m.auth.hostOK(r.Host) {
 		return true
 	}
-	if m.auth.proxySecret == "" {
+	if !m.auth.trustsProxy(r) {
 		return false
 	}
 	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {
@@ -852,13 +890,27 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 type setView struct {
 	registry.PublicSetEntry
 	Runtime RuntimeStatus `json:"runtime"`
+	// KeyMark — метка основного ключа ровно в той форме, в какой он уходит
+	// в статистику: подпись ключа, иначе `key:<mark>`. Панель сопоставляет
+	// строку статистики с ключом. Пусто у открытого набора: ключа нет, метки нет.
+	KeyMark string `json:"keyMark"`
 	// ReloadError — правка уже в реестре, но процесс набора не применил её без
 	// перезапуска: ответ 200 отдаёт причину полем, а не теряет правку.
 	ReloadError string `json:"reloadError,omitempty"`
 }
 
 func (m *Manager) setView(set *registry.Set) setView {
-	return setView{PublicSetEntry: registry.PublicSet(set), Runtime: m.rt.status(set)}
+	v := setView{PublicSetEntry: registry.PublicSet(set), Runtime: m.rt.status(set)}
+	if tokens := registry.ActiveTokens(set.Keys); !set.Open && len(tokens) > 0 {
+		fp := stats.Fingerprint(tokens[0])
+		// keyMark — ровно та метка, под которой ключ виден в статистике:
+		// подпись ключа (её набор ставит клиентом), иначе отпечаток.
+		v.KeyMark = "key:" + fp
+		if name := clientNames(set.Keys)[fp]; name != "" {
+			v.KeyMark = name
+		}
+	}
+	return v
 }
 
 func (m *Manager) setViews() []setView {
@@ -873,6 +925,7 @@ func (m *Manager) setViews() []setView {
 type envVar struct {
 	Name   string `json:"name"`
 	Set    bool   `json:"set"`
+	Used   bool   `json:"used"`
 	Source string `json:"source,omitempty"`
 }
 
@@ -883,6 +936,8 @@ func (m *Manager) apiState(req *request) error {
 		"servers":   serversOrEmpty(m.store.Servers()),
 		"sets":      m.setViews(),
 		"firstPort": registry.FirstPort,
+		// версия бинаря: панель печатает её в статусбаре
+		"version": m.version,
 	})
 	return nil
 }
@@ -970,10 +1025,28 @@ func (m *Manager) apiExportSet(req *request) error {
 
 func (m *Manager) apiEnvList(req *request) error {
 	names := envRefs(m.store.Servers())
+	used := make(map[string]bool, len(names))
+	for _, name := range names {
+		used[name] = true
+	}
+	// Сохранённое имя без ссылок тоже в списке: иначе забыть его можно только
+	// зная наизусть, а значение так и живёт в env.json.
+	for _, name := range m.sec.StoredNames() {
+		if !containsName(names, name) {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
 	got := m.sec.Resolve(names)
 	vars := make([]envVar, 0, len(names))
-	for i, name := range names {
-		vars = append(vars, envVar{Name: name, Set: got[i].value != "", Source: got[i].source})
+	// Используемые — сверху: остальные это хвост, который пора забыть.
+	for _, wantUsed := range []bool{true, false} {
+		for i, name := range names {
+			if used[name] != wantUsed {
+				continue
+			}
+			vars = append(vars, envVar{Name: name, Set: got[i].value != "", Used: used[name], Source: got[i].source})
+		}
 	}
 	resp := map[string]any{"vars": vars}
 	if remoteErr := m.sec.RemoteError(); remoteErr != "" {
@@ -999,9 +1072,9 @@ func (m *Manager) apiEnvPut(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted := m.restartSetsUsingEnv(name)
+	restarted, skipped := m.restartSetsUsingEnv(name)
 	writeJSON(req.w, http.StatusOK, map[string]any{
-		"name": name, "set": true, "source": source, "restarted": restarted,
+		"name": name, "set": true, "source": source, "restarted": restarted, "skipped": skipped,
 	})
 	return nil
 }
@@ -1012,9 +1085,9 @@ func (m *Manager) apiEnvDelete(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted := m.restartSetsUsingEnv(name)
+	restarted, skipped := m.restartSetsUsingEnv(name)
 	writeJSON(req.w, http.StatusOK, map[string]any{
-		"name": name, "removed": removed, "source": source, "restarted": restarted,
+		"name": name, "removed": removed, "source": source, "restarted": restarted, "skipped": skipped,
 	})
 	return nil
 }
@@ -1055,6 +1128,9 @@ func (m *Manager) apiBrowseOpen(req *request) error {
 	}
 	// entry приходит из тела, минуя реестр: без проверки кнопка browse
 	// запускает сервер, который набор отверг бы.
+	if err := checkReservedRefs(body.Entry); err != nil {
+		return err
+	}
 	if msg := srv.Check(); msg != "" {
 		return badRequest(msg)
 	}
@@ -1290,13 +1366,10 @@ func (m *Manager) apiServerDelete(req *request) error {
 	if m.store.Server(name) == nil {
 		return notFound("сервер " + name + " не найден")
 	}
-	// Сначала снимок наборов и запись в реестр: отказ (последний сервер
-	// набора) не должен оставлять наборы остановленными при живом сервере.
+	// Набор без последнего сервера остаётся жить с пустым составом, поэтому
+	// отказа здесь нет: удаление либо проходит, либо падает на записи реестра.
 	sets := m.setsUsing(name)
 	if err := m.store.DeleteServer(name); err != nil {
-		if strings.Contains(err.Error(), "последний в наборе") {
-			return badRequest(err.Error())
-		}
 		return err
 	}
 	stopped := m.stopSets(sets)
@@ -1375,7 +1448,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	}
 	set, err := m.store.UpdateSet(id, json.RawMessage(body))
 	if err != nil {
-		if strings.Contains(err.Error(), "занят") {
+		if errors.Is(err, registry.ErrPortBusy) {
 			return conflict(err.Error())
 		}
 		return err
@@ -1383,7 +1456,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	if running {
 		// Порт набор читает только при старте; ключи, открытость и правила
 		// применяются живьём, по SIGHUP.
-		if restart, why := needsRestart(old, set); restart {
+		if restart, why := needsRestart(old, set, m.store.Servers()); restart {
 			m.log.Info("набор "+id+": правка транспорта — перезапуск", "причина", why)
 			if _, err := m.RestartSet(context.Background(), set); err != nil {
 				return err
@@ -1402,12 +1475,27 @@ func (m *Manager) apiSetUpdate(req *request) error {
 }
 
 // needsRestart — меняется ли в наборе то, что процесс применяет только при
-// старте: порт. Список ключей и открытость сюда не входят: их доставляет
-// reload (ключи и открытость — SetAuth живого слушателя), поэтому выдача,
-// отзыв ключа и переход «открытый набор ± ключ» набор не перезапускают.
-func needsRestart(old, new *registry.Set) (bool, string) {
+// старте: порт и состав переменных `${VAR}`. Список ключей и открытость сюда
+// не входят: их доставляет reload (ключи и открытость — SetAuth живого
+// слушателя), поэтому выдача, отзыв ключа и переход «открытый набор ± ключ»
+// набор не перезапускают. Окружение процесс набора получает при старте, и
+// новая переменная без перезапуска осталась бы пустой.
+func needsRestart(old, new *registry.Set, servers []registry.Server) (bool, string) {
 	if old.Port != new.Port {
 		return true, "порт"
+	}
+	had := map[string]bool{}
+	for _, name := range envRefs(setServers(old, servers)) {
+		had[name] = true
+	}
+	added := []string{}
+	for _, name := range envRefs(setServers(new, servers)) {
+		if !had[name] {
+			added = append(added, name)
+		}
+	}
+	if len(added) > 0 {
+		return true, "новые переменные: " + strings.Join(added, ", ")
 	}
 	return false, ""
 }
@@ -1517,10 +1605,7 @@ func (m *Manager) apiSetDelete(req *request) error {
 func (m *Manager) startSet(ctx context.Context, set *registry.Set) (RuntimeStatus, error) {
 	status, err := m.rt.Start(ctx, set, m.store.Servers())
 	if err != nil {
-		if strings.Contains(err.Error(), "нет активного ключа") {
-			return status, conflict(err.Error())
-		}
-		return status, serverError(err.Error())
+		return status, err
 	}
 	m.health.clear(set.ID)
 	return status, nil
@@ -1529,10 +1614,7 @@ func (m *Manager) startSet(ctx context.Context, set *registry.Set) (RuntimeStatu
 func (m *Manager) RestartSet(ctx context.Context, set *registry.Set) (RuntimeStatus, error) {
 	status, err := m.rt.Restart(ctx, set, m.store.Servers())
 	if err != nil {
-		if strings.Contains(err.Error(), "нет активного ключа") {
-			return status, conflict(err.Error())
-		}
-		return status, serverError(err.Error())
+		return status, err
 	}
 	m.health.clear(set.ID)
 	return status, nil
@@ -1603,7 +1685,7 @@ func (m *Manager) apiSetServers(req *request) error {
 	if !status.Running {
 		servers := make([]serverHealth, 0, len(names))
 		for _, name := range names {
-			servers = append(servers, serverHealth{Name: name, Error: "набор не запущен — нажмите «Запустить»"})
+			servers = append(servers, serverHealth{Name: name, Error: "набор " + id + " не запущен — нажмите «Запустить»"})
 		}
 		writeJSON(req.w, http.StatusOK, setHealth{Running: false, Servers: servers})
 		return nil
@@ -1611,10 +1693,33 @@ func (m *Manager) apiSetServers(req *request) error {
 	view := m.health.get(req.r.Context(), id, func(ctx context.Context) setHealth {
 		return m.probe(ctx, set)
 	})
+	if view.Servers == nil {
+		// Клиент ушёл — ответа ему не нужно: пустой 200 он не прочтёт, а в
+		// журнал недоставка не идёт.
+		if req.r.Context().Err() != nil {
+			return nil
+		}
+		// Проба не дала ответа: серверы остаются в списке с ошибкой, а не
+		// исчезают из ответа (200 с servers: null панель читает как «их нет»).
+		view = m.unprobedHealth(set)
+	}
 	view.Running = status.Running
 	m.noteHealth(id, view)
 	writeJSON(req.w, http.StatusOK, view)
 	return nil
+}
+
+// unprobedHealth — состав набора с ошибкой пробы: проба не ответила за свой
+// бюджет, но панель должна видеть серверы, а не пустой список.
+func (m *Manager) unprobedHealth(set *registry.Set) setHealth {
+	servers := make([]serverHealth, 0, len(set.Servers))
+	for _, name := range set.Servers {
+		servers = append(servers, serverHealth{
+			Name:  name,
+			Error: "проба набора не ответила за " + humanDuration(healthLoadTimeout),
+		})
+	}
+	return setHealth{Servers: servers}
 }
 
 // ─── keys ────────────────────────────────────────────────────────────────────
@@ -1728,8 +1833,8 @@ func (m *Manager) keyIssueInput(set *registry.Set, req *request) (profile, label
 }
 
 // apiKeyNote подписывает ключ человеческим именем: подпись уходит в метку
-// клиента статистики, поэтому работающий набор перезапускается — listener
-// читает clientNames из servers.json при старте.
+// клиента статистики через clientNames, а их доставляет reload — набор
+// остаётся тем же процессом, как и при выдаче ключа.
 func (m *Manager) apiKeyNote(req *request) error {
 	id, keyID := req.args[0], req.args[1]
 	var body struct {
@@ -1765,23 +1870,19 @@ func (m *Manager) apiKeyNote(req *request) error {
 		return err
 	}
 	set = m.store.Set(id)
-	var restartErr string
-	if running {
-		if _, err := m.RestartSet(context.Background(), set); err != nil {
-			m.log.Warn("перезапуск набора после подписи ключа не удался", "set", id, "err", err)
-			restartErr = err.Error()
-		}
-	}
+	view, reloadErr := m.deliverKeys(set, running)
 	var signed registry.PublicKey
 	for _, key := range registry.PublicSet(set).Keys {
 		if key.ID == keyID {
 			signed = key
 		}
 	}
-	resp := map[string]any{"key": signed}
-	// Подпись уже сохранена: ошибку рестарта отдаём полем, а не кодом.
-	if restartErr != "" {
-		resp["restartError"] = restartErr
+	resp := map[string]any{"key": signed, "set": view}
+	// Подпись уже сохранена: ошибку доставки отдаём полем, а не кодом.
+	// restartError — прежнее имя того же поля для панели.
+	if reloadErr != "" {
+		resp["reloadError"] = reloadErr
+		resp["restartError"] = reloadErr
 	}
 	writeJSON(req.w, http.StatusOK, resp)
 	return nil
@@ -1860,22 +1961,44 @@ func keyByToken(set *registry.Set, token string) any {
 
 // ─── вспомогательные ────────────────────────────────────────────────────────
 
-// restartSetsUsingEnv возвращает id работающих наборов, где встречается
-// ${name}, и перезапускает их в фоне: правка секрета не должна ждать до ~40 s
-// двух больных наборов. Ошибки рестарта — в лог, не в ответ.
-func (m *Manager) restartSetsUsingEnv(name string) []string {
-	out := []string{}
+// skippedRestart — работающий набор, оставленный на старом окружении: после
+// перезапуска ему не хватило бы переменной, и он встал бы остановленным.
+type skippedRestart struct {
+	Set    string `json:"set"`
+	Reason string `json:"reason"`
+	// Missing — те же имена машинно: панель собирает фразу на языке читателя,
+	// а reason остаётся готовым текстом для тех, кто зовёт API напрямую.
+	Missing []string `json:"missing,omitempty"`
+}
+
+// restartSetsUsingEnv перезапускает работающие наборы, чьи серверы ссылаются на
+// переменную. Набор, которому после правки не хватит переменных, не трогаем:
+// он продолжает работать со старым окружением, а ответ называет причину.
+// Перезапуск идёт в фоне: правка секрета не должна ждать до ~40 s двух больных
+// наборов; ошибки рестарта — в лог, не в ответ.
+func (m *Manager) restartSetsUsingEnv(name string) ([]string, []skippedRestart) {
+	restarted := []string{}
+	skipped := []skippedRestart{}
 	sets := []*registry.Set{}
 	servers := m.store.Servers()
 	for _, set := range m.store.Sets() {
-		if !containsName(envRefs(setServers(set, servers)), name) || !m.rt.status(set).Running {
+		srv := setServers(set, servers)
+		if !containsName(envRefs(srv), name) || !m.rt.status(set).Running {
 			continue
 		}
-		out = append(out, set.ID)
+		if missing := unresolvedEnvRefs(srv, m.sec); len(missing) > 0 {
+			skipped = append(skipped, skippedRestart{
+				Set:     set.ID,
+				Reason:  "нет переменной " + strings.Join(missing, ", "),
+				Missing: missing,
+			})
+			continue
+		}
+		restarted = append(restarted, set.ID)
 		sets = append(sets, set)
 	}
 	if len(sets) == 0 {
-		return out
+		return restarted, skipped
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(m.ctx, restartTimeout)
@@ -1889,7 +2012,7 @@ func (m *Manager) restartSetsUsingEnv(name string) []string {
 			}
 		}
 	}()
-	return out
+	return restarted, skipped
 }
 
 // envChanged — окружение процесса набора фиксируется при старте

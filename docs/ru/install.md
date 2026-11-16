@@ -15,13 +15,13 @@
 | архив | `mcprig_<version>_<os>_<arch>.tar.gz` |
 | содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | контрольная сумма | `checksums.txt` |
-| релиз | `goreleaser` собирает архивы, пушит образы `slim`/`full` в реестр и создаёт черновик релиза Gitea, который публикует человек; релиз на GitHub создаёт воркфлоу; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
+| релиз | `goreleaser` собирает архивы, пушит образы `slim`/`full` в реестр и публикует релиз Gitea; релиз на GitHub создаёт воркфлоу; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
 Релиз выпускается по тегу `v*` в Gitea CI (`.gitea/workflows/release.yml`): он
 гоняет проверки — `go vet`, тесты с `-race`, `govulncheck`, `gofmt` — а затем
 `goreleaser`, который собирает архивы, пушит образы `slim`/`full` в реестр и
-создаёт черновик релиза в Gitea; черновик публикует человек. Воркфлоу GitHub
+публикует релиз в Gitea сам. Воркфлоу GitHub
 (`.github/workflows/release.yml`) идёт по тому же тегу: пересобирает архивы с
 `goreleaser --skip=publish`, собирает и пушит образы `slim` и `full` в
 `ghcr.io/akrhin/mcprig` и заливает архивы через `gh` в

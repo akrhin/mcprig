@@ -8,8 +8,9 @@ stand against real MCP servers.
 
 ## Requirements
 
-- Go 1.27 (`go.mod` asks for `1.27.3`; with `GOTOOLCHAIN=auto` the toolchain is
-  downloaded on the first build).
+- Go 1.27.4 (`go.mod` asks for it exactly — the release closes GO-2026-6859 in
+  `net/http`; with `GOTOOLCHAIN=auto` a matching toolchain is downloaded if the
+  installed one is older).
 - `bash` and `curl` for the scripts.
 - Optional for the live stand: serena on `127.0.0.1:8899`, `npx`, and
   `xerj` in `~/.local/bin`.
@@ -116,7 +117,8 @@ Logs: the panel writes `$DATA/panel.log`, the set writes
 --clean` to check locally). CI builds and publishes the archives on a `v*` tag;
 release notes are the tag's `CHANGELOG.md` section
 via `scripts/release-notes.sh`. `goreleaser` itself is not installed on the
-development host.
+development host. Every push and pull request runs `.gitea/workflows/ci.yml` —
+the same checks as the tag pipeline minus `goreleaser`.
 
 ## See also
 

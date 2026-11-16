@@ -33,8 +33,9 @@ type authOutcome struct {
 
 func authKey(setID, server string) string { return setID + "\x00" + server }
 
-// apiServerAuthorize заводит вход по OAuth для сервера набора. POST начинает,
-// GET отдаёт состояние — так панель не держит долгий запрос открытым.
+// apiServerAuthorize заводит вход по OAuth для сервера набора. Только POST:
+// вход перезапускает набор, а GET не должен менять состояние. Панель опрашивает
+// состояние отдельным GET .../authorize/status.
 func (m *Manager) apiServerAuthorize(req *request) error {
 	setID, name := req.args[0], req.args[1]
 	set := m.store.Set(setID)
@@ -44,10 +45,6 @@ func (m *Manager) apiServerAuthorize(req *request) error {
 	srv := m.store.Server(name)
 	if srv == nil {
 		return notFound("сервер " + name + " не найден")
-	}
-	if req.r.Method == http.MethodGet {
-		writeJSON(req.w, http.StatusOK, m.flowView(authKey(setID, name)))
-		return nil
 	}
 	inSet := false
 	for _, n := range set.Servers {
@@ -71,8 +68,17 @@ func (m *Manager) apiServerAuthorize(req *request) error {
 	}
 	key := authKey(setID, name)
 	m.setFlow(key, authFlow{State: "pending"})
+	// Ответ фиксирован до запуска горутины: иначе мгновенная ошибка подключения
+	// кладёт в тело 202 состояние error, и ответ зависит от гонки с ней.
+	writeJSON(req.w, http.StatusAccepted, authFlow{State: "pending"})
 	go m.authorize(setID, srv, redirect)
-	writeJSON(req.w, http.StatusAccepted, m.flowView(key))
+	return nil
+}
+
+// apiAuthorizeStatus отдаёт состояние входа для опроса из панели: GET менять
+// состояние не может, поэтому запуск и чтение разведены по разным маршрутам.
+func (m *Manager) apiAuthorizeStatus(req *request) error {
+	writeJSON(req.w, http.StatusOK, m.flowView(authKey(req.args[0], req.args[1])))
 	return nil
 }
 

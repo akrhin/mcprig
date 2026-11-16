@@ -40,7 +40,7 @@ and read as-is: no migration, no wrapper.
 
 | field | type | default | meaning |
 | --- | --- | --- | --- |
-| `servers` | array | required | downstream servers, see below |
+| `servers` | array | `[]` | downstream servers, see below; an empty list is a legal set with no servers |
 | `transport` | object | required by `serve` | the listener this set exposes |
 | `healthMonitor` | `{interval, timeout}` in ms | | accepted for lazy-mcp compatibility; the Go proxy does not read it |
 | `requestTimeout` | int, ms | `0` (no limit) | budget for one `invoke_command`; on expiry the call returns `таймаут вызова <N> мс` |
@@ -219,6 +219,15 @@ When the panel materializes a set, `${VAR}` stays in the file; the set process
 expands it from its own environment, which includes the manager's secret
 chain (OpenBao → `env.json` → process environment; `MCPRIG_*`, `BAO_*` and
 `OPENBAO_*` are reserved and never handed to a downstream).
+
+A set does not start on a half-empty environment: when a server references a
+variable that no source has, `POST /api/sets/<id>/start` answers `409` and names
+it (`переменная VAR: источник не найден (OpenBao, env.json, окружение); набор S
+не запущен`). Only `${NAME}` is a reference — `${NAME:-default}` is not a default
+form, nothing matches it, and the text reaches the server as written. An edit
+that brings a new `${VAR}` through a new server restarts the set, because the
+environment is fixed at start; an ordinary composition edit is applied by reload
+(see [panel.md](panel.md#set-composition)).
 
 ## transport
 

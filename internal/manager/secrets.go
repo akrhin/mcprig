@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/akrhin/mcprig/internal/config"
 )
@@ -79,6 +80,18 @@ func (f *envFile) delete(name string) (bool, error) {
 	}
 	delete(f.values, name)
 	return true, f.saveLocked()
+}
+
+// names — копия ключей файла: панель показывает и те, на которые уже никто не
+// ссылается, иначе забыть значение можно только помня имя наизусть.
+func (f *envFile) names() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]string, 0, len(f.values))
+	for name := range f.values {
+		out = append(out, name)
+	}
+	return out
 }
 
 func (f *envFile) saveLocked() error {
@@ -259,6 +272,10 @@ func (s *Secrets) RemoteError() string {
 	}
 	return ""
 }
+
+// StoredNames — имена, сохранённые в env.json. OpenBao не перечисляем: дешёвого
+// list у KV v2 нет, и придумывать его ради списка не будем.
+func (s *Secrets) StoredNames() []string { return s.local.names() }
 
 // reservedSecret: переменные самого менеджера. Их нельзя подставлять в
 // сервер набора — иначе чужой конфиг унесёт пароль панели или токен OpenBao.
@@ -478,11 +495,17 @@ func (s *Secrets) deleteDefault(name string) (bool, string, error) {
 	return source != "", source, nil
 }
 
+// truncate cuts at the last rune that fits, so a multi-byte character is never
+// split in half (the panel renders these strings as UTF-8 JSON).
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return s[:n] + "…"
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
 }
 
 func envOr(v, def string) string {

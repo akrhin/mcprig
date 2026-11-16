@@ -32,6 +32,7 @@ func TestClientIPFollowsHeaderOnlyForProxy(t *testing.T) {
 		t.Fatalf("без прокси заголовок подделывается: %q", got)
 	}
 	// Клиент прислал "1.2.3.4", прокси дописал свой адрес — считаем по нему.
+	r.RemoteAddr = "127.0.0.1:5555" // прокси на этой же машине
 	if got := (&auth{proxySecret: "s"}).clientIP(r); got != "5.6.7.8" {
 		t.Fatalf("за прокси нужен адрес, дописанный прокси: %q", got)
 	}
@@ -50,31 +51,39 @@ func loginAs(e *env, password, remote, xff string) int {
 	return w.Code
 }
 
-// TestLoginLimitCountsSocketAndForwarded: подмена X-Forwarded-For не обходит
-// лимит — счёт идёт и по адресу сокета, и по адресу от доверенного прокси.
-func TestLoginLimitCountsSocketAndForwarded(t *testing.T) {
+// SEC-11: за доверенным прокси ключ лимита — адрес клиента из X-Forwarded-For
+// (его дописал прокси), а не адрес сокета: пять неудач одного клиента не
+// блокируют соседа за тем же прокси.
+func TestLoginLimitKeysClientBehindTrustedProxy(t *testing.T) {
 	secret := strings.Repeat("s", 32)
-	e := newEnv(t, AuthOptions{Password: "right", ProxySecret: secret})
+	e := newEnv(t, AuthOptions{Password: "right", ProxySecret: secret, TrustedProxies: "10.0.0.1"})
 
-	// Разные XFF с одного сокета: пять 401, шестая — 429 по адресу сокета.
 	for i := 0; i < loginMaxFails; i++ {
-		if code := loginAs(e, "wrong", "10.0.0.1:5000", "203.0.113."+strconv.Itoa(i)); code != http.StatusUnauthorized {
+		if code := loginAs(e, "wrong", "10.0.0.1:5000", "203.0.113.10"); code != http.StatusUnauthorized {
 			t.Fatalf("попытка %d: код %d", i+1, code)
 		}
 	}
-	if code := loginAs(e, "wrong", "10.0.0.1:5000", "203.0.113.99"); code != http.StatusTooManyRequests {
-		t.Fatalf("ротация X-Forwarded-For обошла лимит: код %d", code)
+	if code := loginAs(e, "wrong", "10.0.0.1:5000", "203.0.113.10"); code != http.StatusTooManyRequests {
+		t.Fatalf("лимит по адресу клиента не сработал: код %d", code)
 	}
+	if code := loginAs(e, "wrong", "10.0.0.1:5000", "203.0.113.11"); code != http.StatusUnauthorized {
+		t.Fatalf("сосед за тем же прокси заблокирован: код %d", code)
+	}
+}
 
-	// Один XFF с разных сокетов: блокировка по адресу прокси.
-	e2 := newEnv(t, AuthOptions{Password: "right", ProxySecret: secret})
+// SEC-11: пир без доверия — X-Forwarded-For не ключ; чужие адреса в заголовке
+// не блокируют нового клиента с другого сокета.
+func TestLoginLimitIgnoresForwardedFromUntrustedPeer(t *testing.T) {
+	secret := strings.Repeat("s", 32)
+	e := newEnv(t, AuthOptions{Password: "right", ProxySecret: secret, TrustedProxies: "10.9.9.9"})
+
 	for i := 0; i < loginMaxFails; i++ {
-		if code := loginAs(e2, "wrong", "10.0.1."+strconv.Itoa(i)+":5000", "198.51.100.7"); code != http.StatusUnauthorized {
+		if code := loginAs(e, "wrong", "10.0.1."+strconv.Itoa(i)+":5000", "198.51.100.7"); code != http.StatusUnauthorized {
 			t.Fatalf("попытка %d: код %d", i+1, code)
 		}
 	}
-	if code := loginAs(e2, "wrong", "10.0.1.99:5000", "198.51.100.7"); code != http.StatusTooManyRequests {
-		t.Fatalf("новый сокет обошёл лимит по X-Forwarded-For: код %d", code)
+	if code := loginAs(e, "wrong", "10.0.1.99:5000", "198.51.100.7"); code != http.StatusUnauthorized {
+		t.Fatalf("XFF от недоверенного пира заблокировал нового клиента: код %d", code)
 	}
 }
 

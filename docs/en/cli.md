@@ -148,13 +148,22 @@ No flags. Everything is environment:
 | `MCPRIG_PASSWORD` | empty | panel password |
 | `MCPRIG_PASSWORD_HASH` | empty | `scrypt$N$r$p$salt$hash`; when set, the plain password is ignored |
 | `MCPRIG_PROXY_SECRET` | empty | shared secret for proxy auth; a value shorter than 32 characters logs a warning |
+| `MCPRIG_TRUSTED_PROXIES` | loopback | comma-separated IPs or CIDRs whose `X-Forwarded-*` are believed; an entry that is neither stops the panel at startup |
 | `MCPRIG_USER` | `admin` | login name |
 | `MCPRIG_USER_HEADER` | `Remote-User` | header carrying the user name from a trusted proxy |
 | `MCPRIG_ALLOWED_HOSTS` | loopback only | comma-separated `Host` allowlist |
 | `MCPRIG_AUTH` | empty | `off` disables panel auth |
 
-Setting `MCPRIG_PROXY_SECRET` is what makes `X-Forwarded-*` trusted — the peer
-is not verified — so keep the panel port unreachable except through the proxy.
+Setting `MCPRIG_PROXY_SECRET` is what makes `X-Forwarded-*` trusted, and only
+from a peer the panel believes: loopback, or an address in
+`MCPRIG_TRUSTED_PROXIES`. A request from any other peer is treated as if the
+headers were absent — no public name, no `https`, no client address for the login
+limit. Trusting a proxy on another host therefore takes both the secret and its
+address, and a mismatch shows up as `403` on the origin check with the proxy
+serving the panel correctly. List the proxy alone (a `/32` where you can) and
+keep the panel port unreachable for everyone else, and make the proxy append or
+overwrite `X-Forwarded-For`: anyone who reaches the panel from a trusted address
+controls those headers.
 With an `http` panel behind the secret, browser writes are rejected because the
 request counts as `https`; set `MCPRIG_PUBLIC_URL=https://…` to match.
 
@@ -176,6 +185,7 @@ loopback unless `MCPRIG_HOST` says otherwise.
 
 ```text
 2026/11/09 00:05:27 WARN менеджер: MCPRIG_ALLOWED_HOSTS пуст — принимаются только loopback-хосты
+2026/11/09 00:05:27 WARN панель без пароля (MCPRIG_AUTH=off): доступна всем, кто дотянется до порта; задайте MCPRIG_PASSWORD
 2026/11/09 00:05:27 INFO менеджер запущен addr=127.0.0.1:9080 scheme=http publicUrl= data=/var/lib/mcprig auth=none
 ```
 
@@ -190,7 +200,8 @@ With `MCPRIG_TLS_CERT` and `MCPRIG_TLS_KEY` the panel serves https itself; the
 session cookie is `Secure` whenever the public address is `https` or the panel
 has its own certificate, even though a TLS reverse proxy hands the process plain
 http. `X-Forwarded-Proto` and `X-Forwarded-Host` are trusted only when
-`MCPRIG_PROXY_SECRET` is set — without it they are ignored: they neither mark a
+`MCPRIG_PROXY_SECRET` is set **and** the peer is loopback or listed in
+`MCPRIG_TRUSTED_PROXIES` — otherwise they are ignored: they neither mark a
 request `https` nor name the panel for the Host and Origin checks, and the OAuth
 redirect never depends on them.
 
@@ -232,6 +243,18 @@ wildcard resolves to loopback); the panel address comes from `MCPRIG_HOST` and
 `MCPRIG_PUBLIC_URL` (or the panel address): no host, port `0` or a loopback host
 behind `https` is a problem, because an identity provider cannot send the code
 there.
+
+An install that has not been made yet is not a fault: when neither the client
+config nor the registry exists, `doctor` prints one line — `установка пуста:
+конфиг … и реестр … не созданы, запустите mcprig init` — then `итог: 0 проблем`
+and exit code `0`. A registry that is there but does not parse is still a
+problem (exit `1`). Under `-json` the empty sections are `[]`, not `null`, so a
+consumer does not have to tell "nothing yet" from "not read".
+
+With `MCPRIG_AUTH=off` and neither `MCPRIG_PASSWORD` nor `MCPRIG_PASSWORD_HASH`
+set, the services section adds a warning line — `предупреждение: панель без пароля …`
+— because an open panel is reachable by anyone who gets to the port; it counts
+as a warning, not a problem, so the exit code stays `0`.
 
 ```text
 mcprig doctor, версия dev (/usr/local/bin/mcprig)

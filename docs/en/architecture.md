@@ -18,7 +18,7 @@ MCP client ──HTTP/stdio──▶ set process (mcprig serve) ──stdio/HTTP
 | layer | responsibility |
 | --- | --- |
 | panel | registry, key issuing, supervision, secrets, HTTP API and UI |
-| set process | the five meta-tools, downstream sessions, health, counters, OAuth |
+| set process | the nine meta-tools, downstream sessions, health, counters, OAuth |
 | downstream | a stdio child process (optionally wrapped in `bwrap` by `internal/sandbox`), or an HTTP MCP endpoint |
 
 The panel is a control plane: it never proxies MCP traffic. Clients talk to
@@ -34,8 +34,10 @@ group, `MCPRIG_DATA_DIR` and `MCPRIG_SET=<id>`. Consequences:
 - a crash or restart of one set does not affect another;
 - each set has its own port (9100–9199), bearer key and log file;
 - a set can be run alone under systemd, without the panel;
-- a downstream stdio process is a grandchild of the panel but dies with its
-  set's process group.
+- a downstream stdio process is a grandchild of the panel and lives in its own
+  process group: the set closes its sessions on shutdown, and every session
+  signals its group — `SIGTERM`, a short wait, then `SIGKILL` — so a server that
+  wraps its work (`sh -c "npx … & wait"`) takes its children with it.
 
 The panel materializes `servers.json` atomically (`0600`) before every start,
 so the file on disk is always what the running set was given. Start checks
@@ -127,9 +129,18 @@ names are capped at 64 bytes; the number of counters is capped at 4096, the
 rest collapses into `(прочее)`; error text in the ring is capped at 512 bytes.
 
 The panel does not keep counters: `GET /api/calls` polls `GET /stats` of every
-running set with a 2 s timeout and merges the answers. A set that does not
-answer is reported only by id. Tokens are not counted, because MCP responses
-carry no standard usage field.
+running set with a 2 s timeout and merges the answers; a stopped set is read
+from its raw journal on disk over the last 7 days instead. A running set that
+does not answer is reported only by id. Tokens are not counted, because MCP
+responses carry no standard usage field.
+
+The panel's own requests to a set — the health probe and the live catalog the
+prompt builder reads — carry `X-MCPRig-Caller: panel` and are counted nowhere:
+no counters, no tail, no history. The set's HTTP transport reads that header and
+marks the call, and the recorder skips a marked one both for the meta-tools and
+for `invoke_command`/`invoke_many`. The header is what the client sets, so a key
+holder can send it as well and keep its calls out of the statistics — a
+deliberate shortcut; a signed marker would close it if that ever matters.
 
 ## HTTP transport
 
@@ -203,6 +214,10 @@ environment is in [configuration.md](configuration.md#tracing).
   [diagrams/mcprig.architecture.en.html](../diagrams/mcprig.architecture.en.html),
   raster in
   [diagrams/mcprig.architecture.en.png](../diagrams/mcprig.architecture.en.png).
+- Two more pictures: [what changes with an endpoint](../diagrams/mcprig.why.en.html)
+  and [what one binary does](../diagrams/mcprig.capabilities.en.html).
+- [alternatives.md](alternatives.md) — the same features next to other proxies,
+  plus the limits this architecture buys.
 - [configuration.md](configuration.md) — the per-set config this process reads.
 - [meta-tools.md](meta-tools.md) — the surface a client actually talks to.
 - [panel.md](panel.md) — the manager's HTTP API and UI.

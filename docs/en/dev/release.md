@@ -9,21 +9,27 @@ this page does not repeat those numbers.
 
 ## Pipeline
 
-1. Tag `vX.Y.Z` on `master` and push it.
-2. Gitea CI (`.gitea/workflows/release.yml`) runs the checks — `go vet`, tests
-   with `-race`, `govulncheck`, `gofmt` — then `goreleaser`: four platforms,
-   `checksums.txt`, a **draft** release in Gitea, and the `slim`/`full` images
-   pushed to the registry. Jobs are serialized (`concurrency: mcprig-release`),
-   so a second tag waits instead of cancelling the first.
-3. A human publishes the draft; CI does not.
-4. The GitHub workflow (`.github/workflows/release.yml`) runs on the same tag:
+1. Tag `vX.Y.Z` on `master` and push it to both remotes (Gitea and GitHub).
+2. Gitea CI runs `.gitea/workflows/release.yml` — `go vet`, tests with `-race`,
+   `govulncheck`, `gofmt` — then `goreleaser`: four platforms, `checksums.txt`,
+   a **published** release in Gitea (`.goreleaser.yaml` keeps `draft: false`),
+   and the `slim`/`full` images pushed to the registry. Jobs are serialized
+   (`concurrency: mcprig-release`), so a second tag waits instead of cancelling
+   the first. Nothing is published by hand: a release that stops halfway is
+   re-run by pushing the same tag again or with `rerun` in the Actions UI.
+3. The GitHub workflow (`.github/workflows/release.yml`) runs on the same tag:
    it rebuilds the same archives with `goreleaser --skip=publish`, builds and
    pushes the `slim`/`full` images to `ghcr.io/akrhin/mcprig`, and uploads the
    archives with `gh`, so `.goreleaser.yaml` keeps one set of
    `gitea_urls`/`draft` settings instead of two variants. It runs no tests and
    no `govulncheck`.
-5. Release notes are the tag's `CHANGELOG.md` section, cut by
+4. Release notes are the tag's `CHANGELOG.md` section, cut by
    `scripts/release-notes.sh`.
+
+Every push and pull request runs `.gitea/workflows/ci.yml`: `gofmt`, `go vet`,
+`go build`, `go test ./... -race -p 1`, `scripts/docs-check.sh`,
+`node --check web/app.js` and `govulncheck`. A red run blocks nothing by itself —
+Gitea does not gate merges — so read the run before merging.
 
 A tag can be released by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
 

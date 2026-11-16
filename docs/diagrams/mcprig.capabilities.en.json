@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "diagram_type": "tree",
+  "meta": {
+    "title": "mcprig: what one binary does",
+    "subtitle": "Capability breakdown: each branch is a group of features one operator uses, not a call path",
+    "output": "mcprig.capabilities.en.html",
+    "quality_profile": "showcase"
+  },
+  "nodes": [
+    {
+      "id": "mcprig",
+      "label": "mcprig",
+      "sublabel": "one static Go binary"
+    },
+    {
+      "id": "serve",
+      "label": "Serve",
+      "parent": "mcprig",
+      "sublabel": "a set replaces N servers"
+    },
+    {
+      "id": "set",
+      "label": "Set",
+      "parent": "serve",
+      "sublabel": "own process, port and key"
+    },
+    {
+      "id": "meta",
+      "label": "Nine meta tools",
+      "parent": "serve",
+      "sublabel": "catalog stays out of the context"
+    },
+    {
+      "id": "transports",
+      "label": "stdio and HTTP",
+      "parent": "serve",
+      "sublabel": "URL, headers, OAuth with PKCE"
+    },
+    {
+      "id": "resources",
+      "label": "Resources and prompts",
+      "parent": "serve",
+      "sublabel": "exposed per server"
+    },
+    {
+      "id": "protect",
+      "label": "Protect",
+      "parent": "mcprig",
+      "sublabel": "what a client may reach"
+    },
+    {
+      "id": "keys",
+      "label": "Keys and profiles",
+      "parent": "protect",
+      "sublabel": "8 per set, revoke one by one"
+    },
+    {
+      "id": "policy",
+      "label": "Deny rules, rate limits",
+      "parent": "protect",
+      "sublabel": "per caller and per server/tool"
+    },
+    {
+      "id": "sandbox",
+      "label": "bubblewrap sandbox",
+      "parent": "protect",
+      "sublabel": "ro/rw mounts, tmpfs, prlimit"
+    },
+    {
+      "id": "observe",
+      "label": "Observe",
+      "parent": "mcprig",
+      "sublabel": "what actually happened"
+    },
+    {
+      "id": "calls",
+      "label": "Live calls",
+      "parent": "observe",
+      "sublabel": "running sets and history from disk"
+    },
+    {
+      "id": "stats",
+      "label": "Statistics",
+      "parent": "observe",
+      "sublabel": "calls, errors, p50/p95"
+    },
+    {
+      "id": "health",
+      "label": "Health",
+      "parent": "observe",
+      "sublabel": "probe per server and per set"
+    },
+    {
+      "id": "operate",
+      "label": "Operate",
+      "parent": "mcprig",
+      "sublabel": "the panel and the CLI"
+    },
+    {
+      "id": "panel",
+      "label": "Panel",
+      "parent": "operate",
+      "sublabel": "sets, every server, variables"
+    },
+    {
+      "id": "prompt",
+      "label": "Agent prompt",
+      "parent": "operate",
+      "sublabel": "tool schemas plus your task"
+    },
+    {
+      "id": "io",
+      "label": "Import and export",
+      "parent": "operate",
+      "sublabel": "registry or one set"
+    },
+    {
+      "id": "cli",
+      "label": "CLI and doctor",
+      "parent": "operate",
+      "sublabel": "init, serve, panel, doctor"
+    }
+  ]
+}

@@ -47,8 +47,7 @@ connection: a filtered-out server is never dialed.
       "tags": ["fixture"]
     }
   ],
-  "version": "dev",
-  "pid": 666441
+  "version": "dev"
 }
 ```
 
@@ -64,7 +63,6 @@ connection: a filtered-out server is never dialed.
 | `isolation` | `bwrap` when the sandbox is applied; `без изоляции: <причина>` when it was requested but bubblewrap could not start (`onUnavailable: warn`/`allow`); `нет: конфиг отвергнут` when the record has a `_configError`; absent only for a valid server without a `sandbox` block |
 | `tags` | from the config, when present |
 | `version` | build version of the proxy |
-| `pid` | proxy process id |
 
 Health probes run concurrently, at most 8 at once, with a 15 s timeout and a
 15 s cache that also remembers failures.
@@ -288,7 +286,7 @@ listener, under the same guard as `/mcp` — the set's bearer key, `allowedHosts
 and the `Origin` check. The marker then reads:
 
 ```text
-[обрезано: 32768 из 149873 байт, полный ответ — /tool-out/1f3c9a2b7d4e5f60 (тот же ключ, что у /mcp)]
+[обрезано: 32768 из 149873 байт, полный ответ — /tool-out/1f3c9a2b7d4e5f60 (тот же ключ, которым вызван инструмент)]
 ```
 
 `GET /tool-out/<name>` returns the whole answer: `text/plain; charset=utf-8`,
@@ -297,14 +295,17 @@ the length without the body. The name is the file name without `.txt`, sixteen
 hex characters; anything else is `404`, and so is a name whose file is gone.
 
 A dump older than the retention TTL is `410 Gone` — the marker's promise has run
-out. The endpoint reads the TTL of its own process, once at start, from
-`MCPRIG_TOOLOUT_TTL` (default `24h`). A set started by the panel does not get that
-variable — `MCPRIG_` is a reserved prefix there — so it keeps the default `24h`,
-and a shorter panel retention may delete the file first; then the endpoint
-answers `404`, not `410`.
+out. The endpoint reads the TTL of its own process, once at start: a set started
+by the panel gets it from its registry policy (`transport.toolOutTtl`, written
+from `MCPRIG_TOOLOUT_TTL` when the panel builds `servers.json`), a hand-started
+process reads `MCPRIG_TOOLOUT_TTL` itself (default `24h`). A shorter panel
+retention may delete the file first; then the endpoint answers `404`, not `410`.
 
-The name is a capability, not a session: any holder of the set's key fetches any
-dump whose name it knows, whoever produced it.
+The dump belongs to the key whose call produced it: the file `<name>.owner`
+carries that key's fingerprint, and a reader with another key gets `404`, not
+`403` — a wrong name must not confirm that a dump exists. Revoking or rotating
+the key closes its dumps to everyone; a non-key holder (an open set) owns its
+dump as `anonymous` and reads it back the same way.
 
 The endpoint is never anonymous, not even on an open set: `/mcp` may admit a
 request without a key, the dump does not. A set over stdio keeps the path in the

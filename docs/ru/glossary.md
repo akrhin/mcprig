@@ -75,4 +75,4 @@ User-Agent. См. [meta-tools.md#счётчики](meta-tools.md#счётчик�
 
 - [architecture.md](architecture.md) — как эти части работают процессами.
 - [configuration.md](configuration.md) — поля, названные выше, целиком.
-- [meta-tools.md](meta-tools.md) — пять инструментов с точными формами ответов.
+- [meta-tools.md](meta-tools.md) — девять инструментов с точными формами ответов.

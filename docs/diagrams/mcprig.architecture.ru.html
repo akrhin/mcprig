@@ -5405,19 +5405,19 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="fine" x="468" y="280" class="t-backend" font-size="7" text-anchor="middle">initialize</text>
         </g>
 
-        <g id="node-panel" data-node-id="panel" data-node-label="панель" tabindex="0" role="button" aria-label="Focus панель, наборы · ключи · логи, Компонент архитектуры" aria-pressed="false" data-node-kind="backend" data-node-sublabel="наборы · ключи · логи" data-node-context="Компонент архитектуры">
-          <title>панель · наборы · ключи · логи · Компонент архитектуры</title>
+        <g id="node-panel" data-node-id="panel" data-node-label="панель" tabindex="0" role="button" aria-label="Focus панель, наборы · ключи · статистика, Компонент архитектуры" aria-pressed="false" data-node-kind="backend" data-node-sublabel="наборы · ключи · статистика" data-node-context="Компонент архитектуры">
+          <title>панель · наборы · ключи · статистика · Компонент архитектуры</title>
           <rect x="12" y="338" width="128" height="56" rx="8" class="c-mask"/>
           <rect x="12" y="338" width="128" height="56" rx="8" class="c-backend" data-animate="node" style="--step:7" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(18 344) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="76" y="364" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">панель</text>
-        <text data-detail="context" x="76" y="380" class="t-muted" font-size="9" text-anchor="middle">наборы · ключи · логи</text>
+        <text data-detail="context" x="76" y="380" class="t-muted" font-size="7.4" text-anchor="middle">наборы · ключи · статистика</text>
         </g>
 
-        <g id="node-disk" data-node-id="disk" data-node-label="файлы состояния" tabindex="0" role="button" aria-label="Focus файлы состояния, config · keys · secrets, Компонент архитектуры" aria-pressed="false" data-node-kind="database" data-node-sublabel="config · keys · secrets" data-node-context="Компонент архитектуры">
-          <title>файлы состояния · config · keys · secrets · Компонент архитектуры</title>
+        <g id="node-disk" data-node-id="disk" data-node-label="файлы состояния" tabindex="0" role="button" aria-label="Focus файлы состояния, конфиг · ключи · секреты · журнал, Компонент архитектуры" aria-pressed="false" data-node-kind="database" data-node-sublabel="конфиг · ключи · секреты · журнал" data-node-context="Компонент архитектуры">
+          <title>файлы состояния · конфиг · ключи · секреты · журнал · Компонент архитектуры</title>
           <rect x="200" y="338" width="128" height="56" rx="8" class="c-mask"/>
           <rect x="200" y="338" width="128" height="56" rx="8" class="c-database" data-animate="node" style="--step:9" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(206 344) scale(0.6875)">
@@ -5425,7 +5425,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="264" y="364" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">файлы состояния</text>
-        <text data-detail="context" x="264" y="380" class="t-muted" font-size="8.6" text-anchor="middle">config · keys · secrets</text>
+        <text data-detail="context" x="264" y="380" class="t-muted" font-size="6" text-anchor="middle">конфиг · ключи · секреты · журнал</text>
         </g>
 
         <!-- Connection labels -->
@@ -5669,11 +5669,12 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>Экономия контекста</h3>
         </div>
         <ul>
-          <li>Каталог не в промпте: агент видит пять мета-инструментов</li>
+          <li>Каталог не в промпте: агент видит 5 мета-тулов</li>
           <li>list_commands отдаёт каталог по запросу и кэширует</li>
-          <li>describe_commands: схема только вызываемого инструмента</li>
-          <li>invoke_many: пачка вызовов вместо N отдельных обменов</li>
-          <li>maxBytes режет ответ, полный текст сохраняется в файле</li>
+          <li>describe_commands: схема только зовомого инструмента</li>
+          <li>invoke_many: пачка вызовов вместо N кругов</li>
+          <li>maxBytes режет ответ, полный текст остаётся файлом</li>
+          <li>Набор собирает готовый промт: схемы инструментов, задача и вводная</li>
         </ul>
       </div>
 
@@ -5683,10 +5684,10 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>Клиенту менять нечего</h3>
         </div>
         <ul>
-          <li>Клиентская обвязка не меняется: те же tools/call и JSON-RPC на /mcp</li>
+          <li>Харнесс не меняется: те же tools/call и JSON-RPC на /mcp</li>
           <li>Имена инструментов настоящие: invoke_command{server, command_name, parameters}</li>
           <li>Ошибка приходит текстом инструмента: неизвестный сервер, неизвестный инструмент</li>
-          <li>Статистика по серверам, health опрашивается периодически</li>
+          <li>Статистика по серверам, health опрашивается сам</li>
         </ul>
       </div>
 
@@ -5697,7 +5698,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </div>
         <ul>
           <li>stdio: spawn(command) + своё окружение, рукопожатие initialize</li>
-          <li>HTTP: server/discover, OAuth по 401 или 403</li>
+          <li>HTTP: server/discover, OAuth по 401</li>
           <li>Bearer-токен на набор, у клиента свой набор</li>
           <li>Набор — дочерний процесс панели или свой юнит</li>
         </ul>

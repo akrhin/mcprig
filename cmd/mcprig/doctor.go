@@ -59,6 +59,10 @@ type doctorOptions struct {
 	LastPort   int
 	Version    string
 	Executable string
+	// AuthOff и HasPassword нужны одной проверке: панель запущена без пароля
+	// (MCPRIG_AUTH=off и ни пароля, ни его хеша). Это предупреждение, не проблема.
+	AuthOff     bool
+	HasPassword bool
 }
 
 func newDoctorFlags() (fs *flag.FlagSet, cfgPath *string, asJSON *bool) {
@@ -88,6 +92,9 @@ func runDoctor(args []string) error {
 		LastPort:   registry.LastPort,
 		Version:    version,
 		Executable: executablePath(),
+		AuthOff:    os.Getenv("MCPRIG_AUTH") == "off",
+		HasPassword: strings.TrimSpace(os.Getenv("MCPRIG_PASSWORD")) != "" ||
+			strings.TrimSpace(os.Getenv("MCPRIG_PASSWORD_HASH")) != "",
 	}, envLine, haveEnv)
 
 	var out []byte
@@ -114,6 +121,19 @@ func buildDoctorReport(o doctorOptions, envLine doctorLine, haveEnv bool) doctor
 		Version: []doctorLine{{OK: true, Text: fmt.Sprintf("версия %s (%s)", o.Version, o.Executable)}},
 	}
 	reg, regRaw, regErr := readRegistry(o.DataDir)
+	// Пустая установка — законное «ещё не настроено», а не поломка: проверять
+	// нечего, и чужая панель с env пользователя к ней отношения не имеют.
+	if installEmpty(o.ConfigPath, regErr) {
+		rep.Config = []doctorLine{{OK: true, Text: fmt.Sprintf(
+			"установка пуста: конфиг %s и реестр %s не созданы, запустите mcprig init",
+			o.ConfigPath, filepath.Join(o.DataDir, registry.RegistryFile))}}
+		// Пустые разделы — массивы, а не null: потребитель -json не должен
+		// отличать «данных нет» от «не считали».
+		rep.Sets, rep.Keys = []doctorLine{}, []doctorLine{}
+		rep.Secrets, rep.Services = []doctorLine{}, []doctorLine{}
+		rep.OK = true
+		return rep
+	}
 	var scanRaw []byte
 	var cfg *config.Config
 	rep.Config, scanRaw, cfg = checkConfig(o.ConfigPath, reg, regRaw)
@@ -152,6 +172,9 @@ func renderDoctor(rep doctorReport) []byte {
 		{"секреты", rep.Secrets},
 		{"служебные", rep.Services},
 	} {
+		if len(sec.lines) == 0 {
+			continue
+		}
 		fmt.Fprintf(&b, "\n[%s]\n", sec.title)
 		for _, line := range sec.lines {
 			prefix, text := "ok: ", line.Text
@@ -233,6 +256,16 @@ func readRegistry(dataDir string) (*registry.Data, []byte, error) {
 	return &data, raw, nil
 }
 
+// installEmpty отличает «данных ещё нет» от «данные есть, но плохи»: пусто —
+// только когда нет и реестра, и конфига. Битый реестр остаётся проблемой.
+func installEmpty(configPath string, regErr error) bool {
+	if !errors.Is(regErr, fs.ErrNotExist) {
+		return false
+	}
+	_, err := os.Stat(configPath)
+	return errors.Is(err, fs.ErrNotExist)
+}
+
 // checkConfig сообщает, какой источник конфигурации действует, и отдаёт его
 // сырой текст: по нему ищутся ${VAR}.
 func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, []byte, *config.Config) {
@@ -273,7 +306,8 @@ func checkConfig(path string, reg *registry.Data, regRaw []byte) ([]doctorLine, 
 
 func checkSets(reg *registry.Data, regErr error, dataDir, bindIP string) (sets, keys []doctorLine) {
 	if regErr != nil {
-		line := doctorLine{false, fmt.Sprintf("реестр %s: %v", filepath.Join(dataDir, registry.RegistryFile), regErr)}
+		// readRegistry уже назвал файл: второй «реестр <путь>:» — дубль.
+		line := doctorLine{false, regErr.Error()}
 		return []doctorLine{line}, []doctorLine{line}
 	}
 	if reg == nil || len(reg.Sets) == 0 {
@@ -531,6 +565,9 @@ func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLi
 		lines = append(lines, doctorLine{false, fmt.Sprintf("панель %s: /healthz %d", addr, code)})
 	default:
 		lines = append(lines, doctorLine{true, fmt.Sprintf("панель %s: /healthz 200", addr)})
+	}
+	if o.AuthOff && !o.HasPassword {
+		lines = append(lines, doctorLine{true, "предупреждение: панель без пароля (MCPRIG_AUTH=off) — доступна всем, кто дотянется до порта; задайте MCPRIG_PASSWORD"})
 	}
 	return lines
 }

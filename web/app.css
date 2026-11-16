@@ -289,6 +289,9 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   border: 1px solid var(--line-strong); border-left: 2px solid var(--warn);
   border-radius: var(--r-2); background: var(--surface); font-size: var(--fs-3);
 }
+/* страница прокручивается, ошибка — нет: иначе она остаётся выше окна и её никто не видит */
+#errbar { position: sticky; top: var(--topbar-h); z-index: 30; }
+#set-del-err { margin-top: var(--sp-2); }
 .alertbar-err { border-left-color: var(--err); margin-bottom: 0; margin-top: var(--sp-4); }
 .alertbar .mono { color: var(--text-dim); font-size: var(--fs-2); overflow-wrap: anywhere; }
 .alertbar .ghost-icon { margin-left: auto; }
@@ -296,7 +299,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .set-head { border-bottom: 1px solid var(--line); padding-bottom: var(--sp-4); }
 .set-head-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
 .set-title { font: 500 var(--fs-7) / 1.1 var(--font-mono); min-width: 0; overflow-wrap: anywhere; }
-.set-actions { display: flex; gap: var(--sp-2); margin-left: auto; }
+.set-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-left: auto; }
 
 .set-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
@@ -314,6 +317,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .meta-schema { font-size: var(--fs-1); color: var(--text-dim); }
+.meta-mark { font-size: var(--fs-1); color: var(--text-mute); }
 
 .chip {
   display: inline-flex; align-items: center; flex: none;
@@ -354,6 +358,12 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   height: 2px; background: var(--accent);
 }
 
+/* Страницы панели над содержимым: пилюли, а не вкладки — вкладки принадлежат
+   набору и живут внутри его страницы. Выбранная помечена aria-current. */
+.pagenav { margin-bottom: var(--sp-4); }
+.pagenav .segbtn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.pagenav .segbtn[aria-current="page"] { background: var(--accent-soft); color: var(--text); }
+
 /* ── KPI: сводка за 7 дней — строка-подпись, не главный элемент вкладки ──── */
 /* Таблица уже закрыта своей линией: своей у сводки нет, иначе две hairline */
 .kpis {
@@ -391,6 +401,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   border: 1px dashed var(--line-strong); border-radius: var(--r-3);
 }
 .empty-state .empty-text { margin-bottom: var(--sp-4); }
+.empty-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: center; }
 
 /* ── кнопки ─────────────────────────────────────────────────────────────── */
 .btn {
@@ -462,6 +473,9 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .cell-actions { text-align: right; white-space: nowrap; }
 .cell-actions .btn + .btn { margin-left: 6px; }
 .cell-iso { color: var(--warn); }
+/* наборы, в которых стоит сервер: список имён переносится, а не рвёт таблицу */
+.cell-sets { font-size: var(--fs-2); color: var(--text-dim); min-width: 12ch; }
+.cell-sets span { overflow-wrap: anywhere; }
 
 /* доля в By set: тонкая полоса */
 .share { display: flex; align-items: center; gap: var(--sp-2); min-width: 96px; }
@@ -560,12 +574,34 @@ select.input { padding-right: 6px; }
 
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-3); color: var(--text-dim); }
 .check input { accent-color: var(--accent); }
+.checklist { display: grid; gap: var(--sp-1); }
+/* состав набора: подпись своей строкой, селект и кнопка рядом — иначе
+   select.input растягивается на всю ширину и кнопка уезжает вниз */
+.srv-compose { flex-wrap: wrap; margin-top: var(--sp-3); }
+.srv-compose > .field-help { flex-basis: 100%; }
+#srv-attach { width: auto; min-width: 200px; max-width: 320px; flex: 0 1 320px; }
+/* «убрать» в строке сервера — иконка: пятая текстовая кнопка не влезает
+   в колонку действий и обрезается */
+.icon-xs { width: 24px; height: 24px; }
+.icon-xs:hover { color: var(--err); }
 
 .form-alert {
   padding: var(--sp-2) var(--sp-3); border-radius: var(--r-2);
   border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
   background: color-mix(in srgb, var(--err) 10%, transparent);
   color: var(--err); font-size: var(--fs-2); overflow-wrap: anywhere;
+}
+/* остановленное состояние: предупреждение, а не авария */
+.form-alert-warn {
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+}
+/* импорт прошёл: та же плашка, но зелёная */
+.form-alert-ok {
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  color: var(--ok);
 }
 
 /* ── диалоги ────────────────────────────────────────────────────────────── */
@@ -653,13 +689,23 @@ body.side-open #side.drawer { transform: none; }
 .drawer-body { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
 .pane { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); align-content: start; }
 
-.varlist { display: grid; gap: 2px; }
+.varlist { display: grid; gap: 2px; max-width: 72ch; }
 .varlist li {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
   padding: 6px var(--sp-2); border-bottom: 1px solid var(--line-soft);
   font-family: var(--font-mono); font-size: var(--fs-2); overflow-wrap: anywhere;
 }
-.varlist .v-state { flex: none; color: var(--text-mute); font-size: var(--fs-1); }
+.varlist .v-state { flex: none; color: var(--text-mute); font-size: var(--fs-1); margin-left: auto; }
+/* удаление — иконкой: столбец действий не должен перевешивать само имя */
+.varlist li > .icon-xs { align-self: center; }
+/* имя, значение и хранилище в одну строку — кнопка сохранить держится на базовой линии */
+.varform { flex-wrap: wrap; align-items: flex-end; margin: var(--sp-3) 0 var(--sp-4); max-width: 720px; }
+.varform .fsel { flex: 0 1 200px; }
+/* поле хранилища той же ширины, что имя и значение: иначе список короче и рвёт строку */
+.varform .fsel select { max-width: none; }
+/* объяснения страницы не растягиваются на всю ширину: строка длиннее 100 знаков не читается */
+#page-vars > .block-meta, #page-vars > .field-help { max-width: 76ch; }
+.varform > .btn { margin-bottom: 1px; }
 
 .log {
   margin: 0; padding: var(--sp-3); min-height: 200px;
@@ -669,6 +715,8 @@ body.side-open #side.drawer { transform: none; }
   overflow: auto;
 }
 body.log-wide #side.drawer { width: min(900px, 100vw); }
+/* промт целиком бывает длинным: в диалоге он прокручивается сам */
+.prompt-out { max-height: 40vh; min-height: 120px; }
 
 /* лог одного сервера: панель держит высоту дровера, прокрутка внутри лога */
 .srvlog-body { display: flex; flex-direction: column; align-content: normal; overflow: hidden; }
@@ -763,7 +811,7 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
     font-size: var(--fs-5); text-align: left;
   }
   .rtable td.cell-name::before { display: none; }
-  .rtable td.cell-actions { justify-content: flex-end; padding-top: var(--sp-2); }
+  .rtable td.cell-actions { justify-content: flex-end; padding-top: var(--sp-2); flex-wrap: wrap; }
   .rtable td.cell-actions::before { display: none; }
   .rtable td.num { text-align: right; }
   .rtable td .share { flex: 1 1 auto; }
@@ -794,6 +842,9 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
   .filters { gap: var(--sp-2); }
   .segmented { width: 100%; }
   .segbtn { flex: 1 1 0; text-align: center; }
+  /* на телефоне имя страницы в крошке не переносится: «All servers» ломалось
+     на две строки и растягивало шапку */
+  .crumb-set { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fsel { flex: 1 1 45%; }
   .fsel select { max-width: none; }
   .legend { margin-left: 0; }
@@ -837,18 +888,57 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
    Действия — по содержимому: широкая колонка отрывала кнопки от «последнего вызова». */
 #set-srv-table { table-layout: fixed; }
 #set-srv-table th { white-space: normal; }
-#set-srv-table th:nth-child(1) { width: 30%; }
-#set-srv-table th:nth-child(2) { width: 10%; }
-#set-srv-table th:nth-child(3) { width: 14%; }
-#set-srv-table th:nth-child(4) { width: 11%; }
-#set-srv-table th:nth-child(5) { width: 17%; text-align: right; }
+#set-srv-table th:nth-child(1) { width: 26%; }
+#set-srv-table th:nth-child(2) { width: 9%; }
+#set-srv-table th:nth-child(3) { width: 12%; }
+#set-srv-table th:nth-child(4) { width: 10%; }
+#set-srv-table th:nth-child(5) { width: 15%; text-align: right; }
 #set-srv-table td:nth-child(5) { text-align: right; }
 /* Действия — узкая колонка у правого края: «check/edit» стоят рядом с последним
-   вызовом, а не висят в пустой полосе. По-русски «проверить/изменить» шире,
-   поэтому на узком экране колонке отдаётся четверть ширины таблицы. */
-#set-srv-table th:nth-child(6) { width: 18%; text-align: right; }
+   вызовом, а не висят в пустой полосе. По-русски «проверить/инструменты/
+   изменить» шире, и пятая кнопка «убрать» в строку уже не влезала — от неё
+   осталась иконка, а колонке отдана четверть ширины таблицы. Всё равно тесно —
+   кнопки переносятся на вторую строку, а не уезжают за край. */
+#set-srv-table th:nth-child(6) { width: 28%; text-align: right; }
+
+/* Реестр хоста: те же колонки плюс «In sets». Имя забирает остаток, наборы —
+   своя ширина: длинный текст ошибки иначе растягивает таблицу шире страницы.
+   «Инструментов» и «В наборах» — длинные слова, под них ширина в знаках, а не
+   в процентах от глаза: иначе заголовки наезжают друг на друга. */
+#all-srv-table { table-layout: fixed; }
+#all-srv-table th { white-space: normal; }
+#all-srv-table th:nth-child(1) { width: 26%; }
+#all-srv-table th:nth-child(2) { width: 8%; }
+#all-srv-table th:nth-child(3) { width: 12%; }
+#all-srv-table th:nth-child(4) { width: 10%; }
+#all-srv-table th:nth-child(5) { width: 12%; }
+#all-srv-table th:nth-child(6) { width: 32%; text-align: right; }
+/* Шесть колонок с бейджем здоровья ниже 1000 px не влезают: реестр ходит
+   в карточки раньше остальных таблиц, иначе «не проверен» лезет в соседа. */
+@media (max-width: 1000px) {
+  #all-srv-table thead { display: none; }
+  #all-srv-table, #all-srv-table tbody, #all-srv-table tr, #all-srv-table td { display: block; width: 100%; }
+  #all-srv-table tr {
+    margin-bottom: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface);
+  }
+  #all-srv-table td {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
+    padding: 5px 0; border: 0; text-align: right;
+  }
+  #all-srv-table td::before {
+    content: attr(data-label);
+    flex: none; font-size: var(--fs-1); text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-mute); text-align: left;
+  }
+  #all-srv-table td.cell-name { display: block; padding-bottom: var(--sp-1); font-size: var(--fs-5); text-align: left; }
+  #all-srv-table td.cell-name::before { display: none; }
+  #all-srv-table td.cell-actions { justify-content: flex-end; padding-top: var(--sp-2); flex-wrap: wrap; }
+  #all-srv-table td.cell-actions::before { display: none; }
+}
 @media (max-width: 1100px) {
-  #set-srv-table th:nth-child(1) { width: 23%; }
-  #set-srv-table th:nth-child(6) { width: 26%; }
+  #set-srv-table th:nth-child(1) { width: 22%; }
+  #set-srv-table th:nth-child(6) { width: 34%; }
   #set-srv-table .cell-actions .btn { padding-inline: 8px; }
+  #set-srv-table td.cell-actions { white-space: normal; }
 }

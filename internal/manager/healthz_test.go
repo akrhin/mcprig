@@ -59,7 +59,8 @@ func TestHealthzRejectsForeignHost(t *testing.T) {
 }
 
 // TestDeleteServerReportsStoppedSet: stopped[] — по статусу до Stop, иначе
-// список всегда пуст. В наборе два сервера: удалять последний реестр не даст.
+// список всегда пуст. В наборе два сервера: после удаления одного набор
+// остаётся с другим.
 func TestDeleteServerReportsStoppedSet(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServer(t, "fake")
@@ -80,9 +81,10 @@ func TestDeleteServerReportsStoppedSet(t *testing.T) {
 	}
 }
 
-// TestDeleteLastServerRefused: сервер, без которого набор опустеет, не
-// удаляется — 400, сервер и набор на месте, работающий набор не остановлен.
-func TestDeleteLastServerRefused(t *testing.T) {
+// TestDeleteLastServerEmptiesSet: удаление последнего сервера проходит — 200,
+// сервер убран, набор остаётся с пустым составом, работающий набор остановлен
+// (решение 0004).
+func TestDeleteLastServerEmptiesSet(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServer(t, "only")
 	id := e.addSet(t, "s", "only")
@@ -91,15 +93,19 @@ func TestDeleteLastServerRefused(t *testing.T) {
 	}
 
 	w := e.do(t, http.MethodDelete, "/api/servers/only", nil)
-	status(t, w, http.StatusBadRequest)
-	if e.m.store.Server("only") == nil {
-		t.Fatal("сервер удалён при отказе")
+	status(t, w, http.StatusOK)
+	if e.m.store.Server("only") != nil {
+		t.Fatal("сервер остался в реестре")
 	}
-	if set := e.m.store.Set(id); set == nil || len(set.Servers) != 1 {
-		t.Fatalf("набор потерял сервер при отказе: %+v", set)
+	set := e.m.store.Set(id)
+	if set == nil {
+		t.Fatal("набор исчез вместе с последним сервером")
 	}
-	if !e.m.rt.status(e.m.store.Set(id)).Running {
-		t.Fatal("набор остановлен отбитым удалением")
+	if len(set.Servers) != 0 {
+		t.Fatalf("состав набора после удаления: %v", set.Servers)
+	}
+	if e.m.rt.status(set).Running {
+		t.Fatal("набор не остановлен после удаления единственного сервера")
 	}
 }
 

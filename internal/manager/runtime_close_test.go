@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -66,6 +67,30 @@ func TestLoopbackAddr(t *testing.T) {
 	for bindIP, want := range cases {
 		if got := loopbackAddr(bindIP); got != want {
 			t.Errorf("loopbackAddr(%q) = %q, ждали %q", bindIP, got, want)
+		}
+	}
+}
+
+// Отмена клиента прерывает ожидание готовности: старт возвращает
+// context.Canceled, не висит до бюджета и не оставляет живой процесс (§C6).
+func TestStartHonorsCanceledContext(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "cancel", "fake")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start := time.Now()
+	_, err := e.m.rt.Start(ctx, e.m.store.Set(id), e.m.store.Servers())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, ожидался context.Canceled", err)
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Fatalf("отмена не уважена: старт вернулся за %s", d)
+	}
+	if p := e.m.rt.proc(id); p != nil {
+		if err := syscall.Kill(p.pid, 0); err == nil {
+			t.Fatalf("процесс набора %d жив после отмены", p.pid)
 		}
 	}
 }

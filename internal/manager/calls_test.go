@@ -2,6 +2,7 @@ package manager
 
 import (
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -188,6 +189,99 @@ func TestCallsMergeAndLimit(t *testing.T) {
 	got = decode[callsBody](t, w)
 	if len(got.Calls) != 1 || got.Calls[0].Time != base.Add(3*time.Second).Format(time.RFC3339Nano) {
 		t.Fatalf("limit=1: %s", w.Body.String())
+	}
+}
+
+// Остановленный набор отдаёт свой журнал с диска: панель не должна показывать
+// «0 вызовов» там, где /api/stats видит те же вызовы в истории.
+func TestCallsStoppedReadsHistory(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fs")
+	id := e.addSetBody(t, map[string]any{"name": "stopped", "servers": []string{"fs"}})
+
+	h, err := stats.OpenHistory(e.m.statsDir(id), nil)
+	if err != nil {
+		t.Fatalf("история набора: %v", err)
+	}
+	h.Record("opencode", "fs", "read", 12, nil)
+	h.Record("opencode", "fs", "read", 30, errors.New("boom"))
+	if err := h.Close(); err != nil {
+		t.Fatalf("закрытие истории: %v", err)
+	}
+
+	w := e.do(t, http.MethodGet, "/api/calls", nil)
+	status(t, w, http.StatusOK)
+	got := decode[callsBody](t, w)
+	if len(got.Unreachable) != 0 {
+		t.Fatalf("остановленный набор попал в unreachable: %s", w.Body.String())
+	}
+	if len(got.Calls) != 2 || len(got.Counters) != 1 {
+		t.Fatalf("история остановленного набора: %s", w.Body.String())
+	}
+	failed := 0
+	for _, c := range got.Calls {
+		if c.Set != id || c.Client != "opencode" || c.Tool != "read" {
+			t.Fatalf("строка хвоста: %+v", c)
+		}
+		if c.Failed {
+			failed++
+			if c.Error != "boom" || c.MS != 30 {
+				t.Fatalf("провал в хвосте: %+v", c)
+			}
+		}
+	}
+	if failed != 1 {
+		t.Fatalf("провалов в хвосте = %d, ожидался 1: %+v", failed, got.Calls)
+	}
+	if c := got.Counters[0]; c.Calls != 2 || c.Failures != 1 || c.TotalMs != 42 || c.Client != "opencode" || c.Server != "fs" {
+		t.Fatalf("счётчик остановленного набора: %+v", c)
+	}
+
+	w = e.do(t, http.MethodGet, "/api/calls?set="+id, nil)
+	status(t, w, http.StatusOK)
+	got = decode[callsBody](t, w)
+	if got.Set != id || len(got.Calls) != 2 || len(got.Counters) != 1 {
+		t.Fatalf("/api/calls?set=%s: %s", id, w.Body.String())
+	}
+	if got.Calls[0].Set != "" {
+		t.Fatalf("в ответе одного набора поле set строки должно быть пустым: %+v", got.Calls[0])
+	}
+}
+
+// Открытый набор читается без ключа, поэтому и остановленный отдаёт ту же
+// редакцию, что живой /stats: метка клиента скрыта, текст ошибки не выходит.
+func TestCallsStoppedOpenRedacted(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fs")
+	id := e.addSetBody(t, map[string]any{"name": "open-stopped", "servers": []string{"fs"}, "open": true})
+
+	h, err := stats.OpenHistory(e.m.statsDir(id), nil)
+	if err != nil {
+		t.Fatalf("история набора: %v", err)
+	}
+	h.Record("opencode/2.2.6", "fs", "read", 12, errors.New("boom"))
+	if err := h.Close(); err != nil {
+		t.Fatalf("закрытие истории: %v", err)
+	}
+
+	w := e.do(t, http.MethodGet, "/api/calls", nil)
+	status(t, w, http.StatusOK)
+	got := decode[callsBody](t, w)
+	if len(got.Calls) != 1 || len(got.Counters) != 1 {
+		t.Fatalf("история открытого набора: %s", w.Body.String())
+	}
+	if got.Calls[0].Client != stats.AnonymousLabel || got.Calls[0].Error != "" || !got.Calls[0].Failed {
+		t.Fatalf("строка открытого набора: %+v", got.Calls[0])
+	}
+	if got.Counters[0].Client != stats.AnonymousLabel || got.Counters[0].Calls != 1 {
+		t.Fatalf("счётчик открытого набора: %+v", got.Counters[0])
+	}
+
+	w = e.do(t, http.MethodGet, "/api/calls?set="+id, nil)
+	status(t, w, http.StatusOK)
+	got = decode[callsBody](t, w)
+	if len(got.Calls) != 1 || got.Calls[0].Client != stats.AnonymousLabel || got.Calls[0].Error != "" {
+		t.Fatalf("/api/calls?set=%s: %s", id, w.Body.String())
 	}
 }
 

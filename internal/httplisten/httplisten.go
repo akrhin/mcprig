@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -125,17 +126,16 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	if log == nil {
 		log = slog.Default()
 	}
+	// The SDK's own DNS-rebinding guard is intentionally off, so this list is
+	// the only Host policy: an empty config must not mean "any host". The
+	// guard passes it to HostAllowed, which owns the loopback default.
 	allowed := cfg.Transport.AllowedHosts
 	if len(allowed) == 0 {
-		// The SDK's own DNS-rebinding guard is intentionally off, so this list
-		// is the only Host policy: an empty config must not mean "any host".
-		allowed = []string{"127.0.0.1", "localhost", "::1"}
-		log.Warn("httplisten: allowedHosts пуст — принимаем только loopback", "hosts", allowed)
-	} else {
-		for _, host := range allowed {
-			if host == "*" {
-				log.Warn("httplisten: allowedHosts содержит \"*\" — защита от rebinding отключена для любого Host")
-			}
+		log.Warn("httplisten: allowedHosts пуст — принимаем только loopback", "hosts", loopbackHosts)
+	}
+	for _, host := range allowed {
+		if host == "*" {
+			log.Warn("httplisten: allowedHosts содержит \"*\" — защита от rebinding отключена для любого Host")
 		}
 	}
 	path := cfg.Transport.Path
@@ -151,6 +151,17 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	retention, warns := toolout.FromEnv()
 	for _, w := range warns {
 		log.Warn("httplisten: tool-out", "warn", w)
+	}
+	// Набор под панелью получает срок из реестра (BuildSetConfig кладёт его в
+	// servers.json): окружение набора собирается вручную, и MCPRIG_TOOLOUT_TTL
+	// до него не доезжает. Ручной serve по-прежнему живёт на MCPRIG_TOOLOUT_TTL.
+	if v := strings.TrimSpace(cfg.Transport.ToolOutTTL); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			retention.TTL = d
+		} else {
+			log.Warn("httplisten: tool-out", "warn",
+				fmt.Sprintf("transport.toolOutTtl=%q: срок должен быть положительной длительностью — беру %s", v, retention.TTL))
+		}
 	}
 
 	// Stateless 2026-07-28 per SEP-2567: one temporary session per POST. The
@@ -206,11 +217,16 @@ var toolOutName = regexp.MustCompile(`^[0-9a-f]{16}$`)
 // toolOutHandler serves one saved answer from this process's tool-out. A name
 // past its TTL is 410: the file was there and the marker's promise ran out.
 //
-// shortcut: имя выгрузки — 64-битный capability без привязки к клиенту: любой
-// держатель ключа набора заберёт чужую выгрузку, если знает имя
+// The dump belongs to the key whose call produced it: <name>.owner holds that
+// key's fingerprint, and a reader with another key — or with no .owner beside
+// the file — gets 404, not 403, because a wrong name must not confirm that a
+// dump exists. A caller without a key (an open set) owns the dump as
+// toolout.AnonymousOwner and reads it back under the same name.
+//
+// shortcut: имя по-прежнему capability внутри одного клиента — знающий имя
+// читает свою выгрузку, чужой ключ получает 404, а отозванный ключ теряет
+// доступ к файлу, который живёт до TTL
 // (docs/history/proposals/0002-proxy-improvements.md).
-// shortcut: TTL конечной точки не прокидывается в набор под панелью, прокинуть
-// вместе с профилями/лимитами (T2/T3).
 func toolOutHandler(dir string, ttl time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
@@ -218,7 +234,13 @@ func toolOutHandler(dir string, ttl time.Duration) http.HandlerFunc {
 			http.NotFound(w, r)
 			return
 		}
-		f, err := os.Open(filepath.Join(dir, name+".txt"))
+		path := filepath.Join(dir, name+".txt")
+		owner, err := os.ReadFile(toolout.OwnerPath(path))
+		if err != nil || strings.TrimSpace(string(owner)) != readerOwner(r) {
+			http.NotFound(w, r)
+			return
+		}
+		f, err := os.Open(path)
 		if err != nil {
 			http.NotFound(w, r)
 			return
@@ -243,6 +265,15 @@ func toolOutHandler(dir string, ttl time.Duration) http.HandlerFunc {
 	}
 }
 
+// readerOwner is the fingerprint the guard recorded for this request. A request
+// without a key matches the dump an open set wrote without one.
+func readerOwner(r *http.Request) string {
+	if fp := stats.ClientKey(r.Context()); fp != "" {
+		return fp
+	}
+	return toolout.AnonymousOwner
+}
+
 // guard is the per-request policy in front of the MCP handler: method, Host,
 // Origin, bearer token, body cap. openRoute marks the routes an open set also
 // serves without a header; /tool-out is not one of them.
@@ -258,15 +289,14 @@ func guard(next http.Handler, auth *authSet, openRoute bool, allowed []string) h
 			return
 		}
 
-		host := hostOnly(r.Host)
-		if !hostAllowed(host, allowed) {
+		if !HostAllowed(r.Host, allowed) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 			return
 		}
 
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, err := url.Parse(origin)
-			if err != nil || !hostAllowed(hostOnly(u.Host), allowed) {
+			if err != nil || !HostAllowed(u.Host, allowed) {
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
@@ -295,6 +325,11 @@ func guard(next http.Handler, auth *authSet, openRoute bool, allowed []string) h
 		// clientInfo — не идентичность, а лимит частоты корзинит по ключу.
 		if presented, ok := bearerToken(r); ok {
 			r = r.WithContext(stats.WithClientKey(r.Context(), stats.Fingerprint(presented)))
+		}
+		// Служебный вызов панели (проба здоровья, каталог) — не клиентский
+		// трафик: он не попадает ни в счётчики, ни в хвост, ни в историю.
+		if r.Header.Get(stats.ServiceCallHeader) == stats.ServiceCallerPanel {
+			r = r.WithContext(stats.WithServiceCall(r.Context()))
 		}
 		// Адрес — то, чем опознаётся клиент открытого набора: ключа у него нет,
 		// а метка самообъявлена. Порт срезан, иначе одна машина = много корзин.
@@ -357,17 +392,28 @@ func bearerOK(r *http.Request, tokens *tokenSet) bool {
 	return tokens.ok(presented)
 }
 
-// hostOnly drops the port: AllowedHosts is a host list, not a listener list.
-func hostOnly(hostport string) string {
+// loopbackHosts is the Host policy when none is configured: one copy for the
+// set endpoint and the panel, so "not set" never comes to mean "any host".
+var loopbackHosts = []string{"127.0.0.1", "localhost", "::1"}
+
+// HostOnly drops the port: AllowedHosts is a host list, not a listener list.
+func HostOnly(hostport string) string {
 	if host, _, err := net.SplitHostPort(hostport); err == nil {
 		return host
 	}
 	return strings.Trim(hostport, "[]")
 }
 
-func hostAllowed(host string, allowed []string) bool {
+// HostAllowed is the one Host/rebinding policy for a set endpoint and for the
+// panel. An empty list means loopback; an entry may carry a port, ignored like
+// the checked host's.
+func HostAllowed(hostport string, allowed []string) bool {
+	if len(allowed) == 0 {
+		allowed = loopbackHosts
+	}
+	host := HostOnly(hostport)
 	for _, a := range allowed {
-		if a == "*" || strings.EqualFold(hostOnly(a), host) {
+		if a == "*" || strings.EqualFold(HostOnly(a), host) {
 			return true
 		}
 	}

@@ -9,20 +9,27 @@
 
 ## Конвейер
 
-1. Тег `vX.Y.Z` на `master`, пуш.
-2. Gitea CI (`.gitea/workflows/release.yml`) гоняет проверки — `go vet`, тесты
-   с `-race`, `govulncheck`, `gofmt` — затем `goreleaser`: четыре платформы,
-   `checksums.txt`, **черновик** релиза в Gitea и образы `slim`/`full` в реестр.
-   Задачи (`job`) сериализованы (`concurrency: mcprig-release`): второй тег ждёт,
-   а не отменяет первый.
-3. Черновик публикует человек; CI этого не делает.
-4. Воркфлоу GitHub (`.github/workflows/release.yml`) идёт по тому же тегу:
+1. Тег `vX.Y.Z` на `master`, пуш в оба ремоута (Gitea и GitHub).
+2. Gitea CI гоняет `.gitea/workflows/release.yml` — `go vet`, тесты с `-race`,
+   `govulncheck`, `gofmt` — затем `goreleaser`: четыре платформы,
+   `checksums.txt`, **опубликованный** релиз в Gitea (`.goreleaser.yaml` держит
+   `draft: false`) и образы `slim`/`full` в реестр. Задачи (`job`)
+   сериализованы (`concurrency: mcprig-release`): второй тег ждёт, а не
+   отменяет первый. Руками не публикуется ничего: релиз, оборвавшийся на
+   половине, перезапускают пушем того же тега или `rerun` в интерфейсе Actions.
+3. Воркфлоу GitHub (`.github/workflows/release.yml`) идёт по тому же тегу:
    пересобирает те же архивы с `goreleaser --skip=publish`, собирает и пушит
    образы `slim`/`full` в `ghcr.io/akrhin/mcprig`, заливает архивы через `gh` —
    так `.goreleaser.yaml` остаётся один, с одними `gitea_urls`/`draft`.
    Тестов и `govulncheck` там нет.
-5. Заметки релиза — раздел `CHANGELOG.md` для тега, вырезает
+4. Заметки релиза — раздел `CHANGELOG.md` для тега, вырезает
    `scripts/release-notes.sh`.
+
+Каждый пуш и каждый pull request гоняет `.gitea/workflows/ci.yml`: `gofmt`,
+`go vet`, `go build`, `go test ./... -race -p 1`, `scripts/docs-check.sh`,
+`node --check web/app.js` и `govulncheck`. Красный прогон сам мерж не
+блокирует — Gitea не умеет обязательные проверки, — поэтому его читают глазами
+до мержа.
 
 Релиз можно выпустить и руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
 

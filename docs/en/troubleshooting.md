@@ -155,6 +155,17 @@ answer is cut and the full one is written to `tool-out/`.
 **What to do.** Read the file named in the marker (it lives 24 hours, the
 directory is capped at 256 MiB), or pass a larger `maxBytes` — up to 1048576.
 
+## 11. The panel answers 500
+
+**Symptom.** A button or an API call answers `500` with `внутренняя ошибка,
+подробности в логе` (or the file error wording with the same advice).
+
+**Cause and what to do.** The body never carries the cause: an unclassified
+failure is written to the panel log only — `journalctl --user -u mcprig.service`
+under the shipped unit, the panel's stdout when it runs in the foreground. The
+line there is `ошибка API` with the method, the path and the error, which is what
+names the broken thing.
+
 ## See also
 
 - [cli.md#doctor](cli.md#doctor) — one pass over config, sets, keys, secrets, ports.

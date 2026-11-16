@@ -15,6 +15,7 @@ import (
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/akrhin/mcprig/internal/toollock"
+	"github.com/akrhin/mcprig/internal/toolout"
 )
 
 // Формат servers.json — вход lazy-mcp `serve`. ${VAR} остаются нераскрытыми:
@@ -37,6 +38,9 @@ type setTransport struct {
 	// KeyProfiles — профиль ключа по отпечатку: набор находит им профиль
 	// вызывающего. Отпечаток, а не подпись: подпись клиент называет сам.
 	KeyProfiles map[string]string `json:"keyProfiles,omitempty"`
+	// ToolOutTTL — срок жизни выгрузки усечённого ответа. Маркер обещает файл
+	// на этот срок, и панель чистит tool-out по тому же сроку.
+	ToolOutTTL string `json:"toolOutTtl,omitempty"`
 }
 
 type setHealthMonitor struct {
@@ -63,6 +67,9 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 	if bindIP == "" {
 		bindIP = "0.0.0.0"
 	}
+	// Срок жизни выгрузки — тот, по которому панель чистит tool-out: маркер
+	// обещает клиенту файл ровно на него, и набор обязан обещать то же.
+	toolCfg, _ := toolout.FromEnv()
 	byName := make(map[string]*config.Server, len(servers))
 	for _, s := range servers {
 		if s != nil {
@@ -82,6 +89,7 @@ func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string,
 			AllowAnonymous: set.Open && set.Token == "",
 			ClientNames:    clientNames(set.Keys),
 			KeyProfiles:    keyProfiles(set.Keys),
+			ToolOutTTL:     toolCfg.TTL.String(),
 		},
 		HealthMonitor:  setHealthMonitor{Interval: 60000, Timeout: 120000},
 		RequestTimeout: 120000,

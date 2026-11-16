@@ -99,7 +99,6 @@ type serversOut struct {
 		Tags    []string `json:"tags"`
 	} `json:"servers"`
 	Version string `json:"version"`
-	PID     int    `json:"pid"`
 }
 
 func listServersOut(t *testing.T, cs *mcp.ClientSession) serversOut {
@@ -135,6 +134,22 @@ func TestLazyConnect(t *testing.T) {
 	listServersOut(t, cs)
 	if n := atomic.LoadInt32(&dials); n != 1 {
 		t.Fatalf("the session must be reused, got %d dial(s)", n)
+	}
+}
+
+// list_servers answers with version but not with pid: the process id of the
+// proxy is of no use to a client and only widens what leaks.
+func TestListServersOmitsPID(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	defer m.Close()
+
+	raw := resultText(t, call(t, clientFor(t, m.Server()), "list_servers", nil))
+	if strings.Contains(raw, `"pid"`) {
+		t.Fatalf("list_servers leaked pid: %s", raw)
+	}
+	if !strings.Contains(raw, `"version": "test"`) {
+		t.Fatalf("list_servers must keep version: %s", raw)
 	}
 }
 
@@ -933,6 +948,30 @@ func TestListServersRecorded(t *testing.T) {
 	}
 }
 
+// Служебный вызов панели (проба здоровья, каталог) не попадает ни в счётчики,
+// ни в хвост: у набора, к которому не обращался ни один клиент, статистика
+// остаётся строго нулевой.
+func TestServiceCallNotCounted(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	m.Stats = stats.NewRecorder("t", 8)
+	defer m.Close()
+	handler := m.recordMeta("list_servers", func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{}, nil
+	})
+
+	handler(context.Background(), reqWithMeta(nil))
+	if snap := m.Stats.Snapshot(); len(snap.Counters) != 1 || len(snap.Tail) != 1 {
+		t.Fatalf("обычный вызов не учтён: counters=%+v tail=%+v", snap.Counters, snap.Tail)
+	}
+
+	handler(stats.WithServiceCall(context.Background()), reqWithMeta(nil))
+	snap := m.Stats.Snapshot()
+	if len(snap.Counters) != 1 || len(snap.Tail) != 1 {
+		t.Fatalf("служебный вызов попал в статистику: counters=%+v tail=%+v", snap.Counters, snap.Tail)
+	}
+}
+
 // Неизвестное имя инструмента не заводит счётчик: иначе любое придуманное
 // command_name оседает в памяти.
 func TestStatsSkipUnknownTool(t *testing.T) {
@@ -992,5 +1031,100 @@ func TestIsolationNoteRejectedConfig(t *testing.T) {
 		if got := newEntry(srv).isolationNote(); got != "нет: конфиг отвергнут" {
 			t.Fatalf("%s: isolation %q обещает изоляцию отвергнутому серверу", srv.Name, got)
 		}
+	}
+}
+
+// list_servers не выпускает секрет апстрима в тексте пробы: ключ из ошибки
+// маскируется так же, как в ответе вызова.
+func TestListServersScrubsProbeError(t *testing.T) {
+	const secret = "supersecret-token-value"
+	srv := stdio("alpha")
+	srv.Env = map[string]string{"API_TOKEN": secret}
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{srv}}, &dials, 0)
+	m.dial = func(context.Context, *config.Server) (*mcp.ClientSession, error) {
+		return nil, fmt.Errorf("dial: key %s rejected", secret)
+	}
+	t.Cleanup(func() { _ = m.Close() })
+
+	out := listServersOut(t, clientFor(t, m.Server()))
+	if len(out.Servers) != 1 {
+		t.Fatalf("серверов %d", len(out.Servers))
+	}
+	got := out.Servers[0].Error
+	if strings.Contains(got, secret) {
+		t.Fatalf("секрет утёк в list_servers: %q", got)
+	}
+	if !strings.Contains(got, "***") {
+		t.Fatalf("ошибка пробы не отдана: %q", got)
+	}
+	if out.Servers[0].Healthy {
+		t.Fatal("упавшая проба названа здоровой")
+	}
+}
+
+// invoke_command упирается в те же слоты, что invoke_many: занятые слоты
+// держат вызов до освобождения, а не пускают его внахлёст.
+func TestInvokeCommandWaitsForSlot(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	t.Cleanup(func() { _ = m.Close() })
+
+	slot := m.slots.get("alpha")
+	for i := 0; i < m.slots.limit; i++ {
+		slot <- struct{}{}
+	}
+	done := make(chan *mcp.CallToolResult, 1)
+	go func() {
+		res, err := m.invokeCommand(context.Background(), toolReq("invoke_command", `{"server":"alpha","command":"echo"}`))
+		if err != nil {
+			t.Errorf("invokeCommand: %v", err)
+		}
+		done <- res
+	}()
+	select {
+	case res := <-done:
+		t.Fatalf("вызов прошёл мимо занятых слотов: %s", resultText(t, res))
+	case <-time.After(50 * time.Millisecond):
+	}
+	for i := 0; i < m.slots.limit; i++ {
+		<-slot
+	}
+	res := <-done
+	if res == nil || res.IsError {
+		t.Fatalf("после освобождения слота вызов отбит: %v", res)
+	}
+}
+
+// Ожидание слота уважает ctx: отмена не висит в очереди и не уходит в апстрим.
+func TestInvokeCommandSlotHonorsContext(t *testing.T) {
+	var dials int32
+	m := testManager(&config.Config{Servers: []*config.Server{stdio("alpha")}}, &dials, 0)
+	t.Cleanup(func() { _ = m.Close() })
+
+	slot := m.slots.get("alpha")
+	for i := 0; i < m.slots.limit; i++ {
+		slot <- struct{}{}
+	}
+	t.Cleanup(func() {
+		for i := 0; i < m.slots.limit; i++ {
+			select {
+			case <-slot:
+			default:
+			}
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	res, err := m.invokeCommand(ctx, toolReq("invoke_command", `{"server":"alpha","command":"echo"}`))
+	if err != nil {
+		t.Fatalf("invokeCommand: %v", err)
+	}
+	if !res.IsError || !strings.Contains(resultText(t, res), "слот") {
+		t.Fatalf("отмена в очереди не названа: %s", resultText(t, res))
+	}
+	if n := atomic.LoadInt32(&dials); n != 0 {
+		t.Fatalf("вызов дошёл до апстрима без слота: %d", n)
 	}
 }

@@ -8,6 +8,213 @@ repository the project is built in.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-16
+
+### Added
+
+- The panel has pages of its own instead of one long **Overview**: `#/sets`,
+  `#/servers` and `#/vars` are pills in the content head, `#/stats` and
+  `#/set/<id>` keep working as before, and every page has an address that
+  survives a reload and can be sent to someone else.
+- **All servers** is a page of the whole host registry: name with the reason of
+  a failure, transport, a health badge in colour (`healthy` green, `failed` red,
+  `not checked` neutral — the same badge the set table uses), the tools a check
+  found, the sets the server belongs to, and per-row **check**, **log**,
+  **edit** and **×** that deletes it from the registry after naming the sets it
+  leaves. The details drawer no longer carries the registry: it keeps the log
+  tail of the set, so a set's own composition and a host-wide list stop sharing
+  one screen.
+- **Variables** is a page: the names your servers reference as `${NAME}`, each
+  with whether it is set and where it comes from (`openbao`, `file`, `env`), a
+  form that writes a value — name, value, store `automatic`/`OpenBao`/`file` —
+  and **×** that forgets it everywhere. The panel says plainly that it never
+  reads a value back and that a name no server mentions stays out of the list.
+- The panel composes a set in place: the servers table of the **Overview** tab
+  gains a registry picker with **add to set** and a **×** that detaches a server.
+  Both send `PUT /api/sets/<id>` with the whole `servers` list and redraw from
+  `GET /api/state`; a refusal shows under the block, an empty set says it will
+  serve no tools, and the hint states that a running set takes the change by
+  reload, not by restart.
+- **Import / Export** is a dialog of its own, opened from the head of a set and
+  from the empty state: the whole registry or one set as JSON with **Download
+  JSON** and **Copy**, and an import from a JSON file or a pasted `mcpServers`
+  object behind a preview that names the servers to be added — sets found in the
+  file are skipped with a note, because sets are made in the panel.
+- The head of a set carries a red **Delete set** button: the confirmation names
+  the endpoint and the directory that go away, and the panel returns to the
+  empty state afterwards.
+- **Prompt** in the head of the set opens a dialog over the endpoint below: the
+  task is required, the introduction and the server subset are optional, and the
+  built text comes back monospaced with **copy** and **download .md**; `notes`
+  are shown above it, and a stopped set warns beforehand that schemas will be
+  missing.
+- The keys block of a set shows the `keyMark` of `GET /api/state` next to the
+  prefix — the very label the statistics print for that key: its label when it
+  has one, otherwise `key:<mark>`; hidden for an open set.
+- `POST /api/sets/<id>/prompt` builds one text for an agent out of three
+  parts: `{"task":"…","intro":"…","servers":["…"]}` and the answer
+  `{"prompt":"…","notes":["…"]}`. The tool list comes from the live catalog of
+  the set — names, descriptions and one-line input schemas — and a stopped set
+  falls back to the `tools.lock.json` names with a note that schemas are
+  missing. One schema is capped at 4000 characters, the whole prompt at 64 KiB,
+  both cuts reported in `notes`; set tokens and variable values never reach the
+  text.
+- `GET /api/state` gives every set a `keyMark`: the label its primary key carries
+  in the statistics — the key's label when it has one, otherwise the `key:<6 hex>`
+  fingerprint — so a row in the statistics can be matched to the key in the
+  panel. Empty for an open set; `keyPrefix` stays as it was.
+- A set may be created and started with no servers. An empty `servers` list is
+  now a legal state: `POST /api/sets` and `PUT /api/sets/<id>` accept it, in an
+  update a missing `servers` key leaves the list untouched, and a set without
+  servers starts and answers the meta-tools (`list_servers` is empty). Deleting
+  the last server of a set no longer answers `400` — the set keeps its key and
+  port with an empty list.
+- A saved variable that no server of the install references is visible in the
+  panel and in `GET /api/env` with `"used": false`: the **Variables** page lists
+  every stored name, marks the ones nothing references as *not used by any
+  server* and lets them be forgotten, instead of hiding a value that stays on
+  disk. Unreferenced names come last; `used` is new in the answer.
+
+### Docs
+
+- Two new diagrams next to the architecture one: **the same servers, one
+  endpoint** — what a client pays without a proxy and with one, plus what the
+  endpoint costs — and **what one binary does**, a capability map
+  (`docs/diagrams/`, spec `.json` and PNG per language).
+- `docs/en/alternatives.md` (and the Russian mirror) compares mcprig with
+  mcp-proxy, mcp-hub, mcpo, Docker MCP Gateway, MetaMCP, 1mcp, the Lasso gateway
+  and supergateway, says where each fact came from, and lists where mcprig is
+  weaker: one operator, no roles, a spoofable `X-MCPRig-Caller`, a sandbox that
+  leaves CPU and egress alone.
+- The README carries a fresh panel screenshot and the corrected count of meta
+  tools: nine, of which five work with servers.
+
+### Changed
+
+- A panel started without a password (`MCPRIG_AUTH=off`) now says so at
+  startup: `WARN панель без пароля (MCPRIG_AUTH=off): доступна всем, кто
+  дотянется до порта; задайте MCPRIG_PASSWORD`. `mcprig doctor` prints the same
+  as `предупреждение:` under services when no `MCPRIG_PASSWORD` or
+  `MCPRIG_PASSWORD_HASH` is set — a warning, not a problem, so the exit code
+  stays `0`.
+- `list_servers` no longer answers with `pid`: the proxy's process id is of no
+  use to a client. `version` stays.
+- `GET /api/calls` answers for a stopped set as well: its tail and counters come
+  from the raw journal on disk (`sets/<id>/stats/raw-*.jsonl`) over the same
+  7-day window as `period=7d`, up to the 512 newest rows, and a missing
+  directory answers empty instead of landing in `unreachable`. `schema`,
+  `throttled` and `unreachable` stay properties of a running set; a set without
+  a token is anonymized on read.
+- Signing a key (`PATCH /api/sets/<id>/keys/<keyID>`) reaches the set by reload
+  instead of a restart: the label travels to the statistics client names and the
+  set's pid stays put.
+- Stopping the panel closes every set in parallel under one shared budget (15 s
+  for readiness and 5 s for termination in total) instead of one budget per set,
+  so a dozen sets no longer hold the exit for a minute.
+- A refused start or update now answers by the kind of refusal instead of its
+  wording: a busy port, a set that did not come up and a set without an active
+  key answer `409`, and anything unclassified answers `500` with a line in the
+  log and a generic message in the body. A set with an unfilled `${VAR}` in its
+  environment is refused at start with `409` and the name of the variable
+  instead of starting without it.
+- `mcprig doctor` reads an empty install as healthy: a missing config and a
+  missing registry together mean the setup has not been made yet, so it prints
+  one line, exits `0` and no longer reports "3 problems" on a fresh directory.
+- `describe_commands` answers within the caller's profile: the same allow and
+  deny rules that hide a tool from `list_commands` now hide it here as well.
+- `invoke_command` takes the server's slot: a slow upstream no longer lets an
+  authenticated client stack calls past the per-server concurrency limit.
+- A registry validation error answers `400` with the reason instead of `500`
+  with "see the log": `internal/registry` now returns a typed `ErrInvalid`
+  carrying the text of the first broken field (`port 9200`, `env.A`), and the
+  panel shows it as it is.
+- A dump at `/tool-out/<name>` belongs to the key that caused it: the file gets
+  a `<name>.owner` fingerprint next to it and another key gets `404`. The
+  lifetime of a dump follows the set policy now (`transport.toolOutTtl`) instead
+  of only the panel-wide `MCPRIG_TOOLOUT_TTL`.
+- `GET /api/servers/<id>/authorize` no longer starts the OAuth flow: the flow is
+  `POST`, and `GET …/authorize/status` reads it. A `GET` on the starting route
+  answers `405` with `Allow: POST`; the panel polls the status route.
+- `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-For` are trusted only
+  from a loopback peer or from an address in `MCPRIG_TRUSTED_PROXIES` (IP or
+  CIDR, comma-separated), and not because `MCPRIG_PROXY_SECRET` is set. A peer
+  outside the list loses the header silently: the panel answers with its own
+  origin and the login limit counts the peer's address. A value that parses as
+  neither an IP nor a CIDR refuses the start with the offending entry.
+- Behind a trusted proxy the login limit counts the client, not the proxy: five
+  failed attempts from one `X-Forwarded-For` address no longer lock out every
+  other client of the same proxy.
+- A release is published by CI itself: `.goreleaser.yaml` carries
+  `release.draft: false`, so a `v*` tag produces a public release with no human
+  step. Every push and pull request runs `.gitea/workflows/ci.yml` — `gofmt`,
+  `go vet`, `go build`, the race suite, `scripts/docs-check.sh`,
+  `node --check web/app.js` and `govulncheck` — where before only docs were
+  checked.
+
+### Fixed
+
+- `PUT` and `DELETE /api/env/<NAME>` no longer stop a running set that would
+  lack a variable afterwards: the set keeps working on its previous environment
+  and the answer names it in `skipped` (`{set, reason, missing}`) next to `restarted`.
+  Before, the set was restarted into a refused start and the answer still said
+  it had been restarted.
+- Adding a server that brings a `${VAR}` the set did not use before restarts the
+  set: the process environment is fixed at start, so a reload would have left
+  the variable empty while answering `200`. `needsRestart` compares the variable
+  references of both compositions, not only the port.
+- `POST /api/sets/<id>/prompt` masks tool descriptions and schemas like the
+  notes, and the mask now includes a server's literal `env` and `headers`
+  secrets on par with `${VAR}` values and the set token.
+- A busy set port is recognised by the typed `registry.ErrPortBusy` through
+  `errors.Is`, not by the word «занят» in the error text: rewording the message
+  can no longer turn a `409` into a `500`.
+- `POST /api/browse` rejects a server entry carrying a reserved `${VAR}` or a
+  `{file:…}` reference, like every other route that takes a server from the
+  request body: the entry bypassed the registry, so the browse button could
+  start a server the set would have refused.
+- A stdio server now runs in its own process group and its whole group is shut
+  down when the session closes: SIGTERM, a short wait, then SIGKILL. A server
+  that wraps its work (`sh -c "npx … & wait"`) left its children behind — the
+  process was re-parented to init and survived a probe or a set restart, where
+  only the direct child was signalled. A probe that timed out on `initialize`
+  no longer waits out the transport's five-second exit window either: the group
+  gets the signal at once, so the answer stays inside the probe budget.
+- A deny rule matches a tool name that spans a newline: the rule pattern is
+  compiled with `.` covering every character, so `rm*` refuses `rm\n-rf`
+  instead of letting it through.
+- The quarantined-tool file is read and written with its errors reported: a
+  lock file that cannot be read or written refuses `invoke_command` and
+  `invoke_many` and logs the reason, instead of quietly turning the quarantine
+  off.
+- A probe error printed by `list_servers` has secrets scrubbed like every other
+  place that shows upstream text.
+- A webhook event that could not be delivered is no longer marked as sent: the
+  next event of the same transition is sent again instead of being suppressed.
+- `GET /api/sets/<id>/servers` no longer answers `200` with `servers: null` when
+  the probe gave no answer: every server of the set stays in the list with the
+  probe error, so the panel does not read an expired probe as an empty set. A
+  client that cancels the request gets no answer; a start or reload cancelled by
+  the client stops the spawned set process instead of leaving it holding the
+  port.
+- A `SIGKILL` on a set no longer leaves its servers running: every stdio server
+  starts through a hidden `mcprig child-guard --` wrapper that is the leader of
+  the server's process group, and the kernel hands it `SIGTERM` when the set
+  dies, so it kills the whole group before it exits. A server that wraps its
+  work (`sh -c "npx … & wait"`) was previously re-parented to init and kept the
+  upstream connection and the disk lock of a set that no longer existed. If the
+  binary was replaced under a running set, the wrapper cannot be started and the
+  server runs without it, with a warning in the set log.
+- A dump created before 0.6.0 has no owner fingerprint, so `/tool-out/<name>`
+  answers `404` for it after the upgrade instead of serving the file.
+- Closing a set no longer waits for another init to reap its killed processes:
+  a zombie holds no port and no memory, and in a container it stays around, so
+  the old check spent the whole grace budget on it.
+- The panel refuses a browser request that carries neither `Origin` nor
+  `Sec-Fetch-Site` and a `Origin: null` or `Sec-Fetch-Site: cross-site` outright:
+  before, a request without those headers skipped the origin check, so a
+  cross-site page could reach an unsafe method over a session cookie. `curl`
+  without a cookie keeps working, and `/api/login` stays outside the check.
+
 ## [0.5.1] - 2026-11-15
 
 ### Fixed
@@ -699,7 +906,8 @@ repository the project is built in.
 - Docker images (slim and full), Gitea Actions release with goreleaser and
   govulncheck, Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
 [0.4.0]: https://github.com/akrhin/mcprig/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/akrhin/mcprig/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/akrhin/mcprig/compare/v0.3.6...v0.3.7

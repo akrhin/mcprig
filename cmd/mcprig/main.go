@@ -48,6 +48,10 @@ func startPprof() {
 }
 
 func main() {
+	// Скрытый режим: набор запускает сервер сторожем, который переживает
+	// SIGKILL набора и гасит свою группу (см. downstream.GuardMain). Разбор
+	// флагов сюда не доходит: у режима собственная argv.
+	downstream.RunChildGuardMode(os.Args)
 	startPprof()
 	if err := run(); err != nil {
 		// -h: flag уже напечатал usage, это не ошибка.

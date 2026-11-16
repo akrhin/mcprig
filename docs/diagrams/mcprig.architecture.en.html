@@ -5405,19 +5405,19 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="fine" x="468" y="280" class="t-backend" font-size="7" text-anchor="middle">initialize</text>
         </g>
 
-        <g id="node-panel" data-node-id="panel" data-node-label="panel" tabindex="0" role="button" aria-label="Focus panel, sets · keys · logs, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="sets · keys · logs" data-node-context="Architecture component">
-          <title>panel · sets · keys · logs · Architecture component</title>
+        <g id="node-panel" data-node-id="panel" data-node-label="panel" tabindex="0" role="button" aria-label="Focus panel, sets · keys · stats · prompt, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="sets · keys · stats · prompt" data-node-context="Architecture component">
+          <title>panel · sets · keys · stats · prompt · Architecture component</title>
           <rect x="12" y="338" width="128" height="56" rx="8" class="c-mask"/>
           <rect x="12" y="338" width="128" height="56" rx="8" class="c-backend" data-animate="node" style="--step:7" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(18 344) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="76" y="364" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">panel</text>
-        <text data-detail="context" x="76" y="380" class="t-muted" font-size="9" text-anchor="middle">sets · keys · logs</text>
+        <text data-detail="context" x="76" y="380" class="t-muted" font-size="7.1" text-anchor="middle">sets · keys · stats · prompt</text>
         </g>
 
-        <g id="node-disk" data-node-id="disk" data-node-label="state files" tabindex="0" role="button" aria-label="Focus state files, config · keys · secrets, Architecture component" aria-pressed="false" data-node-kind="database" data-node-sublabel="config · keys · secrets" data-node-context="Architecture component">
-          <title>state files · config · keys · secrets · Architecture component</title>
+        <g id="node-disk" data-node-id="disk" data-node-label="state files" tabindex="0" role="button" aria-label="Focus state files, config · keys · secrets · journal, Architecture component" aria-pressed="false" data-node-kind="database" data-node-sublabel="config · keys · secrets · journal" data-node-context="Architecture component">
+          <title>state files · config · keys · secrets · journal · Architecture component</title>
           <rect x="200" y="338" width="128" height="56" rx="8" class="c-mask"/>
           <rect x="200" y="338" width="128" height="56" rx="8" class="c-database" data-animate="node" style="--step:9" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(206 344) scale(0.6875)">
@@ -5425,7 +5425,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="264" y="364" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">state files</text>
-        <text data-detail="context" x="264" y="380" class="t-muted" font-size="8.6" text-anchor="middle">config · keys · secrets</text>
+        <text data-detail="context" x="264" y="380" class="t-muted" font-size="6" text-anchor="middle">config · keys · secrets · journal</text>
         </g>
 
         <!-- Connection labels -->
@@ -5674,6 +5674,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <li>describe_commands sends the schema of just the tool being called</li>
           <li>invoke_many runs a batch in one answer instead of N round-trips</li>
           <li>maxBytes cuts a large answer; the whole text stays in a file</li>
+          <li>A set compiles a ready-to-paste prompt: tool schemas, your task and an optional intro</li>
         </ul>
       </div>
 
@@ -5697,7 +5698,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </div>
         <ul>
           <li>stdio: spawn(command) + its own env, initialize handshake</li>
-          <li>HTTP: server/discover, OAuth on 401 or 403</li>
+          <li>HTTP: server/discover, OAuth on 401</li>
           <li>One Bearer token per set; each client can have its own set</li>
           <li>A set runs as a child of the panel or as its own unit</li>
         </ul>

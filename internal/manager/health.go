@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/akrhin/mcprig/internal/stats"
 )
 
 const (
@@ -88,6 +90,8 @@ func (c *healthCache) get(ctx context.Context, id string, load func(context.Cont
 			case <-wait:
 				continue
 			case <-ctx.Done():
+				// Пустой вид — сигнал «ответа нет»: обработчик решает,
+				// молчать (клиент ушёл) или отдать серверы с ошибкой.
 				return setHealth{}
 			}
 		}
@@ -120,6 +124,9 @@ func (t *bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if t.token != "" {
 		clone.Header.Set("Authorization", "Bearer "+t.token)
 	}
+	// Проба — служебный вызов панели: набор читает этот заголовок и не пишет
+	// её ни в счётчики, ни в хвост, ни в историю.
+	clone.Header.Set(stats.ServiceCallHeader, stats.ServiceCallerPanel)
 	base := t.base
 	if base == nil {
 		base = http.DefaultTransport

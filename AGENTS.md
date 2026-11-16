@@ -25,7 +25,34 @@ bash scripts/docs-check.sh        # ворота документации: сс�
 bash scripts/dev-real-set.sh      # стенд на живых серверах: см. docs/dev-real-servers.md
 ```
 
-Go-тулчейн: локально 1.24.4, модуль требует 1.27.4 — `GOTOOLCHAIN=auto` скачивает нужный тулчейн сам (проверено: `GOTOOLCHAIN=go1.27.4 go version`).
+Пакет, чьи тесты поднимают stdio-серверы, обязан иметь `TestMain` с
+`downstream.RunChildGuardMode(os.Args)`: сторож — это `os.Executable()`, и без
+перехвата тестовый бинарник вместо сервера запускает тесты (песочница при этом
+молча «протекает»).
+
+Go-тулчейн: модуль требует 1.27.4, и столько же стоит на хосте разработки; `GOTOOLCHAIN=auto` подтянет нужный тулчейн, если локальный отстал (проверено: `GOTOOLCHAIN=go1.27.4 go version`).
+
+## Диаграммы и картинки
+
+`docs/diagrams/` — по файлу `.json` (спецификация) → `.html` (archify) → `.png` (растр)
+на каждом языке. Правится только `.json`, остальное перегенерируется:
+
+```bash
+archify finalize architecture docs/diagrams/mcprig.why.en.json docs/diagrams/mcprig.why.en.html \
+  --quality showcase --out-dir .tmp/diagrams --json
+```
+
+`finalize` прогоняет validate → deliver → check → browser-check; второй прогон в тот же
+каталог падает на `viewer/evidence-path-conflict` — каждому прогону свой `--out-dir`, а
+`*.delivery.json` и `.review/` в репозиторий не коммитятся. PNG снимается headless-Chrome
+с `--force-device-scale-factor=2`, из копии `.html` с добавленным в `<head>` стилем
+`.toolbar,.diagram-nav{display:none!important}` (иначе в кадр попадают кнопки вьюера), в
+тёмной теме: `"…?theme=dark"`. Карточки-подсказки в режиме `?embed=1` не рисуются —
+для PNG этот параметр не ставить.
+
+Скриншот панели для README (`design/ui/panel.png`) — живая панель под
+`systemd-run --user` на отдельном порту, тёмная тема, EN, 1280 CSS px при DPR 2;
+прежний кадр уезжает в `design/ui/archive/panel-<версия>.png`.
 
 ## Ссылки
 

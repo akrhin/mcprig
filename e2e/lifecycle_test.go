@@ -335,33 +335,6 @@ func (l *lifecycle) mcpInit(url, token string) string {
 	return init
 }
 
-// postAny принимает любой не-5xx-код: некоторые вызовы допустимо завершать
-// по-разному (старт падающего набора).
-func (l *lifecycle) postAny(path string, payload any) map[string]any {
-	l.t.Helper()
-	var body io.Reader
-	if payload != nil {
-		raw, _ := json.Marshal(payload)
-		body = bytes.NewReader(raw)
-	}
-	req, _ := http.NewRequest(http.MethodPost, l.panel+path, body)
-	if payload != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	resp, err := l.client.Do(req)
-	if err != nil {
-		l.t.Fatalf("POST %s: %v", path, err)
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	var out map[string]any
-	_ = json.Unmarshal(raw, &out)
-	if resp.StatusCode >= 500 && resp.StatusCode != http.StatusInternalServerError {
-		l.t.Fatalf("POST %s: %d %s", path, resp.StatusCode, raw)
-	}
-	return out
-}
-
 func (l *lifecycle) mcpCall(url, token string, payload map[string]any) string {
 	l.t.Helper()
 	raw, _ := json.Marshal(payload)
@@ -397,15 +370,6 @@ func (l *lifecycle) getSetStats(port int, token string) map[string]any {
 		l.t.Fatalf("/stats: не JSON (%d): %s", resp.StatusCode, body)
 	}
 	return out
-}
-
-func (l *lifecycle) writeScript(name, body string) string {
-	l.t.Helper()
-	path := filepath.Join(l.dir, name)
-	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
-		l.t.Fatal(err)
-	}
-	return path
 }
 
 func portOpen(port int, wait time.Duration) bool {

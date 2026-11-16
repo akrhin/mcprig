@@ -337,25 +337,32 @@ func TestDeleteServerStripsSets(t *testing.T) {
 	}
 }
 
-func TestDeleteServerRefusesLastInSet(t *testing.T) {
+// Удаление последнего сервера оставляет набор с пустым составом: ключ и порт
+// принадлежат набору, а не его составу (решение 0004).
+func TestDeleteServerLeavesSetEmpty(t *testing.T) {
 	dir := t.TempDir()
 	store := openStore(t, dir)
 	addServer(t, store, `{"name":"a","command":["x"]}`)
-	addServer(t, store, `{"name":"b","command":["y"]}`)
-	addSet(t, store, `{"name":"demo","servers":["a"],"port":`+strconv.Itoa(freePort(t))+`}`)
+	set := addSet(t, store, `{"name":"demo","servers":["a"],"port":`+strconv.Itoa(freePort(t))+`}`)
 
-	err := store.DeleteServer("a")
-	if err == nil {
-		t.Fatal("удаление последнего сервера набора не вернуло ошибку")
+	if err := store.DeleteServer("a"); err != nil {
+		t.Fatalf("DeleteServer: %v", err)
 	}
-	if !strings.Contains(err.Error(), "последний в наборе") {
-		t.Errorf("ошибка: %q", err)
+	if store.Server("a") != nil {
+		t.Error("сервер остался в реестре")
 	}
-	if store.Server("a") == nil {
-		t.Error("сервер удалён, хотя операция должна была отказать")
+	got := store.Set("demo")
+	if got == nil {
+		t.Fatal("набор исчез вместе с последним сервером")
 	}
-	if got := store.Set("demo").Servers; len(got) != 1 || got[0] != "a" {
-		t.Errorf("набор после отказа: %v", got)
+	if len(got.Servers) != 0 {
+		t.Errorf("состав набора после удаления: %v", got.Servers)
+	}
+	if got.Token != set.Token || got.Port != set.Port {
+		t.Errorf("ключ или порт набора потеряны: %+v", got)
+	}
+	if reopened := openStore(t, dir).Set("demo"); reopened == nil || len(reopened.Servers) != 0 {
+		t.Errorf("после перезагрузки набор = %+v", reopened)
 	}
 }
 
@@ -624,6 +631,42 @@ func TestSetSnapshots(t *testing.T) {
 	if kept.Name != "demo" || kept.Servers[0] != "fs" || kept.Token == "leak" {
 		t.Fatalf("запись через снапшот изменила реестр: %+v", kept)
 	}
+	if kept.Keys[0].Token == "leak" {
+		t.Fatal("ключ в снапшоте тот же массив, что в реестре")
+	}
+
+	// Метаданные набора — тоже копия: карта профилей, лимит и notify не
+	// должны меняться через снапшот в обход блокировки.
+	addSet(t, store, `{"name":"rich","servers":["fs"],"port":`+strconv.Itoa(freePort(t, store.Set("demo").Port))+`,
+		"profiles":{"p":{"deny":["alpha/*"]}},"rateLimit":{"perMinute":10},
+		"notify":{"webhook":"http://127.0.0.1/hook"}}`)
+	rich := store.Set("rich")
+	rich.Profiles["p"].Deny[0] = "*"
+	rich.Profiles["new"] = &config.Profile{Deny: []string{"*"}}
+	rich.RateLimit.PerMinute = 999
+	rich.Notify.Webhook = "http://evil.example/hook"
+	if kept := store.Set("rich"); kept.Profiles["p"].Deny[0] != "alpha/*" ||
+		len(kept.Profiles) != 1 || kept.RateLimit.PerMinute != 10 ||
+		kept.Notify.Webhook != "http://127.0.0.1/hook" {
+		t.Fatalf("метаданные набора изменены через снапшот: %+v", kept)
+	}
+}
+
+// Порт, занятый другим набором, — ErrPortBusy: менеджер отвечает 409 через
+// errors.Is, не разбирая текст ошибки.
+func TestUpdateSetPortBusyIsTyped(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	addServer(t, store, `{"name":"fs","command":["npx","x"]}`)
+	addSet(t, store, `{"name":"a","servers":["fs"]}`)
+	addSet(t, store, `{"name":"b","servers":["fs"]}`)
+	busy := store.Set("a").Port
+	_, err := store.UpdateSet("b", json.RawMessage(`{"port":`+strconv.Itoa(busy)+`}`))
+	if !errors.Is(err, ErrPortBusy) {
+		t.Fatalf("ошибка = %v, ждали ErrPortBusy", err)
+	}
+	if want := fmt.Sprintf("порт %d занят набором a", busy); err.Error() != want {
+		t.Fatalf("текст ошибки = %q, ждали %q", err.Error(), want)
+	}
 }
 
 func TestSetValidation(t *testing.T) {
@@ -635,7 +678,6 @@ func TestSetValidation(t *testing.T) {
 		name string
 		body string
 	}{
-		{"без серверов", `{"name":"demo","servers":[]}`},
 		{"сервер не в реестре", `{"name":"demo","servers":["nope"]}`},
 		{"autostart не bool", `{"name":"demo","servers":["fs"],"autostart":"true"}`},
 		{"open не bool", `{"name":"demo","servers":["fs"],"open":1}`},
@@ -656,6 +698,34 @@ func TestSetValidation(t *testing.T) {
 	}
 	if set.ID != "taken" || set.Port != taken || len(set.Keys) != 1 {
 		t.Errorf("UpdateSet потерял поля: %+v", set)
+	}
+}
+
+// Пустой набор допустим, а отсутствие ключа servers в правке значит «не
+// менять состав», а не «очистить» (решение 0004).
+func TestEmptySetAllowed(t *testing.T) {
+	store := openStore(t, t.TempDir())
+
+	if set := addSet(t, store, `{"name":"explicit","servers":[]}`); len(set.Servers) != 0 {
+		t.Errorf("явный пустой состав: %v", set.Servers)
+	}
+	if set := addSet(t, store, `{"name":"bare"}`); len(set.Servers) != 0 {
+		t.Errorf("набор без ключа servers: %v", set.Servers)
+	}
+
+	addServer(t, store, `{"name":"fs","command":["x"]}`)
+	full := addSet(t, store, `{"name":"full","servers":["fs"]}`)
+	if _, err := store.UpdateSet(full.ID, json.RawMessage(`{"description":"d"}`)); err != nil {
+		t.Fatalf("UpdateSet без servers: %v", err)
+	}
+	if got := store.Set(full.ID); len(got.Servers) != 1 || got.Servers[0] != "fs" {
+		t.Errorf("правка без servers стёрла состав: %v", got.Servers)
+	}
+	if _, err := store.UpdateSet(full.ID, json.RawMessage(`{"servers":[]}`)); err != nil {
+		t.Fatalf("UpdateSet с пустым servers: %v", err)
+	}
+	if got := store.Set(full.ID); len(got.Servers) != 0 {
+		t.Errorf("явный [] не очистил состав: %v", got.Servers)
 	}
 }
 

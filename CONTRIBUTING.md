@@ -130,9 +130,9 @@ done
 
 The `v*` tag job does the same and also tags `latest` (slim) and `latest-full`. It
 needs the `REGISTRY`, `REGISTRY_USER` and `REGISTRY_PASSWORD` secrets and prints
-that it skipped when they are missing. The job runs before the release draft is
-published, so `latest` moves at tag time; a draft that is scrapped leaves `latest`
-on an unpublished version — re-point the two tags by hand:
+that it skipped when they are missing. The job runs in the same pipeline as the
+published release, so `latest` moves at tag time; a release that has to be
+re-cut leaves `latest` on the old version — re-point the two tags by hand:
 
 ```bash
 for pair in "slim latest" "full latest-full"; do
@@ -148,12 +148,16 @@ done
 ## Release
 
 A release is cut inside Gitea. A `v*` tag runs gofmt, vet, the race suite and
-govulncheck, then goreleaser builds the archives into a release draft; a human
-publishes it. Release notes are the tag's `CHANGELOG.md` section, cut from
-`## [Unreleased]` by a `release:` commit.
+govulncheck, then goreleaser publishes the archives and the release itself —
+no draft, nothing to click. Release notes are the tag's `CHANGELOG.md` section,
+cut from `## [Unreleased]` by a `release:` commit.
+
+Every push and pull request runs `.gitea/workflows/ci.yml`: gofmt, vet, build,
+the race suite, `scripts/docs-check.sh`, `node --check web/app.js` and
+govulncheck. Gitea cannot make a check mandatory, so the red run is read before
+the merge, not enforced by the server.
 
 The public side is a second, independent pass: `.github/workflows/release.yml`
 runs on the same tag in the GitHub repository, builds the same archives with
 goreleaser `--skip=publish`, uploads them to the GitHub release with `gh`, and
-pushes the `slim`/`full` images to GHCR. It never publishes to Gitea, and it
-takes no input from the Gitea draft.
+pushes the `slim`/`full` images to GHCR. It never publishes to Gitea.

@@ -77,6 +77,34 @@ func TestSweepRemovesByTTL(t *testing.T) {
 	}
 }
 
+// Отпечаток уходит вместе со своей выгрузкой: без .txt он сирота, а выгрузка
+// без .owner перестала бы отдаваться читателю.
+func TestSweepRemovesOwnerWithDump(t *testing.T) {
+	base := t.TempDir()
+	dir := Dir(base)
+	old := put(t, dir, "old.txt", 10, 25*time.Hour)
+	put(t, dir, "old.owner", 7, 26*time.Hour)
+	// Чужой .owner при живом .txt в счёт не идёт: это не выгрузка.
+	put(t, dir, "lonely.owner", 500, time.Minute)
+
+	rep, err := Sweep(base, Config{TTL: 24 * time.Hour, Max: 1 << 20}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Removed != 1 || rep.Freed != 10 {
+		t.Fatalf("отчёт: %+v", rep)
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatalf("старый файл на месте: %v", err)
+	}
+	if _, err := os.Stat(OwnerPath(old)); !os.IsNotExist(err) {
+		t.Fatalf("отпечаток без выгрузки остался: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "lonely.owner")); err != nil {
+		t.Fatalf("чужой .owner удалён: %v", err)
+	}
+}
+
 // Свежий файл может читаться прямо сейчас: размерный проход его не трогает,
 // даже когда каталог всё равно больше лимита.
 func TestSweepBySizeKeepsRecent(t *testing.T) {

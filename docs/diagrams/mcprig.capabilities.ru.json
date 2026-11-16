@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "diagram_type": "tree",
+  "meta": {
+    "title": "mcprig: что делает один бинарник",
+    "subtitle": "Разбор возможностей: ветка — группа того, чем пользуется оператор, а не путь вызова",
+    "output": "mcprig.capabilities.ru.html",
+    "quality_profile": "showcase"
+  },
+  "nodes": [
+    {
+      "id": "mcprig",
+      "label": "mcprig",
+      "sublabel": "один статический бинарник Go"
+    },
+    {
+      "id": "serve",
+      "label": "Обслуживает",
+      "parent": "mcprig",
+      "sublabel": "набор заменяет N серверов"
+    },
+    {
+      "id": "set",
+      "label": "Набор",
+      "parent": "serve",
+      "sublabel": "свой процесс, порт и ключ"
+    },
+    {
+      "id": "meta",
+      "label": "Девять мета-инструментов",
+      "parent": "serve",
+      "sublabel": "каталог не попадает в контекст"
+    },
+    {
+      "id": "transports",
+      "label": "stdio и HTTP",
+      "parent": "serve",
+      "sublabel": "URL, заголовки, OAuth с PKCE"
+    },
+    {
+      "id": "resources",
+      "label": "Ресурсы и промты",
+      "parent": "serve",
+      "sublabel": "видны, если сервер их отдаёт"
+    },
+    {
+      "id": "protect",
+      "label": "Защищает",
+      "parent": "mcprig",
+      "sublabel": "что клиент может достать"
+    },
+    {
+      "id": "keys",
+      "label": "Ключи и профили",
+      "parent": "protect",
+      "sublabel": "до 8 на набор, отзыв по одному"
+    },
+    {
+      "id": "policy",
+      "label": "Запреты, лимиты",
+      "parent": "protect",
+      "sublabel": "на вызывающего и на server/tool"
+    },
+    {
+      "id": "sandbox",
+      "label": "Песочница bubblewrap",
+      "parent": "protect",
+      "sublabel": "ro/rw-монтирования, tmpfs, prlimit"
+    },
+    {
+      "id": "observe",
+      "label": "Показывает",
+      "parent": "mcprig",
+      "sublabel": "что произошло на самом деле"
+    },
+    {
+      "id": "calls",
+      "label": "Живые вызовы",
+      "parent": "observe",
+      "sublabel": "запущенные и история с диска"
+    },
+    {
+      "id": "stats",
+      "label": "Статистика",
+      "parent": "observe",
+      "sublabel": "вызовы, ошибки, p50/p95"
+    },
+    {
+      "id": "health",
+      "label": "Здоровье",
+      "parent": "observe",
+      "sublabel": "проба сервера и набора"
+    },
+    {
+      "id": "operate",
+      "label": "Управляет",
+      "parent": "mcprig",
+      "sublabel": "панель и CLI"
+    },
+    {
+      "id": "panel",
+      "label": "Панель",
+      "parent": "operate",
+      "sublabel": "наборы, все серверы, переменные"
+    },
+    {
+      "id": "prompt",
+      "label": "Промт для агента",
+      "parent": "operate",
+      "sublabel": "схемы инструментов и задача"
+    },
+    {
+      "id": "io",
+      "label": "Импорт и экспорт",
+      "parent": "operate",
+      "sublabel": "реестр или один набор"
+    },
+    {
+      "id": "cli",
+      "label": "CLI и doctor",
+      "parent": "operate",
+      "sublabel": "init, serve, panel, doctor"
+    }
+  ]
+}

@@ -35,6 +35,14 @@ type Config struct {
 	Max int64
 }
 
+// AnonymousOwner marks a dump whose caller presented no key: an open set, or
+// stdio. Such a dump is readable by a caller that has no key either.
+const AnonymousOwner = "anonymous"
+
+// OwnerPath is the sidecar that keeps a dump to the key that asked for it: one
+// line, the key fingerprint the counters use.
+func OwnerPath(dump string) string { return strings.TrimSuffix(dump, ".txt") + ".owner" }
+
 // Base is the data directory this process writes its tool-out into.
 func Base() string {
 	if dir := os.Getenv("MCPRIG_DATA_DIR"); dir != "" {
@@ -150,8 +158,8 @@ func sweepDir(dir string, cfg Config, now time.Time) (Report, error) {
 	var total int64
 	fresh := make([]entry, 0, len(list))
 	for _, de := range list {
-		if de.IsDir() {
-			continue
+		if de.IsDir() || strings.HasSuffix(de.Name(), ".owner") {
+			continue // .owner живёт и умирает вместе со своим .txt
 		}
 		info, err := de.Info()
 		if err != nil {
@@ -159,6 +167,7 @@ func sweepDir(dir string, cfg Config, now time.Time) (Report, error) {
 		}
 		e := entry{filepath.Join(dir, de.Name()), info.Size(), info.ModTime()}
 		if now.Sub(e.mod) > cfg.TTL && os.Remove(e.path) == nil {
+			_ = os.Remove(OwnerPath(e.path))
 			rep.Removed++
 			rep.Freed += e.size
 			continue
@@ -180,6 +189,7 @@ func sweepDir(dir string, cfg Config, now time.Time) (Report, error) {
 			continue
 		}
 		if os.Remove(e.path) == nil {
+			_ = os.Remove(OwnerPath(e.path))
 			rep.Removed++
 			rep.Freed += e.size
 			total -= e.size
@@ -235,8 +245,8 @@ func Usage(base string) (size int64, count int, oldest time.Time, err error) {
 		}
 		found = true
 		for _, de := range list {
-			if de.IsDir() {
-				continue
+			if de.IsDir() || strings.HasSuffix(de.Name(), ".owner") {
+				continue // отпечаток — не выгрузка: его байты в счёт не идут
 			}
 			info, err := de.Info()
 			if err != nil {

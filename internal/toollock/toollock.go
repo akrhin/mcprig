@@ -64,22 +64,29 @@ func Split(key string) (server, tool string) {
 // shortcut: битый файл теряет прежние одобрения (инструменты одобрятся
 // заново как новые); перейти на резервную копию, если это начнёт мешать.
 func Read(path string) File {
+	f, err := ReadFile(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		slog.Warn("tools.lock.json не прочитан — одобрения неизвестны", "path", path, "err", err)
+	}
+	return f
+}
+
+// ReadFile — Read с ошибкой: карантин обязан отличить «записей нет»
+// (fs.ErrNotExist — обычный старт набора) от «записи не прочитаны»: во втором
+// случае решение брать неоткуда, и вызов fail-closed отклоняется.
+func ReadFile(path string) (File, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			slog.Warn("tools.lock.json не прочитан — одобрения неизвестны", "path", path, "err", err)
-		}
-		return File{Tools: map[string]Entry{}}
+		return File{Tools: map[string]Entry{}}, err
 	}
 	var f File
 	if err := json.Unmarshal(raw, &f); err != nil {
-		slog.Warn("tools.lock.json не разобран — одобрения потеряны", "path", path, "err", err)
-		return File{Tools: map[string]Entry{}}
+		return File{Tools: map[string]Entry{}}, fmt.Errorf("tools.lock.json не разобран: %w", err)
 	}
 	if f.Tools == nil {
 		f.Tools = map[string]Entry{}
 	}
-	return f
+	return f, nil
 }
 
 // Update — единственный писатель файла: читает под межпроцессной блокировкой,

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -145,8 +146,28 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		if res.Applied && c.OnSandboxApplied != nil {
 			c.OnSandboxApplied(srv)
 		}
-		cmd := exec.Command(res.Argv[0], res.Argv[1:]...)
+		// Прямой ребёнок набора — сторож (child-guard), а не сервер: убитый
+		// SIGKILL набор не успевает погасить группу, обработчика у него нет.
+		// Сторож переживает набор и добивает внуков по Pdeathsig.
+		//
+		// Бинарник мог быть заменён переименованием при живом наборе: тогда
+		// /proc/self/exe кончается на « (deleted)» и запустить сторожа нельзя.
+		// Сервер важнее сторожа — стартуем без него и говорим об этом в лог.
+		exe, err := os.Executable()
+		if err != nil || !fileExists(exe) {
+			if c.Log != nil {
+				c.Log.Warn("child-guard недоступен: сервер стартует без сторожа",
+					"server", srv.Name, "путь", exe, "ошибка", err)
+			}
+			exe = ""
+		}
+		argv := guardArgv(res.Argv, exe)
+		cmd := exec.Command(argv[0], argv[1:]...)
 		cmd.Dir = srv.Cwd
+		// Своя группа: иначе гасится только прямой ребёнок, а внуки сервера
+		// остаются в системе (см. groupTransport). Pdeathsig — сигнал сторожу,
+		// что набор умер.
+		cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM, Setpgid: true}
 		tail := &stderrTail{}
 		cmd.Stderr = tail
 		// A set runs with an env already narrowed by the manager; the server's
@@ -156,7 +177,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 			base = c.Env(srv)
 		}
 		cmd.Env = append(withoutReserved(base), flatten(srv.Env)...)
-		return &mcp.CommandTransport{Command: cmd}, tail, nil
+		return &groupTransport{CommandTransport: mcp.CommandTransport{Command: cmd}}, tail, nil
 	case config.TransportHTTP:
 		if srv.URL == "" {
 			return nil, nil, fmt.Errorf("url пуст — укажите адрес сервера")
@@ -286,3 +307,19 @@ func withHeaders(base http.RoundTripper, headers map[string]string) http.RoundTr
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// guardArgv ставит перед сервером сторожа; без пути к бинарнику — сам сервер.
+func guardArgv(server []string, exe string) []string {
+	argv := make([]string, 0, len(server)+3)
+	if exe != "" {
+		argv = append(argv, exe, "child-guard", "--")
+	}
+	return append(argv, server...)
+}
+
+// fileExists — проверка, что путь ещё существует: у заменённого бинарника
+// /proc/self/exe кончается на « (deleted)», и exec по нему падает.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}

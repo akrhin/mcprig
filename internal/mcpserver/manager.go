@@ -11,7 +11,6 @@ import (
 	"io"
 	"maps"
 	"net"
-	"os"
 	"reflect"
 	"slices"
 	"sort"
@@ -121,6 +120,10 @@ type Manager struct {
 	// lockMu сериализует чтение-правку-запись записи карантина: два
 	// одновременных list_commands иначе теряли бы запись друг друга.
 	lockMu sync.Mutex
+	// lockErr — ошибка последней записи tools.lock.json. Пока она есть,
+	// карантин не может ручаться за одобрения, и вызовы отклоняются; успешный
+	// обход каталога её снимает.
+	lockErr error
 
 	// ToolOutURL, when set, names a truncated answer by its /tool-out URL
 	// instead of a path: the caller reached this process over HTTP with a key
@@ -681,7 +684,7 @@ func (m *Manager) recordMeta(name string, fn mcp.ToolHandler) mcp.ToolHandler {
 		if recErr == nil && res != nil && res.IsError {
 			recErr = errors.New(resultMessage(res))
 		}
-		if m.Stats != nil {
+		if m.Stats != nil && !stats.ServiceCall(ctx) {
 			m.Stats.Record(labelOf(ctx, req), "mcprig", name, time.Since(start), recErr)
 		}
 		return res, err
@@ -729,8 +732,7 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 	out := struct {
 		Servers []serverInfo `json:"servers"`
 		Version string       `json:"version"`
-		PID     int          `json:"pid"`
-	}{Servers: make([]serverInfo, len(targets)), Version: m.version, PID: os.Getpid()}
+	}{Servers: make([]serverInfo, len(targets)), Version: m.version}
 
 	var wg sync.WaitGroup
 	for i, e := range targets {
@@ -746,9 +748,11 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 				Enabled:     srv.Enabled,
 				Healthy:     healthy,
 				Unknown:     unknown,
-				Error:       errText,
-				Tags:        srv.Tags,
-				Isolation:   e.isolationNote(),
+				// Текст пробы и заметка об изоляции повторяют ключ апстрима
+				// так же охотно, как ответ вызова: наружу — только маска.
+				Error:     config.ScrubSecrets(errText, e.secrets),
+				Tags:      srv.Tags,
+				Isolation: config.ScrubSecrets(e.isolationNote(), e.secrets),
 			}
 		}()
 	}
@@ -876,7 +880,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if err != nil {
 			return errResult(err)
 		}
-		return m.jsonTruncResult(filterCommands(profileCommands(profileName, profile, cmds), in.Prefix, in.NamesOnly), maxBytes)
+		return m.jsonTruncResult(ctx, filterCommands(profileCommands(profileName, profile, cmds), in.Prefix, in.NamesOnly), maxBytes)
 	case len(in.Servers) > 0:
 		// Ответ остальных не теряется из-за одного упавшего: у него в карте
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
@@ -917,7 +921,7 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if failed == len(in.Servers) {
 			return errResult(firstErr)
 		}
-		return m.jsonTruncResult(out, maxBytes)
+		return m.jsonTruncResult(ctx, out, maxBytes)
 	}
 	return errResult(errNoTargets)
 }
@@ -1007,6 +1011,10 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	}); err != nil {
 		return errResult(err)
 	}
+	// Схемы сужает тот же профиль, что каталог: скрытое от ключа в
+	// list_commands имя не должно возвращаться здесь своей схемой.
+	profileName, profile := callerProfile(ctx, m.config())
+	tools = profileTools(profileName, profile, in.Server, tools)
 	byName := make(map[string]*mcp.Tool, len(tools))
 	for _, tool := range tools {
 		byName[tool.Name] = tool
@@ -1026,7 +1034,7 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 			OutputSchema: tool.OutputSchema,
 		})
 	}
-	return m.jsonTruncResult(out, maxBytes)
+	return m.jsonTruncResult(ctx, out, maxBytes)
 }
 
 // ─── invoke_command ───────────────────────────────────────────────────────────
@@ -1104,6 +1112,16 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 
 	callCtx, cancel := m.callCtx(ctx)
 	defer cancel()
+	// Тот же слот, что у invoke_many: без него один клиент держит у апстрима
+	// столько одновременных вызовов, сколько пришлёт, и топит его вместе с
+	// соседями. Ожидание уважает ctx: отмена и таймаут не ждут очереди молча.
+	slot := m.slots.get(srv.Name)
+	select {
+	case slot <- struct{}{}:
+		defer func() { <-slot }()
+	case <-callCtx.Done():
+		return errResult(fmt.Errorf("нет свободного слота для %s/%s: %w", srv.Name, in.CommandName, callCtx.Err()))
+	}
 	res, err := m.callWithRetry(callCtx, labelOf(ctx, req), e, in.CommandName, args)
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {
@@ -1114,7 +1132,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	if res == nil {
 		return res, nil
 	}
-	return m.truncateResult(res, maxBytes)
+	return m.truncateResult(ctx, res, maxBytes)
 }
 
 // callWithRetry runs one downstream call under invoke_command's retry rule and
@@ -1151,7 +1169,7 @@ func (m *Manager) callWithRetry(ctx context.Context, label string, e *entry, nam
 	if recErr == nil && res != nil && res.IsError {
 		recErr = errors.New(resultMessage(res))
 	}
-	if m.Stats != nil && (err == nil || res != nil) {
+	if m.Stats != nil && !stats.ServiceCall(ctx) && (err == nil || res != nil) {
 		m.Stats.Record(label, e.server().Name, name, time.Since(start), recErr)
 	}
 	return res, err
@@ -1616,12 +1634,12 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 // jsonTruncResult is jsonResult under maxBytes when the caller asked for a cap:
 // a cut JSON catalog is not valid JSON, so an absent or zero maxBytes means no
 // cap at all, exactly as the tool behaved before the parameter existed.
-func (m *Manager) jsonTruncResult(v any, maxBytes int) (*mcp.CallToolResult, error) {
+func (m *Manager) jsonTruncResult(ctx context.Context, v any, maxBytes int) (*mcp.CallToolResult, error) {
 	res, err := jsonResult(v)
 	if err != nil || maxBytes <= 0 {
 		return res, err
 	}
-	return m.truncateResult(res, maxBytes)
+	return m.truncateResult(ctx, res, maxBytes)
 }
 
 // resultMessage берёт текст ошибки из ответа инструмента.

@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/akrhin/mcprig/internal/httplisten"
 )
 
 const (
@@ -32,10 +34,13 @@ type AuthOptions struct {
 	Password     string
 	PasswordHash string
 	ProxySecret  string
-	User         string
-	UserHeader   string
-	AllowedHosts []string
-	Off          bool
+	// TrustedProxies — пиры, чьим X-Forwarded-* верим: IP или CIDR через
+	// запятую. Пусто — только loopback: прокси обычно на этой же машине.
+	TrustedProxies string
+	User           string
+	UserHeader     string
+	AllowedHosts   []string
+	Off            bool
 	// Secure ставит cookie Secure независимо от r.TLS: панель за TLS-прокси
 	// видит http, а публичный адрес (или собственный TLS) говорит https.
 	Secure bool
@@ -167,6 +172,7 @@ type auth struct {
 	password     string
 	hash         *scryptHash
 	proxySecret  string
+	trustedNets  []*net.IPNet
 	secure       bool
 	user         string
 	userHeader   string
@@ -195,10 +201,46 @@ const (
 	loginMaxPending = 8
 )
 
+// parseTrustedProxies читает MCPRIG_TRUSTED_PROXIES: адреса пиров, чьим
+// X-Forwarded-* можно верить. Ошибка в записи валит старт: молча сузить
+// доверие до loopback значило бы уронить вход за прокси уже в бою.
+func parseTrustedProxies(list string) ([]*net.IPNet, error) {
+	var out []*net.IPNet
+	for _, item := range strings.Split(list, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if !strings.Contains(item, "/") {
+			ip := net.ParseIP(item)
+			if ip == nil {
+				return nil, fmt.Errorf("менеджер: MCPRIG_TRUSTED_PROXIES: не IP и не CIDR: %q", item)
+			}
+			bits := 8 * net.IPv6len
+			if v4 := ip.To4(); v4 != nil {
+				ip, bits = v4, 8*net.IPv4len
+			}
+			out = append(out, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+			continue
+		}
+		_, n, err := net.ParseCIDR(item)
+		if err != nil {
+			return nil, fmt.Errorf("менеджер: MCPRIG_TRUSTED_PROXIES: %q: %w", item, err)
+		}
+		out = append(out, n)
+	}
+	return out, nil
+}
+
 func newAuth(o AuthOptions) (*auth, error) {
+	trusted, err := parseTrustedProxies(o.TrustedProxies)
+	if err != nil {
+		return nil, err
+	}
 	a := &auth{
 		password:     o.Password,
 		proxySecret:  o.ProxySecret,
+		trustedNets:  trusted,
 		secure:       o.Secure,
 		user:         o.User,
 		userHeader:   o.UserHeader,
@@ -246,23 +288,10 @@ func (a *auth) loginEnabled() bool {
 	return a.mode == modePassword || a.mode == modeProxyPassword
 }
 
-// hostOK — Host обязан быть в списке. Пустой список значит loopback, как в
-// internal/httplisten: «не настроено» не должно означать «любой хост».
+// hostOK — Host обязан быть в списке. Политика одна на панель и на набор:
+// httplisten.HostAllowed, где пустой список значит loopback, а не «любой хост».
 func (a *auth) hostOK(host string) bool {
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	host = strings.ToLower(strings.Trim(host, "[]"))
-	allowed := a.allowedHosts
-	if len(allowed) == 0 {
-		allowed = []string{"127.0.0.1", "localhost", "::1"}
-	}
-	for _, h := range allowed {
-		if h == "*" || strings.ToLower(h) == host {
-			return true
-		}
-	}
-	return false
+	return httplisten.HostAllowed(host, a.allowedHosts)
 }
 
 func (a *auth) proxyOK(r *http.Request) bool {
@@ -272,6 +301,28 @@ func (a *auth) proxyOK(r *http.Request) bool {
 	}
 	secret := r.Header.Get("x-mcp-proxy-secret")
 	return subtle.ConstantTimeCompare([]byte(secret), []byte(a.proxySecret)) == 1
+}
+
+// trustsProxy — верить ли X-Forwarded-* этого запроса. Секрет говорит «прокси
+// настроен», но не «запрос пришёл от него»: заголовки от чужого пира подделали
+// бы публичное имя, схему и адрес клиента.
+func (a *auth) trustsProxy(r *http.Request) bool {
+	if a.proxySecret == "" {
+		return false
+	}
+	ip := net.ParseIP(httplisten.HostOnly(r.RemoteAddr))
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() {
+		return true
+	}
+	for _, n := range a.trustedNets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *auth) sessionOK(r *http.Request) (session, bool) {
@@ -317,11 +368,10 @@ func (a *auth) login(user, password string) bool {
 	return subtle.ConstantTimeCompare([]byte(password), []byte(a.password)) == 1
 }
 
-// clientIP — адрес для лимита входа. За обратным прокси RemoteAddr один на
-// всех, поэтому X-Forwarded-For читаем только когда прокси настроен явно:
-// иначе заголовок подделывается и лимит обходится.
+// clientIP — адрес клиента за прокси. X-Forwarded-For читаем только от
+// доверенного пира: иначе заголовок подделывается и лимит входа обходится.
 func (a *auth) clientIP(r *http.Request) string {
-	if a.proxySecret != "" {
+	if a.trustsProxy(r) {
 		// Берём последний адрес: его дописал ближайший прокси. Первый элемент
 		// приходит от клиента и подделывается, обходя лимит входа.
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
@@ -337,27 +387,22 @@ func (a *auth) clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// loginIPs — ключи лимита входа: адрес сокета и, при заданном секрете прокси,
-// адрес из X-Forwarded-For. Считаем по обоим: подмена заголовка упирается в
-// адрес сокета, а за честным прокси лимит остаётся на реального клиента.
+// loginIPs — ключ лимита входа. За доверенным прокси адрес сокета один на
+// всех клиентов, поэтому считаем по адресу из X-Forwarded-For (его дописал
+// прокси); иначе — по сокету, иначе заголовок обходил бы лимит.
 func (a *auth) loginIPs(r *http.Request) []string {
-	socket := hostOnly(r.RemoteAddr)
-	if ip := a.clientIP(r); ip != socket {
-		return []string{socket, ip}
+	socket := httplisten.HostOnly(r.RemoteAddr)
+	if a.trustsProxy(r) {
+		if ip := a.clientIP(r); ip != socket {
+			return []string{ip}
+		}
 	}
 	return []string{socket}
 }
 
-func hostOnly(addr string) string {
-	if h, _, err := net.SplitHostPort(addr); err == nil {
-		return h
-	}
-	return addr
-}
-
 // secureRequest — панель обычно стоит за TLS-прокси, где до Go доходит http.
-// X-Forwarded-Proto верим только доверенному прокси (задан
-// MCPRIG_PROXY_SECRET): иначе любой клиент пометил бы свой http-запрос https.
+// X-Forwarded-Proto верим только доверенному пиру (trustsProxy): иначе любой
+// клиент пометил бы свой http-запрос https.
 func secureRequest(r *http.Request, trustProxy bool) bool {
 	return r.TLS != nil || (trustProxy && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"))
 }
@@ -461,7 +506,7 @@ func (a *auth) startSession(w http.ResponseWriter, r *http.Request) (string, err
 		MaxAge:   int(sessionTTL / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   a.secure || secureRequest(r, a.proxySecret != ""),
+		Secure:   a.secure || secureRequest(r, a.trustsProxy(r)),
 	})
 	return a.user, nil
 }
@@ -477,6 +522,6 @@ func (a *auth) clearSession(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   a.secure || secureRequest(r, a.proxySecret != ""),
+		Secure:   a.secure || secureRequest(r, a.trustsProxy(r)),
 	})
 }

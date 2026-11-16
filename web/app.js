@@ -54,6 +54,7 @@
       'head.copyKey': 'Copy key',
       'head.noKey': 'no key',
       'head.schemaTip': "how much context the set's tool list costs",
+      'head.keyMarkTip': "the mark this key shows up under in the statistics: its note, or the key: fingerprint when it has none",
       'head.servers': 'Servers',
       'head.tools': 'Tools',
       'head.keys': 'Keys',
@@ -67,6 +68,36 @@
       'tabs.overview': 'Overview',
       'tabs.calls': 'Calls',
       'tabs.stats': 'Statistics',
+      'nav.label': 'Panel pages',
+      'nav.sets': 'Sets',
+      'nav.servers': 'All servers',
+      'nav.vars': 'Variables',
+      'reg.title': 'All servers',
+      'reg.count': '{n} {serversW} in the registry',
+      'reg.thSets': 'In sets',
+      'reg.inNone': 'not attached',
+      'reg.hint': 'Health comes from the check of a running set; a server outside every set stays unchecked until you press Check here. An OAuth sign-in happens in the set the server belongs to.',
+      'reg.emptyTitle': 'The registry is empty',
+      'reg.emptyText': 'A server is one MCP endpoint: a local command or a remote URL. Sets take their members from here.',
+      'vars.title': 'Variables',
+      'vars.note': 'The names your servers reference as ${NAME}. A value is written here and handed to the set process at start; the panel never reads one back.',
+      'vars.name': 'name',
+      'vars.value': 'value',
+      'vars.store': 'store',
+      'vars.storeAuto': 'automatic',
+      'vars.storeFile': 'file on this host',
+      'vars.needName': 'name: latin letters, digits and _, not starting with a digit',
+      'vars.needValue': 'the value cannot be empty',
+      'vars.saved': 'value saved for {name} · {source}',
+      'vars.savedUnref': '{name} is saved; OpenBao values are listed only when a server references them',
+      'vars.unused': 'not used by any server',
+      'vars.forgot': '{name} forgotten',
+      'vars.restarted': 'restarted: {list}',
+      'vars.skippedOne': '{set} stays on its old value: {what}',
+      'vars.skippedMissing': 'missing {names}',
+      'vars.del': 'forget the value',
+      'vars.delConfirm': 'Forget {name}? A running set keeps the value it started with; only sets that no longer need it restart.',
+      'vars.honest': 'Values live in OpenBao or in a file only this host can read: the panel shows a name, whether it is set and where it comes from, never a value. A name saved here stays in the list even when no server mentions it, marked as unused.',
       'kpi.calls': 'calls · 7 days',
       'kpi.errRate': 'error rate',
       'kpi.p50': 'p50',
@@ -85,6 +116,14 @@
       'setSrv.lastTip': 'from the last 100 calls',
       'setSrv.emptyTitle': 'This set has no servers',
       'setSrv.emptyText': 'Servers live in the host registry; attach one to give this set tools to serve.',
+      'setSrv.attachLabel': 'Add a registry server to this set',
+      'setSrv.attach': 'add to set',
+      'setSrv.attachNone': 'every server in the registry is already in this set',
+      'setSrv.composeHelp': 'The list is saved at once. A running set applies the change without a restart, and a removed server loses its session. An empty set starts and serves no tools.',
+      'setSrv.remove': 'remove',
+      'setSrv.removeTip': 'detach {name} from the set — the server stays in the registry',
+      'setSrv.emptyWarn': 'the set has no servers now: it starts, but serves no tools',
+      'setSrv.reloadWarn': 'saved, but the running set did not apply it: {err}',
       'tail.thTime': 'Time',
       'tail.thServer': 'Server',
       'tail.thTool': 'Tool',
@@ -143,18 +182,14 @@
       'stats.emptyPeriod2': 'This set recorded no calls in the selected period.',
       'stats.resetFilters': 'Reset filters',
       'stats.unreach': 'no response: {list}',
+      'stats.stopped': 'not running: {list}',
       'stats.fail': 'the stats request failed: {msg}',
       'stats.more': '{n} more — narrow the filter',
       'stats.colTip': '{label} · {n} calls',
       'stats.colTipErr': '{label} · {n} calls, {err} errors',
       'side.label': 'Details',
-      'side.servers': 'servers',
-      'side.env': 'variables',
-      'side.log': 'log',
-      'side.close': 'Close the details panel',
-      'side.registry': 'host-wide registry',
-      'side.registryEmpty': 'registry is empty',
       'side.server': 'server',
+      'side.close': 'Close the details panel',
       'form.sub': 'Changes apply to the host registry and take effect on the next set restart.',
       'form.description': 'description',
       'form.transport': 'transport',
@@ -180,9 +215,10 @@
       'form.editing': 'server · {name}',
       'form.new': 'new server',
       'form.create': 'create',
-      'form.deleteConfirm': 'Delete server {name} from the host registry? It will disappear from the sets that use it.',
+      'form.deleteConfirm': 'Delete server {name} from the host registry? Used by: {sets}. The tools it brings go with it.',
+      'form.deleteEmpty': 'Left without servers: {empty} — such a set starts, but offers no tools.',
+      'form.deleteFree': 'Delete server {name} from the host registry? No set uses it.',
       'env.empty': 'no variables',
-      'env.note': 'values are supplied by the set process — the panel neither stores nor shows them',
       'env.set': 'set',
       'env.unset': 'not set',
       'log.tail': 'log tail of the set',
@@ -241,7 +277,6 @@
       'srv.edit': 'edit',
       'srv.check': 'check',
       'srv.log': 'log',
-      'srv.probe': 'probe',
       'srv.authorize': 'authorize',
       'auth.title': 'OAuth authorization',
       'auth.waiting': 'Open the link in a browser — the panel waits for the redirect. The set restarts by itself once the token is saved.',
@@ -250,8 +285,7 @@
       'auth.copy': 'copy link',
       'auth.copied': 'link copied',
       'srv.notProbed': 'not probed',
-      'srv.notInSet': 'not in this set',
-      'srv.setOff': 'set is not running',
+      'srv.setOff': 'set {name} is not running',
       'srv.unchecked': 'not checked',
       'srv.noResponse': 'no response',
       'srv.healthy': 'Healthy',
@@ -259,6 +293,58 @@
       'srv.probeFail': 'probe failed',
       'srv.notFound': 'server {name} is not in the registry',
       'srv.reloadWarn': 'saved, but running sets did not apply the change: {err}',
+      'srv.tryStart': 'Start & check',
+      'srv.tryStartTip': 'the set is stopped: the check starts the server for a moment, so a running server answers while the set stays down',
+      'srv.probeTip': 'the probe starts the server for a moment: the host registry holds no process between calls',
+      'srv.probeOk': 'answers, not started',
+      'srv.probeOkTip': 'the check started the server for a moment and it answered; the set itself is still stopped',
+      'set.del': 'Delete set',
+      'set.delConfirm': 'Delete set {name}? Its keys and its call history go with it; the servers stay in the host registry.',
+      'set.delFail': 'could not delete the set: {msg}',
+      'io.open': 'Import / Export',
+      'io.title': 'Import and export',
+      'io.sub': 'The host registry as JSON, one set on its own, or servers copied from another client.',
+      'io.export': 'Export',
+      'io.registry': 'Whole registry',
+      'io.download': 'Download JSON',
+      'io.copy': 'Copy',
+      'io.regNote': '{serversW} · {setsW} · env and headers go out as written in the registry',
+      'io.set': 'One set',
+      'io.setHelp': 'The servers of the set only, in the shape other clients read. Keys and history stay here.',
+      'io.importL': 'Import',
+      'io.file': 'JSON file',
+      'io.text': 'or paste the JSON',
+      'io.ph': '{ "mcpServers": { "x": { "command": "npx", "args": ["-y", "pkg"] } } }',
+      'io.importHelp': 'Servers from Claude Desktop and Cursor go in as they are, and so does a registry file. A server already in the registry stays as it is; sets are not imported.',
+      'io.peek': '{n} {serversW} to import: {list}',
+      'io.peekSets': '{n} {setsW} in the file: sets are made in the panel, so they cannot be imported',
+      'io.peekNone': 'no servers in this JSON',
+      'io.badJson': 'not JSON: {err}',
+      'io.badShape': 'expected the mcpServers object of another client or a registry file',
+      'io.doImport': 'import',
+      'io.added': 'added: {list}',
+      'io.skipped': 'not imported: {list}',
+      'io.noNew': 'nothing new: every server is already in the registry',
+      'io.fail': 'import failed: {msg}',
+      'io.noData': 'the panel returned no registry',
+      'prompt.open': 'Prompt',
+      'prompt.title': 'Prompt for an agent',
+      'prompt.sub': 'One text — an introduction, the set’s tools with their schemas and the task. Copy it to the agent.',
+      'prompt.parts': 'Parts',
+      'prompt.task': 'Task',
+      'prompt.taskPh': 'what the agent has to do with these tools',
+      'prompt.intro': 'Introduction · optional',
+      'prompt.introPh': 'who the agent is and how it should behave',
+      'prompt.introHelp': 'Empty — a short default paragraph about the set is used.',
+      'prompt.servers': 'Servers · all when none is chosen',
+      'prompt.noServers': 'The set has no servers — the text will list no tools.',
+      'prompt.build': 'Build',
+      'prompt.result': 'Ready text',
+      'prompt.copy': 'copy',
+      'prompt.download': 'download .md',
+      'prompt.stopped': 'The set is not running: the text gets tool names from the saved list only, without schemas.',
+      'prompt.notesLabel': 'notes',
+      'prompt.fail': 'could not build the prompt: {msg}',
       'err.offline': 'no connection to the daemon',
       'err.http': 'HTTP {status} · {path}',
       'add.nameRequired': 'a name is required'
@@ -299,6 +385,7 @@
       'head.copyKey': 'Скопировать ключ',
       'head.noKey': 'ключа нет',
       'head.schemaTip': 'сколько контекста стоит перечень инструментов набора',
+      'head.keyMarkTip': 'метка ключа набора в статистике: его подпись, а если подписи нет — отпечаток key:',
       'head.servers': 'Серверов',
       'head.tools': 'Инструментов',
       'head.keys': 'Ключи',
@@ -312,6 +399,36 @@
       'tabs.overview': 'Обзор',
       'tabs.calls': 'Вызовы',
       'tabs.stats': 'Статистика',
+      'nav.label': 'Страницы панели',
+      'nav.sets': 'Наборы',
+      'nav.servers': 'Все серверы',
+      'nav.vars': 'Переменные',
+      'reg.title': 'Все серверы',
+      'reg.count': '{n} {serversW} в реестре',
+      'reg.thSets': 'В наборах',
+      'reg.inNone': 'не в наборе',
+      'reg.hint': 'Здоровье — это проверка запущенного набора; сервер вне наборов остаётся непроверенным, пока не нажать «Проверить» здесь. Вход через OAuth делается в наборе, куда сервер входит.',
+      'reg.emptyTitle': 'Реестр пуст',
+      'reg.emptyText': 'Сервер — одна точка MCP: локальная команда или удалённый адрес. Наборы берут состав отсюда.',
+      'vars.title': 'Переменные',
+      'vars.note': 'Имена, которые серверы упоминают как ${NAME}. Значение пишется здесь и уходит процессу набора при старте; обратно панель его не читает.',
+      'vars.name': 'имя',
+      'vars.value': 'значение',
+      'vars.store': 'хранилище',
+      'vars.storeAuto': 'автоматически',
+      'vars.storeFile': 'файл на этом хосте',
+      'vars.needName': 'имя: латинские буквы, цифры и _, не с цифры',
+      'vars.needValue': 'значение не может быть пустым',
+      'vars.saved': 'значение {name} сохранено · {source}',
+      'vars.savedUnref': 'значение {name} сохранено; значения OpenBao видны, только когда сервер на них ссылается',
+      'vars.unused': 'не используется ни одним сервером',
+      'vars.forgot': 'значение {name} забыто',
+      'vars.restarted': 'перезапущены: {list}',
+      'vars.skippedOne': '{set} остался на прежнем значении: {what}',
+      'vars.skippedMissing': 'нет переменной {names}',
+      'vars.del': 'забыть значение',
+      'vars.delConfirm': 'Забыть {name}? Работающий набор остаётся со значением, с которым запустился; перезапускаются только наборы, которым это значение больше не нужно.',
+      'vars.honest': 'Значения живут в OpenBao или в файле, который читает только этот хост: видно имя, стоит ли значение и откуда оно берётся, — но не само значение. Имя, сохранённое здесь, остаётся в списке, даже если его не упоминает ни один сервер, — с пометкой «не используется».',
       'kpi.calls': 'вызовов · 7 дней',
       'kpi.errRate': 'доля ошибок',
       'kpi.p50': 'p50',
@@ -330,6 +447,14 @@
       'setSrv.lastTip': 'по последним 100 вызовам',
       'setSrv.emptyTitle': 'В наборе нет серверов',
       'setSrv.emptyText': 'Серверы живут в реестре хоста; подключите один, чтобы у набора появились инструменты.',
+      'setSrv.attachLabel': 'добавить в набор сервер из реестра',
+      'setSrv.attach': 'добавить в набор',
+      'setSrv.attachNone': 'все серверы реестра уже в наборе',
+      'setSrv.composeHelp': 'Состав сохраняется сразу. Запущенный набор применит правку без перезапуска, снятый сервер потеряет соединение. Пустой набор стартует, но инструментов не отдаёт.',
+      'setSrv.remove': 'убрать',
+      'setSrv.removeTip': 'убрать {name} из набора — сервер останется в реестре',
+      'setSrv.emptyWarn': 'набор остался без серверов: стартует, но инструментов не отдаёт',
+      'setSrv.reloadWarn': 'сохранено, но работающий набор не применил правку: {err}',
       'tail.thTime': 'Время',
       'tail.thServer': 'Сервер',
       'tail.thTool': 'Инструмент',
@@ -388,18 +513,14 @@
       'stats.emptyPeriod2': 'за выбранный период набор не записал вызовов',
       'stats.resetFilters': 'Сбросить фильтры',
       'stats.unreach': 'нет ответа: {list}',
+      'stats.stopped': 'набор не запущен: {list}',
       'stats.fail': 'запрос статистики не удался: {msg}',
       'stats.more': 'ещё {n} — сузьте фильтр',
       'stats.colTip': '{label} · вызовов {n}',
       'stats.colTipErr': '{label} · вызовов {n}, ошибок {err}',
       'side.label': 'Детали',
-      'side.servers': 'серверы',
-      'side.env': 'переменные',
-      'side.log': 'лог',
-      'side.close': 'Закрыть панель деталей',
-      'side.registry': 'общий реестр хоста',
-      'side.registryEmpty': 'реестр пуст',
       'side.server': 'сервер',
+      'side.close': 'Закрыть панель деталей',
       'form.sub': 'Изменения попадают в реестр хоста и действуют после перезапуска набора.',
       'form.description': 'описание',
       'form.transport': 'транспорт',
@@ -425,9 +546,10 @@
       'form.editing': 'сервер · {name}',
       'form.new': 'новый сервер',
       'form.create': 'Создать',
-      'form.deleteConfirm': 'Удалить сервер {name} из реестра хоста? Он исчезнет из наборов, где используется.',
+      'form.deleteConfirm': 'Удалить сервер {name} из реестра хоста? Используется в: {sets}. Инструменты, которые он даёт, уйдут вместе с ним.',
+      'form.deleteEmpty': 'Без него пустым останется: {empty} — такой набор запускается, но инструментов не даёт.',
+      'form.deleteFree': 'Удалить сервер {name} из реестра хоста? Он не используется ни в одном наборе.',
       'env.empty': 'переменных нет',
-      'env.note': 'значения подставляет процесс набора — панель их не хранит и не показывает',
       'env.set': 'задана',
       'env.unset': 'не задана',
       'log.tail': 'хвост лога набора',
@@ -486,8 +608,7 @@
       'srv.edit': 'Изменить',
       'srv.check': 'Проверить',
       'srv.log': 'Лог',
-      'srv.probe': 'Проверить',
-      'srv.authorize': 'Войти через OAuth',
+      'srv.authorize': 'Авторизовать',
       'auth.title': 'Войти через OAuth',
       'auth.waiting': 'Откройте ссылку в браузере — панель ждёт возврата. После сохранения токена набор перезапустится сам.',
       'auth.link': 'ссылка авторизации',
@@ -495,8 +616,7 @@
       'auth.copy': 'скопировать ссылку',
       'auth.copied': 'ссылка скопирована',
       'srv.notProbed': 'не проверен',
-      'srv.notInSet': 'не в наборе',
-      'srv.setOff': 'набор не запущен',
+      'srv.setOff': 'набор {name} не запущен',
       'srv.unchecked': 'не проверен',
       'srv.noResponse': 'нет ответа',
       'srv.healthy': 'Здоров',
@@ -504,6 +624,58 @@
       'srv.probeFail': 'проверка не удалась',
       'srv.notFound': 'сервер {name} не найден в реестре',
       'srv.reloadWarn': 'сохранено, но работающие наборы не применили правку: {err}',
+      'srv.tryStart': 'Проверить запуск',
+      'srv.tryStartTip': 'набор остановлен: проверка поднимет процесс сервера на время — сервер ответит, а набор останется остановленным',
+      'srv.probeTip': 'проверка поднимает процесс сервера на время: между вызовами реестр хоста процесс не держит',
+      'srv.probeOk': 'отвечает, не запущен',
+      'srv.probeOkTip': 'проверка подняла сервер на время, он ответил; сам набор по-прежнему остановлен',
+      'set.del': 'Удалить набор',
+      'set.delConfirm': 'Удалить набор {name}? Вместе с ним уйдут его ключи и история вызовов; серверы останутся в реестре хоста.',
+      'set.delFail': 'не удалось удалить набор: {msg}',
+      'io.open': 'Импорт и экспорт',
+      'io.title': 'Импорт и экспорт',
+      'io.sub': 'Реестр хоста в JSON, один набор отдельно или серверы, взятые из другого клиента.',
+      'io.export': 'Экспорт',
+      'io.registry': 'Весь реестр',
+      'io.download': 'Скачать JSON',
+      'io.copy': 'Скопировать',
+      'io.regNote': '{serversW} · {setsW} · env и headers выгружаются так, как записаны в реестре',
+      'io.set': 'Один набор',
+      'io.setHelp': 'Только серверы набора, в форме, которую читают другие клиенты. Ключи и история остаются здесь.',
+      'io.importL': 'Импорт',
+      'io.file': 'Файл JSON',
+      'io.text': 'или вставьте JSON',
+      'io.ph': '{ "mcpServers": { "x": { "command": "npx", "args": ["-y", "pkg"] } } }',
+      'io.importHelp': 'Серверы из Claude Desktop и Cursor принимаются как есть, файл реестра — тоже. Сервер, который уже есть в реестре, остаётся как был; наборы не импортируются.',
+      'io.peek': 'к импорту {n} {serversW}: {list}',
+      'io.peekSets': 'наборов в файле: {n} — наборы делаются в панели, поэтому не импортируются',
+      'io.peekNone': 'в этом JSON нет серверов',
+      'io.badJson': 'это не JSON: {err}',
+      'io.badShape': 'ожидался объект mcpServers другого клиента или файл реестра',
+      'io.doImport': 'Импортировать',
+      'io.added': 'добавлены: {list}',
+      'io.skipped': 'не добавлены: {list}',
+      'io.noNew': 'нового нет: все эти серверы уже в реестре',
+      'io.fail': 'импорт не удался: {msg}',
+      'io.noData': 'панель не отдала реестр',
+      'prompt.open': 'Промт',
+      'prompt.title': 'Промт для агента',
+      'prompt.sub': 'Один текст: вводная, инструменты набора со схемами и задача. Скопируйте его агенту.',
+      'prompt.parts': 'Части',
+      'prompt.task': 'Задача',
+      'prompt.taskPh': 'что агент должен сделать этими инструментами',
+      'prompt.intro': 'Вводная · необязательно',
+      'prompt.introPh': 'кто агент и как себя вести',
+      'prompt.introHelp': 'Пусто — подставится короткий вводный абзац о наборе.',
+      'prompt.servers': 'Серверы · без выбора — все',
+      'prompt.noServers': 'В наборе нет серверов — в тексте не будет инструментов.',
+      'prompt.build': 'Собрать',
+      'prompt.result': 'Готовый текст',
+      'prompt.copy': 'копировать',
+      'prompt.download': 'скачать .md',
+      'prompt.stopped': 'Набор остановлен: в текст попадут только имена инструментов из сохранённого списка, без схем.',
+      'prompt.notesLabel': 'примечания',
+      'prompt.fail': 'не удалось собрать промт: {msg}',
       'err.offline': 'панель не отвечает — проверьте, запущен ли mcprig',
       'err.http': 'HTTP {status} · {path}',
       'add.nameRequired': 'Укажите имя набора'
@@ -575,17 +747,27 @@
     });
   }
 
+  /* ---------- страницы панели ----------
+     Адрес называет открытую страницу: #/sets, #/servers, #/vars. Набор и его
+     вкладки живут внутри #/sets и остаются в адресе как #/set/<id> и #/stats/<p>. */
+  function pageOf(hash) {
+    if (/^#\/servers$/.test(hash)) { return 'servers'; }
+    if (/^#\/vars$/.test(hash)) { return 'vars'; }
+    return 'sets';
+  }
+
   // набор из адреса (#/set/demo) выбирается сразу, данные подтягивает первый /api/state
   var linkId = (/^#\/set\/([^/]+)$/.exec(location.hash) || [])[1];
   var st = {
     sets: [], servers: [], sel: linkId ? decodeURIComponent(linkId) : null,
-    health: null, calls: null, kpi: null, env: [], logKey: '', errTimer: 0, busy: false, boot: !!linkId,
+    health: null, calls: null, kpi: null, env: null, logKey: '', errTimer: 0, busy: false, boot: !!linkId,
+    version: '',
     // probe — доказательства строки «Проверить»: они свежее кэша health (15 с)
     probeTools: {}, probeHealth: {}, healthBusy: false,
-    tab: 'overview', sideTab: 'servers', railPref: '',
+    tab: 'overview', page: pageOf(location.hash), railPref: '',
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
-    mock: null, srvEditing: '', srvReturn: null,
+    mock: null, mockEnv: null, srvEditing: '', srvReturn: null,
     st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' },
     // paged — открыта вторая страница вызовов: тикер её не перезаписывает.
     // callsSeq — номер загрузки первой страницы: ответ догрузки из прошлого
@@ -655,6 +837,7 @@
     return fmtCached('day', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
   }
 
+  // подпись месячного столбца в «Архиве»: MM.YYYY
   function mon(iso) {
     var d = new Date(iso);
     if (isNaN(d.getTime())) { return '—'; }
@@ -723,6 +906,16 @@
     return st.mockTools.then(function (d) { return { tools: d.tools || [] }; });
   }
 
+  // Переменные в демо: файл читается один раз, дальше список живёт в st.mockEnv,
+  // иначе PUT/DELETE меняли бы ответ, а следующий GET снова отдавал бы файл.
+  function mockEnv() {
+    if (!st.mockEnv) {
+      st.mockEnv = fetch('mock/' + mockName('/api/env') + '.json', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); });
+    }
+    return st.mockEnv;
+  }
+
   // Демо повторяет контракт /api/calls: limit и before (строго раньше). Иначе
   // «Показать ещё» в демо нечего показать, а адрес запроса расходится с живым.
   function mockCallsPage(data, path) {
@@ -755,6 +948,8 @@
       if (st.mock && path.indexOf('/api/state') === 0) { return Promise.resolve(st.mock); }
       // список карантина в демо живёт в памяти: одобрение должно быть видно сразу
       if (/^\/api\/sets\/[^/]+\/tools$/.test(path)) { return mockTools(); }
+      // переменные в демо живут в памяти: PUT/DELETE должны менять список сразу
+      if (path.indexOf('/api/env') === 0) { return mockEnv(); }
       // срезы считаются из строк, а не читаются готовым файлом: иначе фильтры
       // в демо не на что влиять и цифры врут
       if (path.indexOf('/api/stats') === 0) { return Promise.resolve(mockStats(path)); }
@@ -777,7 +972,9 @@
       });
   }
 
-  function send(method, path, body) {
+  // quiet — у действия своя строка ошибки рядом с кнопкой, и верхняя плашка
+  // сказала бы то же второй раз
+  function send(method, path, body, quiet) {
     if (MOCK) { return mockSend(method, path, body); }
     return fetch(path, {
       method: method,
@@ -790,7 +987,7 @@
         return data;
       });
     }).catch(function (e) {
-      fail(e.message || String(e));
+      if (!quiet) { fail(e.message || String(e)); }
       throw e;
     });
   }
@@ -860,6 +1057,25 @@
         return { approved: approved };
       });
     }
+    // Состав набора: демо тоже правит его, иначе правка в панели ничем бы не
+    // отличалась от сохранённой и таблица врала бы о наборе.
+    var tm = /^\/api\/sets\/([^/]+)$/.exec(path);
+    if (tm && method === 'PUT' && st.mock) {
+      var tset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(tm[1]); })[0];
+      if (tset && body && Array.isArray(body.servers)) { tset.servers = body.servers.slice(); }
+      return Promise.resolve(tset || {});
+    }
+    // Промт собирается и в демо: пустой ответ показал бы в диалоге «undefined».
+    var pm = /^\/api\/sets\/([^/]+)\/prompt$/.exec(path);
+    if (pm && method === 'POST' && st.mock) {
+      var pset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(pm[1]); })[0];
+      var use = (body && body.servers && body.servers.length ? body.servers : (pset && pset.servers) || []);
+      var head = ((body && body.intro) || 'Ты работаешь с MCP-набором ' + decodeURIComponent(pm[1]) + ' (mcprig).') +
+        '\n\n## Инструменты\n';
+      var tools = use.map(function (n) { return '\n### ' + n + '\n\n(демо: инструменты не запрошены)\n'; }).join('');
+      var out = head + (use.length ? tools : '\n(серверов нет)\n') + '\n## Задача\n\n' + ((body && body.task) || '') + '\n';
+      return Promise.resolve({ prompt: out, notes: ['демо: схемы инструментов не запрашиваются'] });
+    }
     // Выдача ключа: демо проверяет профиль теми же словами, что демон
     // (internal/manager/api.go, keyProfileOf), и показывает новый ключ сразу.
     var km = /^\/api\/sets\/([^/]+)\/keys$/.exec(path);
@@ -889,6 +1105,33 @@
         if (k.id === keyID) { k.note = String((body && body.note) || ''); }
       });
       return Promise.resolve({ ok: true });
+    }
+    // Переменная в демо меняется по-настоящему: PUT пишет значение, DELETE убирает
+    // строку, и следующий loadEnv отдаёт изменённый список (иначе страница врала бы).
+    var em = /^\/api\/env\/([A-Za-z_][A-Za-z0-9_]*)$/.exec(path);
+    if (em && (method === 'PUT' || method === 'DELETE')) {
+      var envName = em[1];
+      return mockEnv().then(function (d) {
+        d.vars = d.vars || [];
+        var row = d.vars.filter(function (v) { return v.name === envName; })[0];
+        if (method === 'DELETE') {
+          // ответ как у apiEnvDelete: removed и source — откуда ушло значение
+          var had = !!row && !!row.set;
+          var was = (row && row.source) || '';
+          // строка остаётся, только если на имя ссылается сервер: у сохранённого
+          // без ссылок живой /api/env после забывания строку больше не отдаёт
+          if (row && row.used === false) {
+            d.vars = d.vars.filter(function (v) { return v.name !== envName; });
+          } else if (row) { row.set = false; row.source = ''; }
+          return { name: envName, removed: had, source: was, restarted: [] };
+        }
+        // source — из store тела, как storeName в secrets.go: local и пусто → file
+        var from = String((body && (body.store || body.source)) || 'file');
+        var source = from === 'local' || from === 'automatic' ? 'file' : from;
+        if (row) { row.set = true; row.source = source; }
+        else { d.vars.push({ name: envName, set: true, used: false, source: source }); }
+        return { name: envName, set: true, source: source, restarted: [] };
+      });
     }
     var m = /^\/api\/servers(?:\/([^/]+))?$/.exec(path);
     if (!m || !st.mock) { return Promise.resolve({ ok: true, ms: 14, tools: [] }); }
@@ -1151,6 +1394,7 @@
       if (!data) { return; }
       st.sets = data.sets || [];
       st.servers = data.servers || [];
+      st.version = data.version || '';
       renderChrome();
       renderRail();
       renderServers(st.health);
@@ -1167,18 +1411,42 @@
     var none = st.sets.length === 0;
     $('status-counts').textContent = fmtN(st.servers.length) + ' ' + word(st.servers.length, 'server');
     $('f-updated').textContent = clock();
+    $('f-version').textContent = st.version ? 'mcprig ' + st.version + ' ·' : '—';
     $('rail-count').textContent = fmtN(st.sets.length);
-    show($('empty-state'), none);
+    // шапка набора и его вкладки — только на странице наборов: на соседних
+    // страницах тот же набор ни к чему
+    var onSets = st.page === 'sets';
+    show($('empty-state'), none && onSets);
     show($('rail-empty'), none);
-    show($('phead'), !none);
-    show($('tabs'), !none);
+    show($('phead'), !none && onSets);
+    show($('tabs'), !none && onSets);
     applyTab(none ? null : st.tab);
-    // адрес и крошки повторяют открытое; наборы приходят и без выбора
+    renderCrumb();
     var set = current();
-    $('crumb-set').textContent = set ? (set.name || set.id) : '—';
     $('endpoint').textContent = set
       ? 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp' : '—';
     if (none) { renderKpis(null); renderSetServers(); }
+  }
+
+  // Крошка называет то, что открыто: набор — на его странице, иначе страницу
+  function renderCrumb() {
+    var set = current();
+    $('crumb-set').textContent = st.page !== 'sets' ? t('nav.' + st.page)
+      : set ? (set.name || set.id) : '—';
+  }
+
+  // Переключение страницы: адрес уже сменён ссылкой или hashchange
+  function applyPage(name) {
+    if (st.page !== name) { st.page = name; }
+    show($('page-sets'), name === 'sets');
+    show($('page-servers'), name === 'servers');
+    show($('page-vars'), name === 'vars');
+    [].forEach.call(document.querySelectorAll('#pagenav .segbtn'), function (a) {
+      if (a.dataset.page === name) { a.setAttribute('aria-current', 'page'); } else { a.removeAttribute('aria-current'); }
+    });
+    if (name === 'servers') { renderServers(st.health); }
+    if (name === 'vars') { loadEnv(); }
+    renderChrome();
   }
 
   // Рейл: личность набора и состояние. Цифр трафика здесь нет — они в наборе.
@@ -1216,12 +1484,28 @@
   function healthy(h) { return !!(h && h.healthy === true && !h.unknown); }
 
   // Три честных состояния и «не проверено»: пустое здоровье — не «ок».
-  function badgeState(h, running) {
-    if (!running) { return { cls: 'badge-unknown', text: t('srv.setOff'), hollow: true }; }
+  // probed — ответ проверки у остановленного набора: проверка поднимает процесс,
+  // и её результат иначе пропадал бы бесследно
+  function badgeState(h, running, name, probed) {
+    if (!running) {
+      if (probed && h) {
+        return h.healthy === false
+          ? { cls: 'badge-err', text: t('srv.failed') }
+          : { cls: 'badge-ok', text: t('srv.probeOk') };
+      }
+      return { cls: 'badge-unknown', text: t('srv.setOff', { name: name }), hollow: true };
+    }
     if (!h) { return { cls: 'badge-unknown', text: t('srv.notProbed'), hollow: true }; }
     if (h.healthy === false) { return { cls: 'badge-err', text: t('srv.failed') }; }
     if (h.unknown) { return { cls: 'badge-unknown', text: t('srv.unchecked'), hollow: true }; }
     return { cls: 'badge-ok', text: t('srv.healthy') };
+  }
+
+  // Один бейдж здоровья на обе таблицы — строка и реестр: цвет и текст живут здесь
+  function paintBadge(node, st8) {
+    node.className = 'badge ' + st8.cls;
+    node.replaceChildren(el('span', 'dot' + (st8.hollow ? ' dot-hollow' : '')),
+      document.createTextNode(st8.text));
   }
 
   // Последний вызов по серверу — из того же хвоста, что и вкладка «Вызовы».
@@ -1240,6 +1524,7 @@
   function renderSetServers() {
     var set = current();
     var names = (set && set.servers) || [];
+    var setNm = set ? (set.name || set.id) : '';
     var running = !!(set && set.runtime && set.runtime.running);
     var health = (st.health && st.health.servers) || [];
     var last = lastByServer();
@@ -1256,7 +1541,7 @@
     $('set-srv-note').textContent = st.healthBusy && running
       ? t('setSrv.checking', { n: fmtN(rows.length), serversW: word(rows.length, 'server') })
       : running ? t('setSrv.note', { h: fmtN(ok), f: fmtN(bad), u: fmtN(un) })
-        : t('srv.setOff');
+        : t('srv.setOff', { name: setNm });
     show($('set-srv-empty'), rows.length === 0);
     sync($('set-srv-body'), rows, function (r) { return r.name; },
       function () {
@@ -1290,6 +1575,10 @@
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
         edit.dataset.edit = '';
+        var del = act.appendChild(el('button', 'ghost-icon icon-xs'));
+        del.type = 'button';
+        del.dataset.del = '';
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
         return tr;
       },
       function (tr, row) {
@@ -1313,16 +1602,19 @@
           badge.className = 'badge badge-unknown';
           badge.replaceChildren(el('span', 'skel'));
         } else {
-          var st8 = badgeState(h, running);
-          badge.className = 'badge ' + st8.cls;
-          badge.replaceChildren(el('span', 'dot' + (st8.hollow ? ' dot-hollow' : '')),
-            document.createTextNode(st8.text));
-          badge.title = (h && h.error) || '';
+          var probed = st.probeHealth && st.probeHealth[row.name];
+          var st8 = badgeState(h, running, setNm, probed);
+          paintBadge(badge, st8);
+          badge.title = (h && h.error) || (probed && !running ? t('srv.probeOkTip') : '');
         }
-        tr.children[3].textContent = st.probeTools[row.name] != null ? fmtN(st.probeTools[row.name]) : '—';
+        // у остановленного набора инструментов нет: число здесь врало бы о составе
+        tr.children[3].textContent = running && st.probeTools[row.name] != null ? fmtN(st.probeTools[row.name]) : '—';
         tr.children[4].textContent = last[row.name] ? hm(last[row.name]) : '—';
         var check = tr.querySelector('[data-check]');
-        check.textContent = t('srv.check');
+        // У остановленного набора проверка поднимает процесс: кнопка называет
+        // действие тем, что оно делает, а не тем, как оно выглядит.
+        check.textContent = running ? t('srv.check') : t('srv.tryStart');
+        check.title = running ? '' : t('srv.tryStartTip');
         check.dataset.check = row.name;
         var log = tr.querySelector('[data-log]');
         log.textContent = t('srv.log');
@@ -1333,7 +1625,57 @@
         var edit = tr.querySelector('[data-edit]');
         edit.textContent = t('srv.edit');
         edit.dataset.edit = row.name;
+        var del = tr.querySelector('[data-del]');
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+        del.dataset.del = row.name;
+        del.title = t('setSrv.removeTip', { name: row.name });
+        del.setAttribute('aria-label', del.title);
       });
+    fillAttach();
+  }
+
+  // Свободные серверы реестра — те, кого в наборе ещё нет: чужое имя демон
+  // отверг бы, а список из одного набора в другой не переносится.
+  function fillAttach() {
+    var set = current();
+    var inSet = (set && set.servers) || [];
+    var sel = $('srv-attach');
+    var keep = sel.value;
+    sel.replaceChildren();
+    var free = st.servers.filter(function (s) { return inSet.indexOf(s.name) < 0; });
+    free.forEach(function (s) {
+      var opt = sel.appendChild(el('option', '', s.name));
+      opt.value = s.name;
+    });
+    if (free.some(function (s) { return s.name === keep; })) { sel.value = keep; }
+    show($('srv-compose'), free.length > 0);
+    show($('srv-attach-none'), free.length === 0);
+  }
+
+  function setSrvErr(msg) {
+    var box = $('srv-compose-err');
+    box.textContent = msg || '';
+    show(box, !!msg);
+  }
+
+  // Состав уходит полным списком: демон разбирает тело как patch, и именно
+  // полное поле делает правку одной операцией, без чтения текущего состава.
+  function saveSetServers(btn, names) {
+    var set = current();
+    if (!set || st.busy) { return; }
+    st.busy = true;
+    if (btn) { btn.disabled = true; }
+    setSrvErr('');
+    send('PUT', '/api/sets/' + encodeURIComponent(set.id), { servers: names }, true)
+      .then(function (r) {
+        return loadState().then(function () {
+          if (r && r.reloadError) { setSrvErr(t('setSrv.reloadWarn', { err: r.reloadError })); }
+          // пустой набор законен, но «нет инструментов» — не то, что видно по таблице
+          else if (!names.length) { setSrvErr(t('setSrv.emptyWarn')); }
+        });
+      })
+      .catch(function (e) { setSrvErr(e.message); })
+      .then(function () { st.busy = false; if (btn) { btn.disabled = false; } });
   }
 
   // Одна проба на оба списка: из неё же берётся число инструментов строки.
@@ -1376,6 +1718,7 @@
     // форма сервера привязана к списку прежнего набора — закрываем без возврата фокуса
     closeSrv(false);
     st.sel = id;
+    setDelErr('');
     st.health = null;
     st.calls = null;
     st.probeTools = {};
@@ -1385,8 +1728,10 @@
     // статистика идёт за рельсом: свой фильтр набора начинается с текущего,
     // ручной выбор в списке фильтра живёт до следующего переключения набора
     st.st.set = id || '';
-    // адрес повторяет открытое: на статистике его держит setTab, набор его не перебивает
-    if (st.tab !== 'stats') {
+    // адрес повторяет открытое: на статистике его держит setTab, набор его не перебивает;
+    // на соседних страницах выбранный набор в адрес не попадает — там живёт страница,
+    // а вкладка «Наборы» из адреса остаётся наборной страницей и его не переписывает
+    if (st.page === 'sets' && st.tab !== 'stats' && location.hash !== '#/sets') {
       if (id) {
         history.replaceState(null, '', '#/set/' + id);
       } else {
@@ -1417,12 +1762,13 @@
       $('k-calls').textContent = $('k-err').textContent = $('k-p50').textContent = $('k-p95').textContent = '—';
       $('schema').textContent = '—';
       $('meta-tools').textContent = '—';
+      show($('key-mark'), false);
       return;
     }
     var state = setState(set);
     var name = set.name || set.id;
     $('set-name').textContent = name;
-    $('crumb-set').textContent = name;
+    renderCrumb();
     $('set-port').textContent = ':' + set.port;
     $('set-state').className = 'badge ' + (state.cls === 'ok' ? 'badge-ok'
       : state.cls === 'err' ? 'badge-err' : 'badge-warn');
@@ -1438,6 +1784,10 @@
     keyBtn.dataset.i18nTitle = hasKey ? 'head.copyKey' : 'head.noKey';
     keyBtn.title = t(keyBtn.dataset.i18nTitle);
     $('keys-count').textContent = fmtN((set.keys || []).length);
+    // метка основного ключа — ровно та строка, что печатает статистика
+    var mark = $('key-mark');
+    show(mark, !!set.keyMark);
+    mark.textContent = set.keyMark || '';
     $('meta-servers').textContent = fmtN((set.servers || []).length);
     var schema = (st.calls && st.calls.schema) || null;
     $('meta-tools').textContent = schema ? fmtN(schema.tools) : '—';
@@ -1481,8 +1831,8 @@
     var tot = data && data.totals;
     $('k-calls').textContent = tot ? fmtN(tot.calls) : '—';
     $('k-err').textContent = tot && tot.calls ? pct(tot.failures, tot.calls) : '—';
-    $('k-p50').textContent = tot ? ms(tot.p50ms) : '—';
-    $('k-p95').textContent = tot ? ms(tot.p95ms) : '—';
+    $('k-p50').textContent = tot && tot.calls ? ms(tot.p50ms) : '—';
+    $('k-p95').textContent = tot && tot.calls ? ms(tot.p95ms) : '—';
     // прочерк бледнее цифры: пустая полоса не притворяется нулём
     [].forEach.call(document.querySelectorAll('.kpi'), function (k) {
       var n = k.querySelector('.kpi-num');
@@ -1511,19 +1861,29 @@
     });
   }
 
-  /* ---------- реестр хоста (дровер «Детали») ---------- */
+  /* ---------- реестр хоста (страница «Все серверы») ---------- */
 
   function renderServers(health) {
     var set = current();
     var inSet = (set && set.servers) || [];
+    var hs = (health && health.servers) || [];
     // список — общий реестр хоста, а не состав набора: новый сервер виден сразу,
-    // а принадлежность к набору помечена в строке
+    // наборы, куда он входит, живут отдельной колонкой
     var rows = st.servers.map(function (s) {
-      var h = health && health.servers
-        ? health.servers.filter(function (x) { return x.name === s.name; })[0] || null : null;
-      return { name: s.name, srv: s, health: h, mine: inSet.indexOf(s.name) >= 0 };
+      var h = hs.filter(function (x) { return x.name === s.name; })[0] || null;
+      var mine = inSet.indexOf(s.name) >= 0;
+      // здоровье и статус набора — у своего набора, иначе у первого, где сервер стоит:
+      // иначе «не проверен» врёт про сервер остановленного набора
+      var own = mine ? set : setsOf(s.name)[0] || null;
+      return {
+        name: s.name, srv: s, health: h, mine: mine, sets: setsOf(s.name),
+        own: own ? (own.name || own.id) : '',
+        ownRunning: !!(own && own.runtime && own.runtime.running)
+      };
     });
-    $('srv-count').textContent = fmtN(rows.length);
+    $('srv-note').textContent = t('reg.count', {
+      n: fmtN(rows.length), serversW: word(rows.length, 'server')
+    });
     show($('servers-empty'), rows.length === 0);
     sync($('servers'), rows, function (r) { return r.name; },
       function () {
@@ -1535,16 +1895,31 @@
         var ty = tr.appendChild(el('td'));
         ty.dataset.label = t('setSrv.thType');
         ty.appendChild(el('span', 'chip'));
+        var hc = tr.appendChild(el('td'));
+        hc.dataset.label = t('setSrv.thState');
+        hc.appendChild(el('span', 'badge badge-unknown'));
+        var tc = tr.appendChild(el('td', 'num'));
+        tc.dataset.label = t('setSrv.thTools');
+        tc.title = t('setSrv.toolsTip');
+        var sc = tr.appendChild(el('td', 'cell-sets'));
+        sc.dataset.label = t('reg.thSets');
+        sc.appendChild(el('span'));
         var act = tr.appendChild(el('td', 'cell-actions'));
-        var probe = act.appendChild(el('button', 'btn btn-xs'));
-        probe.type = 'button';
-        probe.dataset.probe = '';
+        var check = act.appendChild(el('button', 'btn btn-xs'));
+        check.type = 'button';
+        check.dataset.check = '';
         var auth = act.appendChild(el('button', 'btn btn-xs'));
         auth.type = 'button';
         auth.dataset.authorize = '';
+        var log = act.appendChild(el('button', 'btn btn-xs'));
+        log.type = 'button';
+        log.dataset.log = '';
         var edit = act.appendChild(el('button', 'btn btn-xs'));
         edit.type = 'button';
-        edit.dataset.regedit = '';
+        edit.dataset.edit = '';
+        var del = act.appendChild(el('button', 'ghost-icon icon-xs'));
+        del.type = 'button';
+        del.dataset.del = '';
         return tr;
       },
       function (tr, row) {
@@ -1555,28 +1930,55 @@
         var iso = isoOf(h && h.isolation);
         var sub = tr.querySelector('.cell-sub');
         // причина ошибки приходит от демона по-русски — её не переводим
-        var note = !row.mine ? t('srv.notInSet')
-          : h && h.healthy === false ? (h.error || t('srv.noResponse'))
-            : h && h.healthy === true && h.unknown ? t('srv.unchecked')
-              : iso ? iso.label : (srv.description || '');
+        var note = h && h.healthy === false ? (h.error || t('srv.noResponse'))
+          : iso ? iso.label : (srv.description || '');
         sub.textContent = note || '';
         sub.hidden = !note;
         sub.title = (h && h.error) || '';
         sub.className = 'cell-sub' + (h && h.healthy === false ? ' cell-iso' : '');
         tr.querySelector('.chip').textContent =
           srv.transport || (srv.command ? 'stdio' : srv.url ? 'http' : '—');
-        var probe = tr.querySelector('[data-probe]');
-        probe.textContent = t('srv.probe');
-        probe.dataset.probe = row.name;
-        // вход по OAuth — у удалённого сервера набора: локальному он не нужен
+        // Здоровье знает только проверка: своя (строка «Проверить») или проверка
+        // набора, в котором сервер стоит. Вне набора он честно непроверен.
+        var probed = st.probeHealth[row.name];
+        var badge = tr.querySelector('.badge');
+        // статус набора своей строки: у запущенного набора проверка даёт «Здоров»,
+        // у остановленного — «отвечает, не запущен», как в таблице набора
+        paintBadge(badge, probed
+          ? badgeState(probed, row.ownRunning, row.own, true)
+          : badgeState(h, row.ownRunning, row.own));
+        badge.title = (probed && probed.error) || (h && h.error) || (probed ? t('srv.probeOkTip') : '');
+        tr.children[3].textContent = st.probeTools[row.name] != null ? fmtN(st.probeTools[row.name]) : '—';
+        var setsCell = tr.querySelector('.cell-sets span');
+        setsCell.textContent = row.sets.length
+          ? row.sets.map(function (s) { return s.name || s.id; }).join(', ')
+          : t('reg.inNone');
+        var check = tr.querySelector('[data-check]');
+        check.textContent = t('srv.check');
+        // проверка поднимает процесс на время: об этом должен знать тот, кто жмёт
+        check.title = t('srv.probeTip');
+        check.dataset.check = row.name;
+        // вход по OAuth — у удалённого сервера набора: локальному он не нужен,
+        // а вход идёт в наборе, поэтому только для текущего
         var auth = tr.querySelector('[data-authorize]');
         var canAuth = row.mine && !!srv.url;
         auth.hidden = !canAuth;
         auth.textContent = t('srv.authorize');
         auth.dataset.authorize = canAuth ? row.name : '';
-        var edit = tr.querySelector('[data-regedit]');
+        // лог — хвост лога набора: сервер вне наборов своего лога не имеет
+        var log = tr.querySelector('[data-log]');
+        log.hidden = row.sets.length === 0;
+        log.textContent = t('srv.log');
+        log.dataset.log = row.name;
+        log.dataset.set = row.sets.length ? row.sets[0].id : '';
+        var edit = tr.querySelector('[data-edit]');
         edit.textContent = t('srv.edit');
-        edit.dataset.regedit = row.name;
+        edit.dataset.edit = row.name;
+        var del = tr.querySelector('[data-del]');
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+        del.dataset.del = row.name;
+        del.title = t('form.delete');
+        del.setAttribute('aria-label', del.title);
       });
   }
 
@@ -1608,7 +2010,7 @@
     var flow = authFlow;
     if (!flow) { return; }
     clearTimeout(authPoll);
-    get(authPath(flow.id, flow.name)).then(function (v) {
+    get(authPath(flow.id, flow.name) + '/status').then(function (v) {
       if (authFlow !== flow) { return; }
       if (showAuth(v)) { authPoll = setTimeout(pollAuth, 1500); }
       else if (v && v.state === 'ok') { setTimeout(loadHealth, 1500); }
@@ -1646,10 +2048,13 @@
 
   function srvForm() { return $('srvform'); }
 
+  // Ошибка живёт в форме, у кнопки, которая её вызвала: верхняя плашка при
+  // открытом диалоге остаётся за ним, а длинная форма прокручивает ошибку из вида.
   function srvErr(msg) {
     var box = $('srv-err');
     box.textContent = msg || '';
     show(box, !!msg);
+    if (msg) { box.focus({ preventScroll: true }); box.scrollIntoView({ block: 'nearest' }); }
   }
 
   // закрытие: фокус возвращается на кнопку, которая форму открыла
@@ -1816,16 +2221,37 @@
       .then(function () { st.busy = false; btn.disabled = false; });
   }
 
+  // Наборы, где стоит сервер: confirm называет их поимённо — «исчезнет из наборов»
+  // человеку ничего не говорит о том, что именно он теряет.
+  function setsOf(name) {
+    return st.sets.filter(function (s) { return (s.servers || []).indexOf(name) >= 0; });
+  }
+
+  function setsWith(name) {
+    return setsOf(name).map(function (s) { return s.name || s.id; });
+  }
+
+  // Что будет с наборами при удалении сервера — один текст на форму и на список
+  function deleteText(name) {
+    var sets = setsWith(name);
+    // набор, где он единственный: после удаления в нём не останется ни одного сервера
+    var empty = setsOf(name).filter(function (s) { return (s.servers || []).length === 1; })
+      .map(function (s) { return s.name || s.id; });
+    return !sets.length
+      ? t('form.deleteFree', { name: name })
+      : t('form.deleteConfirm', { name: name, sets: sets.join(', ') })
+        + (empty.length ? ' ' + t('form.deleteEmpty', { empty: empty.join(', ') }) : '');
+  }
+
   function delSrv() {
     var name = st.srvEditing;
     if (!name || st.busy) { return; }
-    var ok = window.confirm(t('form.deleteConfirm', { name: name }));
-    if (!ok) { return; }
+    if (!window.confirm(deleteText(name))) { return; }
     var btn = $('srv-del');
     st.busy = true;
     btn.disabled = true;
     srvErr('');
-    send('DELETE', '/api/servers/' + encodeURIComponent(name))
+    send('DELETE', '/api/servers/' + encodeURIComponent(name), null, true)
       .then(function () { return loadState(); })
       .then(function () { renderServers(st.health); })
       .then(function () {
@@ -1833,6 +2259,53 @@
         $('srv-add').focus();
       })
       .catch(function (err) { srvErr(err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  // то же удаление из списка реестра: ошибка уходит в плашку над содержимым
+  function delServerRow(name, btn) {
+    if (!name || st.busy) { return; }
+    if (!window.confirm(deleteText(name))) { return; }
+    st.busy = true;
+    btn.disabled = true;
+    send('DELETE', '/api/servers/' + encodeURIComponent(name), null, true)
+      .then(function () { return loadState(); })
+      .then(function () { renderServers(st.health); renderSetServers(); })
+      .catch(function (e) { fail(e.message, e); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  /* ---------- удаление набора ----------
+     Набор — это его ключи, история и каталог: серверы живут в реестре хоста и
+     переживают его. Демон снимает набор с порта до удаления файлов. */
+
+  function setDelErr(msg) {
+    var box = $('set-del-err');
+    box.textContent = msg || '';
+    show(box, !!msg);
+    if (msg) { box.focus({ preventScroll: true }); box.scrollIntoView({ block: 'nearest' }); }
+  }
+
+  function delSet() {
+    var set = current();
+    if (!set || st.busy) { return; }
+    var name = set.name || set.id;
+    if (!window.confirm(t('set.delConfirm', { name: name }))) { return; }
+    var btn = $('set-del');
+    var wasSel = st.sel === set.id;
+    var idx = st.sets.map(function (s) { return s.id; }).indexOf(set.id);
+    st.busy = true;
+    btn.disabled = true;
+    setDelErr('');
+    send('DELETE', '/api/sets/' + encodeURIComponent(set.id), null, true)
+      .then(function () { return loadState(); })
+      .then(function () {
+        // сосед по списку: следующий, а если его нет — предыдущий
+        if (!wasSel) { return; }
+        var next = st.sets[Math.min(Math.max(idx, 0), st.sets.length - 1)];
+        if (next) { select(next.id); } else { $('empty-add').focus(); }
+      })
+      .catch(function (err) { setDelErr(err.message); })
       .then(function () { st.busy = false; btn.disabled = false; });
   }
 
@@ -1908,6 +2381,258 @@
   function resumeCalls() {
     if (st.callsMore.busy) { return; }
     loadCalls();
+  }
+
+  /* ---------- импорт и экспорт ----------
+     Обе стороны — один и тот же JSON. Экспорт берёт готовое у демона (секретов в
+     нём нет), импорт принимает объект mcpServers — форму Claude Desktop и
+     Cursor — или файл реестра. Наборы не импортируются: их делает панель. */
+
+  var ioData = null;
+
+  function ioMsg(msg) {
+    var box = $('io-err');
+    box.textContent = msg || '';
+    show(box, !!msg);
+    if (msg) { box.focus({ preventScroll: true }); box.scrollIntoView({ block: 'nearest' }); }
+  }
+
+  // имена списком: длинный импорт не должен растягивать строку на весь диалог
+  function ioList(names) {
+    var head = names.slice(0, 6).join(', ');
+    return names.length > 6 ? head + ' … +' + (names.length - 6) : head;
+  }
+
+  // Значение сервера из чужого файла: command строкой и args — законная форма
+  // Claude Desktop и Cursor, а демон ждёт argv массивом (строку он отклоняет).
+  function ioServer(v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) { return v; }
+    var out = {};
+    Object.keys(v).forEach(function (k) { out[k] = v[k]; });
+    delete out.name;
+    if (Array.isArray(out.args)) {
+      out.command = (typeof out.command === 'string' ? [out.command] : (out.command || [])).concat(out.args);
+      delete out.args;
+    }
+    return out;
+  }
+
+  // что поняли из текста: пары «имя → сервер» и сколько в файле наборов
+  function ioParse(text) {
+    if (!text) { return { entries: null }; }
+    var data;
+    try { data = JSON.parse(text); } catch (e) { return { err: t('io.badJson', { err: e.message }) }; }
+    var list = [];
+    if (data && data.mcpServers && typeof data.mcpServers === 'object') {
+      Object.keys(data.mcpServers).forEach(function (n) { list.push([n, ioServer(data.mcpServers[n])]); });
+      return { entries: list, sets: 0 };
+    }
+    if (data && Array.isArray(data.servers)) {
+      data.servers.forEach(function (s) {
+        if (s && s.name) { list.push([s.name, ioServer(s)]); }
+      });
+      return { entries: list, sets: Array.isArray(data.sets) ? data.sets.length : 0 };
+    }
+    return { err: t('io.badShape') };
+  }
+
+  // Предпросмотр до отправки: сколько серверов нашлось и какие — импорт меняет
+  // реестр хоста, и «сколько» человек должен увидеть заранее.
+  function ioPreview() {
+    var p = ioParse(($('io-text').value || '').trim());
+    var peek = $('io-peek');
+    peek.className = 'field-help';
+    ioMsg(p.err || '');
+    $('io-add').disabled = !!p.err || !p.entries || !p.entries.length;
+    if (p.err || !p.entries) { peek.textContent = ''; return p; }
+    var names = p.entries.map(function (e) { return e[0]; });
+    var line = names.length
+      ? t('io.peek', { n: fmtN(names.length), serversW: word(names.length, 'server'), list: ioList(names) })
+      : t('io.peekNone');
+    if (p.sets) { line += ' · ' + t('io.peekSets', { n: fmtN(p.sets), setsW: word(p.sets, 'set') }); }
+    peek.textContent = line;
+    return p;
+  }
+
+  function ioFillSets() {
+    var sel = $('io-set');
+    var keep = sel.value;
+    sel.replaceChildren();
+    st.sets.forEach(function (s) {
+      var o = el('option', '', (s.name || s.id) + ' · :' + s.port);
+      o.value = s.id;
+      sel.appendChild(o);
+    });
+    sel.disabled = !st.sets.length;
+    $('io-set-dl').disabled = !st.sets.length;
+    var ids = st.sets.map(function (s) { return s.id; });
+    sel.value = ids.indexOf(keep) >= 0 ? keep : ids.indexOf(st.sel) >= 0 ? st.sel : (ids[0] || '');
+  }
+
+  function openIo() {
+    var dlg = $('io-dlg');
+    ioData = null;
+    ioFillSets();
+    ioMsg('');
+    $('io-peek').textContent = '';
+    $('io-file').value = '';
+    $('io-text').value = '';
+    $('io-add').disabled = true;
+    $('io-reg-note').textContent = '';
+    $('io-reg-dl').disabled = true;
+    $('io-reg-copy').disabled = true;
+    if (!dlg.open) { dlg.showModal(); }
+    get('/api/export/registry').then(function (d) {
+      if (!d) { throw new Error(t('io.noData')); }
+      ioData = d;
+      ioNote();
+      $('io-reg-dl').disabled = false;
+      $('io-reg-copy').disabled = false;
+    }).catch(function (err) { ioMsg(err.message); });
+  }
+
+  // состав реестра словами: пересчитывается и при смене языка, пока диалог открыт
+  function ioNote() {
+    if (!ioData) { return; }
+    var n = (ioData.servers || []).length, m = (ioData.sets || []).length;
+    $('io-reg-note').textContent = t('io.regNote', {
+      serversW: fmtN(n) + ' ' + word(n, 'server'),
+      setsW: fmtN(m) + ' ' + word(m, 'set')
+    });
+  }
+
+  function closeIo() {
+    var dlg = $('io-dlg');
+    if (dlg.open) { dlg.close(); }
+  }
+
+  // mime нужен промту: это .md, а не JSON
+  function download(name, data, mime) {
+    var body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    var url = URL.createObjectURL(new Blob([body], { type: mime || 'application/json' }));
+    var a = el('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  /* ---------- промт для агента ----------
+     Текст собирает демон (internal/manager/prompt.go): каталог со схемами и
+     маска секретов живут у него, а браузер показал бы половину. */
+
+  var promptText = '', promptNotes = [];
+
+  function promptErr(msg) {
+    var box = $('prompt-err');
+    box.textContent = msg || '';
+    show(box, !!msg);
+  }
+
+  function promptWarn() {
+    var set = current();
+    var off = !set || !(set.runtime && set.runtime.running);
+    $('prompt-warn').textContent = off ? t('prompt.stopped') : '';
+    show($('prompt-warn'), off);
+  }
+
+  function promptNote() {
+    $('prompt-notes').textContent = promptNotes.length
+      ? t('prompt.notesLabel') + ': ' + promptNotes.join(' · ') : '';
+    show($('prompt-notes'), promptNotes.length > 0);
+  }
+
+  function openPrompt() {
+    var set = current();
+    if (!set) { return; }
+    promptText = '';
+    promptNotes = [];
+    $('prompt-set').textContent = set.name || set.id;
+    $('prompt-task').value = '';
+    $('prompt-intro').value = '';
+    promptErr('');
+    promptWarn();
+    promptNote();
+    show($('prompt-result'), false);
+    var box = $('prompt-servers');
+    var names = set.servers || [];
+    box.replaceChildren();
+    names.forEach(function (name) {
+      var lab = el('label', 'check');
+      var cb = lab.appendChild(el('input'));
+      cb.type = 'checkbox';
+      cb.value = name;
+      lab.appendChild(document.createTextNode(name));
+      box.appendChild(lab);
+    });
+    show($('prompt-srv-field'), names.length > 0);
+    show($('prompt-nosrv'), names.length === 0);
+    var dlg = $('prompt-dlg');
+    if (!dlg.open) { dlg.showModal(); }
+    $('prompt-task').focus();
+  }
+
+  function buildPrompt() {
+    var set = current();
+    if (!set || st.busy) { return; }
+    var task = $('prompt-task').value.trim();
+    // задача обязательна: демон ответил бы 400, но кнопка не должна обещать
+    // сборку, которой не будет
+    if (!task) { $('prompt-task').focus(); return; }
+    var chosen = [].map.call($('prompt-servers').querySelectorAll('input:checked'),
+      function (i) { return i.value; });
+    var body = { task: task, intro: $('prompt-intro').value.trim() };
+    if (chosen.length) { body.servers = chosen; }
+    var btn = $('prompt-build');
+    st.busy = true;
+    btn.disabled = true;
+    promptErr('');
+    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/prompt', body, true)
+      .then(function (r) {
+        promptText = (r && r.prompt) || '';
+        promptNotes = (r && r.notes) || [];
+        $('prompt-out').textContent = promptText;
+        promptNote();
+        show($('prompt-result'), !!promptText);
+      })
+      .catch(function (e) { promptErr(t('prompt.fail', { msg: e.message })); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  function closePrompt() {
+    var dlg = $('prompt-dlg');
+    if (dlg.open) { dlg.close(); }
+  }
+
+
+  function ioImport() {
+    var p = ioPreview();
+    if (!p.entries || !p.entries.length) { return; }
+    var body = { mcpServers: {} };
+    p.entries.forEach(function (e) { body.mcpServers[e[0]] = e[1]; });
+    var btn = $('io-add');
+    btn.disabled = true;
+    send('POST', '/api/import', body)
+      .then(function (r) {
+        var added = (r && r.added) || [];
+        var skipped = (r && r.skipped) || [];
+        var parts = [added.length ? t('io.added', { list: ioList(added) }) : t('io.noNew')];
+        if (skipped.length) {
+          // причину даёт демон, по-русски — её не переводим
+          parts.push(t('io.skipped', {
+            list: skipped.map(function (s) { return s.name ? s.name + ' (' + s.reason + ')' : s.reason; }).join('; ')
+          }));
+        }
+        $('io-peek').textContent = parts.join(' · ');
+        $('io-peek').className = 'form-alert form-alert-ok';
+        // реестр хоста изменился — и селект наборов, и дровер должны знать сразу
+        ioData = null;
+        return loadState();
+      })
+      .catch(function (err) { ioMsg(t('io.fail', { msg: err.message })); })
+      .then(function () { btn.disabled = false; });
   }
 
   /* ---------- вкладка «Вызовы» ---------- */
@@ -1989,6 +2714,10 @@
         var li = el('li');
         li.appendChild(el('code'));
         li.appendChild(el('span', 'v-state'));
+        var del = li.appendChild(el('button', 'ghost-icon icon-xs'));
+        del.type = 'button';
+        del.dataset.envdel = '';
+        del.innerHTML = '<svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
         return li;
       },
       function (li, v) {
@@ -1997,8 +2726,75 @@
         code.title = v.name;
         li.querySelector('.v-state').textContent = (v.set ? t('env.set') : t('env.unset')) +
           (v.source ? ' · ' + v.source : '') +
+          (v.used === false ? ' · ' + t('vars.unused') : '') +
           (!v.set && st.envRemoteError ? ' · ' + st.envRemoteError : '');
+        var del = li.querySelector('[data-envdel]');
+        del.dataset.envdel = v.name;
+        del.title = t('vars.del');
+        del.setAttribute('aria-label', t('vars.del') + ' · ' + v.name);
       });
+  }
+
+  // Плашка под формой: строка исхода одна, ошибка и «сохранено» не стоят рядом.
+  // skipped — наборы, оставленные на старом окружении: это предупреждение, не ошибка.
+  function envNote(ok, text, skipped) {
+    show($('env-err'), !ok);
+    show($('env-msg'), ok);
+    $(ok ? 'env-msg' : 'env-err').textContent = text;
+    var warn = (ok && skipped && skipped.length ? skipped : []).map(function (s) {
+      // причина приходит и машинно (missing), и текстом (reason): фразу
+      // собираем на языке читателя, а reason нужен тем, кто зовёт API напрямую
+      var what = s.missing && s.missing.length
+        ? t('vars.skippedMissing', { names: s.missing.join(', ') })
+        : (s.reason || '');
+      return t('vars.skippedOne', { set: s.set, what: what });
+    }).join(' · ');
+    show($('env-warn'), !!warn);
+    $('env-warn').textContent = warn;
+  }
+
+  function saveEnv(e) {
+    e.preventDefault();
+    var name = $('env-name').value.trim();
+    var value = $('env-value').value;
+    var store = $('env-store').value;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { envNote(false, t('vars.needName')); $('env-name').focus(); return; }
+    if (!value) { envNote(false, t('vars.needValue')); $('env-value').focus(); return; }
+    var btn = $('env-save');
+    if (st.busy) { return; }
+    st.busy = true;
+    btn.disabled = true;
+    send('PUT', '/api/env/' + encodeURIComponent(name), { value: value, store: store })
+      .then(function (r) {
+        r = r || {};
+        envNote(true, t('vars.saved', { name: r.name || name, source: r.source || store || 'auto' }) +
+          (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped);
+        $('env-value').value = '';
+        return loadEnv().then(function () {
+          // значение записано, но имени нет в списке: его пока не упоминает ни один сервер
+          var seen = (st.env || []).some(function (v) { return v.name === (r.name || name); });
+          if (!seen) { envNote(true, t('vars.saved', { name: r.name || name, source: r.source || 'auto' }) + ' · ' + t('vars.savedUnref', { name: name }), r.skipped); }
+        });
+      })
+      .catch(function (err) { envNote(false, err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
+  }
+
+  function delEnv(name, btn) {
+    if (st.busy || !name) { return; }
+    if (!window.confirm(t('vars.delConfirm', { name: name }))) { return; }
+    st.busy = true;
+    btn.disabled = true;
+    // без store: значение забывается во всех хранилищах, а не только в одном
+    send('DELETE', '/api/env/' + encodeURIComponent(name), null, true)
+      .then(function (r) {
+        r = r || {};
+        envNote(true, t('vars.forgot', { name: r.name || name })
+          + (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped);
+        return loadEnv();
+      })
+      .catch(function (err) { envNote(false, err.message); })
+      .then(function () { st.busy = false; btn.disabled = false; });
   }
 
   function loadLog() {
@@ -2037,13 +2833,14 @@
 
   var srvLog = { name: '', set: '', seq: 0 };
 
-  function openSrvLog(name) {
-    var set = current();
-    if (!set) { return; }
+  function openSrvLog(name, setId) {
+    // набор — тот, где сервер стоит: со страницы реестра он приходит в dataset
+    var id = setId || (current() && current().id);
+    if (!id) { return; }
     srvLog.name = name;
-    srvLog.set = set.id;
+    srvLog.set = id;
     srvLog.returnFocus = document.activeElement;
-    $('srvlog-h').textContent = t('srvlog.title', { server: name, set: set.id });
+    $('srvlog-h').textContent = t('srvlog.title', { server: name, set: id });
     $('srvlog-err').hidden = true;
     var dlg = $('srvlog-dlg');
     if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
@@ -2341,8 +3138,15 @@
     show($('s-grid'), !empty);
 
     var unreach = (d && d.unreachable) || [];
+    // остановленный набор — состояние, а не отказ: тон предупреждающий, а не красный
+    var live = unreach.some(function (id) {
+      var s = st.sets.filter(function (x) { return x.id === id; })[0];
+      return !!(s && s.runtime && s.runtime.running);
+    });
     show($('stats-unreach'), unreach.length > 0);
-    $('stats-unreach').textContent = unreach.length ? t('stats.unreach', { list: unreach.join(', ') }) : '';
+    $('stats-unreach').className = 'form-alert' + (live ? '' : ' form-alert-warn');
+    $('stats-unreach').textContent = unreach.length
+      ? t(live ? 'stats.unreach' : 'stats.stopped', { list: unreach.join(', ') }) : '';
 
     if (empty) {
       var narrowed = !!(st.st.server || st.st.tool || st.st.client);
@@ -2578,8 +3382,14 @@
   function setTab(name) {
     st.tab = name;
     applyTab(name);
-    // адрес повторяет то, что открыто: у статистики в нём ещё и период
-    var hash = name === 'stats' ? '#/stats/' + st.st.period : (st.sel ? '#/set/' + st.sel : '');
+    // адрес повторяет то, что открыто: у статистики в нём ещё и период.
+    // На соседних страницах вкладки не видны и адрес не трогают; на «Наборах»
+    // из адреса набор в адрес не переезжает — там живёт страница.
+    var hash = '';
+    if (st.page === 'sets') {
+      if (name === 'stats') { hash = '#/stats/' + st.st.period; }
+      else if (st.sel && location.hash !== '#/sets') { hash = '#/set/' + st.sel; }
+    }
     if (hash && location.hash !== hash) { history.replaceState(null, '', hash); }
     if (name === 'stats') {
       if (!st.st.data) { loadStats(); }
@@ -2604,27 +3414,13 @@
 
   /* ---------- панель деталей ---------- */
 
-  function setSideTab(name) {
-    st.sideTab = name;
-    ['servers', 'env', 'log'].forEach(function (p) {
-      var btn = document.querySelector('.drawer-seg .segbtn[data-side="' + p + '"]');
-      var on = p === name;
-      btn.setAttribute('aria-selected', on ? 'true' : 'false');
-      btn.tabIndex = on ? 0 : -1;
-      show(document.querySelector('.pane[data-pane="' + p + '"]'), on);
-    });
-  }
-
   function openSide() {
     st.sideReturn = document.activeElement;
     document.body.classList.add('side-open');
     $('side-open').setAttribute('aria-expanded', 'true');
     $('side').setAttribute('aria-hidden', 'false');
     show($('scrim'), true);
-    if (window.innerWidth < 1200) {
-      var tab = document.querySelector('.drawer-seg .segbtn[aria-selected="true"]') || $('side-close');
-      tab.focus();
-    }
+    if (window.innerWidth < 1200) { $('side-close').focus(); }
   }
 
   function closeSide() {
@@ -2811,6 +3607,9 @@
     renderStats(st.st.data);
     applyRail();
     applyThemeMenu();
+    // у диалога импорта текст собирается кодом, а title его не перерисует
+    if ($('io-dlg').open) { ioNote(); ioPreview(); }
+    if ($('prompt-dlg').open) { promptWarn(); promptNote(); }
   };
 
   /* ---------- привязки ---------- */
@@ -2848,13 +3647,6 @@
     $('tabbtn-' + order[i]).focus();
   });
 
-  document.querySelector('.drawer-seg').addEventListener('click', function (e) {
-    var btn = e.target.closest('.segbtn');
-    if (btn) { setSideTab(btn.dataset.side); }
-  });
-  document.querySelector('.drawer-seg').addEventListener('keydown', function (e) {
-    arrowNav(e, this, function (b) { setSideTab(b.dataset.side); });
-  });
   $('s-period').addEventListener('keydown', function (e) {
     arrowNav(e, this, function (b) { setPeriod(b.dataset.period); });
   });
@@ -2931,9 +3723,12 @@
 
   window.addEventListener('hashchange', function () {
     var m = /^#\/set\/([^/]+)$/.exec(location.hash);
-    if (m && m[1] !== st.sel) { select(decodeURIComponent(m[1])); return; }
+    if (m) { applyPage('sets'); if (m[1] !== st.sel) { select(decodeURIComponent(m[1])); } return; }
     var s = /^#\/stats\/([a-z0-9]+)$/.exec(location.hash);
-    if (s) { setTab('stats'); setPeriod(s[1], true); }
+    if (s) { applyPage('sets'); setTab('stats'); setPeriod(s[1], true); return; }
+    // «Наборы» из адреса, а не из вкладки: статистика на этой странице не открыта
+    if (location.hash === '#/sets' && st.tab === 'stats') { setTab('overview'); }
+    applyPage(pageOf(location.hash));
   });
 
   var resizeTimer = 0;
@@ -3043,6 +3838,61 @@
 
   $('restart').addEventListener('click', function () { runAct(this, 'restart'); });
 
+  $('set-del').addEventListener('click', delSet);
+
+  /* ---------- импорт и экспорт ---------- */
+
+  $('io').addEventListener('click', openIo);
+  $('empty-io').addEventListener('click', openIo);
+  $('io-x').addEventListener('click', closeIo);
+  $('io-close').addEventListener('click', closeIo);
+  $('io-add').addEventListener('click', ioImport);
+  $('io-text').addEventListener('input', ioPreview);
+
+  /* ---------- промт для агента ---------- */
+
+  $('prompt-open').addEventListener('click', openPrompt);
+  $('prompt-x').addEventListener('click', closePrompt);
+  $('prompt-close').addEventListener('click', closePrompt);
+  $('prompt-build').addEventListener('click', buildPrompt);
+  $('prompt-copy').addEventListener('click', function () {
+    if (promptText) { copyText(promptText, this, t('prompt.copy')); }
+  });
+  $('prompt-dl').addEventListener('click', function () {
+    var set = current();
+    if (promptText && set) { download('mcprig-prompt-' + set.id + '.md', promptText, 'text/markdown'); }
+  });
+
+  // файл — только источник текста: предпросмотр и отправка идут тем же путём
+  $('io-file').addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    if (!file) { return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      $('io-text').value = String(reader.result || '');
+      ioPreview();
+    };
+    reader.onerror = function () { ioMsg(t('io.fail', { msg: file.name })); };
+    reader.readAsText(file);
+  });
+
+  $('io-reg-dl').addEventListener('click', function () {
+    if (ioData) { download('mcprig-registry.json', ioData); }
+  });
+
+  $('io-reg-copy').addEventListener('click', function () {
+    if (ioData) { copyText(JSON.stringify(ioData, null, 2), this); }
+  });
+
+  $('io-set-dl').addEventListener('click', function () {
+    var id = $('io-set').value;
+    if (!id) { return; }
+    get('/api/export?set=' + encodeURIComponent(id)).then(function (d) {
+      if (!d) { throw new Error(t('io.noData')); }
+      download('mcprig-' + id + '.json', d);
+    }).catch(function (err) { ioMsg(err.message); });
+  });
+
   $('log-refresh').addEventListener('click', function () { loadLog(); });
   $('log-wide').addEventListener('click', function () {
     var on = document.body.classList.toggle('log-wide');
@@ -3060,7 +3910,20 @@
     var toolsBtn = e.target.closest('[data-tools]');
     if (toolsBtn) { openTools(toolsBtn.dataset.tools); return; }
     var edit = e.target.closest('[data-edit]');
-    if (edit) { openSrv(edit.dataset.edit); }
+    if (edit) { openSrv(edit.dataset.edit); return; }
+    var del = e.target.closest('[data-del]');
+    if (del) {
+      var set = current();
+      if (!set) { return; }
+      saveSetServers(del, (set.servers || []).filter(function (n) { return n !== del.dataset.del; }));
+    }
+  });
+
+  $('srv-attach-add').addEventListener('click', function () {
+    var set = current();
+    var name = $('srv-attach').value;
+    if (!set || !name) { return; }
+    saveSetServers(this, (set.servers || []).concat([name]));
   });
 
   $('srvlog-close').addEventListener('click', closeSrvLog);
@@ -3075,12 +3938,24 @@
   $('calls-resume').addEventListener('click', resumeCalls);
 
   $('servers').addEventListener('click', function (e) {
-    var probe = e.target.closest('[data-probe]');
-    if (probe) { probeServer(probe.dataset.probe, probe); return; }
+    var check = e.target.closest('[data-check]');
+    if (check) { probeServer(check.dataset.check, check); return; }
     var auth = e.target.closest('[data-authorize]');
     if (auth && auth.dataset.authorize) { startAuth(auth.dataset.authorize); return; }
-    var edit = e.target.closest('[data-regedit]');
-    if (edit) { openSrv(edit.dataset.regedit); }
+    var logBtn = e.target.closest('[data-log]');
+    if (logBtn) { openSrvLog(logBtn.dataset.log, logBtn.dataset.set); return; }
+    var edit = e.target.closest('[data-edit]');
+    if (edit) { openSrv(edit.dataset.edit); return; }
+    var del = e.target.closest('[data-del]');
+    if (del) { delServerRow(del.dataset.del, del); }
+  });
+
+  $('srv-new').addEventListener('click', function () { openSrv(''); });
+
+  $('envform').addEventListener('submit', saveEnv);
+  $('env').addEventListener('click', function (e) {
+    var del = e.target.closest('[data-envdel]');
+    if (del) { delEnv(del.dataset.envdel, del); }
   });
 
   $('auth-close').addEventListener('click', closeAuth);
@@ -3246,10 +4121,9 @@
   setTitle();
   applyRail();
   applyThemeMenu();
+  applyPage(st.page);
   setTab(st.tab);
   setPeriod(st.st.period, true);
-  setSideTab(st.sideTab);
-  loadEnv();
   loadState().then(function () {
     every(5000, loadState);
     every(5000, function () {

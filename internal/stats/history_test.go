@@ -553,3 +553,53 @@ func TestRotateSkipsBrokenDay(t *testing.T) {
 		t.Fatalf("raw старше RawDays остался: %v", err)
 	}
 }
+
+// TailFromDir отдаёт панели хвост и счётчики остановленного набора: две суток
+// журнала, порядок по убыванию времени, лимит и пустой каталог.
+func TestTailFromDir(t *testing.T) {
+	dir := t.TempDir()
+	today := startOfDay(time.Now())
+	yesterday := today.AddDate(0, 0, -1)
+	writeRaw(t, dir, yesterday, []rawLine{
+		{Time: yesterday.Add(10 * time.Hour), Client: "opencode", Server: "fs", Tool: "read", MS: 4},
+		{Time: yesterday.Add(11 * time.Hour), Client: "opencode", Server: "fs", Tool: "read", MS: 8, Failed: true, Err: "boom"},
+	})
+	writeRaw(t, dir, today, []rawLine{
+		{Time: today.Add(time.Hour), Client: "opencode", Server: "git", Tool: "status", MS: 20},
+	})
+	// Восьмые сутки назад — за окном period=7d, в ответ не попадают.
+	writeRaw(t, dir, today.AddDate(0, 0, -RawDays), []rawLine{
+		{Time: today.AddDate(0, 0, -RawDays).Add(time.Hour), Client: "opencode", Server: "old", Tool: "tail", MS: 500},
+	})
+
+	tail, counters := TailFromDir(dir, 2)
+	if len(tail) != 2 {
+		t.Fatalf("хвост = %d строк, ожидалось 2 (лимит)", len(tail))
+	}
+	if !tail[0].Time.Equal(today.Add(time.Hour)) || !tail[1].Time.Equal(yesterday.Add(11*time.Hour)) {
+		t.Fatalf("порядок хвоста: %+v", tail)
+	}
+	if tail[0].Tool != "status" || tail[1].Message != "boom" || !tail[1].Failed || tail[0].Failed {
+		t.Fatalf("строки хвоста: %+v", tail)
+	}
+
+	if len(counters) != 2 || counters[0].Server != "fs" || counters[1].Server != "git" {
+		t.Fatalf("счётчики: %+v", counters)
+	}
+	if c := counters[0]; c.Calls != 2 || c.Failures != 1 || c.TotalMs != 12 || c.P50Ms != 4 || c.P95Ms != 4 {
+		t.Fatalf("агрегат fs/read: %+v", c)
+	}
+	if c := counters[1]; c.Calls != 1 || c.Failures != 0 || c.TotalMs != 20 {
+		t.Fatalf("агрегат git/status: %+v", c)
+	}
+
+	tail, _ = TailFromDir(dir, 10)
+	if len(tail) != 3 {
+		t.Fatalf("без урезания: %d строк", len(tail))
+	}
+
+	empty, emptyCounters := TailFromDir(filepath.Join(dir, "нет"), 5)
+	if empty == nil || emptyCounters == nil || len(empty) != 0 || len(emptyCounters) != 0 {
+		t.Fatalf("пустой каталог: tail=%v counters=%v", empty, emptyCounters)
+	}
+}

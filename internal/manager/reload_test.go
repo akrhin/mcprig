@@ -107,6 +107,11 @@ func TestReloadKeepsStdioChildren(t *testing.T) {
 	if got := e.m.rt.status(e.m.store.Set(id)); got.PID != started.PID {
 		t.Fatalf("pid набора сменился: %d → %d", started.PID, got.PID)
 	}
+	// Ребёнок жив и reload не упал — но проверяем доставку: процесс набора
+	// должен подтвердить новое поколение, иначе тест зелёный и без SIGHUP.
+	if applied := getApplied(t, started.Port); applied.Generation < 1 {
+		t.Fatalf("reload не дошёл до набора: generation = %d", applied.Generation)
+	}
 }
 
 // Рестарт начинает поколение заново: старый ack не должен выглядеть ответом
@@ -200,6 +205,45 @@ func TestReloadKeepsOtherSessions(t *testing.T) {
 	}
 	if len(applied.Servers) != 2 || applied.Servers[0] != "first" || applied.Servers[1] != "second" {
 		t.Fatalf("применены серверы %v, ожидались first и second", applied.Servers)
+	}
+}
+
+// Подпись ключа едет через reload: набор не перезапускается (pid тот же), а
+// процесс набора подтверждает новое поколение конфига (§C5).
+func TestKeyNoteReloadsWithoutRestart(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "signed", "fake")
+
+	w := e.do(t, http.MethodPost, "/api/sets/"+id+"/start", nil)
+	status(t, w, http.StatusOK)
+	started := decode[RuntimeStatus](t, w)
+
+	keys := decode[struct {
+		Keys []struct {
+			ID string `json:"id"`
+		} `json:"keys"`
+	}](t, e.do(t, http.MethodGet, "/api/sets/"+id+"/keys", nil)).Keys
+	if len(keys) == 0 {
+		t.Fatal("у набора нет ключа")
+	}
+
+	w = e.do(t, http.MethodPatch, "/api/sets/"+id+"/keys/"+keys[0].ID, map[string]any{"note": "hermes"})
+	status(t, w, http.StatusOK)
+	if got := decode[struct {
+		Key struct {
+			Note string `json:"note"`
+		} `json:"key"`
+	}](t, w).Key.Note; got != "hermes" {
+		t.Fatalf("подпись = %q, ожидалась hermes", got)
+	}
+
+	after := e.m.rt.status(e.m.store.Set(id))
+	if after.PID != started.PID {
+		t.Fatalf("подпись ключа перезапустила набор: pid %d → %d", started.PID, after.PID)
+	}
+	if applied := getApplied(t, started.Port); applied.Generation < 1 {
+		t.Fatalf("reload не дошёл до набора: generation = %d", applied.Generation)
 	}
 }
 
@@ -371,21 +415,39 @@ func TestSetUpdateKeepsEditWhenReloadFails(t *testing.T) {
 // needsRestart — развилка «перезапуск или reload» по полям набора.
 func TestNeedsRestart(t *testing.T) {
 	base := &registry.Set{ID: "s", Port: 9101, Token: "t", Open: false}
-	if restart, _ := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t"}); restart {
+	none := []registry.Server{}
+	if restart, _ := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t"}, none); restart {
 		t.Fatal("неизменный транспорт потребовал перезапуска")
 	}
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9102, Token: "t"}); !restart || why != "порт" {
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9102, Token: "t"}, none); !restart || why != "порт" {
 		t.Fatalf("порт: %v %q", restart, why)
 	}
 	// Смена ключа больше не требует перезапуска: список токенов доезжает
 	// reload'ом, поэтому решение о перезапуске его не трогает.
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "u"}); restart {
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "u"}, none); restart {
 		t.Fatalf("ключ: %v %q", restart, why)
 	}
 	// Открытость перезапуска не требует: слушатель меняет её живьём
 	// (SetAuth), как и список ключей.
-	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t", Open: true}); restart {
+	if restart, why := needsRestart(base, &registry.Set{ID: "s", Port: 9101, Token: "t", Open: true}, none); restart {
 		t.Fatalf("открытость: %v %q", restart, why)
+	}
+}
+
+// Сервер с новой ${VAR} в составе набора: окружение процесса зафиксировано при
+// старте, поэтому без перезапуска переменная осталась бы пустой.
+func TestNeedsRestartOnNewEnvRef(t *testing.T) {
+	servers := []registry.Server{
+		{Name: "plain", Transport: "stdio", Command: []string{"/bin/true"}},
+		{Name: "wants", Transport: "stdio", Command: []string{"/bin/true"}, Env: map[string]string{"TOKEN": "${NEW}"}},
+	}
+	old := &registry.Set{ID: "s", Port: 9101, Servers: []string{"plain"}}
+	if restart, why := needsRestart(old, &registry.Set{ID: "s", Port: 9101, Servers: []string{"plain", "wants"}}, servers); !restart || !strings.Contains(why, "NEW") {
+		t.Fatalf("новая переменная: %v %q", restart, why)
+	}
+	// Тот же сервер без ссылок на переменные перезапуска не требует.
+	if restart, why := needsRestart(old, &registry.Set{ID: "s", Port: 9101, Servers: []string{"plain"}}, servers); restart {
+		t.Fatalf("без новых переменных: %v %q", restart, why)
 	}
 }
 

@@ -375,8 +375,8 @@ func (s *Store) UpdateServer(name string, patch json.RawMessage) (Server, error)
 	return srv, nil
 }
 
-// DeleteServer removes a server and every reference to it from the sets. A
-// set must keep at least one server, so deleting the last one is refused.
+// DeleteServer removes a server and every reference to it from the sets. A set
+// left without servers stays: an empty set is a legal state (decision 0004).
 func (s *Store) DeleteServer(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -395,9 +395,6 @@ func (s *Store) DeleteServer(name string) error {
 		}
 		if len(kept) == len(set.Servers) {
 			continue
-		}
-		if len(kept) == 0 {
-			return fmt.Errorf("сервер %s последний в наборе %s: удалите набор или добавьте другой", name, set.ID)
 		}
 		cp := *set
 		cp.Servers = kept
@@ -428,11 +425,40 @@ func (s *Store) Set(id string) *Set {
 }
 
 // snapshot copies the mutable parts of a set, so a caller cannot write back
-// into registry state through the returned pointer.
+// into registry state through the returned pointer. Profiles, the rate limit
+// and Notify are maps or pointers: a shallow copy would let a handler edit the
+// store's state past the lock.
 func (set *Set) snapshot() *Set {
 	cp := *set
 	cp.Servers = append([]string(nil), set.Servers...)
 	cp.Keys = append([]Key(nil), set.Keys...)
+	if set.Notify != nil {
+		n := *set.Notify
+		cp.Notify = &n
+	}
+	if set.RateLimit != nil {
+		rl := *set.RateLimit
+		if set.RateLimit.PerTool != nil {
+			rl.PerTool = make(map[string]config.RateLimit, len(set.RateLimit.PerTool))
+			for name, limit := range set.RateLimit.PerTool {
+				rl.PerTool[name] = limit
+			}
+		}
+		cp.RateLimit = &rl
+	}
+	if set.Profiles != nil {
+		cp.Profiles = make(map[string]*config.Profile, len(set.Profiles))
+		for name, profile := range set.Profiles {
+			if profile == nil {
+				cp.Profiles[name] = nil
+				continue
+			}
+			p := *profile
+			p.Deny = append([]string(nil), profile.Deny...)
+			p.Allow = append([]string(nil), profile.Allow...)
+			cp.Profiles[name] = &p
+		}
+	}
 	return &cp
 }
 

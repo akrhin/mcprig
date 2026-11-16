@@ -45,3 +45,27 @@ func TestGlobMatchConcurrent(t *testing.T) {
 		t.Error(msg)
 	}
 }
+
+// A name that arrives with a line break must not slip past a deny rule: the
+// gate sees tool names from upstream, and "." has to match "\n" for "*" to mean
+// "any run of characters" in the literal sense.
+func TestDenyRuleSpansNewline(t *testing.T) {
+	deny := &Permissions{Rules: []Rule{{Pattern: "rm*", Action: PermissionDeny, Message: "rm запрещён"}}}
+	if msg, denied := DenyReason(nil, deny, "srv", "rm\n-rf"); !denied {
+		t.Fatalf("rm\\n-rf прошёл deny-правило (msg=%q)", msg)
+	}
+	if _, denied := DenyReason(nil, deny, "srv", "ls"); denied {
+		t.Fatal("безвредное имя ls попало под deny")
+	}
+	if _, denied := DenyReason(nil, deny, "srv", "rm"); !denied {
+		t.Fatal("rm должен отбиваться: правило rm* его покрывает")
+	}
+	// `?` counts one character, and a newline is one.
+	single := &Permissions{Rules: []Rule{{Pattern: "a?b", Action: PermissionDeny}}}
+	if _, denied := DenyReason(nil, single, "srv", "a\nb"); !denied {
+		t.Fatal("a\\nb не отбит правилом a?b: ? не совпал с переводом строки")
+	}
+	if _, denied := DenyReason(nil, single, "srv", "a\nxb"); denied {
+		t.Fatal("a\\nxb отбит правилом a?b, хотя ? — ровно один символ")
+	}
+}
