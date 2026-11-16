@@ -501,6 +501,12 @@ From any other peer the headers are ignored — otherwise any client could claim
 `https` and spoof the check, or step around the login limit by naming a fresh
 `X-Forwarded-For`. A value that parses as neither an IP nor a CIDR refuses the
 start with the offending entry named.
+Trust is given to an address, so list the proxy alone (a `/32` where you can) and
+keep the panel port reachable by nothing else: anyone who can open the panel from
+a trusted address also controls those headers. The proxy itself must append or
+overwrite `X-Forwarded-For` (`$proxy_add_x_forwarded_for` in nginx, not
+`$http_x_forwarded_for`); with a pass-through value the login limit counts
+whatever the client sent.
 With an `http` panel behind a trusted proxy, browser writes are rejected because
 the request counts as `https` — set `MCPRIG_PUBLIC_URL=https://…` to match what
 the browser sees.

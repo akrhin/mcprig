@@ -160,7 +160,10 @@ from a peer the panel believes: loopback, or an address in
 headers were absent — no public name, no `https`, no client address for the login
 limit. Trusting a proxy on another host therefore takes both the secret and its
 address, and a mismatch shows up as `403` on the origin check with the proxy
-serving the panel correctly.
+serving the panel correctly. List the proxy alone (a `/32` where you can) and
+keep the panel port unreachable for everyone else, and make the proxy append or
+overwrite `X-Forwarded-For`: anyone who reaches the panel from a trusted address
+controls those headers.
 With an `http` panel behind the secret, browser writes are rejected because the
 request counts as `https`; set `MCPRIG_PUBLIC_URL=https://…` to match.
 

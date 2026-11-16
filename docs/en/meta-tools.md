@@ -286,7 +286,7 @@ listener, under the same guard as `/mcp` — the set's bearer key, `allowedHosts
 and the `Origin` check. The marker then reads:
 
 ```text
-[обрезано: 32768 из 149873 байт, полный ответ — /tool-out/1f3c9a2b7d4e5f60 (тот же ключ, что у /mcp)]
+[обрезано: 32768 из 149873 байт, полный ответ — /tool-out/1f3c9a2b7d4e5f60 (тот же ключ, которым вызван инструмент)]
 ```
 
 `GET /tool-out/<name>` returns the whole answer: `text/plain; charset=utf-8`,
