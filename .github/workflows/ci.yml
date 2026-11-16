@@ -1,18 +1,19 @@
 name: ci
-# Каждый пуш и каждый PR: формат, статика, сборка, тесты, документация, веб.
-# Раньше здесь стоял только docs.yml для markdown — правка Go уезжала в master
-# без единого прогона, и поломку ловил первый тег. Теги по-прежнему гоняет
-# release.yml (там же govulncheck и goreleaser).
+# Каждый пуш в master и каждый PR. Единственное место, где гоняются проверки:
+# репозиторий на GitHub — источник истины, Gitea держит зеркало кода и собирает
+# образы (.gitea/workflows/images.yml). Публичный репозиторий на стандартных
+# раннерах не тарифицируется, поэтому здесь нет экономии, которая ломает полноту.
 on:
   push:
+    branches: [master]
   pull_request:
 
+# Права по умолчанию — только чтение. Каждая джоба сама просит то, что ей нужно.
 permissions:
   contents: read
 
 concurrency:
-  # Свежий пуш отменяет прогон по тому же ref: ждать очередь незачем.
-  group: mcprig-ci-${{ gitea.ref }}
+  group: mcprig-ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -24,8 +25,10 @@ jobs:
     timeout-minutes: 30
     steps:
       # Экшены прибиты к SHA: тег можно переписать, коммит — нет.
+      # persist-credentials: false — токен не остаётся в .git/config после checkout.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -34,40 +37,49 @@ jobs:
       - name: Формат
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; echo "gofmt: файлы не отформатированы"; exit 1; }
+      # go.mod/go.sum должны совпадать с кодом: иначе следующий же обновляющий
+      # `go mod tidy` приезжает в master посторонним диффом.
+      - name: go.mod в порядке
+        run: go mod tidy -diff
       - name: go vet
         run: go vet ./...
       - name: Сборка
         run: go build ./...
-      # goreleaser собирает и darwin: поле, которого там нет, иначе всплывает
-      # только на теге, когда релиз уже не собрать.
-      - name: Кросс-сборка под macOS
+      # goreleaser собирает linux и darwin: поле, которого нет в одном из
+      # GOOS, иначе всплывает только на теге, когда релиз уже не собрать.
+      - name: Кросс-сборка
         run: |
           GOOS=darwin GOARCH=arm64 go build ./...
           GOOS=darwin GOARCH=amd64 go build ./...
+          GOOS=linux GOARCH=arm64 go build ./...
       # -p 1 обязателен: пакеты manager и e2e делят порты 9100–9199
       - name: Тесты
-        run: go test ./... -race -count=1 -p 1
+        run: go test ./... -race -count=1 -p 1 -covermode=atomic -coverprofile=coverage.out
+      - name: Покрытие
+        run: go tool cover -func=coverage.out | tail -1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 14
+          if-no-files-found: error
 
-  docs:
+  lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: docs-check
-        run: bash scripts/docs-check.sh
-
-  web:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Синтаксис панели
-        run: |
-          if ! command -v node >/dev/null 2>&1; then
-            echo "в образе раннера нет node — проверка синтаксиса панели пропущена"
-            exit 0
-          fi
-          node --check web/app.js
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Конфиг в репозитории: .golangci.yml. Версия линтера прибита.
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          args: --timeout=10m
 
   vuln:
     runs-on: ubuntu-latest
@@ -75,12 +87,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Уязвимые зависимости
+      - name: Уязвимые зависимости и вызовы
         run: |
           set -euo pipefail
           # proxy.golang.org на раннере иногда обрывает TLS — повторяем установку,
@@ -92,3 +105,73 @@ jobs:
           done
           [ "$ok" = 1 ] || { echo "govulncheck не установился"; exit 1; }
           govulncheck ./...
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # вся история: секрет, утёкший год назад, всё ещё утёк
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Свой gitleaks вместо стороннего экшена: не нужен лицензионный ключ и
+      # лишний поставщик в цепочке, а версия прибита к тегу.
+      - name: Секреты в истории
+        run: |
+          set -euo pipefail
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          "$(go env GOPATH)/bin/gitleaks" git --no-banner --redact --verbose \
+            --config .gitleaks.toml \
+            --report-format json --report-path gitleaks.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: gitleaks
+          path: gitleaks.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: docs-check
+        run: bash scripts/docs-check.sh
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Синтаксис панели
+        run: |
+          if ! command -v node >/dev/null 2>&1; then
+            echo "в образе раннера нет node — проверка синтаксиса панели пропущена"
+            exit 0
+          fi
+          node --check web/app.js
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Сборка без публикации: Dockerfile и цели slim/full проверяются на каждом
+      # PR, а не на теге. Образы в реестр пушит Gitea (там секреты реестра).
+      - name: Образ собирается
+        run: |
+          docker build --target slim -t mcprig:ci-slim .
+          docker build --target full -t mcprig:ci-full .
+          # Версия печатается флагом serve — другого способа у бинарника нет.
+          docker run --rm mcprig:ci-slim serve --version

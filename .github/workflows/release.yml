@@ -92,6 +92,29 @@ jobs:
             docker push "$IMAGE:$ver-$target"
             docker push "$IMAGE:$latest"
           done
+      # Реестр хоста — Gitea Container Registry за cloudpub-адресом: до него
+      # достаёт и GitHub-раннер. Образ собирается один раз, пушится в два места.
+      - name: Образы в реестр хоста
+        env:
+          REGISTRY: ${{ secrets.REGISTRY }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${REGISTRY:-}" ] || [ -z "${REGISTRY_USER:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
+            echo "secrets.REGISTRY/REGISTRY_USER/REGISTRY_PASSWORD не заданы — образы ушли только в GHCR"
+            exit 0
+          fi
+          ver=$(printf '%s' "${{ inputs.tag || github.ref_name }}" | sed 's/^v//')
+          repo="$REGISTRY/sintez/mcprig"
+          printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin
+          for target in slim full; do
+            case "$target" in full) latest=latest-full ;; *) latest=latest ;; esac
+            docker tag "ghcr.io/akrhin/mcprig:$ver-$target" "$repo:$ver-$target"
+            docker tag "ghcr.io/akrhin/mcprig:$ver-$target" "$repo:$latest"
+            docker push "$repo:$ver-$target"
+            docker push "$repo:$latest"
+          done
       - name: Опубликовать релиз
         env:
           GH_TOKEN: ${{ github.token }}
