@@ -40,7 +40,7 @@ and read as-is: no migration, no wrapper.
 
 | field | type | default | meaning |
 | --- | --- | --- | --- |
-| `servers` | array | required | downstream servers, see below |
+| `servers` | array | `[]` | downstream servers, see below; an empty list is a legal set with no servers |
 | `transport` | object | required by `serve` | the listener this set exposes |
 | `healthMonitor` | `{interval, timeout}` in ms | | accepted for lazy-mcp compatibility; the Go proxy does not read it |
 | `requestTimeout` | int, ms | `0` (no limit) | budget for one `invoke_command`; on expiry the call returns `таймаут вызова <N> мс` |

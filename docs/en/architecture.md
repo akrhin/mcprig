@@ -34,8 +34,10 @@ group, `MCPRIG_DATA_DIR` and `MCPRIG_SET=<id>`. Consequences:
 - a crash or restart of one set does not affect another;
 - each set has its own port (9100–9199), bearer key and log file;
 - a set can be run alone under systemd, without the panel;
-- a downstream stdio process is a grandchild of the panel but dies with its
-  set's process group.
+- a downstream stdio process is a grandchild of the panel and lives in its own
+  process group: the set closes its sessions on shutdown, and every session
+  signals its group — `SIGTERM`, a short wait, then `SIGKILL` — so a server that
+  wraps its work (`sh -c "npx … & wait"`) takes its children with it.
 
 The panel materializes `servers.json` atomically (`0600`) before every start,
 so the file on disk is always what the running set was given. Start checks
@@ -127,9 +129,10 @@ names are capped at 64 bytes; the number of counters is capped at 4096, the
 rest collapses into `(прочее)`; error text in the ring is capped at 512 bytes.
 
 The panel does not keep counters: `GET /api/calls` polls `GET /stats` of every
-running set with a 2 s timeout and merges the answers. A set that does not
-answer is reported only by id. Tokens are not counted, because MCP responses
-carry no standard usage field.
+running set with a 2 s timeout and merges the answers; a stopped set is read
+from its raw journal on disk over the last 7 days instead. A running set that
+does not answer is reported only by id. Tokens are not counted, because MCP
+responses carry no standard usage field.
 
 ## HTTP transport
 

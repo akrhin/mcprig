@@ -8,6 +8,125 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Added
+
+- The panel has pages of its own instead of one long **Overview**: `#/sets`,
+  `#/servers` and `#/vars` are pills in the content head, `#/stats` and
+  `#/set/<id>` keep working as before, and every page has an address that
+  survives a reload and can be sent to someone else.
+- **All servers** is a page of the whole host registry: name with the reason of
+  a failure, transport, a health badge in colour (`healthy` green, `failed` red,
+  `not checked` neutral — the same badge the set table uses), the tools a check
+  found, the sets the server belongs to, and per-row **check**, **log**,
+  **edit** and **×** that deletes it from the registry after naming the sets it
+  leaves. The details drawer no longer carries the registry: it keeps the log
+  tail of the set, so a set's own composition and a host-wide list stop sharing
+  one screen.
+- **Variables** is a page: the names your servers reference as `${NAME}`, each
+  with whether it is set and where it comes from (`openbao`, `file`, `env`), a
+  form that writes a value — name, value, store `automatic`/`OpenBao`/`file` —
+  and **×** that forgets it everywhere. The panel says plainly that it never
+  reads a value back and that a name no server mentions stays out of the list.
+- The panel composes a set in place: the servers table of the **Overview** tab
+  gains a registry picker with **add to set** and a **×** that detaches a server.
+  Both send `PUT /api/sets/<id>` with the whole `servers` list and redraw from
+  `GET /api/state`; a refusal shows under the block, an empty set says it will
+  serve no tools, and the hint states that a running set takes the change by
+  reload, not by restart.
+- **Prompt** in the head of the set opens a dialog over the endpoint below: the
+  task is required, the introduction and the server subset are optional, and the
+  built text comes back monospaced with **copy** and **download .md**; `notes`
+  are shown above it, and a stopped set warns beforehand that schemas will be
+  missing.
+- The keys block of a set shows the `keyMark` of `GET /api/state` as
+  `key:<mark>` next to the prefix, with the statistics mark as its tooltip;
+  hidden for an open set.
+- `POST /api/sets/<id>/prompt` builds one text for an agent out of three
+  parts: `{"task":"…","intro":"…","servers":["…"]}` and the answer
+  `{"prompt":"…","notes":["…"]}`. The tool list comes from the live catalog of
+  the set — names, descriptions and one-line input schemas — and a stopped set
+  falls back to the `tools.lock.json` names with a note that schemas are
+  missing. One schema is capped at 4000 characters, the whole prompt at 64 KiB,
+  both cuts reported in `notes`; set tokens and variable values never reach the
+  text.
+- `GET /api/state` gives every set a `keyMark`: the `key:<6 hex>` fingerprint
+  the statistics print for the set's primary key, so a row in the statistics can
+  be matched to the key in the panel. Empty for an open set; `keyPrefix` stays
+  as it was.
+- A set may be created and started with no servers. An empty `servers` list is
+  now a legal state: `POST /api/sets` and `PUT /api/sets/<id>` accept it, in an
+  update a missing `servers` key leaves the list untouched, and a set without
+  servers starts and answers the meta-tools (`list_servers` is empty). Deleting
+  the last server of a set no longer answers `400` — the set keeps its key and
+  port with an empty list.
+
+### Changed
+
+- A panel started without a password (`MCPRIG_AUTH=off`) now says so at
+  startup: `WARN панель без пароля (MCPRIG_AUTH=off): доступна всем, кто
+  дотянется до порта; задайте MCPRIG_PASSWORD`. `mcprig doctor` prints the same
+  as `внимание:` under services when no `MCPRIG_PASSWORD` or
+  `MCPRIG_PASSWORD_HASH` is set — a warning, not a problem, so the exit code
+  stays `0`.
+- `list_servers` no longer answers with `pid`: the proxy's process id is of no
+  use to a client. `version` stays.
+- `GET /api/calls` answers for a stopped set as well: its tail and counters come
+  from the raw journal on disk (`sets/<id>/stats/raw-*.jsonl`) over the same
+  7-day window as `period=7d`, up to the 512 newest rows, and a missing
+  directory answers empty instead of landing in `unreachable`. `schema`,
+  `throttled` and `unreachable` stay properties of a running set; a set without
+  a token is anonymized on read.
+- Signing a key (`PATCH /api/sets/<id>/keys/<keyID>`) reaches the set by reload
+  instead of a restart: the label travels to the statistics client names and the
+  set's pid stays put.
+- Stopping the panel closes every set in parallel under one shared budget (15 s
+  for readiness and 5 s for termination in total) instead of one budget per set,
+  so a dozen sets no longer hold the exit for a minute.
+- A refused start or update now answers by the kind of refusal instead of its
+  wording: a busy port, a set that did not come up and a set without an active
+  key answer `409`, and anything unclassified answers `500` with a line in the
+  log and a generic message in the body. A set with an unfilled `${VAR}` in its
+  environment is refused at start with `409` and the name of the variable
+  instead of starting without it.
+- `mcprig doctor` reads an empty install as healthy: a missing config and a
+  missing registry together mean the setup has not been made yet, so it prints
+  one line, exits `0` and no longer reports "3 problems" on a fresh directory.
+- `describe_commands` answers within the caller's profile: the same allow and
+  deny rules that hide a tool from `list_commands` now hide it here as well.
+- `invoke_command` takes the server's slot: a slow upstream no longer lets an
+  authenticated client stack calls past the per-server concurrency limit.
+
+### Fixed
+
+- `POST /api/browse` rejects a server entry carrying a reserved `${VAR}` or a
+  `{file:…}` reference, like every other route that takes a server from the
+  request body: the entry bypassed the registry, so the browse button could
+  start a server the set would have refused.
+- A stdio server now runs in its own process group and its whole group is shut
+  down when the session closes: SIGTERM, a short wait, then SIGKILL. A server
+  that wraps its work (`sh -c "npx … & wait"`) left its children behind — the
+  process was re-parented to init and survived a probe or a set restart, where
+  only the direct child was signalled. A probe that timed out on `initialize`
+  no longer waits out the transport's five-second exit window either: the group
+  gets the signal at once, so the answer stays inside the probe budget.
+- A deny rule matches a tool name that spans a newline: the rule pattern is
+  compiled with `.` covering every character, so `rm*` refuses `rm\n-rf`
+  instead of letting it through.
+- The quarantined-tool file is read and written with its errors reported: a
+  lock file that cannot be read or written refuses `invoke_command` and
+  `invoke_many` and logs the reason, instead of quietly turning the quarantine
+  off.
+- A probe error printed by `list_servers` has secrets scrubbed like every other
+  place that shows upstream text.
+- A webhook event that could not be delivered is no longer marked as sent: the
+  next event of the same transition is sent again instead of being suppressed.
+- `GET /api/sets/<id>/servers` no longer answers `200` with `servers: null` when
+  the probe gave no answer: every server of the set stays in the list with the
+  probe error, so the panel does not read an expired probe as an empty set. A
+  client that cancels the request gets no answer; a start or reload cancelled by
+  the client stops the spawned set process instead of leaving it holding the
+  port.
+
 ## [0.5.1] - 2026-11-15
 
 ### Fixed
