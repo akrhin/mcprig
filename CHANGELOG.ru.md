@@ -10,6 +10,8 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-16
+
 ### Изменено
 
 - Проверки и релизы идут в одном месте — в GitHub. `.github/workflows/ci.yml`
@@ -951,7 +953,8 @@
 - Образы Docker (slim и full), релиз Gitea Actions с goreleaser и govulncheck,
   Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/akrhin/mcprig/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/akrhin/mcprig/compare/v0.5.1...v0.6.0
 [0.4.0]: https://github.com/akrhin/mcprig/compare/v0.3.8...v0.4.0
