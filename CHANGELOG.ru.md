@@ -10,6 +10,31 @@
 
 ## [Unreleased]
 
+### Изменено
+
+- Проверки и релизы идут в одном месте — в GitHub. `.github/workflows/ci.yml`
+  работает на каждый пуш и pull request (`gofmt`, `go mod tidy -diff`, `go vet`,
+  `go build`, кросс-сборка под `darwin/arm64`, `darwin/amd64` и `linux/arm64`,
+  тесты с `-race`, `golangci-lint` по `.golangci.yml`, `govulncheck`, `gitleaks`
+  по всей истории, `docs-check`, `node --check` и `docker build` обеих целей
+  образа), `codeql.yml` сканирует Go и JavaScript панели, `dependency-review.yml`
+  валит pull request, который добавляет зависимость с уязвимостью высокой
+  важности, а Dependabot раз в неделю предлагает обновления. Gitea держит зеркало
+  кода и не запускает воркфлоу вовсе: её `ci.yml`, `release.yml` и `images.yml`
+  удалены, поэтому тесты, архивы и образы собираются один раз — в GitHub, — а
+  джоба релиза пушит образы в GHCR и в реестр хоста.
+- Конвейер защищён: экшены прибиты к SHA коммитов, права по умолчанию
+  `contents: read`, checkout не оставляет токен (`persist-credentials: false`),
+  pull request не получает секреты репозитория, а сканеры ставят свои инструменты
+  вместо сторонних экшенов.
+
+### Документация
+
+- `docs/ru/dev/release.md` и английское зеркало описывают единственного сборщика,
+  список проверок и то, что держит в безопасности сам конвейер;
+  `docs/ru|en/dev/development.md` ссылается на тот же файл вместо повтора списка
+  джоб.
+
 ## [0.6.1] - 2026-11-16
 
 ### Исправлено

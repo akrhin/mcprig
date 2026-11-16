@@ -18,15 +18,12 @@
 | релиз | `goreleaser` собирает архивы, пушит образы `slim`/`full` в реестр и публикует релиз Gitea; релиз на GitHub создаёт воркфлоу; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Релиз выпускается по тегу `v*` в Gitea CI (`.gitea/workflows/release.yml`): он
-гоняет проверки — `go vet`, тесты с `-race`, `govulncheck`, `gofmt` — а затем
-`goreleaser`, который собирает архивы, пушит образы `slim`/`full` в реестр и
-публикует релиз в Gitea сам. Воркфлоу GitHub
-(`.github/workflows/release.yml`) идёт по тому же тегу: пересобирает архивы с
-`goreleaser --skip=publish`, собирает и пушит образы `slim` и `full` в
-`ghcr.io/akrhin/mcprig` и заливает архивы через `gh` в
-<https://github.com/akrhin/mcprig/releases>; тестов и `govulncheck` там нет,
-только `go build ./...`. Тег можно выпустить и руками:
+Релиз выпускается по тегу `v*` в GitHub (`.github/workflows/release.yml`): он
+гоняет проверки — `gofmt`, `go vet`, тесты с `-race`, `govulncheck` — а затем
+`goreleaser`, который собирает архивы, публикует страницу релиза на
+<https://github.com/akrhin/mcprig/releases> и собирает образы `slim` и `full`
+один раз, пуша их в `ghcr.io/akrhin/mcprig` и — при заданных секретах реестра —
+ещё и в реестр хоста. Тег можно выпустить и руками:
 `gh workflow run release.yml -f tag=vX.Y.Z`.
 
 Архивы собирает CI, а не goreleaser: сам `goreleaser` на хосте разработки не установлен.

@@ -15,18 +15,16 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | archive | `mcprig_<version>_<os>_<arch>.tar.gz` |
 | contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | checksum | `checksums.txt` |
-| release | `goreleaser` builds the archives, pushes the `slim`/`full` images to the registry and publishes the Gitea release; the GitHub release is created by the workflow; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
+| release | the GitHub workflow runs `goreleaser`, which builds the archives and publishes the release page, and pushes the `slim`/`full` images to GHCR and to the host registry; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Releases are cut on a `v*` tag by Gitea CI (`.gitea/workflows/release.yml`): it
-runs the checks — `go vet`, tests with `-race`, `govulncheck`, `gofmt` — and then
-`goreleaser`, which builds the archives and publishes the Gitea release. The
-GitHub workflow (`.github/workflows/release.yml`) fires on the same tag: it
-rebuilds the archives with `goreleaser --skip=publish`, builds and
-pushes the `slim` and `full` images to `ghcr.io/akrhin/mcprig`, and uploads the
-archives with `gh` to <https://github.com/akrhin/mcprig/releases>; it runs no
-tests and no `govulncheck`, just `go build ./...`. A tag can also be released
-by hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Releases are cut on a `v*` tag by GitHub (`.github/workflows/release.yml`): it
+runs the checks — `gofmt`, `go vet`, tests with `-race`, `govulncheck` — and then
+`goreleaser`, which builds the archives, publishes the release page at
+<https://github.com/akrhin/mcprig/releases> and builds the `slim` and `full`
+images once, pushing them to `ghcr.io/akrhin/mcprig` and, when the registry
+secrets are set, to the host registry as well. A tag can also be released by
+hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` is not installed on the development host, so archives are built by
 CI, not here. To build the same binary by hand:

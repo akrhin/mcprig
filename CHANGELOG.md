@@ -8,6 +8,33 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Changed
+
+- Checks and releases run in one place: GitHub. `.github/workflows/ci.yml` runs
+  on every push and pull request (`gofmt`, `go mod tidy -diff`, `go vet`,
+  `go build`, cross-build for `darwin/arm64`, `darwin/amd64` and `linux/arm64`,
+  tests with `-race`, `golangci-lint` from `.golangci.yml`, `govulncheck`,
+  `gitleaks` over the whole history, `docs-check`, `node --check` and a
+  `docker build` of both image targets), `codeql.yml` scans Go and the panel's
+  JavaScript, `dependency-review.yml` fails a pull request that adds a
+  dependency with a high-severity advisory, and Dependabot proposes updates
+  weekly. Gitea keeps the code mirror and runs no workflows at all: its
+  `ci.yml`, `release.yml` and `images.yml` are gone, so tests, archives and
+  images are built once — on GitHub — and the release job pushes the images to
+  GHCR and to the host registry.
+- The pipeline is hardened: actions are pinned to commit SHAs, permissions
+  default to `contents: read`, checkout leaves no token behind
+  (`persist-credentials: false`), pull requests receive no repository secrets,
+  and the scanners install their own tools instead of pulling third-party
+  actions.
+
+### Docs
+
+- `docs/en/dev/release.md` and `docs/ru/dev/release.md` describe the single
+  builder, the list of checks and what keeps the pipeline itself safe;
+  `docs/en|ru/dev/development.md` points at the same file instead of repeating
+  the job list.
+
 ## [0.6.1] - 2026-11-16
 
 ### Fixed

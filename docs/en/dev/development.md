@@ -117,10 +117,12 @@ Logs: the panel writes `$DATA/panel.log`, the set writes
 --clean` to check locally). CI builds and publishes the archives on a `v*` tag;
 release notes are the tag's `CHANGELOG.md` section
 via `scripts/release-notes.sh`. `goreleaser` itself is not installed on the
-development host. Every push and pull request runs `.gitea/workflows/ci.yml` —
+development host. Every push and pull request runs `.github/workflows/ci.yml` —
 the same checks as the tag pipeline minus `goreleaser`, plus a cross-build for
-`darwin` (`GOOS=darwin go build ./...`): the archives target macOS too, and a
-Linux-only field breaks them without failing a Linux build.
+`darwin` and `linux/arm64`: the archives target macOS and ARM too, and a
+Linux-only field breaks them without failing a Linux build. Gitea carries the
+mirror and builds the images only; the full list of checks is in
+[release.md](release.md).
 
 ## See also
 
