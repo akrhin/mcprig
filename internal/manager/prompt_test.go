@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -172,26 +173,72 @@ func TestSetPromptStoppedSet(t *testing.T) {
 	}
 }
 
-// Токен набора не попадает в ответ даже из текста ошибки.
+// Токен и секреты серверов не попадают в промт ни из одного источника:
+// ни из заметок, ни из описания и схемы инструмента.
 func TestSetPromptNoToken(t *testing.T) {
-	p := newPromptEnv(t)
+	const literal = "literal-env-secret-9f3a"
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServerWithEnv(t, "alpha", map[string]string{"API_KEY": literal})
+	e.addServer(t, "beta")
+	p := promptEnv{env: e, id: e.addSet(t, "p", "alpha", "beta")}
+
 	token := p.m.store.Set(p.id).Token
 	if token == "" {
 		t.Fatal("закрытый набор без токена")
 	}
+	schema := `{"type":"object","properties":{"token":{"type":"string","default":"` + token + `"}}}`
 	p.m.running = func(*registry.Set) bool { return true }
 	p.m.catalog = func(_ context.Context, _ *registry.Set, names []string) promptCatalog {
 		cat := emptyCatalog(names)
 		cat.Notes = append(cat.Notes, "каталог набора недоступен: bearer "+token)
+		for i := range cat.Servers {
+			cat.Servers[i].Tools = []promptTool{{
+				Name:        "run_" + cat.Servers[i].Name,
+				Description: "ходит в API с ключом " + literal,
+				Schema:      schema,
+			}}
+		}
 		return cat
 	}
 
 	prompt, notes := p.prompt(t, map[string]any{"task": "задача"})
-	if strings.Contains(prompt+strings.Join(notes, "\n"), token) {
-		t.Fatalf("токен набора утёк в промт: %v", notes)
+	text := prompt + strings.Join(notes, "\n")
+	for name, secret := range map[string]string{"токен набора": token, "литеральный env-секрет": literal} {
+		if strings.Contains(text, secret) {
+			t.Fatalf("%s утёк в промт:\n%s", name, text)
+		}
 	}
 	if !strings.Contains(strings.Join(notes, "\n"), "***") {
 		t.Fatalf("текст ошибки не замаскирован: %v", notes)
+	}
+	if !strings.Contains(prompt, "***") {
+		t.Fatalf("описание или схема не замаскированы:\n%s", prompt)
+	}
+	// Маска не должна ломать схему: это по-прежнему JSON с той же структурой.
+	var schemas []string
+	for _, line := range strings.Split(prompt, "\n") {
+		if line = strings.TrimSpace(line); strings.HasPrefix(line, `{"type":"object"`) {
+			schemas = append(schemas, line)
+		}
+	}
+	if len(schemas) != 2 {
+		t.Fatalf("схем в промте %d, ожидалось 2:\n%s", len(schemas), prompt)
+	}
+	for _, raw := range schemas {
+		var got struct {
+			Properties map[string]any `json:"properties"`
+		}
+		if err := json.Unmarshal([]byte(raw), &got); err != nil {
+			t.Fatalf("схема перестала быть JSON после маски: %v\n%s", err, raw)
+		}
+		if _, ok := got.Properties["token"]; !ok {
+			t.Fatalf("структура схемы сломана: %s", raw)
+		}
+	}
+	for _, want := range []string{"run_alpha", "run_beta"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("имя инструмента %q потерялось:\n%s", want, prompt)
+		}
 	}
 }
 

@@ -109,6 +109,17 @@ func (m *Manager) apiSetPrompt(req *request) error {
 	for i := range cat.Notes {
 		cat.Notes[i] = config.ScrubSecrets(cat.Notes[i], secrets)
 	}
+	// Описание и схема приходят от чужих серверов и повторяют ключ так же
+	// охотно, как текст ошибки: маска нужна всем трём источникам.
+	for i := range cat.Servers {
+		for j := range cat.Servers[i].Tools {
+			tool := &cat.Servers[i].Tools[j]
+			tool.Description = config.ScrubSecrets(tool.Description, secrets)
+			// shortcut: секрет ищется в готовой схеме дословно; значение с
+			// JSON-спецсимволами там экранировано и не совпадёт.
+			tool.Schema = config.ScrubSecrets(tool.Schema, secrets)
+		}
+	}
 
 	prompt, notes := buildPrompt(set.ID, in.Intro, in.Task, cat)
 	notes = append(cat.Notes, notes...)
@@ -145,37 +156,47 @@ func promptServers(set *registry.Set, want []string) ([]string, error) {
 	return out, nil
 }
 
-// promptSecretValues — значения переменных, которые видят серверы набора:
+// promptSecretValues — значения, которые нельзя выпускать наружу: литеральные
+// env и заголовки серверов набора плюс то, что они видят через ${VAR}:
 // текст ошибки пробы уходит в промт только через маску, как в list_servers.
 func (m *Manager) promptSecretValues(set *registry.Set) []string {
-	if m.sec == nil {
-		return nil
-	}
 	servers := m.store.Servers()
 	byName := make(map[string]*config.Server, len(servers))
 	for _, srv := range servers {
 		byName[srv.Name] = srv
 	}
-	seen := map[string]bool{}
+	seenRef := map[string]bool{}
+	seenValue := map[string]bool{}
 	names := make([]string, 0, 8)
+	values := make([]string, 0, 8)
+	addValue := func(v string) {
+		if v == "" || seenValue[v] {
+			return
+		}
+		seenValue[v] = true
+		values = append(values, v)
+	}
 	for _, name := range set.Servers {
 		srv, ok := byName[name]
 		if !ok || srv == nil {
 			continue
 		}
+		for _, v := range srv.Secrets() {
+			addValue(v)
+		}
 		for _, ref := range serverEnvRefs(srv) {
-			if seen[ref] {
+			if seenRef[ref] {
 				continue
 			}
-			seen[ref] = true
+			seenRef[ref] = true
 			names = append(names, ref)
 		}
 	}
-	values := make([]string, 0, len(names))
+	if m.sec == nil {
+		return values
+	}
 	for _, v := range m.sec.Resolve(names) {
-		if v.value != "" {
-			values = append(values, v.value)
-		}
+		addValue(v.value)
 	}
 	return values
 }
