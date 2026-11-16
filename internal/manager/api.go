@@ -736,6 +736,10 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 				"ua", r.UserAgent())
 			return &httpError{http.StatusForbidden, "Origin: null не принимается — откройте панель по её адресу"}
 		}
+		// null без cookie — источник неизвестен, но власти у запроса нет:
+		// в лог, чтобы такой клиент было видно, и дальше по общему пути.
+		m.log.Info("csrf: Origin: null без cookie — запрос обслужен", "path", r.URL.Path,
+			"ua", r.UserAgent())
 	case origin != "":
 		u, err := url.Parse(origin)
 		if err != nil || !m.originMatches(u, r) {
