@@ -40,6 +40,7 @@ stand against real servers, then cut a release.
 | [architecture.md](architecture.md) | how the processes fit together, why each set is its own process, health, statistics, OAuth |
 | [alternatives.md](alternatives.md) | other proxies and gateways, the honest comparison, and where mcprig is weaker |
 | [troubleshooting.md](troubleshooting.md) | symptom → cause → what to do, from the incidents that actually happened |
+| [upgrading.md](upgrading.md) | what answers differently after 0.6.0, symptom → fix, and how to roll back |
 | [glossary.md](glossary.md) | set, meta-tool, downstream/upstream, tool-out, sandbox, hook, warm |
 | [dev/development.md](dev/development.md) | requirements, build, the test gate, the contract suite, the live stand |
 | [dev/release.md](dev/release.md) | tag → CI → archives → mirror, as a checklist |
