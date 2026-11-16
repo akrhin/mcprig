@@ -78,7 +78,16 @@ func (m *Manager) apiServerAuthorize(req *request) error {
 // apiAuthorizeStatus отдаёт состояние входа для опроса из панели: GET менять
 // состояние не может, поэтому запуск и чтение разведены по разным маршрутам.
 func (m *Manager) apiAuthorizeStatus(req *request) error {
-	writeJSON(req.w, http.StatusOK, m.flowView(authKey(req.args[0], req.args[1])))
+	setID, name := req.args[0], req.args[1]
+	// Несуществующая пара отвечает 404, как запуск: иначе опрос "idle"
+	// выглядит как живой вход в набор, которого нет.
+	if m.store.Set(setID) == nil {
+		return notFound("набор " + setID + " не найден")
+	}
+	if m.store.Server(name) == nil {
+		return notFound("сервер " + name + " не найден")
+	}
+	writeJSON(req.w, http.StatusOK, m.flowView(authKey(setID, name)))
 	return nil
 }
 
