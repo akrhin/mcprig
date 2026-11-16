@@ -485,10 +485,13 @@ Writes (`POST`/`PUT`/`DELETE`) are rejected when `Sec-Fetch-Site` is
 `cross-site`, when `Origin` does not match `Host`, or when the body is not
 JSON. A cookie-authenticated write must also carry `Origin`: without it the
 request gets `403` "не хватает заголовка Origin" — a browser sends it on every such
-request, a forged one from another site does not. `Origin: null` (a sandboxed or
-`data:` page) is refused the same way, and so is a request that carries
-`Sec-Fetch-Site` without `Origin`: browsers always send both. Header-based proxy
-auth and login (`POST /api/login`, no cookie yet) are exempt.
+request, a forged one from another site does not. A request that carries
+`Sec-Fetch-Site` without `Origin`: browsers always send both. `Origin: null` is
+an unknown source — a sandboxed frame, a `file://` page, a client that is not a
+browser; the only ambient authority such a request could abuse is the session
+cookie, so it is refused only when the cookie is there and passes otherwise.
+Header-based proxy auth and login (`POST /api/login`, no cookie yet) are exempt
+from the `Origin` checks: a failed login grants nothing.
 
 `Origin` is compared in full — scheme, host and port; `MCPRIG_ALLOWED_HOSTS` is
 not a list of sources (it names the panel itself). `X-Forwarded-Proto`,

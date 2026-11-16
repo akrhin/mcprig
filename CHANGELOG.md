@@ -8,6 +8,20 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Fixed
+
+- A request with `Origin: null` and no session cookie — a sandboxed frame, a
+  `file://` page, a client that is not a browser — is served again: the check
+  refused it before it could be told apart from a cookie-carrying one, which
+  also broke `POST /api/login` from such a page. The refusal stays for the case
+  it exists for: `Origin: null` with a session cookie.
+
+### Docs
+
+- [docs/en/upgrading.md](docs/en/upgrading.md) and its Russian mirror collect
+  what answers differently after 0.6.0, with the fix for each symptom, and how
+  to roll back; the README now carries all three diagrams under spoilers.
+
 ## [0.6.0] - 2026-11-16
 
 ### Added

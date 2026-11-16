@@ -172,7 +172,8 @@ func TestCSRFNullOriginAndFetchSite(t *testing.T) {
 		cookie bool
 		want   string // пусто — отказ не ожидается
 	}{
-		{"origin null", "null", "", false, "Origin: null не принимается"},
+		{"origin null без cookie — как запрос без Origin", "null", "", false, ""},
+		{"origin null с cookie", "null", "", true, "Origin: null не принимается"},
 		{"Sec-Fetch-Site без Origin", "", "same-origin", false, "браузерный запрос без Origin"},
 		{"ни Origin, ни Sec-Fetch, ни cookie", "", "", false, ""},
 		{"cookie без Origin", "", "", true, "не хватает заголовка Origin"},
