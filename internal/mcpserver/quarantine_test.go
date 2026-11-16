@@ -339,6 +339,23 @@ func TestQuarantineFailsClosedOnUnreadableLock(t *testing.T) {
 	}
 }
 
+// denyWrite отнимает у каталога право записи и отвечает, вышло ли это: под
+// root права не мешают, и сбой записи так не смоделировать.
+func denyWrite(t *testing.T, dir string) bool {
+	t.Helper()
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("запрет записи: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	probe := filepath.Join(dir, ".write-probe")
+	err := os.WriteFile(probe, []byte("x"), 0o600)
+	if err == nil {
+		_ = os.Remove(probe)
+		return false
+	}
+	return true
+}
+
 // Запись файла не удалась — вызов не идёт: одобрение нового инструмента в файл
 // не попало, и решать по устаревшему карантину нельзя.
 func TestQuarantineFailsClosedOnWriteError(t *testing.T) {
@@ -347,8 +364,8 @@ func TestQuarantineFailsClosedOnWriteError(t *testing.T) {
 	if err := toollock.Write(lock, toollock.File{Tools: map[string]toollock.Entry{}}); err != nil {
 		t.Fatalf("подготовка файла: %v", err)
 	}
-	if err := os.Chmod(dir, 0o500); err != nil {
-		t.Fatalf("запрет записи: %v", err)
+	if !denyWrite(t, dir) {
+		t.Skip("каталог пишется даже без права записи (тесты под root): сбой записи не смоделировать")
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
@@ -373,8 +390,8 @@ func TestQuarantineRecoversAfterWriteError(t *testing.T) {
 	if err := toollock.Write(lock, toollock.File{Tools: map[string]toollock.Entry{}}); err != nil {
 		t.Fatalf("подготовка файла: %v", err)
 	}
-	if err := os.Chmod(dir, 0o500); err != nil {
-		t.Fatalf("запрет записи: %v", err)
+	if !denyWrite(t, dir) {
+		t.Skip("каталог пишется даже без права записи (тесты под root): сбой записи не смоделировать")
 	}
 
 	cs := clientFor(t, descriptorManager(t, "v1", lock).Server())
