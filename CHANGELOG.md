@@ -8,6 +8,12 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Changed
+
+- The image build in `ci.yml` runs on a pull request only, and only when the
+  `Dockerfile`, `.dockerignore`, `go.mod`/`go.sum` or `docker/` changed: a push
+  to `master` no longer rebuilds an image the tag will build anyway.
+
 ## [0.6.2] - 2026-11-16
 
 ### Changed

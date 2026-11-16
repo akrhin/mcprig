@@ -19,8 +19,10 @@ Gitea держит зеркало кода и запускает ровно од
    `linux/arm64`, `go test ./... -race -count=1 -p 1` с покрытием в артефакте,
    `golangci-lint` (`.golangci.yml`: стандартные линтеры плюс `gosec`,
    `bodyclose`, `errorlint`, `gocritic`, `noctx`, `unparam`), `govulncheck`,
-   `gitleaks` по всей истории, `scripts/docs-check.sh`, `node --check web/app.js`
-   и `docker build` обеих целей образа.
+   `gitleaks` по всей истории, `scripts/docs-check.sh`, `node --check web/app.js`.
+   `docker build` обеих целей образа идёт только на pull request и только когда
+   изменились `Dockerfile`, `.dockerignore`, `go.mod`/`go.sum` или `docker/` —
+   по тегу образы собираются всё равно, и пуш в `master` эту работу не повторяет.
 3. GitHub `codeql` сканирует Go и JavaScript панели на каждый пуш и раз в неделю;
    `dependency-review` валит pull request, который добавляет зависимость с
    уязвимостью высокой важности.

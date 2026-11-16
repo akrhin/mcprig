@@ -89,7 +89,12 @@ func (e *usageError) Error() string { return e.msg }
 
 // newServeFlags описывает флаги serve один раз: их разбирает и parseArgs, и run.
 func newServeFlags() (fs *flag.FlagSet, cfgPath *string, showVersion *bool, addr *string) {
-	fs = flag.NewFlagSet("serve", flag.ContinueOnError)
+	return newServeFlagsNamed("serve")
+}
+
+// newServeFlagsNamed — те же флаги под другим именем для help без подкоманды.
+func newServeFlagsNamed(name string) (fs *flag.FlagSet, cfgPath *string, showVersion *bool, addr *string) {
+	fs = flag.NewFlagSet(name, flag.ContinueOnError)
 	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
 	showVersion = fs.Bool("version", false, "показать версию и выйти")
 	addr = fs.String("addr", "", "адрес прослушивания, по умолчанию берётся из поля transport конфигурации")
@@ -126,7 +131,8 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 	}
 	// Флаги без подкоманды — это serve: так исторически запускают прокси.
 	if strings.HasPrefix(args[0], "-") {
-		fs, _, _, _ := newServeFlags()
+		// Подкоманды нет — help печатает имя программы, а не "serve".
+		fs, _, _, _ := newServeFlagsNamed("mcprig")
 		if err := parseFlags(fs, args); err != nil {
 			return "", nil, err
 		}

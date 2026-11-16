@@ -1,5 +1,6 @@
 name: ci
-# Каждый пуш в master и каждый PR. Единственное место, где гоняются проверки:
+# Каждый пуш в master и каждый PR. Единственное место, где гоняются проверки
+# (образ — только на PR с правкой Dockerfile или зависимостей):
 # репозиторий на GitHub — источник истины, Gitea держит зеркало кода и собирает
 # образы (.gitea/workflows/images.yml). Публичный репозиторий на стандартных
 # раннерах не тарифицируется, поэтому здесь нет экономии, которая ломает полноту.
@@ -160,16 +161,34 @@ jobs:
           fi
           node --check web/app.js
 
+  # Образ собирается только там, где его могут сломать: на PR и только если
+  # тронуты Dockerfile, .dockerignore или зависимости. На push в master тесты
+  # уже прошли, а тег всё равно собирает образы заново (release.yml).
   docker:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Сборка без публикации: Dockerfile и цели slim/full проверяются на каждом
-      # PR, а не на теге. Образы в реестр пушит Gitea (там секреты реестра).
+          fetch-depth: 0
+      - name: Что изменилось
+        id: changed
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if git diff --name-only "origin/${BASE}...HEAD" | grep -qE '^(Dockerfile|\.dockerignore|go\.(mod|sum)|docker/)'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "Dockerfile и зависимости не менялись — образ не собираем"
+          fi
+      # Сборка без публикации: цели slim/full проверяются до тега. Образы в
+      # реестр хоста пушит Gitea (там секреты реестра), в GHCR — release.yml.
       - name: Образ собирается
+        if: steps.changed.outputs.build == 'true'
         run: |
           docker build --target slim -t mcprig:ci-slim .
           docker build --target full -t mcprig:ci-full .
