@@ -20,7 +20,10 @@ releases; Gitea keeps a mirror of the code and runs exactly one workflow,
    an artifact, `golangci-lint` (`.golangci.yml`: standard linters plus `gosec`,
    `bodyclose`, `errorlint`, `gocritic`, `noctx`, `unparam`), `govulncheck`,
    `gitleaks` over the whole history, `scripts/docs-check.sh`, `node --check
-   web/app.js`, and a `docker build` of both image targets.
+   web/app.js`. `docker build` of both image targets runs on a pull request
+   only, and only when `Dockerfile`, `.dockerignore`, `go.mod`/`go.sum` or
+   `docker/` changed — the tag builds the images anyway, so a push to `master`
+   does not repeat that work.
 3. GitHub `codeql` scans Go and the panel's JavaScript on every push and weekly;
    `dependency-review` fails a pull request that adds a dependency with a
    high-severity advisory.

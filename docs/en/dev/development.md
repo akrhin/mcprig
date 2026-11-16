@@ -120,7 +120,10 @@ via `scripts/release-notes.sh`. `goreleaser` itself is not installed on the
 development host. Every push and pull request runs `.github/workflows/ci.yml` —
 the same checks as the tag pipeline minus `goreleaser`, plus a cross-build for
 `darwin` and `linux/arm64`: the archives target macOS and ARM too, and a
-Linux-only field breaks them without failing a Linux build. Gitea carries the
+Linux-only field breaks them without failing a Linux build. The image build is
+the one exception: it runs on a pull request that touches `Dockerfile`,
+`.dockerignore`, the module files or `docker/`, and never on a push to
+`master` — the tag builds the images again anyway. Gitea carries the
 mirror and builds the images only; the full list of checks is in
 [release.md](release.md).
 
