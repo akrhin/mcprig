@@ -65,7 +65,7 @@ func TestGuardParentProcess(t *testing.T) {
 	}
 	line := append([]string{os.Args[0], "child-guard", "--"}, strings.Split(os.Getenv("GUARD_ARGV"), argSep)...)
 	cmd := exec.Command(line[0], line[1:]...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM, Setpgid: true}
+	cmd.SysProcAttr = childAttr()
 	if err := cmd.Start(); err != nil {
 		os.Exit(9)
 	}
