@@ -12,7 +12,7 @@ One static Go binary that serves many MCP servers through a single MCP endpoint,
 [![release](https://img.shields.io/github/v/release/akrhin/mcprig)](https://github.com/akrhin/mcprig/releases) [![license](https://img.shields.io/github/license/akrhin/mcprig)](LICENSE) [![go](https://img.shields.io/badge/go-1.27-blue)](go.mod)
 
 A client that talks to a dozen MCP servers pays for a dozen tool lists in its
-context before it asks anything. mcprig puts them behind five meta-tools, groups
+context before it asks anything. mcprig puts them behind nine meta-tools, groups
 servers into named sets, runs each set as its own process with its own port and
 key, and manages the whole registry from a web panel.
 
@@ -82,12 +82,20 @@ runs `mcprig stdio` with no port and no key. Both forms with real output:
 
 [![mcprig architecture](docs/diagrams/mcprig.architecture.en.png)](docs/diagrams/mcprig.architecture.en.html)
 
-Client → one set endpoint → five meta-tools → the downstream servers of that set.
+Client → one set endpoint → nine meta-tools (five work with servers, four serve
+resources and prompts) → the downstream servers of that set.
 The panel supervises one `mcprig serve` process per set, so a restart or a crash
 of one set leaves the others serving. The interactive version of the picture
 (themes, zoom, PNG/SVG export) is
 [docs/diagrams/mcprig.architecture.en.html](docs/diagrams/mcprig.architecture.en.html);
 the spec it is generated from is next to it as `.json`.
+
+What changes when the servers sit behind one endpoint — and what it costs — is a
+second picture: [with and without a proxy](docs/diagrams/mcprig.why.en.html),
+with the feature map in
+[what one binary does](docs/diagrams/mcprig.capabilities.en.html). How it
+compares with other proxies and where it stays weaker:
+[docs/en/alternatives.md](docs/en/alternatives.md).
 
 ## Configuration
 

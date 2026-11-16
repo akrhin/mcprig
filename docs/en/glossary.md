@@ -72,4 +72,4 @@ created `0700`: `registry.json`, `env.json`, `manager.pid`, and per set
 
 - [architecture.md](architecture.md) — how these pieces run as processes.
 - [configuration.md](configuration.md) — the fields named above, in full.
-- [meta-tools.md](meta-tools.md) — the five tools, with exact response shapes.
+- [meta-tools.md](meta-tools.md) — the nine tools, with exact response shapes.

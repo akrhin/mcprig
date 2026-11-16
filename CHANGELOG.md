@@ -68,6 +68,20 @@ repository the project is built in.
   the last server of a set no longer answers `400` — the set keeps its key and
   port with an empty list.
 
+### Docs
+
+- Two new diagrams next to the architecture one: **the same servers, one
+  endpoint** — what a client pays without a proxy and with one, plus what the
+  endpoint costs — and **what one binary does**, a capability map
+  (`docs/diagrams/`, spec `.json` and PNG per language).
+- `docs/en/alternatives.md` (and the Russian mirror) compares mcprig with
+  mcp-proxy, mcp-hub, mcpo, Docker MCP Gateway, MetaMCP, 1mcp, the Lasso gateway
+  and supergateway, says where each fact came from, and lists where mcprig is
+  weaker: one operator, no roles, a spoofable `X-MCPRig-Caller`, a sandbox that
+  leaves CPU and egress alone.
+- The README carries a fresh panel screenshot and the corrected count of meta
+  tools: nine, of which five work with servers.
+
 ### Changed
 
 - A panel started without a password (`MCPRIG_AUTH=off`) now says so at

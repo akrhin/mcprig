@@ -18,7 +18,7 @@ MCP client ──HTTP/stdio──▶ set process (mcprig serve) ──stdio/HTTP
 | layer | responsibility |
 | --- | --- |
 | panel | registry, key issuing, supervision, secrets, HTTP API and UI |
-| set process | the five meta-tools, downstream sessions, health, counters, OAuth |
+| set process | the nine meta-tools, downstream sessions, health, counters, OAuth |
 | downstream | a stdio child process (optionally wrapped in `bwrap` by `internal/sandbox`), or an HTTP MCP endpoint |
 
 The panel is a control plane: it never proxies MCP traffic. Clients talk to
@@ -214,6 +214,10 @@ environment is in [configuration.md](configuration.md#tracing).
   [diagrams/mcprig.architecture.en.html](../diagrams/mcprig.architecture.en.html),
   raster in
   [diagrams/mcprig.architecture.en.png](../diagrams/mcprig.architecture.en.png).
+- Two more pictures: [what changes with an endpoint](../diagrams/mcprig.why.en.html)
+  and [what one binary does](../diagrams/mcprig.capabilities.en.html).
+- [alternatives.md](alternatives.md) — the same features next to other proxies,
+  plus the limits this architecture buys.
 - [configuration.md](configuration.md) — the per-set config this process reads.
 - [meta-tools.md](meta-tools.md) — the surface a client actually talks to.
 - [panel.md](panel.md) — the manager's HTTP API and UI.

@@ -3,7 +3,7 @@ EN · [RU](../ru/index.md)
 # mcprig documentation
 
 mcprig is a single static binary that puts many MCP servers behind one endpoint:
-a client sees five meta-tools instead of every tool of every server, and each
+a client sees nine meta-tools instead of every tool of every server, and each
 *set* runs as its own supervised process with its own port and key. The same
 binary also carries the registry, the supervisor and the web panel.
 
@@ -36,8 +36,9 @@ stand against real servers, then cut a release.
 | [configuration.md](configuration.md) | every field of `servers.json`: servers, `sandbox`, secrets, `transport`, `permissions`, `oauth`, and what happens to a broken entry |
 | [cli.md](cli.md) | the nine subcommands with real output: `serve`, `stdio`, `auth`, `panel`, `doctor`, `warm`, `status`, `logs`, `init`; `tool-out` retention |
 | [panel.md](panel.md) | what the panel shows, the HTTP API behind it, call history, health, and how access is checked |
-| [meta-tools.md](meta-tools.md) | the five tools a client sees, exact response shapes, error text, secret scrubbing, counters |
+| [meta-tools.md](meta-tools.md) | the nine tools a client sees, exact response shapes, error text, secret scrubbing, counters |
 | [architecture.md](architecture.md) | how the processes fit together, why each set is its own process, health, statistics, OAuth |
+| [alternatives.md](alternatives.md) | other proxies and gateways, the honest comparison, and where mcprig is weaker |
 | [troubleshooting.md](troubleshooting.md) | symptom → cause → what to do, from the incidents that actually happened |
 | [glossary.md](glossary.md) | set, meta-tool, downstream/upstream, tool-out, sandbox, hook, warm |
 | [dev/development.md](dev/development.md) | requirements, build, the test gate, the contract suite, the live stand |

@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "mcprig: the same servers, one endpoint",
+    "output": "mcprig.why.en.html",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto"
+    },
+    "viewBox": [
+      1180,
+      330
+    ]
+  },
+  "components": [
+    {
+      "id": "cA",
+      "type": "external",
+      "label": "MCP client",
+      "sublabel": "one harness",
+      "pos": [
+        30,
+        110
+      ],
+      "size": [
+        130,
+        56
+      ]
+    },
+    {
+      "id": "a1",
+      "type": "backend",
+      "label": "server A",
+      "sublabel": "own URL · own key",
+      "pos": [
+        210,
+        24
+      ],
+      "size": [
+        140,
+        56
+      ]
+    },
+    {
+      "id": "a2",
+      "type": "backend",
+      "label": "server B",
+      "sublabel": "own URL · own key",
+      "pos": [
+        210,
+        110
+      ],
+      "size": [
+        140,
+        56
+      ]
+    },
+    {
+      "id": "a3",
+      "type": "backend",
+      "label": "server C",
+      "sublabel": "own URL · own key",
+      "pos": [
+        210,
+        196
+      ],
+      "size": [
+        140,
+        56
+      ]
+    },
+    {
+      "id": "cB",
+      "type": "external",
+      "label": "MCP client",
+      "sublabel": "the same harness",
+      "pos": [
+        550,
+        110
+      ],
+      "size": [
+        130,
+        56
+      ]
+    },
+    {
+      "id": "endpoint",
+      "type": "security",
+      "label": "set endpoint",
+      "sublabel": "one port · one key",
+      "pos": [
+        780,
+        108
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "b1",
+      "type": "backend",
+      "label": "server A",
+      "sublabel": "in the set",
+      "pos": [
+        990,
+        24
+      ],
+      "size": [
+        140,
+        56
+      ]
+    },
+    {
+      "id": "b2",
+      "type": "backend",
+      "label": "server B",
+      "sublabel": "in the set",
+      "pos": [
+        990,
+        110
+      ],
+      "size": [
+        140,
+        56
+      ]
+    },
+    {
+      "id": "b3",
+      "type": "backend",
+      "label": "server C",
+      "sublabel": "in the set",
+      "pos": [
+        990,
+        196
+      ],
+      "size": [
+        140,
+        56
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "without a proxy: every catalog in the context, every key at hand",
+      "pad": 24,
+      "wraps": [
+        "cA",
+        "a1",
+        "a2",
+        "a3"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "with mcprig: nine meta-tools, one key, one place to look",
+      "pad": 24,
+      "wraps": [
+        "cB",
+        "endpoint",
+        "b1",
+        "b2",
+        "b3"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "e1",
+      "from": "cA",
+      "to": "a1",
+      "label": "catalog + key"
+    },
+    {
+      "id": "e2",
+      "from": "cA",
+      "to": "a2",
+      "label": "catalog + key"
+    },
+    {
+      "id": "e3",
+      "from": "cA",
+      "to": "a3",
+      "label": "catalog + key"
+    },
+    {
+      "id": "e4",
+      "from": "cB",
+      "to": "endpoint",
+      "label": "tools/call",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e5",
+      "from": "endpoint",
+      "to": "b1",
+      "label": "spawn / connect"
+    },
+    {
+      "id": "e6",
+      "from": "endpoint",
+      "to": "b2"
+    },
+    {
+      "id": "e7",
+      "from": "endpoint",
+      "to": "b3"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "What the context pays",
+      "items": [
+        "Without a proxy every server's catalog lands in the prompt before the first question; three servers of 40 tools is 120 definitions",
+        "With mcprig the agent sees nine meta tools (five work with servers, four serve resources and prompts); list_commands brings a catalog on demand and caches it",
+        "describe_commands sends one schema, invoke_many runs a batch in a single answer"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What the operator gets",
+      "items": [
+        "One endpoint and one Bearer key per set, each set its own process and port — a crash of one leaves the others serving",
+        "Panel: sets, servers, variables, keys with profiles, live calls, statistics with p50/p95, a ready-to-paste agent prompt",
+        "Sandbox for stdio servers, OAuth for remote ones, import/export of the registry"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "What it costs",
+      "items": [
+        "One more process per set and one indirection: a tool is reached as invoke_command{server, command_name}",
+        "A schema the agent has not seen costs a describe_commands call, and list_commands returns the catalog in parts under maxBytes",
+        "Single operator, one panel password, no per-user roles; CLI and log lines are Russian"
+      ]
+    }
+  ]
+}

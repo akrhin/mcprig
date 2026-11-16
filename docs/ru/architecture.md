@@ -18,7 +18,7 @@ MCP client ──HTTP/stdio──▶ set process (mcprig serve) ──stdio/HTTP
 | слой | ответственность |
 | --- | --- |
 | панель | реестр, выдача ключей, надзор, секреты, HTTP API и UI |
-| процесс набора | пять мета-инструментов, сессии нижестоящих серверов, здоровье, счётчики, OAuth |
+| процесс набора | девять мета-инструментов, сессии нижестоящих серверов, здоровье, счётчики, OAuth |
 | нижестоящий | дочерний stdio-процесс (по желанию обёрнут в `bwrap` через `internal/sandbox`) или HTTP-точка MCP |
 
 Панель — управляющий слой: она никогда не проксирует трафик MCP. Клиенты
@@ -214,6 +214,10 @@ parent-id, 2 hex флагов без `ff`, идентификаторы не н�
   [diagrams/mcprig.architecture.ru.html](../diagrams/mcprig.architecture.ru.html),
   растром —
   [diagrams/mcprig.architecture.ru.png](../diagrams/mcprig.architecture.ru.png).
+- Ещё две картинки: [что меняет единая точка входа](../diagrams/mcprig.why.ru.html)
+  и [что умеет один бинарник](../diagrams/mcprig.capabilities.ru.html).
+- [alternatives.md](alternatives.md) — те же возможности рядом с другими прокси
+  и то, чем эта архитектура платит.
 - [configuration.md](configuration.md) — конфиг набора, который читает этот процесс.
 - [meta-tools.md](meta-tools.md) — поверхность, с которой говорит клиент.
 - [panel.md](panel.md) — HTTP API и UI менеджера.

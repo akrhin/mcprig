@@ -147,7 +147,7 @@
       "id": "panel",
       "type": "backend",
       "label": "panel",
-      "sublabel": "sets · keys · logs",
+      "sublabel": "sets · keys · stats · prompt",
       "pos": [
         12,
         338
@@ -161,7 +161,7 @@
       "id": "disk",
       "type": "database",
       "label": "state files",
-      "sublabel": "config · keys · secrets",
+      "sublabel": "config · keys · secrets · journal",
       "pos": [
         200,
         338
@@ -269,7 +269,8 @@
         "list_commands returns the catalog on demand and caches it",
         "describe_commands sends the schema of just the tool being called",
         "invoke_many runs a batch in one answer instead of N round-trips",
-        "maxBytes cuts a large answer; the whole text stays in a file"
+        "maxBytes cuts a large answer; the whole text stays in a file",
+        "A set compiles a ready-to-paste prompt: tool schemas, your task and an optional intro"
       ]
     },
     {

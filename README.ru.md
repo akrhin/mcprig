@@ -12,7 +12,7 @@
 [![release](https://img.shields.io/github/v/release/akrhin/mcprig)](https://github.com/akrhin/mcprig/releases) [![license](https://img.shields.io/github/license/akrhin/mcprig)](LICENSE) [![go](https://img.shields.io/badge/go-1.27-blue)](go.mod)
 
 Клиент, который ходит в десяток MCP-серверов, платит за десяток списков
-инструментов в контексте ещё до первого вопроса. mcprig убирает их за пять
+инструментов в контексте ещё до первого вопроса. mcprig убирает их за девять
 мета-тулов, собирает серверы в именованные наборы, держит каждый набор отдельным
 процессом со своим портом и ключом и управляет реестром из веб-панели.
 
@@ -81,12 +81,18 @@ Docker работает так же и не требует Go: `docker pull ghcr
 
 [![архитектура mcprig](docs/diagrams/mcprig.architecture.ru.png)](docs/diagrams/mcprig.architecture.ru.html)
 
-Клиент → одна точка входа набора → пять мета-тулов → нижестоящие серверы этого
+Клиент → одна точка входа набора → девять мета-тулов (пять работают с серверами,
+четыре обслуживают ресурсы и промты) → нижестоящие серверы этого
 набора. Панель держит по одному процессу `mcprig serve` на набор, поэтому
 перезапуск или падение одного набора не задевает остальные. Интерактивная версия
 схемы (темы, зум, экспорт PNG/SVG) —
 [docs/diagrams/mcprig.architecture.ru.html](docs/diagrams/mcprig.architecture.ru.html);
 спецификация, из которой она генерируется, лежит рядом как `.json`.
+
+Что меняется, когда серверы стоят за одной точкой входа, и чем это платится —
+вторая картинка: [с прокси и без](docs/diagrams/mcprig.why.ru.html), карта
+возможностей — [что умеет один бинарник](docs/diagrams/mcprig.capabilities.ru.html).
+Сравнение с другими прокси и слабые места — [docs/ru/alternatives.md](docs/ru/alternatives.md).
 
 ## Конфигурация
 
