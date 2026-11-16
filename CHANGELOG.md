@@ -38,9 +38,9 @@ repository the project is built in.
   built text comes back monospaced with **copy** and **download .md**; `notes`
   are shown above it, and a stopped set warns beforehand that schemas will be
   missing.
-- The keys block of a set shows the `keyMark` of `GET /api/state` as
-  `key:<mark>` next to the prefix, with the statistics mark as its tooltip;
-  hidden for an open set.
+- The keys block of a set shows the `keyMark` of `GET /api/state` next to the
+  prefix — the very label the statistics print for that key: its label when it
+  has one, otherwise `key:<mark>`; hidden for an open set.
 - `POST /api/sets/<id>/prompt` builds one text for an agent out of three
   parts: `{"task":"…","intro":"…","servers":["…"]}` and the answer
   `{"prompt":"…","notes":["…"]}`. The tool list comes from the live catalog of
@@ -49,10 +49,10 @@ repository the project is built in.
   missing. One schema is capped at 4000 characters, the whole prompt at 64 KiB,
   both cuts reported in `notes`; set tokens and variable values never reach the
   text.
-- `GET /api/state` gives every set a `keyMark`: the `key:<6 hex>` fingerprint
-  the statistics print for the set's primary key, so a row in the statistics can
-  be matched to the key in the panel. Empty for an open set; `keyPrefix` stays
-  as it was.
+- `GET /api/state` gives every set a `keyMark`: the label its primary key carries
+  in the statistics — the key's label when it has one, otherwise the `key:<6 hex>`
+  fingerprint — so a row in the statistics can be matched to the key in the
+  panel. Empty for an open set; `keyPrefix` stays as it was.
 - A set may be created and started with no servers. An empty `servers` list is
   now a legal state: `POST /api/sets` and `PUT /api/sets/<id>` accept it, in an
   update a missing `servers` key leaves the list untouched, and a set without
@@ -98,6 +98,21 @@ repository the project is built in.
 
 ### Fixed
 
+- `PUT` and `DELETE /api/env/<NAME>` no longer stop a running set that would
+  lack a variable afterwards: the set keeps working on its previous environment
+  and the answer names it in `skipped` (`{set, reason, missing}`) next to `restarted`.
+  Before, the set was restarted into a refused start and the answer still said
+  it had been restarted.
+- Adding a server that brings a `${VAR}` the set did not use before restarts the
+  set: the process environment is fixed at start, so a reload would have left
+  the variable empty while answering `200`. `needsRestart` compares the variable
+  references of both compositions, not only the port.
+- `POST /api/sets/<id>/prompt` masks tool descriptions and schemas like the
+  notes, and the mask now includes a server's literal `env` and `headers`
+  secrets on par with `${VAR}` values and the set token.
+- A busy set port is recognised by the typed `registry.ErrPortBusy` through
+  `errors.Is`, not by the word «занят» in the error text: rewording the message
+  can no longer turn a `409` into a `500`.
 - `POST /api/browse` rejects a server entry carrying a reserved `${VAR}` or a
   `{file:…}` reference, like every other route that takes a server from the
   request body: the entry bypassed the registry, so the browse button could

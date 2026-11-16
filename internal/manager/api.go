@@ -1927,6 +1927,9 @@ func keyByToken(set *registry.Set, token string) any {
 type skippedRestart struct {
 	Set    string `json:"set"`
 	Reason string `json:"reason"`
+	// Missing — те же имена машинно: панель собирает фразу на языке читателя,
+	// а reason остаётся готовым текстом для тех, кто зовёт API напрямую.
+	Missing []string `json:"missing,omitempty"`
 }
 
 // restartSetsUsingEnv перезапускает работающие наборы, чьи серверы ссылаются на
@@ -1946,8 +1949,9 @@ func (m *Manager) restartSetsUsingEnv(name string) ([]string, []skippedRestart) 
 		}
 		if missing := unresolvedEnvRefs(srv, m.sec); len(missing) > 0 {
 			skipped = append(skipped, skippedRestart{
-				Set:    set.ID,
-				Reason: "нет переменной " + strings.Join(missing, ", "),
+				Set:     set.ID,
+				Reason:  "нет переменной " + strings.Join(missing, ", "),
+				Missing: missing,
 			})
 			continue
 		}

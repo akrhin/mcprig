@@ -54,7 +54,7 @@
       'head.copyKey': 'Copy key',
       'head.noKey': 'no key',
       'head.schemaTip': "how much context the set's tool list costs",
-      'head.keyMarkTip': 'the mark this key shows up under in the statistics — the part after key:',
+      'head.keyMarkTip': "the mark this key shows up under in the statistics: its note, or the key: fingerprint when it has none",
       'head.servers': 'Servers',
       'head.tools': 'Tools',
       'head.keys': 'Keys',
@@ -92,8 +92,10 @@
       'vars.savedUnref': 'no server mentions {name} yet, so the name stays out of the list',
       'vars.forgot': '{name} forgotten',
       'vars.restarted': 'restarted: {list}',
+      'vars.skippedOne': '{set} stays on its old value: {what}',
+      'vars.skippedMissing': 'missing {names}',
       'vars.del': 'forget the value',
-      'vars.delConfirm': 'Forget {name}? A set that uses it starts without the value.',
+      'vars.delConfirm': 'Forget {name}? A running set keeps the value it started with; only sets that no longer need it restart.',
       'vars.honest': 'Values live in OpenBao or in a file only this host can read: the panel shows a name, whether it is set and where it comes from, never a value. A name no server references stays out of the list until some server mentions it.',
       'kpi.calls': 'calls · 7 days',
       'kpi.errRate': 'error rate',
@@ -382,7 +384,7 @@
       'head.copyKey': 'Скопировать ключ',
       'head.noKey': 'ключа нет',
       'head.schemaTip': 'сколько контекста стоит перечень инструментов набора',
-      'head.keyMarkTip': 'метка ключа набора в статистике — то, что стоит после key:',
+      'head.keyMarkTip': 'метка ключа набора в статистике: его подпись, а если подписи нет — отпечаток key:',
       'head.servers': 'Серверов',
       'head.tools': 'Инструментов',
       'head.keys': 'Ключи',
@@ -420,8 +422,10 @@
       'vars.savedUnref': 'ни один сервер пока не упоминает {name}, поэтому в списке имени нет',
       'vars.forgot': 'значение {name} забыто',
       'vars.restarted': 'перезапущены: {list}',
+      'vars.skippedOne': '{set} остался на прежнем значении: {what}',
+      'vars.skippedMissing': 'нет переменной {names}',
       'vars.del': 'забыть значение',
-      'vars.delConfirm': 'Забыть {name}? Набор, который использует это значение, запустится без него.',
+      'vars.delConfirm': 'Забыть {name}? Работающий набор остаётся со значением, с которым запустился; перезапускаются только наборы, которым это значение больше не нужно.',
       'vars.honest': 'Значения живут в OpenBao или в файле, который читает только этот хост: видно имя, стоит ли значение и откуда оно берётся, — но не само значение. Имя, которое не упоминает ни один сервер, в списке не появится.',
       'kpi.calls': 'вызовов · 7 дней',
       'kpi.errRate': 'доля ошибок',
@@ -1776,10 +1780,10 @@
     keyBtn.dataset.i18nTitle = hasKey ? 'head.copyKey' : 'head.noKey';
     keyBtn.title = t(keyBtn.dataset.i18nTitle);
     $('keys-count').textContent = fmtN((set.keys || []).length);
-    // отпечаток основного ключа — ровно та метка, что печатает статистика
+    // метка основного ключа — ровно та строка, что печатает статистика
     var mark = $('key-mark');
     show(mark, !!set.keyMark);
-    mark.textContent = set.keyMark ? 'key:' + set.keyMark : '';
+    mark.textContent = set.keyMark || '';
     $('meta-servers').textContent = fmtN((set.servers || []).length);
     var schema = (st.calls && st.calls.schema) || null;
     $('meta-tools').textContent = schema ? fmtN(schema.tools) : '—';
@@ -2726,11 +2730,22 @@
       });
   }
 
-  // Плашка под формой: строка исхода одна, ошибка и «сохранено» не стоят рядом
-  function envNote(ok, text) {
+  // Плашка под формой: строка исхода одна, ошибка и «сохранено» не стоят рядом.
+  // skipped — наборы, оставленные на старом окружении: это предупреждение, не ошибка.
+  function envNote(ok, text, skipped) {
     show($('env-err'), !ok);
     show($('env-msg'), ok);
     $(ok ? 'env-msg' : 'env-err').textContent = text;
+    var warn = (ok && skipped && skipped.length ? skipped : []).map(function (s) {
+      // причина приходит и машинно (missing), и текстом (reason): фразу
+      // собираем на языке читателя, а reason нужен тем, кто зовёт API напрямую
+      var what = s.missing && s.missing.length
+        ? t('vars.skippedMissing', { names: s.missing.join(', ') })
+        : (s.reason || '');
+      return t('vars.skippedOne', { set: s.set, what: what });
+    }).join(' · ');
+    show($('env-warn'), !!warn);
+    $('env-warn').textContent = warn;
   }
 
   function saveEnv(e) {
@@ -2748,12 +2763,12 @@
       .then(function (r) {
         r = r || {};
         envNote(true, t('vars.saved', { name: r.name || name, source: r.source || store || 'auto' }) +
-          (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''));
+          (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped);
         $('env-value').value = '';
         return loadEnv().then(function () {
           // значение записано, но имени нет в списке: его пока не упоминает ни один сервер
           var seen = (st.env || []).some(function (v) { return v.name === (r.name || name); });
-          if (!seen) { envNote(true, t('vars.saved', { name: r.name || name, source: r.source || 'auto' }) + ' · ' + t('vars.savedUnref', { name: name })); }
+          if (!seen) { envNote(true, t('vars.saved', { name: r.name || name, source: r.source || 'auto' }) + ' · ' + t('vars.savedUnref', { name: name }), r.skipped); }
         });
       })
       .catch(function (err) { envNote(false, err.message); })
@@ -2770,7 +2785,7 @@
       .then(function (r) {
         r = r || {};
         envNote(true, t('vars.forgot', { name: r.name || name })
-          + (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''));
+          + (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped);
         return loadEnv();
       })
       .catch(function (err) { envNote(false, err.message); })

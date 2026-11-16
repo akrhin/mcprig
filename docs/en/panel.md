@@ -145,7 +145,10 @@ A running set takes the change by reload ([reload](#reload-without-a-restart)): 
 new server joins lazily and its tools appear after the first `list_commands` or
 **Check** probe, a removed one loses its session and cache. The process is not
 restarted — the hint under the picker says so, because a restart would drop the
-connections of every other server in the set. An empty list is legal: the set
+connections of every other server in the set. The one exception is a server that
+brings a `${VAR}` the set did not use before: the process environment is fixed at
+start, so such an addition restarts the set (the panel names the variables in its
+hint instead of promising a reload). An empty list is legal: the set
 saves, starts and serves no tools; the panel says that in the same place instead
 of blocking the save.
 
@@ -233,7 +236,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `GET /healthz` | public liveness probe |
 | `GET /` | panel (redirects to `/login` when auth is on and there is no session) |
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
-| `GET /api/state` | servers, sets, `firstPort` — the first paint. A set's `keyMark` is the statistics' `key:<mark>` fingerprint of its primary key, empty for an open set |
+| `GET /api/state` | servers, sets, `firstPort` — the first paint. A set's `keyMark` is the label its primary key carries in the statistics: the key's label when it has one, otherwise `key:<mark>`; empty for an open set |
 | `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
 | `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port` or `open` restarts the set. A `token` in the body replaces the primary key and creates one when the set has no active key |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
@@ -254,7 +257,7 @@ Static panel files are served for `GET`/`HEAD` after authentication. The API:
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
 | `GET /api/calls?set=<id>&limit=<N>&before=<time>&after=<time>` | merged call tail of the running sets plus the on-disk history of the stopped ones; default 50, max 500; `before`/`after` are RFC3339 times bounding a row's `time` (strictly older / strictly newer, one at a time); for one running set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |
-| `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; the answer returns at once, sets using the variable restart in the background (60 s budget) and `restarted` lists them; stopping the panel cancels the background restart |
+| `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; the answer returns at once, sets using the variable restart in the background (60 s budget) and `restarted` lists them; a running set that would not start for want of a variable after the change is left untouched and named in `skipped` (`{set, reason, missing}`), still working on its previous environment; stopping the panel cancels the background restart |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | export the registry or one set |
 | `POST /api/browse` | open a live session to a server for tool inspection |
