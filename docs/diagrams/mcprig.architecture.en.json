@@ -61,7 +61,7 @@
       "type": "backend",
       "label": "set A",
       "sublabel": "one endpoint · own servers",
-      "tag": "5 meta tools",
+      "tag": "9 meta tools",
       "pos": [
         200,
         48
@@ -147,7 +147,7 @@
       "id": "panel",
       "type": "backend",
       "label": "panel",
-      "sublabel": "sets · keys · stats · prompt",
+      "sublabel": "ports 9100–9199 · sets · keys",
       "pos": [
         12,
         338
@@ -161,7 +161,7 @@
       "id": "disk",
       "type": "database",
       "label": "state files",
-      "sublabel": "config · keys · secrets · journal",
+      "sublabel": "sets/<id>/ · config · journal",
       "pos": [
         200,
         338
@@ -265,7 +265,7 @@
       "dot": "cyan",
       "title": "Context economy",
       "items": [
-        "A catalog of hundreds of tools never enters the prompt: the agent sees five meta tools",
+        "A catalog of hundreds of tools never enters the prompt: the agent sees nine meta tools",
         "list_commands returns the catalog on demand and caches it",
         "describe_commands sends the schema of just the tool being called",
         "invoke_many runs a batch in one answer instead of N round-trips",

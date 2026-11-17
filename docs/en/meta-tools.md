@@ -44,7 +44,9 @@ connection: a filtered-out server is never dialed.
       "type": "stdio",
       "enabled": true,
       "healthy": true,
-      "tags": ["fixture"]
+      "command": "echo",
+      "tags": ["fixture"],
+      "approval": "quarantine"
     }
   ],
   "version": "dev"
@@ -55,14 +57,23 @@ connection: a filtered-out server is never dialed.
 | --- | --- |
 | `name` | server name |
 | `description` | present when the config has one |
+| `hint` | one line on when this server is the right one and where to start. The built-in table covers the servers this build knows; a set's own `hint` field wins over it, and an unknown server without one has no `hint` key at all |
 | `type` | `stdio` or `remote` |
 | `enabled` | from the config; a disabled server is not probed and is reported `healthy: true` |
 | `healthy` | result of a probe; `false` for a broken config or a failed connect. A probe that could not get a free slot is reported `true` and is not cached — see `unknown` |
 | `unknown` | `true` when the probe never started (no free slot): `healthy: true` here means "not sick", not "checked" |
 | `error` | probe error text, present with `healthy: false` |
 | `isolation` | `bwrap` when the sandbox is applied; `без изоляции: <причина>` when it was requested but bubblewrap could not start (`onUnavailable: warn`/`allow`); `нет: конфиг отвергнут` when the record has a `_configError`; absent only for a valid server without a `sandbox` block |
+| `url` | remote servers: the address, with the server's own secrets masked |
+| `command` | stdio servers: the first word of `command` — the executable — masked the same way |
+| `tools` | size of the catalog the set already holds, so the number costs no dial; absent until the catalog has been read once |
+| `visible` | how many of `tools` this key really sees; present only when a profile or a `permissions` rule cut the list to a non-empty part — a key cut down to nothing shows no `visible`, because the field is omitted at `0` |
+| `approval` | `quarantine` when the set checks descriptors against `tools.lock.json`; absent for a process that keeps no such record |
 | `tags` | from the config, when present |
 | `version` | build version of the proxy |
+
+The server's `env` and `headers` are never part of the answer: only the
+executable of `command` and the masked `url` are shown.
 
 Health probes run concurrently, at most 8 at once, with a 15 s timeout and a
 15 s cache that also remembers failures.
@@ -92,7 +103,14 @@ With `servers`, one `requestTimeout` bounds the whole call, not each server.
 Servers are queried in parallel, eight at a time.
 
 `{"refresh": true}` (with `list_commands` and `describe_commands`) drops the
-cached tool list and asks the servers again. The cache otherwise lives as long
+cached tool list and asks the servers again — at most once every 5 s per caller
+and server. The caller is counted by the same identity the rate limit uses: the
+fingerprint of its key, or, on an open set, the client address — behind a proxy
+that address is shared, so the window is shared too. A refresh asked inside that
+window is held back, the answer comes from the cache and carries
+`_meta.refreshDeferred` naming the servers:
+`{"refreshDeferred": "serena: обновление каталога не чаще раза в 5s"}`. It is not
+an error. The cache otherwise lives as long
 as the connection: the set drops it when the downstream sends
 `notifications/tools/list_changed`, so a tool that appears mid-connection is
 visible on the next call without a refresh.
@@ -160,6 +178,7 @@ Input:
 | `command_name` | one of `command_name` or its alias `command` (see below) |
 | `command` | alias for `command_name`; `list_commands` returns the name in the `command` field, so either key works. Sending both with different values is an error. The client sees the schema at session start, so after the update it must re-read `tools/list` (or start a new session) — otherwise the old `required: command_name` wins over `anyOf` |
 | `parameters` | optional object; `null` and an empty string mean `{}` |
+| `timeoutMs` | optional limit for this call in ms, 1000 to 600000; `0` or absent means the set's `requestTimeout`. Out of range is refused before anything runs: `Error: timeoutMs: допустимо от 1000 до 600000 мс` |
 | `maxBytes` | optional cap on the returned answer in bytes; default 32768, at most 1048576; `0` means the default. The catalog tools `list_commands` and `describe_commands` are the exception: they cut nothing unless `maxBytes` is given |
 
 Downstream arguments go **inside** `parameters`. Any other top-level key is an
@@ -182,7 +201,28 @@ The downstream result is returned as-is: `content`, `structuredContent` and
 tool returned `isError`, there is no retry — the result is returned as it is,
 so a side effect is never performed twice. `list_commands` and
 `describe_commands` are never repeated: they have their own timeouts.
-`requestTimeout`, when set, applies to one call.
+`requestTimeout`, when set, bounds one call unless the call brings its own
+`timeoutMs`, which wins. A call that ran reports `_meta.timeoutMs` — the limit it
+actually ran under, `requestTimeout` included — so a client compares its own
+budget against the real one; the key is absent only when no limit applies, and a
+refusal before the call starts carries no `_meta` at all. A call that does not
+answer in time fails with the deadline named:
+
+```text
+Error: таймаут вызова 120000 мс: serena/find_symbol не ответил: context deadline exceeded
+```
+
+A downstream server takes at most four calls at a time, and a single
+`invoke_command` is one of them: the slots are the same ones `invoke_many` uses. A
+fifth call waits for a free slot, and the wait counts against the call's own
+limit — its `timeoutMs`, or the set's `requestTimeout`. When the limit runs out
+while the call is still queued, the answer names the queue, not the upstream:
+
+```text
+Error: нет свободного слота для serena/find_symbol: context deadline exceeded
+```
+
+The call is not sent in that case, and the cause in the text says so.
 
 ### Rate limit
 
@@ -218,9 +258,9 @@ its message rather than the profile. `list_commands` hides such commands
 instead of reporting them. The profile is found by the key's fingerprint, not by
 its note, and a key without a profile is not filtered at all.
 
-`describe_commands` is not filtered: the names are hidden from the catalog, but
-a schema for a guessed name is still served and the call itself is refused, so a
-key learns what it is barred from — knowingly, and nothing more.
+`describe_commands` is filtered the same way: a name a rule denies or a profile
+hides is left out of `commands` and lands in `missing`, so the catalog never
+gives it away; a call to a guessed name is still refused with the policy marker.
 
 ### Descriptor quarantine
 
@@ -261,29 +301,63 @@ mcprig approve --set main --all                # everything currently changed
 Quarantine survives a set restart; entries of a server removed from the set are
 pruned when the set config is rebuilt.
 
-An answer longer than `maxBytes` is cut at a UTF-8 boundary; the returned text
-ends with a marker naming the kept and full sizes and the file holding the full
-answer:
+A `tools.lock.json` that does not parse is not read as a blank slate: the set
+leaves the file untouched and refuses every call while the record is unknown —
+
+```text
+🚫 Карантин неизвестен: файл одобрений не прочитан (tools.lock.json не разобран: …) — вызов serena/find_symbol отклонён
+```
+
+— until the file is repaired or removed. A missing file is still a normal start:
+the first descriptor seen is approved. Every server of a set that keeps this
+record carries `approval: "quarantine"` in `list_servers`, so the mode is visible
+before the first refusal.
+
+An answer longer than `maxBytes` is cut, and the full one goes to a file. A JSON
+answer is cut **structurally**, so it stays one valid JSON document: the longest
+string values are shortened first (a value of 32 bytes or less is kept as it is),
+and the cut is recorded inside the document — an object gains the `_truncated`
+key, an array gains one last string element:
+
+```json
+{"results": ["…"], "_truncated": "ответ усечён: 149873 байт, полный ответ — /tmp/mcprig-data/tool-out/1f3c9a2b7d4e5f60.txt"}
+```
+
+A structural cut needs something it may shorten: strings longer than the
+32-byte floor, or an array long enough to lose its tail. An answer built only of
+short strings and values that do not shrink cannot be cut honestly, so it falls
+back to the raw cut below — the marker still names the full answer, but what the
+caller gets is a fragment, not a JSON document. Valid JSON is therefore promised
+only while the answer has long strings to shorten.
+
+An answer that is not one JSON document, is a bare scalar, is larger than
+8 MiB, or is a JSON document with nothing left to shorten, is cut raw at a
+UTF-8 boundary and ends with a marker naming the kept and full sizes and the
+file:
 
 ```text
 …обрезанный текст
 [обрезано: 32768 из 149873 байт, полный ответ — /tmp/mcprig-data/tool-out/1f3c9a2b7d4e5f60.txt]
 ```
 
+An answer that carried `structuredContent` is serialized as one JSON envelope and
+cut structurally like any other JSON, so the caller receives valid JSON text, not
+a structure; in the raw fallback one more line follows the marker —
+`[structuredContent больше maxBytes: полный ответ в файле]`.
+
 The full answer is written `0600` to
 `${MCPRIG_DATA_DIR:-$TMPDIR}/tool-out/<random>.txt`; the directory is created
-on first use. When the answer carried `structuredContent`, one more line follows
-the marker — `[structuredContent не влезает в maxBytes: полный ответ в файле]`:
-the structure does not survive the text cut, and a client whose meaning lives in
-structured data has nothing to read otherwise. An answer within the cap is
-returned untouched — no file, no marker. A non-numeric or negative `maxBytes`, or one above 1048576, is an
-error like any other bad argument.
+on first use. An answer within the cap is returned untouched — no file, no
+marker. A non-numeric or negative `maxBytes`, or one above 1048576, is
+an error like any other bad argument.
 
 ### Fetching the full answer over HTTP
 
 A set served over HTTP hands the file out instead of a path: over the same
 listener, under the same guard as `/mcp` — the set's bearer key, `allowedHosts`
-and the `Origin` check. The marker then reads:
+and the `Origin` check. A structurally cut JSON answer carries that address
+inside `_truncated` (`/tool-out/1f3c9a2b7d4e5f60 (тот же ключ, которым вызван
+инструмент)`); the marker of a raw cut reads:
 
 ```text
 [обрезано: 32768 из 149873 байт, полный ответ — /tool-out/1f3c9a2b7d4e5f60 (тот же ключ, которым вызван инструмент)]
@@ -318,22 +392,33 @@ Input: `{"calls": [{"server": "echo", "command_name": "echo", "parameters": {"te
 
 | field | meaning |
 | --- | --- |
-| `calls` | required; 1 to 8 calls, each shaped like one `invoke_command` call |
+| `calls` | required; 1 to 8 calls, each shaped like one `invoke_command` call, its own `timeoutMs` included |
 | `maxBytes` | optional cap applied to **each** answer; same default and limits as `invoke_command` |
 
 Calls run in parallel. At most 4 calls hit one downstream server at the same
 time (eight at once made a downstream drop the batch), and at most 8 run in
-total. One `requestTimeout` bounds the whole fan-out, not each call.
+total; the same per-server limit applies to a single `invoke_command`. The
+fan-out budget exists only when the set carries a `requestTimeout`: it is then
+the largest of the set's `requestTimeout` and the `timeoutMs` of its calls, so a
+call that asked for more room is not cut short before its own limit; that
+per-call limit then applies after the call gets its slot — waiting for a slot is
+bounded by the fan-out budget only. Without a `requestTimeout` there is no
+fan-out budget, and a neighbour's limit never reaches a call that brought no
+`timeoutMs` of its own.
 
 The answer is an array with one entry per call, **in the order of `calls`**, not
 in completion order:
 
 ```json
 [
-  {"ok": true, "server": "echo", "command_name": "echo", "result": "echo:{\"text\":\"a\"}", "ms": 12},
-  {"ok": false, "server": "nope", "command_name": "x", "error": "неизвестный сервер \"nope\"", "ms": 0}
+  {"ok": true, "server": "echo", "command_name": "echo", "result": "echo:{\"text\":\"a\"}", "ms": 12, "timeout_ms": 120000},
+  {"ok": false, "server": "nope", "command_name": "x", "error": "неизвестный сервер \"nope\"", "ms": 0, "timeout_ms": 120000}
 ]
 ```
+
+`timeout_ms` names the limit that particular call ran under — its own
+`timeoutMs` or the set's `requestTimeout`; the answer's `_meta.timeoutMs` is the
+fan-out budget. Both are omitted only when no limit applies.
 
 `result` is what `invoke_command` would return: the text of a single text item,
 or the whole result object otherwise, truncated at `maxBytes`. A call that
@@ -347,7 +432,16 @@ refusal `result` carries the same answer `invoke_command` gives: the
 Bad input fails the whole request with `isError: true` and nothing is run: no
 calls, more than 8, an unknown key inside a call, a missing `server` or
 `command_name` (or its alias `command`), `parameters` that is not an object, or
-a bad `maxBytes`.
+a bad `maxBytes`. When every call failed, the answer itself carries
+`isError: true`; a partial failure stays data with `ok: false` on the entries
+that failed.
+
+A call that waited for a free slot on its server and did not get one is refused
+with the queue named, not the call:
+
+```text
+нет свободного слота у сервера serena (лимит 4): ждали 120000ms, вызов не отправлен: context deadline exceeded
+```
 
 ## Resources and prompts
 
@@ -445,7 +539,10 @@ The allow/deny block is checked before the server is connected; see
 }
 ```
 
-The `_meta.lazyMcpPolicy` marker is what host hooks look for.
+The `_meta.lazyMcpPolicy` marker is what host hooks look for. A `deny` rule also
+hides the name from the catalog: `list_commands` does not list it,
+`describe_commands` puts it in `missing`, and `list_servers` counts it out of
+`visible` — so a key never sees a name it could not call.
 
 ## Counters
 

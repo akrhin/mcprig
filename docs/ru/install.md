@@ -15,18 +15,25 @@
 | архив | `mcprig_<version>_<os>_<arch>.tar.gz` |
 | содержимое | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | контрольная сумма | `checksums.txt` |
-| релиз | `goreleaser` собирает архивы, пушит образы `slim`/`full` в реестр и публикует релиз Gitea; релиз на GitHub создаёт воркфлоу; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
+| релиз | воркфлоу GitHub гоняет `goreleaser` с `--skip=publish`: он собирает архивы и `checksums.txt` и сам ничего не публикует; страницу релиза создаёт `gh release`, образы `slim`/`full` в GHCR пушит `docker build`, а реестр хоста получает воркфлоу Gitea `images` по тому же тегу; заметки — раздел `CHANGELOG.md` для тега (`scripts/release-notes.sh`) |
 | сборка | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Релиз выпускается по тегу `v*` в GitHub (`.github/workflows/release.yml`): он
-гоняет проверки — `gofmt`, `go vet`, тесты с `-race`, `govulncheck` — а затем
-`goreleaser`, который собирает архивы, публикует страницу релиза на
-<https://github.com/akrhin/mcprig/releases> и собирает образы `slim` и `full`
-один раз, пуша их в `ghcr.io/akrhin/mcprig` и — при заданных секретах реестра —
-ещё и в реестр хоста. Тег можно выпустить и руками:
-`gh workflow run release.yml -f tag=vX.Y.Z`.
+Релиз выпускается по тегу `v*` в GitHub (`.github/workflows/release.yml`). `ci` на
+теги не висит, поэтому проверки повторяет сам релизный воркфлоу после
+`go build ./...`: `go vet ./...` и `go test ./... -race -count=1 -p 1`. Затем
+`goreleaser release --clean --skip=publish` собирает четыре архива и
+`checksums.txt`, `gh release` публикует страницу на
+<https://github.com/akrhin/mcprig/releases> (догружая в неё файлы, если тег
+переставили), а `docker build`/`docker push` отправляют `<version>-slim`,
+`<version>-full`, `latest` и `latest-full` в `ghcr.io/akrhin/mcprig`. Руками
+ничего публиковать не нужно.
 
-Архивы собирает CI, а не goreleaser: сам `goreleaser` на хосте разработки не установлен.
+Тот же тег запускает на Gitea `.gitea/workflows/images.yml`: он собирает обе цели
+заново и пушит их в реестр хоста — раннер GitHub туда войти не может. Это
+отдельный пуш: релиз на GitHub его не ждёт и о его исходе не сообщает. Тег можно
+выпустить и руками: `gh workflow run release.yml -f tag=vX.Y.Z`.
+
+Архивы собирает CI: сам `goreleaser` на хосте разработки не установлен.
 Собрать тот же бинарник руками:
 
 ```bash
@@ -91,18 +98,18 @@ systemctl --user enable --now mcprig.service
 ```bash
 docker pull ghcr.io/akrhin/mcprig:latest        # slim
 docker pull ghcr.io/akrhin/mcprig:latest-full   # full
-docker pull ghcr.io/akrhin/mcprig:0.4.0-slim    # закреплённый релиз
-docker pull ghcr.io/akrhin/mcprig:0.4.0-full
+docker pull ghcr.io/akrhin/mcprig:0.6.3-slim    # закреплённый релиз
+docker pull ghcr.io/akrhin/mcprig:0.6.3-full
 ```
 
 `latest` и `latest-full` идут за последним релизом, теги версии закрепляют пару
-(`0.4.0-slim`, `0.4.0-full` — текущая).
+(`0.6.3-slim`, `0.6.3-full` — пара текущего релиза).
 
 Либо собрать самому:
 
 ```bash
-docker build --build-arg VERSION=0.4.0 -t mcprig:slim .
-docker build --build-arg VERSION=0.4.0 --target full -t mcprig:full .
+docker build --build-arg VERSION=0.6.3 -t mcprig:slim .
+docker build --build-arg VERSION=0.6.3 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
@@ -110,7 +117,7 @@ docker run --rm -p 127.0.0.1:9100:9100 \
 ```
 
 Точка входа образа — `mcprig`; команда по умолчанию —
-`serve --config /config/servers.json`; адрес берётся из `transport.host` и `transport.port` — в конфиге должно стоять `0.0.0.0` и тот порт, который вы публикуете. `VERSION` — версия **без** ведущего `v`: `0.4.0`, а не `v0.4.0`; значение с `v` отвергается, и сборка падает. Рабочий каталог —
+`serve --config /config/servers.json`; адрес берётся из `transport.host` и `transport.port` — в конфиге должно стоять `0.0.0.0` и тот порт, который вы публикуете. `VERSION` — версия **без** ведущего `v`: `0.6.3`, а не `v0.6.3`; значение с `v` отвергается, и сборка падает. Рабочий каталог —
 `/data`, владелец — uid 10001; смонтируйте туда том и задайте
 `MCPRIG_DATA_DIR=/data`, чтобы токены OAuth и прочее состояние переживали
 перезапуск. Оба образа задают `MCPRIG_HOST=0.0.0.0`, поэтому панель внутри

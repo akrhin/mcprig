@@ -40,7 +40,10 @@ mcprig serve --config ~/.config/mcprig/sets/demo/servers.json
 
 `-addr` меняет только слушателя; `transport.path` (по умолчанию `/mcp`),
 `authToken`, `allowAnonymous` и `allowedHosts` по-прежнему берутся из файла.
-Пустой `authToken` — ошибка старта, если `allowAnonymous` не true.
+Пустой `authToken` — ошибка старта, если `allowAnonymous` не true. Набор,
+созданный в панели, держит файл в каталоге состояния —
+`$MCPRIG_DATA_DIR/sets/<id>/servers.json`; `~/.config/mcprig/sets/<set>/` —
+место юнита systemd `mcprig-set@` ([install.md](install.md#состояние-на-диске)).
 
 Вывод идёт в stderr:
 
@@ -130,27 +133,39 @@ health-проба набора ждёт 15 с, а человеку у брауз
 MCPRIG_PASSWORD='change-me' mcprig panel
 ```
 
-Флагов нет. Всё задаётся окружением:
+`-h` / `--help` печатает двадцать семь переменных окружения, которые читает
+панель, по одной в строке и в том же порядке, что ниже, и выходит с кодом `0`;
+любой другой аргумент — ошибка использования с кодом `2`. Флагов у панели нет:
+всё задаётся окружением — двадцать четыре строки таблицы плюс
+`MCPRIG_TOOLOUT_TTL` и `MCPRIG_TOOLOUT_MAX`
+([срок жизни tool-out](#срок-жизни-tool-out)) и `MCPRIG_PPROF` ([serve](#serve)).
 
 | переменная | по умолчанию | значение |
 | --- | --- | --- |
 | `MCPRIG_DATA_DIR` | `$XDG_STATE_HOME/mcprig`, иначе `~/.local/state/mcprig` | реестр, ключи, логи, токены OAuth |
+| `XDG_STATE_HOME` | `~/.local/state` | база каталога состояния; `MCPRIG_DATA_DIR` её перекрывает |
+| `MCPRIG_CLI` | запущенный исполняемый файл | бинарник, запускаемый для каждого набора (`serve --config …`) |
+| `MCPRIG_SEED_FILE` | пусто | JSON с `servers[]` и `sets[]`; используется, только когда реестр пуст; для закрытых наборов генерируются новые ключи |
 | `MCPRIG_HOST` | `127.0.0.1` | адрес прослушивания панели |
 | `MCPRIG_PORT` | `9091` | порт панели |
 | `MCPRIG_PUBLIC_URL` | пусто | публичный адрес панели, `http(s)://host[:port][/prefix]`; когда задан — единственный источник redirect OAuth и решения о `Secure`-cookie. Проверяется на старте: схема, хост, без query/fragment, без хвостового `/` |
-| `MCPRIG_TLS_CERT` | пусто | сертификат слушателя панели; задаётся вместе с `MCPRIG_TLS_KEY` — одно поле без другого отбивает старт, нечитаемый файл тоже |
-| `MCPRIG_TLS_KEY` | пусто | ключ слушателя панели |
-| `MCPRIG_CLI` | запущенный исполняемый файл | бинарник, запускаемый для каждого набора (`serve --config …`) |
 | `MCPRIG_BIND_IP` | `0.0.0.0` | `transport.host`, записываемый в `servers.json` каждого набора |
-| `MCPRIG_SEED_FILE` | пусто | JSON с `servers[]` и `sets[]`; используется, только когда реестр пуст; для закрытых наборов генерируются новые ключи |
 | `MCPRIG_PASSWORD` | пусто | пароль панели |
 | `MCPRIG_PASSWORD_HASH` | пусто | `scrypt$N$r$p$salt$hash`; если задан, простой пароль игнорируется |
+| `MCPRIG_USER` | `admin` | имя для входа |
+| `MCPRIG_AUTH` | пусто | `off` отключает аутентификацию панели |
+| `MCPRIG_TLS_CERT` | пусто | сертификат слушателя панели; задаётся вместе с `MCPRIG_TLS_KEY` — одно поле без другого отбивает старт, нечитаемый файл тоже |
+| `MCPRIG_TLS_KEY` | пусто | ключ слушателя панели |
 | `MCPRIG_PROXY_SECRET` | пусто | общий секрет для прокси-аутентификации; значение короче 32 символов пишет предупреждение в лог |
 | `MCPRIG_TRUSTED_PROXIES` | loopback | IP или CIDR через запятую, чьим `X-Forwarded-*` верят; запись, которая не разбирается, останавливает панель на старте |
-| `MCPRIG_USER` | `admin` | имя для входа |
 | `MCPRIG_USER_HEADER` | `Remote-User` | заголовок с именем пользователя от доверенного прокси |
 | `MCPRIG_ALLOWED_HOSTS` | только loopback | список разрешённых `Host` через запятую |
-| `MCPRIG_AUTH` | пусто | `off` отключает аутентификацию панели |
+| `BAO_ADDR` | пусто | адрес OpenBao для секретов наборов; пусто — секреты остаются только в локальном env-файле |
+| `OPENBAO_ADDR` | пусто | то же, что `BAO_ADDR`, если тот пуст |
+| `BAO_TOKEN` | пусто | токен OpenBao; без него и без `BAO_ADDR` секреты остаются локальными |
+| `OPENBAO_TOKEN` | пусто | то же, что `BAO_TOKEN`, если тот пуст |
+| `BAO_MOUNT` | `secret` | KV v2 mount внутри OpenBao |
+| `BAO_PREFIX` | `mcp` | префикс путей внутри mount |
 
 Доверие `X-Forwarded-*` включается *заданием* `MCPRIG_PROXY_SECRET` и только
 от пира, которому панель верит: loopback или адрес из
@@ -316,8 +331,8 @@ mcprig warm --config ~/.config/mcprig/sets/demo/servers.json
 `mcprig init`. Открытый набор прогревается без ключа.
 
 ```text
-example: 421 инструмент(ов), 5.6 мс
-итог: 1 набор, 421 инструмент(ов), 5.6 мс
+example: 421 инструмент, 5.6 мс
+итог: 1 набор, 421 инструмент, 5.6 мс
 ```
 
 `-json` печатает те же строки:

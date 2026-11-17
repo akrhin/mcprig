@@ -16,7 +16,7 @@
 мета-тулов, собирает серверы в именованные наборы, держит каждый набор отдельным
 процессом со своим портом и ключом и управляет реестром из веб-панели.
 
-- Пять мета-тулов вместо всего каталога инструментов
+- Девять мета-тулов вместо всего каталога инструментов
 - Одна точка входа и один ключ на набор
 - Реестр, ключи и живой поток вызовов в панели
 - Состав набора, импорт и экспорт, готовый промт для агента из инструментов набора
@@ -31,14 +31,18 @@
 Архивы релиза есть для linux и darwin на amd64 и arm64. Linux amd64:
 
 ```bash
-curl -LO https://github.com/akrhin/mcprig/releases/download/v0.4.0/mcprig_0.4.0_linux_amd64.tar.gz
-tar -xzf mcprig_0.4.0_linux_amd64.tar.gz
+curl -LO https://github.com/akrhin/mcprig/releases/download/v0.6.3/mcprig_0.6.3_linux_amd64.tar.gz
+tar -xzf mcprig_0.6.3_linux_amd64.tar.gz
 MCPRIG_PASSWORD=change-me ./mcprig panel
 ```
 
 Откройте <http://localhost:9091>, войдите как `admin`, добавьте сервер, добавьте
 набор с этим сервером, нажмите **Start**, затем создайте ключ набора. Панель
-показывает токен один раз: сохраните его в `demo.key` и выставьте `chmod 600`.
+показывает токен один раз; сохраните его туда, куда смотрит только владелец:
+
+```bash
+umask 077; printf '%s' '<token>' > demo.key
+```
 
 ![mcprig panel](design/ui/panel.png)
 
@@ -72,10 +76,16 @@ Docker работает так же и не требует Go: `docker pull ghcr
 ```
 
 `--client opencode` печатает JSON с корнем `mcp`, `--client codex` — таблицу TOML.
-Если клиент сам запускает бинарник, вместо `--remote` передайте
-`--config ~/.config/mcprig/sets/demo/servers.json`: фрагмент будет запускать
-`mcprig stdio` без порта и без ключа. Обе формы с реальным выводом:
-[docs/ru/cli.md](docs/ru/cli.md#init).
+Порт в адресе — свой у набора: он виден чипом в шапке набора, а полный адрес — в
+топбаре ([docs/ru/panel.md](docs/ru/panel.md#что-показывает)). Если клиент сам
+запускает бинарник, вместо `--remote` передайте `--config` с
+`servers.json` этого набора: фрагмент будет запускать `mcprig stdio` без порта и
+без ключа. Панель пишет конфиг набора в каталог состояния —
+`$MCPRIG_DATA_DIR/sets/demo/servers.json`, где `MCPRIG_DATA_DIR` по умолчанию
+равен `~/.local/state/mcprig`; а `~/.config/mcprig/sets/demo/servers.json` —
+файл, с которым работает юнит `mcprig-set@`
+([docs/ru/install.md](docs/ru/install.md#состояние-на-диске)). Обе формы с
+реальным выводом: [docs/ru/cli.md](docs/ru/cli.md#init).
 
 ## Архитектура
 

@@ -27,15 +27,22 @@ releases; Gitea keeps a mirror of the code and runs exactly one workflow,
 3. GitHub `codeql` scans Go and the panel's JavaScript on every push and weekly;
    `dependency-review` fails a pull request that adds a dependency with a
    high-severity advisory.
-4. GitHub `release` runs on the tag: `goreleaser` builds four platforms and
-   `checksums.txt`, publishes the release page (`.goreleaser.yaml` keeps
-   `draft: false`) and builds the `slim`/`full` images once, pushing them to
+4. GitHub `release` runs on the tag. `ci` does not run on tags, so the release
+   workflow repeats the checks itself — `go vet ./...` and
+   `go test ./... -race -count=1 -p 1` — before it publishes anything. Then
+   `goreleaser release --clean --skip=publish` builds four platforms and
+   `checksums.txt` and publishes nothing, `gh release` creates the page (or
+   uploads into it) and forces `--draft=false --latest`, and `docker build`/`push`
+   sends `<version>-slim`, `<version>-full`, `latest` and `latest-full` to
    `ghcr.io/akrhin/mcprig`. Nothing is published by hand.
-5. Gitea `images` runs on the same tag and does one thing: builds `slim` and
-   `full` and pushes them to the host registry from `secrets.REGISTRY`. A
-   GitHub runner cannot push there — `docker login` to that registry answers
-   `403` — so the images for the host come from Gitea, the release does not wait
-   for them.
+5. Gitea `images` runs on the same tag, and only on a tag — it has no manual
+   trigger — and does one thing: builds `slim` and `full` and pushes them to the
+   host registry from `secrets.REGISTRY`. A GitHub runner cannot push there —
+   `docker login` to that registry answers `403` — so the images for the host come
+   from Gitea, the release does not wait for them. Without the registry secrets,
+   or without a docker socket in the runner's job container, the workflow prints
+   that and exits `0`: a green `images` run does not by itself prove the images
+   were pushed.
 6. Release notes are the tag's `CHANGELOG.md` section, cut by
    `scripts/release-notes.sh`.
 
@@ -67,7 +74,7 @@ goreleaser release --snapshot --clean   # build the archives, publish nothing
 ## Version string
 
 `-X main.version` carries the version; a plain `go build` prints `dev`. For the
-images pass `--build-arg VERSION=0.4.0` — **without** the leading `v`: a value
+images pass `--build-arg VERSION=0.6.3` — **without** the leading `v`: a value
 that starts with `v` is rejected and the build fails.
 
 ## Putting a release on a host

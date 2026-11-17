@@ -1,3 +1,6 @@
+[← Docs index](index.md)
+EN · [RU](../ru/upgrading.md)
+
 # Upgrading to 0.6
 
 0.6.0 closes the review debts of 0.5.1, and a few of them change what a client
@@ -35,6 +38,15 @@ upgrade, with the fix for each.
 Since 0.6.0 a `SIGKILL` of a set process takes its stdio servers with it. A
 server that used the set's death as a way to keep running on its own will not
 survive; if you relied on that, run it outside the set.
+
+## Key labels
+
+A key's label is the `label` field now; `note` was the same field under its
+older name. The daemon still accepts `note` from clients written before the
+rename, and issuing a key writes both fields, so an older binary reading the
+registry still sees the label. Nothing needs doing on an existing installation:
+the panel reads and sends `label`, and a registry written by 0.5.x loads through
+its `note`.
 
 ## Agent prompt and panel
 

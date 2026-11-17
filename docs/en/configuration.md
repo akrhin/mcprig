@@ -43,7 +43,7 @@ and read as-is: no migration, no wrapper.
 | `servers` | array | `[]` | downstream servers, see below; an empty list is a legal set with no servers |
 | `transport` | object | required by `serve` | the listener this set exposes |
 | `healthMonitor` | `{interval, timeout}` in ms | | accepted for lazy-mcp compatibility; the Go proxy does not read it |
-| `requestTimeout` | int, ms | `0` (no limit) | budget for one `invoke_command`; on expiry the call returns `таймаут вызова <N> мс` |
+| `requestTimeout` | int, ms | `0` (no limit) | default budget for one `invoke_command`; on expiry the call returns `таймаут вызова <N> мс`. A call may set its own `timeoutMs` (1000..600000) and that value wins — [meta-tools.md](meta-tools.md#invoke_command) |
 | `permissions` | object | allow everything | global allow/deny block |
 | `oauth` | object | | set-wide OAuth defaults, overridden per server |
 
@@ -64,12 +64,13 @@ get zero.
 | --- | --- | --- | --- |
 | `name` | string | required | server name used by the meta-tools; a repeated name leaves the later entry unhealthy (`имя уже занято другим сервером`) |
 | `description` | string | empty | shown by `list_servers` and searched by `filter` |
+| `hint` | string | empty | one line `list_servers` shows for this server: when it is the right one and where to start. Known servers get a built-in line; this field overrides it, and a server without either has no `hint` key |
 | `transport` | `stdio` / `http` | inferred | inferred from `url` or `command` when absent |
 | `command` | array or string | | stdio command; see both forms below |
 | `args` | array | empty | arguments appended to a string-form `command` (legacy) |
 | `cwd` | string | empty | working directory; stdio only, must be absolute; mounted read-only inside the sandbox |
 | `env` | object of strings | empty | extra environment for a stdio process |
-| `envAllow` | array of strings | empty | host variables passed through to a stdio process besides the fixed base (`PATH`, `HOME`, `LANG`, `TZ`, `TMPDIR`, `LC_*`, `XDG_*`, `SSL_*`, `NODE_EXTRA_CA_CERTS`); nothing else from the host environment reaches it |
+| `envAllow` | array of strings | empty | host variables passed through to a stdio process besides the fixed base (`PATH`, `HOME`, `LANG`, `TZ`, `TMPDIR`, `LC_*`, `XDG_*`, `SSL_*`, `NODE_EXTRA_CA_CERTS`, and the proxy addresses `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` in both cases plus `NODE_USE_ENV_PROXY`); nothing else from the host environment reaches it, and proxy values are never logged |
 | `url` | string | | HTTP endpoint; http only |
 | `headers` | object of strings | empty | extra headers for every HTTP request |
 | `tags` | array of strings | empty | labels for `list_servers` and `filter` |
@@ -314,7 +315,8 @@ or 403. An empty block is fine.
 A server block is merged over the set-wide block; unset fields fall back to
 the set-wide value, then to the default. Dynamic client registration, PKCE,
 code exchange and refresh are done by the MCP SDK. Tokens are stored in
-`<data dir>/oauth.json`.
+`<data dir>/sets/<id>/oauth.json` for a set the panel runs and in
+`<data dir>/oauth.json` for a standalone `serve`/`stdio` process.
 
 The panel has its own OAuth redirect, which is not a `servers.json` field: it is
 pinned by `MCPRIG_PUBLIC_URL` (see [cli.md](cli.md#panel)), so that a panel

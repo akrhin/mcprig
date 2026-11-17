@@ -15,16 +15,24 @@ This file covers release archives, systemd units, Docker and the on-disk state.
 | archive | `mcprig_<version>_<os>_<arch>.tar.gz` |
 | contents | `mcprig`, `README.md`, `README.ru.md`, `LICENSE`, `deploy/mcprig.service`, `deploy/mcprig-set@.service`, `deploy/mcprig-warm.service`, `deploy/mcprig-warm.timer` |
 | checksum | `checksums.txt` |
-| release | the GitHub workflow runs `goreleaser`, which builds the archives and publishes the release page, and pushes the `slim`/`full` images to GHCR and to the host registry; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
+| release | the GitHub workflow runs `goreleaser` with `--skip=publish`: it builds the archives and `checksums.txt` and publishes nothing by itself; `gh release` creates the GitHub release page, `docker build` pushes the `slim`/`full` images to GHCR, and the host registry is fed by the Gitea workflow `images` on the same tag; notes are the tag's `CHANGELOG.md` section (`scripts/release-notes.sh`) |
 | build | `CGO_ENABLED=0`, `-trimpath`, `-s -w -X main.version=<version>` |
 
-Releases are cut on a `v*` tag by GitHub (`.github/workflows/release.yml`): it
-runs the checks — `gofmt`, `go vet`, tests with `-race`, `govulncheck` — and then
-`goreleaser`, which builds the archives, publishes the release page at
-<https://github.com/akrhin/mcprig/releases> and builds the `slim` and `full`
-images once, pushing them to `ghcr.io/akrhin/mcprig` and, when the registry
-secrets are set, to the host registry as well. A tag can also be released by
-hand: `gh workflow run release.yml -f tag=vX.Y.Z`.
+Releases are cut on a `v*` tag by GitHub (`.github/workflows/release.yml`). `ci`
+does not run on tags, so the release workflow repeats the checks itself after
+`go build ./...`: `go vet ./...` and `go test ./... -race -count=1 -p 1`. Then
+`goreleaser release --clean --skip=publish` builds the four archives and
+`checksums.txt`, `gh release` publishes the page at
+<https://github.com/akrhin/mcprig/releases> (uploading into it when the tag was
+moved), and `docker build`/`docker push` sends `<version>-slim`,
+`<version>-full`, `latest` and `latest-full` to `ghcr.io/akrhin/mcprig`. Nothing
+is published by hand.
+
+The same tag also triggers `.gitea/workflows/images.yml` on Gitea, which builds
+both targets again and pushes them to the host registry — a GitHub runner cannot
+log in there. It is a separate push: the GitHub release neither waits for it nor
+reports its result. A tag can also be released by hand:
+`gh workflow run release.yml -f tag=vX.Y.Z`.
 
 `goreleaser` is not installed on the development host, so archives are built by
 CI, not here. To build the same binary by hand:
@@ -92,18 +100,18 @@ Both are published to GitHub Container Registry, so no login is needed:
 ```bash
 docker pull ghcr.io/akrhin/mcprig:latest        # slim
 docker pull ghcr.io/akrhin/mcprig:latest-full   # full
-docker pull ghcr.io/akrhin/mcprig:0.4.0-slim    # pinned release
-docker pull ghcr.io/akrhin/mcprig:0.4.0-full
+docker pull ghcr.io/akrhin/mcprig:0.6.3-slim    # pinned release
+docker pull ghcr.io/akrhin/mcprig:0.6.3-full
 ```
 
 `latest` and `latest-full` follow the newest release; the version tags pin one
-pair (`0.4.0-slim`, `0.4.0-full` are the current pair).
+pair (`0.6.3-slim`, `0.6.3-full` are the pair of the current release).
 
 Or build them yourself:
 
 ```bash
-docker build --build-arg VERSION=0.4.0 -t mcprig:slim .
-docker build --build-arg VERSION=0.4.0 --target full -t mcprig:full .
+docker build --build-arg VERSION=0.6.3 -t mcprig:slim .
+docker build --build-arg VERSION=0.6.3 --target full -t mcprig:full .
 docker run --rm -p 127.0.0.1:9100:9100 \
   -v "$PWD/servers.json:/config/servers.json:ro" \
   -e MCPRIG_DATA_DIR=/data \
@@ -114,7 +122,7 @@ The image entrypoint is `mcprig`; the default command is
 `serve --config /config/servers.json`; the set listen address comes from
 `transport.host` and `transport.port`, so mount a config whose transport says
 `0.0.0.0` and publish the port you chose. `VERSION` is the version **without**
-the leading `v` — `0.4.0`, not `v0.4.0`; a value that starts with `v` is
+the leading `v` — `0.6.3`, not `v0.6.3`; a value that starts with `v` is
 rejected and the build fails. The working directory is `/data`,
 owned by uid 10001; mount a volume there and set
 `MCPRIG_DATA_DIR=/data` so OAuth tokens and other state survive a restart.

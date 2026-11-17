@@ -16,7 +16,7 @@ context before it asks anything. mcprig puts them behind nine meta-tools, groups
 servers into named sets, runs each set as its own process with its own port and
 key, and manages the whole registry from a web panel.
 
-- Five meta-tools instead of a whole tool catalogue
+- Nine meta-tools instead of a whole tool catalogue
 - One endpoint, one key per named set
 - Registry, keys and live call tail in the panel
 - Set composition, import/export, and a ready-to-paste agent prompt built from a set's tools
@@ -31,14 +31,18 @@ meta-tools, architecture. Русский: [docs/ru](docs/ru/index.md).
 Release archives cover linux and darwin on amd64 and arm64. Linux amd64:
 
 ```bash
-curl -LO https://github.com/akrhin/mcprig/releases/download/v0.4.0/mcprig_0.4.0_linux_amd64.tar.gz
-tar -xzf mcprig_0.4.0_linux_amd64.tar.gz
+curl -LO https://github.com/akrhin/mcprig/releases/download/v0.6.3/mcprig_0.6.3_linux_amd64.tar.gz
+tar -xzf mcprig_0.6.3_linux_amd64.tar.gz
 MCPRIG_PASSWORD=change-me ./mcprig panel
 ```
 
 Open <http://localhost:9091>, sign in as `admin`, add a server, add a set that
 contains it, press **Start**, then issue a key for the set. The panel shows the
-token once: save it to `demo.key` and `chmod 600` it.
+token once; save it where only you can read it:
+
+```bash
+umask 077; printf '%s' '<token>' > demo.key
+```
 
 ![mcprig panel](design/ui/panel.png)
 
@@ -72,11 +76,18 @@ directory: [docs/en/install.md](docs/en/install.md).
 }
 ```
 
-`--client opencode` prints `mcp` JSON, `--client codex` prints a TOML table. For a
-client that spawns the binary itself, drop `--remote` and pass
-`--config ~/.config/mcprig/sets/demo/servers.json` instead: the fragment then
-runs `mcprig stdio` with no port and no key. Both forms with real output:
-[docs/en/cli.md](docs/en/cli.md#init).
+`--client opencode` prints `mcp` JSON, `--client codex` prints a TOML table. The
+port in an endpoint is the set's own: the set header shows it as a chip and the
+top bar prints the full endpoint
+([docs/en/panel.md](docs/en/panel.md#what-it-shows)). For a
+client that spawns the binary itself, drop `--remote` and pass `--config` with
+that set's `servers.json` instead: the fragment then runs `mcprig stdio` with no
+port and no key. The panel writes a set's config into its state directory —
+`$MCPRIG_DATA_DIR/sets/demo/servers.json`, with `MCPRIG_DATA_DIR` defaulting to
+`~/.local/state/mcprig` — while `~/.config/mcprig/sets/demo/servers.json` is the
+file the `mcprig-set@` systemd unit runs
+([docs/en/install.md](docs/en/install.md#state-on-disk)). Both forms with real
+output: [docs/en/cli.md](docs/en/cli.md#init).
 
 ## Architecture
 

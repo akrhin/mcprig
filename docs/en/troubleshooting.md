@@ -12,8 +12,10 @@ Nothing here is hypothetical; each entry ends in the page that has the details.
 `порт 9100 занят другим процессом` / `порт 9100 занят набором other`.
 
 **Cause.** Ports 9100–9199 are shared by sets, the test suites and other services
-on the host; the allocator skips ports a foreign listener already holds, but an
-explicit `port` in the config is checked and refused.
+on the host; the busy check listens on `0.0.0.0`, the address a set binds, so a
+listener on any single host address counts too. The allocator skips ports a
+foreign listener already holds, but an explicit `port` in the config is checked
+and refused.
 
 **What to do.** Let the allocator pick a port, or take a free one.
 `mcprig doctor` lists foreign listeners in that range — they are skipped on
