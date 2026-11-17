@@ -8,6 +8,12 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Fixed
+
+- Panel: choosing a set in the rail opens that set from any page — from the host
+  overview, statistics, all servers; before, the click only changed the window
+  title, and on a fresh install the tabs of a set could not be reached at all.
+
 ## [0.6.5] - 2026-11-17
 
 ### Added

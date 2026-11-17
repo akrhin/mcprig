@@ -26,13 +26,18 @@ stats filters, dialog state, keys/calls pagination guards. Persisted browser
 state is only `mcprig.theme`, `mcprig.palette`, `mcprig.palette.win98`,
 `mcprig.lang` and `mcprig.rail`.
 
-**Screens.** `pageOf()` maps the hash to a page: `#/servers`, `#/vars`, else
-`sets` (`web/app.js:753-757`, markup `web/index.html:131,406,432`).
-A set adds `#/set/<id>` (`web/app.js:760`) and the statistics tab `#/stats/<period>`
-(`web/app.js:4118-4119`); `setTab`/`select` rewrite the hash with
-`history.replaceState` (`web/app.js:3382-3399`, `:1734-1740`). There is no
-`hashchange` listener — navigation happens on click bindings calling
-`applyPage` (`web/app.js:1439-1450`) or `setTab`. Set head `#phead`, tabs
+**Screens.** The address is the state: `pageOf()` maps the hash to a page
+(`#/` host, `#/sets`, `#/stats/<period>`, `#/set/<id>[/<tab>]`, `#/servers`,
+`#/vars`, `web/app.js:846-855`), `routeOf()` adds the set and its tab
+(`:857-870`, unknown tab to overview, `#/sets` with no set is the list),
+`applyPage()` shows one page and repaints the page nav (`:1668-1685`), and
+`route()` runs on load and on every `hashchange` (`:4198-4212`).
+`setTab()` pushes `#/set/<id>/<tab>` (`:3861-3874`), `select()` pushes the set
+address and opens the set page on an explicit choice (rail click, create,
+neighbour after delete) even from the host overview (`:1948-1996`);
+`setHash()` builds it (`:1998-2001`), `setTitle()` names the page (`:2003-2011`).
+The set list at `#/sets` is `renderSetsList()` (`:1635-1666`), the host overview
+`refreshHost()`/`renderHostCalls()` (`:2139`, `:2263`). Set head `#phead`, tabs
 `#tab-overview|#tab-calls|#tab-stats` (`web/index.html:142,177-274`), rail
 `#rail-sets`, details drawer `#side` (`web/index.html:476`), statusbar
 `web/index.html:463-470`. Seven `<dialog>`s: server editor `srv-dlg:500`, server
