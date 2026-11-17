@@ -395,7 +395,9 @@
       'mock.exposeKind': 'expose: unknown kind "{kind}" (allowed {list})',
       'mock.noServer': 'no server {name}',
       'mock.noSet': 'no set {id}',
-      'add.nameRequired': 'a name is required'
+      'add.nameRequired': 'a name is required',
+      'add.nameInvalid': 'name: lowercase latin letters, digits, hyphen and underscore only',
+      'busy.wait': 'an operation is in progress — try again in a moment'
     },
     ru: {
       'title.panel': 'mcprig',
@@ -772,7 +774,9 @@
       'mock.exposeKind': 'expose: неизвестный вид "{kind}" (допустимо {list})',
       'mock.noServer': 'нет сервера {name}',
       'mock.noSet': 'нет набора {id}',
-      'add.nameRequired': 'Укажите имя набора'
+      'add.nameRequired': 'Укажите имя набора',
+      'add.nameInvalid': 'имя: только строчные латинские буквы, цифры, дефис и подчёркивание',
+      'busy.wait': 'идёт операция — повторите через мгновение'
     }
   };
 
@@ -1576,6 +1580,9 @@
 
   /* ---------- плашка ошибки ---------- */
 
+  // общий такт держит st.busy: клик в это окно раньше молча пропадал
+  function busyNote() { fail(t('busy.wait')); }
+
   function fail(msg, err) {
     if (err && window.console) { console.error(err); }
     var bar = $('errbar');
@@ -1596,6 +1603,8 @@
   function loadState() {
     var seq = ++stateSeq;
     return get('/api/state').then(function (data) {
+      // применяется только последний запрос: каждый новый loadState() поднимает
+      // stateSeq, так что дропнутый ответ уже перекрыт более свежим
       if (seq !== stateSeq) { return; }
       if (!data) { return; }
       st.sets = data.sets || [];
@@ -1611,6 +1620,9 @@
       // прямая ссылка на #/set/<id>[/tab] и F5: набор уже выбран из адреса, но
       // его данные (здоровье, вызовы, каталог, профили ключей) никто не просил
       else if (st.boot) { st.boot = false; select(st.sel, true); }
+      // на прямом адресе статистики первый loadStats() уходил вхолостую (наборов
+      // ещё нет) — добираем, как только состояние известно
+      if (st.page === 'stats' && !st.st.facets) { loadStats(); }
       else {
         renderHead();
         renderSetServers();
@@ -1947,7 +1959,7 @@
   // полное поле делает правку одной операцией, без чтения текущего состава.
   function saveSetServers(btn, names) {
     var set = current();
-    if (!set || st.busy) { return; }
+    if (!set || st.busy) { return busyNote(); }
     st.busy = true;
     if (btn) { btn.disabled = true; }
     setSrvErr('');
@@ -2206,7 +2218,7 @@
 
   function refreshHost() {
     // не чаще раза в 8 с: снимок хоста — это N запросов, а /api/state идёт каждые 5
-    if (st.host.busy) { return; }
+    if (st.host.busy) { return busyNote(); }
     if (!st.sets.length && !st.servers.length) { return; }
     if (st.host.at && Date.now() - Date.parse(st.host.at) < 8000) { return; }
     st.host.busy = true;
@@ -2728,7 +2740,7 @@
 
   function saveSrv(e) {
     e.preventDefault();
-    if (st.busy) { return; }
+    if (st.busy) { return busyNote(); }
     var body = collectSrv();
     var editing = st.srvEditing;
     var btn = $('srv-save');
@@ -2780,7 +2792,7 @@
 
   function delSrv() {
     var name = st.srvEditing;
-    if (!name || st.busy) { return; }
+    if (!name || st.busy) { return busyNote(); }
     if (!window.confirm(deleteText(name))) { return; }
     var btn = $('srv-del');
     st.busy = true;
@@ -2799,7 +2811,7 @@
 
   // то же удаление из списка реестра: ошибка уходит в плашку над содержимым
   function delServerRow(name, btn) {
-    if (!name || st.busy) { return; }
+    if (!name || st.busy) { return busyNote(); }
     if (!window.confirm(deleteText(name))) { return; }
     st.busy = true;
     btn.disabled = true;
@@ -2823,7 +2835,7 @@
 
   function delSet() {
     var set = current();
-    if (!set || st.busy) { return; }
+    if (!set || st.busy) { return busyNote(); }
     var name = set.name || set.id;
     if (!window.confirm(t('set.delConfirm', { name: name }))) { return; }
     var btn = $('set-del');
@@ -3108,7 +3120,7 @@
 
   function buildPrompt() {
     var set = current();
-    if (!set || st.busy) { return; }
+    if (!set || st.busy) { return busyNote(); }
     var task = $('prompt-task').value.trim();
     // задача обязательна: демон ответил бы 400, но кнопка не должна обещать
     // сборку, которой не будет
@@ -3304,7 +3316,7 @@
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { envNote(false, t('vars.needName')); $('env-name').focus(); return; }
     if (!value) { envNote(false, t('vars.needValue')); $('env-value').focus(); return; }
     var btn = $('env-save');
-    if (st.busy) { return; }
+    if (st.busy) { return busyNote(); }
     st.busy = true;
     btn.disabled = true;
     send('PUT', '/api/env/' + encodeURIComponent(name), { value: value, store: store })
@@ -3412,6 +3424,12 @@
       .then(function (data) {
         if (seq !== srvLog.seq) { return; }
         renderSrvLog((data && data.logs) || []);
+        if (data && data.error) {
+          // пустой хвост без причины значит «сервер молчал»; причина — отказ чтения
+          var box = $('srvlog-err');
+          box.textContent = t('srvlog.fail') + ' · ' + data.error;
+          box.hidden = false;
+        }
       })
       .catch(function (e) {
         if (seq !== srvLog.seq) { return; }
@@ -4025,7 +4043,7 @@
   /* ---------- действия ---------- */
 
   function act(btn, path, done) {
-    if (st.busy) { return; }
+    if (st.busy) { return busyNote(); }
     st.busy = true;
     var label = btn.textContent;
     btn.disabled = true;
@@ -4641,6 +4659,11 @@
     var portRaw = $('add-port').value.trim();
     var err = $('add-err');
     if (!name) { err.textContent = t('add.nameRequired'); err.hidden = false; return; }
+    // id набора — только строчные латинские, цифры, дефис и подчёркивание;
+    // приводим здесь, чтобы сервер не переименовывал набор молча
+    name = name.toLowerCase().replace(/[^a-z0-9_]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!name) { err.textContent = t('add.nameInvalid'); err.hidden = false; return; }
+    $('add-name').value = name;
     var body = { name: name };
     if (portRaw) { body.port = parseInt(portRaw, 10); }
     send('POST', '/api/sets', body).then(function (set) {
@@ -4665,7 +4688,7 @@
   $('key-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var set = current();
-    if (!set || st.busy) { return; }
+    if (!set || st.busy) { return busyNote(); }
     var label = $('key-label').value.trim();
     var profile = $('key-profile').value;
     var body = {};

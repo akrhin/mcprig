@@ -719,7 +719,9 @@ func tailFile(path string, lines int) ([]string, error) {
 // сервера встречается отдельным словом. Вывод ребёнка пишет процесс набора в
 // serverlogs/<имя>.log (stdout у stdio-сервера занят протоколом), а в лог
 // набора он не попадает вовсе — без файла у сервера был пустой лог.
-func (rt *Runtime) ServerLogs(id, server string, lines int) []string {
+// Второе значение — причина, по которой хвост не прочитан; отсутствие файла
+// причиной не считается: сервер мог просто ничего не писать.
+func (rt *Runtime) ServerLogs(id, server string, lines int) ([]string, error) {
 	if lines <= 0 {
 		lines = 200
 	}
@@ -729,13 +731,17 @@ func (rt *Runtime) ServerLogs(id, server string, lines int) []string {
 			out = append(out, line)
 		}
 	}
+	var failure error
 	if safepath.Name(server) {
 		tail, err := tailFile(ServerLogPath(rt.dataDir, id, server), lines)
 		if err != nil {
 			// «сервер ничего не писал» и «файл не читается» не должны выглядеть
 			// одинаково: второе — повод смотреть диск, а не сервер
-			rt.log.Warn("хвост лога сервера не прочитан",
-				"set", safelog.Value(id), "server", safelog.Value(server), "err", err)
+			if !errors.Is(err, os.ErrNotExist) {
+				failure = err
+				rt.log.Warn("хвост лога сервера не прочитан",
+					"set", safelog.Value(id), "server", safelog.Value(server), "err", err)
+			}
 		} else {
 			out = append(out, tail...)
 		}
@@ -743,7 +749,7 @@ func (rt *Runtime) ServerLogs(id, server string, lines int) []string {
 	if len(out) > lines {
 		out = out[len(out)-lines:]
 	}
-	return out
+	return out, failure
 }
 
 // Close гасит все наборы параллельно в общем бюджете: последовательное ожидание

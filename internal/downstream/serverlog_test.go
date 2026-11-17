@@ -95,3 +95,29 @@ func TestServerLogsFileIsPrivate(t *testing.T) {
 		t.Fatalf("каталог хвоста %o, ожидался 700", perm)
 	}
 }
+
+// TestServerLogsMarkStart: свежий файл получает метку запуска — без неё
+// перезапуск после падения не отличить от первого старта.
+func TestServerLogsMarkStart(t *testing.T) {
+	dir := t.TempDir()
+	logs := NewServerLogs(dir, nil)
+	srv := &config.Server{Name: "dap"}
+	w := logs.Writer(srv)
+	if w == nil {
+		t.Fatal("писатель не создан")
+	}
+	if _, err := w.Write([]byte("вывод сервера\n")); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(ServerLogPath(dir, "dap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.HasPrefix(text, "— запуск ") {
+		t.Fatalf("нет метки запуска: %q", text)
+	}
+	if !strings.Contains(text, "вывод сервера") {
+		t.Fatalf("вывод сервера потерян: %q", text)
+	}
+}

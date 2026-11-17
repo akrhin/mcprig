@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/safepath"
@@ -78,6 +79,13 @@ func (l *ServerLogs) Writer(srv *config.Server) io.Writer {
 		w.size = info.Size()
 	} else {
 		l.warn("размер хвоста не прочитан", srv.Name, err)
+	}
+	// Метка запуска: без неё перезапуск после падения не отличить от первого
+	// старта, а хвост прошлого запуска выглядит как текущий.
+	if w.size == 0 {
+		if _, err := f.WriteString("— запуск " + time.Now().Format("2006-01-02 15:04:05") + " —\n"); err == nil {
+			w.size = int64(len("— запуск 2006-01-02 15:04:05 —\n"))
+		}
 	}
 	l.files[srv.Name] = w
 	return w

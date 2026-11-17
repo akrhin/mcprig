@@ -14,6 +14,21 @@ repository the project is built in.
   set and was empty in practice. The child's stderr now goes to
   `sets/<id>/serverlogs/<name>.log`, capped at 256 KiB and cleared on stop, and
   the dialog appends that tail to the set lines.
+- Server log: each run of the process opens with a `— запуск <date time> —`
+  marker, so a restart after a crash is told apart from the first start; a tail
+  that exists but cannot be read now comes with `error` in the answer and the
+  dialog prints it instead of showing "empty" as if the server were silent.
+- Sets: `POST /api/sets` refused to say anything when the name was outside the
+  id pattern — it renamed the set silently. The id is now taken as typed and a
+  bad one is `400` with the rule in the message; the panel reduces the name to
+  that form in the form and shows the rule instead of sending something else.
+- Panel: one refusal of the first `/api/state` stopped every timer for good —
+  the panel then sat frozen until a reload; the failure is reported and the
+  timers start anyway.
+- Panel: a click that landed while the periodic sync held the panel showed
+  nothing; it now says an operation is in progress.
+- Panel: the statistics page loaded its data only on the second tick when opened
+  by address; it now asks as soon as the sets are known.
 - Panel: the copy button of the endpoint moved the address out of the DOM for the
   second it showed "copied" — switching the language in that window threw
   `Cannot set properties of null`; the feedback now goes to the button label.

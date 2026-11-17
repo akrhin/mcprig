@@ -1707,10 +1707,14 @@ func (m *Manager) apiServerLogs(req *request) error {
 	if !containsName(set.Servers, name) {
 		return notFound("сервер " + name + " не найден в наборе " + id)
 	}
-	writeJSON(req.w, http.StatusOK, map[string]any{
-		"server": name,
-		"logs":   m.rt.ServerLogs(id, name, linesParam(req.r, 200)),
-	})
+	logs, err := m.rt.ServerLogs(id, name, linesParam(req.r, 200))
+	body := map[string]any{"server": name, "logs": logs}
+	// пустой хвост без причины значит «сервер молчал»; причина уходит в ответ,
+	// иначе отказ чтения выглядит как тишина сервера
+	if err != nil {
+		body["error"] = err.Error()
+	}
+	writeJSON(req.w, http.StatusOK, body)
 	return nil
 }
 

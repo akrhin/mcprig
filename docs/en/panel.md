@@ -98,7 +98,10 @@ filtered by that server's name plus the tail of the server process's own stderr
 (`sets/<id>/serverlogs/<name>.log`, cleared when the set stops). The drawer
 reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the lines as
 text; a server that has neither shows `log is empty`, and a failed request keeps
-the lines already shown and reports the reason above them.
+the lines already shown and reports the reason above them. The file starts with a
+`— запуск <date time> —` marker, so a restart after a crash is told apart from the
+first start; when the tail exists but cannot be read, the answer carries `error`
+and the drawer prints it instead of pretending the server was silent.
 
 The **Tools** button of a row switches to the **Tools** tab with that server
 picked in its **Server** filter
@@ -306,13 +309,13 @@ shipped unit, the panel's stdout in a foreground run.
 | `GET /` | panel (redirects to `/login` when auth is on and there is no session) |
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
 | `GET /api/state` | servers, sets, `firstPort` and `version` of the running binary (the footer prints it) — the first paint. A set's `keyMark` is the label its primary key carries in the statistics: the key's label when it has one, otherwise `key:<mark>`; empty for an open set |
-| `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
+| `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body. A set id is lowercase latin letters, digits, hyphen and underscore (`my-lab`); a name outside the pattern is `400` with that rule in the message — the backend no longer renames it silently |
 | `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). The edit is written before it is applied, so a failed apply is never a 500: a restart that did not come back is `failed` (`{"<id>":"<cause>"}`) next to the set view, and a process that refused a reload reports it in the view's `reloadError`, so the panel does not show a saved edit as lost. A change of `port`, or a new `${VAR}` brought by a new server, restarts the set; `open` reaches the live listener by reload. A `token` in the body replaces the primary key and creates one when the set has no active key |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
 | `POST /api/sets/<id>/reload` | apply `servers.json` without a restart: `{"reloaded":true,"generation":N,"applied":[…],"restartNeeded":[…],"error":"…"}`. A stopped set answers `{"reloaded":false,"reason":"набор не запущен"}` and the file is written anyway. A non-empty `restartNeeded` or a set `error` gives `reloaded:false` with the cause in `reason`; a write failure is `500` |
 | `GET /api/sets/<id>/servers` | per-server health for one set |
 | `GET /api/sets/<id>/logs?lines=N` | log tail (default 200 lines) |
-| `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines |
+| `GET /api/sets/<id>/servers/<name>/logs` | one downstream's log lines, oldest first: a `— запуск <date time> —` marker opens each run of the process, and an unreadable tail adds `error` (absent means the server simply wrote nothing) |
 | `GET /api/sets/<id>/tools` | `{"tools":[…]}` — the set's descriptor records: `server`, `tool`, `hash` (as the catalog serves it now), `approvedHash` and `state` (`ok`, `changed`) |
 | `POST /api/sets/<id>/tools/approve` | approve the current descriptor: `{"server":"serena","tool":"find_symbol"}`, or `{"all":true}` for everything currently changed; answers `{"approved":["serena/find_symbol"]}`, empty when nothing needed it. The record is written with `approvedBy: "panel"` |
 | `POST /api/sets/<id>/prompt` | one text for an agent out of three parts: `{"task":"…","intro":"…","servers":["…"]}` → `{"prompt":"…","notes":["…"]}`. `intro` and `servers` are optional, an empty `task` is `400`; tools come from the live catalog with their input schemas, a stopped set falls back to the `tools.lock.json` names and says so in `notes` |

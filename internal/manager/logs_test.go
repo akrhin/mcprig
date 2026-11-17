@@ -167,6 +167,48 @@ func TestServerLogsShowProcessOutput(t *testing.T) {
 	}
 }
 
+// TestServerLogsReportReadFailure: отказ чтения хвоста виден в ответе, иначе
+// пустой список не отличить от «сервер ничего не писал».
+func TestServerLogsReportReadFailure(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "slf", "fake")
+	// Каталог на месте файла: чтение падает с EISDIR, а не с «нет файла».
+	path := ServerLogPath(e.dir, id, "fake")
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	w := e.do(t, http.MethodGet, "/api/sets/"+id+"/servers/fake/logs?lines=10", nil)
+	status(t, w, http.StatusOK)
+	body := decode[struct {
+		Logs  []string `json:"logs"`
+		Error string   `json:"error"`
+	}](t, w)
+	if body.Error == "" {
+		t.Fatalf("отказ чтения хвоста не попал в ответ: %+v", body)
+	}
+}
+
+// TestMentionsMatchesWholeWord: строки лога набора попадают в лог сервера
+// только по имени целиком — «fake» не должен ловить «fake2».
+func TestMentionsMatchesWholeWord(t *testing.T) {
+	cases := []struct {
+		line, name string
+		want       bool
+	}{
+		{"получен вызов сервера fake", "fake", true},
+		{"получен вызов сервера fake2", "fake", false},
+		{"fake: старт", "fake", true},
+		{"сбой в fake-сервис", "fake", false},
+	}
+	for _, c := range cases {
+		if got := mentions(c.line, c.name); got != c.want {
+			t.Fatalf("mentions(%q, %q) = %v, ждали %v", c.line, c.name, got, c.want)
+		}
+	}
+}
+
 // tailFile отбрасывает первую строку окна: она прочитана с середины файла и
 // целой строкой лога не является.
 func TestTailFileDropsPartialFirstLine(t *testing.T) {
