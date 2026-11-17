@@ -482,7 +482,8 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
   await step("Y3 пустые состояния: вкладки пустого набора", async () => {
     await page.click("#add-toggle");
     await page.fill("#add-name", "empty");
-    await page.fill("#add-port", "9191");
+    // порт не задаём: жёсткий 9191 держали остатки прошлых прогонов, и набор не
+    // создавался — панель сама берёт первый свободный
     await page.click("#addform button[type=submit]");
     await waitFor(async () => (await setOf("empty")), 8000);
     await go("#/set/empty/servers");
