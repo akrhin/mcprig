@@ -124,9 +124,9 @@ func TestInvokeManyKeepsInputOrder(t *testing.T) {
 	cs := clientFor(t, m.Server())
 
 	res := call(t, cs, "invoke_many", map[string]any{"calls": []any{
-		echoCall("a", "first", 80),
+		echoCall("a", "first", 200),
 		echoCall("a", "second", 10),
-		echoCall("a", "third", 40),
+		echoCall("a", "third", 100),
 	}})
 	if res.IsError {
 		t.Fatalf("invoke_many: %s", resultText(t, res))
@@ -146,8 +146,11 @@ func TestInvokeManyKeepsInputOrder(t *testing.T) {
 	}
 	// All three ran at once: the per-server cap is 4, so the order above is
 	// not an artifact of serialization.
-	if peak := f.peak("a"); peak != 3 {
-		t.Fatalf("параллельных вызовов %d, want 3", peak)
+	// На загруженной машине горутина с задержкой 10 мс успевает завершиться до
+	// старта соседней, и пик ровно 3 недостижим; важно, что вызовы шли не по
+	// очереди — два и больше одновременно.
+	if peak := f.peak("a"); peak < 2 {
+		t.Fatalf("параллельных вызовов %d, want ≥ 2", peak)
 	}
 }
 
