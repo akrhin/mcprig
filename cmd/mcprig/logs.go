@@ -16,6 +16,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/akrhin/mcprig/internal/safelog"
 )
 
 // logsPollInterval — шаг опроса -f; переменная, чтобы тест не ждал секунду.
@@ -187,7 +189,9 @@ func printLogs(o *logsConfig, lines []logLine) {
 	var b strings.Builder
 	for _, l := range lines {
 		if !o.JSON {
-			b.WriteString(l.Line)
+			// Вывод сервера — чужой текст: управляющие последовательности в
+			// терминале оператора подменяют видимый лог и заголовок окна.
+			b.WriteString(safelog.Value(l.Line))
 			b.WriteByte('\n')
 			continue
 		}

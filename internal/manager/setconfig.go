@@ -211,8 +211,8 @@ func ServerLogPath(dataDir, id, name string) string {
 
 // clearServerLogs убирает хвосты серверов: после остановки или перезапуска
 // строки прошлого запуска не должны выглядеть текущими.
-func clearServerLogs(dataDir, id string) {
-	_ = os.RemoveAll(filepath.Join(dataDir, "sets", id, "serverlogs"))
+func clearServerLogs(dataDir, id string) error {
+	return os.RemoveAll(filepath.Join(dataDir, "sets", id, "serverlogs"))
 }
 
 // migrateLog переносит унаследованный lazy-mcp.log в mcprig.log один раз: без

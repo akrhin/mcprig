@@ -24,6 +24,7 @@ import (
 	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/safelog"
+	"github.com/akrhin/mcprig/internal/safepath"
 )
 
 const (
@@ -394,7 +395,9 @@ func (rt *Runtime) stopProc(id string, p *process) {
 	rt.mu.Unlock()
 	// Хвосты серверов принадлежат прошлому запуску: набор погашен, и панель не
 	// должна выдавать старые строки за текущие.
-	clearServerLogs(rt.dataDir, id)
+	if err := clearServerLogs(rt.dataDir, id); err != nil {
+		rt.log.Warn("хвосты серверов не удалены", "set", safelog.Value(id), "err", err)
+	}
 	if live {
 		rt.log.Info("набор " + safelog.Value(id) + ": остановлен")
 	}
@@ -673,8 +676,14 @@ func tailFile(path string, lines int) ([]string, error) {
 		}
 		off := size - read
 		buf := make([]byte, read)
-		if _, err := f.ReadAt(buf, off); err != nil && !errors.Is(err, io.EOF) {
+		n, err := f.ReadAt(buf, off)
+		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
+		}
+		// Файл усекли между Stat и чтением: незаполненный хвост буфера — нули,
+		// а не текст, поэтому берём только прочитанное.
+		if int64(n) < read {
+			buf = buf[:n]
 		}
 		text := string(buf)
 		if off > 0 {
@@ -720,8 +729,16 @@ func (rt *Runtime) ServerLogs(id, server string, lines int) []string {
 			out = append(out, line)
 		}
 	}
-	if tail, err := tailFile(ServerLogPath(rt.dataDir, id, server), lines); err == nil {
-		out = append(out, tail...)
+	if safepath.Name(server) {
+		tail, err := tailFile(ServerLogPath(rt.dataDir, id, server), lines)
+		if err != nil {
+			// «сервер ничего не писал» и «файл не читается» не должны выглядеть
+			// одинаково: второе — повод смотреть диск, а не сервер
+			rt.log.Warn("хвост лога сервера не прочитан",
+				"set", safelog.Value(id), "server", safelog.Value(server), "err", err)
+		} else {
+			out = append(out, tail...)
+		}
 	}
 	if len(out) > lines {
 		out = out[len(out)-lines:]

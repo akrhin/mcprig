@@ -28,16 +28,18 @@ state is only `mcprig.theme`, `mcprig.palette`, `mcprig.palette.win98`,
 
 **Screens.** The address is the state: `pageOf()` maps the hash to a page
 (`#/` host, `#/sets`, `#/stats/<period>`, `#/set/<id>[/<tab>]`, `#/servers`,
-`#/vars`, `web/app.js:850-857`), `routeOf()` adds the set and its tab
-(`:861-871`, unknown tab to overview, `#/sets` with no set is the list),
-`applyPage()` shows one page and repaints the page nav (`:1681-1698`), and
-`route()` runs on load and on every `hashchange` (`:4220-4232`).
-`setTab()` pushes `#/set/<id>/<tab>` (`:3877-3891`), `select()` pushes the set
+`#/vars`, `web/app.js:853-860`), `routeOf()` adds the set and its tab
+(`:864-874`, unknown tab to overview, `#/sets` with no set is the list),
+`applyPage()` shows one page and repaints the page nav (`:1712-1729`). On load the
+address is read once into the initial state (`routeOf()` at `:878`), so the first
+`loadState()` renders that set (`st.boot`); afterwards `route()` follows every
+`hashchange` (`:4315-4327`).
+`setTab()` pushes `#/set/<id>/<tab>` (`:3953-3967`), `select()` pushes the set
 address and opens the set page on an explicit choice (rail click, create,
-neighbour after delete) even from the host overview (`:1962-2012`);
-`setHash()` builds it (`:2015-2017`), `setTitle()` names the page (`:2020-2028`).
-The set list at `#/sets` is `renderSetsList()` (`:1648-1678`), the host overview
-`refreshHost()`/`renderHostCalls()` (`:2156-2195`, `:2280-2311`). Set head `#phead`, tabs
+delete of the open set) even from the host overview (`:1995-2045`);
+`setHash()` builds it (`:2048-2050`), `setTitle()` names the page (`:2053-2061`).
+The set list at `#/sets` is `renderSetsList()` (`:1679-1709`), the host overview
+`refreshHost()`/`renderHostCalls()` (`:2207-2246`, `:2348-2379`). Set head `#phead`, tabs
 `#tab-overview|#tab-calls|#tab-stats` (`web/index.html:142,177-274`), rail
 `#rail-sets`, details drawer `#side` (`web/index.html:476`), statusbar
 `web/index.html:463-470`. Seven `<dialog>`s: server editor `srv-dlg:500`, server
@@ -96,8 +98,8 @@ to a JSON file (`web/app.js:888-897`), `mockSend` mutates an in-memory copy,
    title, rail, theme menu, page, tab, period, `loadState` (`web/app.js:4074-4100`).
 2. `loadState()` = `GET /api/state` → `st.sets`, `st.servers`, `st.version`;
    renders chrome, rail, registry, filters; picks the URL's set or the first one
-   (`web/app.js:1587-1605`), and `select()` fires `loadHealth`, `loadCalls`,
-   `loadLog` (`web/app.js:3272-3279`, из `select()` `:1962-2012`).
+   (`web/app.js:1596-1632`, stale answers dropped by `stateSeq`), and `select()` fires `loadHealth`, `loadCalls`,
+   `loadLog` (`web/app.js:3272-3279`, из `select()` `:1995-2045`).
 3. Authorization is outside the SPA: unauthenticated `GET /` redirects to
    `/login`, `POST /api/login` sets the cookie (`internal/manager/api.go:415-473`).
 4. Polling: `every(ms, fn)` with `document.hidden` guard (`web/app.js:4114`);

@@ -3,6 +3,7 @@ package downstream
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestConnectWritesChildStderrToServerLogs(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if _, err := (&Connector{Version: "test", ServerLogs: NewServerLogs(dir)}).Connect(ctx, srv); err == nil {
+	if _, err := (&Connector{Version: "test", ServerLogs: NewServerLogs(dir, nil)}).Connect(ctx, srv); err == nil {
 		t.Fatal("want a connect error from a dead server")
 	}
 
@@ -44,7 +45,7 @@ func TestConnectWritesChildStderrToServerLogs(t *testing.T) {
 // Writer один на сервер: переподключение дописывает тот же файл, а не начинает
 // его заново, и хвост не растёт выше предела.
 func TestServerLogsWriterIsSharedAndBounded(t *testing.T) {
-	logs := NewServerLogs(t.TempDir())
+	logs := NewServerLogs(t.TempDir(), nil)
 	srv := &config.Server{Name: "s1"}
 	w := logs.Writer(srv)
 	if w == nil {
@@ -68,5 +69,29 @@ func TestServerLogsWriterIsSharedAndBounded(t *testing.T) {
 	}
 	if nw := logs.Writer(&config.Server{Name: "../escape"}); nw != nil {
 		t.Fatal("имя вне сегмента пути принято")
+	}
+}
+
+// Права хвоста: вывод сервера может нести значения из env, поэтому файл
+// читает только владелец, и каталог тоже.
+func TestServerLogsFileIsPrivate(t *testing.T) {
+	logs := NewServerLogs(t.TempDir(), nil)
+	if w := logs.Writer(&config.Server{Name: "s1"}); w == nil {
+		t.Fatal("Writer вернул nil")
+	}
+	path := ServerLogPath(logs.setDir, "s1")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("файл хвоста %o, ожидался 600", perm)
+	}
+	dir, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := dir.Mode().Perm(); perm != 0o700 {
+		t.Fatalf("каталог хвоста %o, ожидался 700", perm)
 	}
 }

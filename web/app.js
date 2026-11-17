@@ -1608,6 +1608,9 @@
       var ids = st.sets.map(function (s) { return s.id; });
       if (st.list) { st.sel = null; }
       else if (ids.indexOf(st.sel) === -1) { select(ids[0] || null); }
+      // прямая ссылка на #/set/<id>[/tab] и F5: набор уже выбран из адреса, но
+      // его данные (здоровье, вызовы, каталог, профили ключей) никто не просил
+      else if (st.boot) { st.boot = false; select(st.sel, true); }
       else {
         renderHead();
         renderSetServers();
@@ -2328,7 +2331,7 @@
         var why = s.runtime && s.runtime.error;
         if (why) {
           var note = state.appendChild(el('span', 'cell-reason'));
-          note.textContent = why.length > 60 ? why.slice(0, 60) + '…' : why;
+          note.textContent = why;
           note.title = why;
           note.tabIndex = 0;
           note.setAttribute('role', 'button');
@@ -2828,14 +2831,12 @@
     st.busy = true;
     btn.disabled = true;
     setDelErr('');
+    // удалили открытый набор — сразу к списку: иначе loadState успевает выбрать
+    // соседа, записать его в адрес и мигнуть чужой панелью, а «назад» со списка
+    // ведёт на набор, который человек не выбирал
+    if (wasSel) { st.list = true; st.sel = null; history.pushState(null, '', '#/sets'); }
     send('DELETE', '/api/sets/' + encodeURIComponent(set.id), null, true)
       .then(function () { return loadState(); })
-      .then(function () {
-        // удалили открытый набор — возвращаемся к списку: сосед по списку
-        // оказывается выбранным сам, и это читается как «набор не тот»
-        if (!wasSel) { return; }
-        location.hash = '#/sets';
-      })
       .catch(function (err) { setDelErr(err.message); })
       .then(function () { st.busy = false; btn.disabled = false; });
   }
@@ -3212,7 +3213,9 @@
       // Причина провала обрезана в строке: нажатие раскрывает её целиком,
       // title остаётся для мыши. На тач-экране подсказки не существует.
       if (c.failed && c.error) {
-        var why = el('span', 'call-err', ' · ' + (c.error.length > 80 ? c.error.slice(0, 80) + '…' : c.error));
+        // текст целиком: обрезку в строке делает CSS, а нажатие раскрывает то же
+        // место — иначе на тач-экране полной причины не увидеть ничем
+        var why = el('span', 'call-err', ' · ' + c.error);
         why.title = c.error;
         why.tabIndex = 0;
         why.setAttribute('role', 'button');
@@ -4128,7 +4131,9 @@
   // уже сохранена, и молчать об этом нельзя.
   function saveNote(keyID, input, btn) {
     var set = current();
-    if (!set || st.busy) { return; }
+    // Двойной клик отсекает кнопка; общий st.busy трогать нельзя: такт обзора
+    // держит его во время автовыбора, и сохранение подписи молча пропадало.
+    if (!set || btn.disabled) { return; }
     st.busy = true;
     btn.disabled = true;
     show($('keys-warn'), false);
@@ -4706,8 +4711,10 @@
     revoke.disabled = true;
     // отзыв активного ключа останавливает набор: это несколько секунд, и молчать
     // в них нельзя — кнопка гаснет, но причина не видна
-    $('keys-warn').textContent = t('keys.revoking');
-    show($('keys-warn'), true);
+    var warnBox = $('keys-warn');
+    warnBox.className = 'form-alert';
+    warnBox.textContent = t('keys.revoking');
+    show(warnBox, true);
     send('DELETE', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' +
       encodeURIComponent(revoke.dataset.revoke)).then(function (r) {
       return loadState().then(function () {
@@ -4715,13 +4722,20 @@
         renderKeys(now);
         // Отзыв активного ключа останавливает набор: без токена он не слушает.
         // Молчать об этом нельзя — панель выглядела бы просто «остановленной».
-        show($('keys-warn'), false);
+        show(warnBox, false);
         if (r && r.wasActive && !(now.runtime && now.runtime.running)) {
-          $('keys-warn').textContent = t('keys.revokedStopped');
-          show($('keys-warn'), true);
+          warnBox.className = 'form-alert form-alert-warn';
+          warnBox.textContent = t('keys.revokedStopped');
+          show(warnBox, true);
         }
       });
-    }).catch(function () { show($('keys-warn'), false); revoke.disabled = false; });
+    }).catch(function (e) {
+      // Отказ DELETE уже показан fail(); здесь — то, что пришло от loadState:
+      // иначе ключ остаётся «активным», а человеку не сказано ни слова.
+      show(warnBox, false);
+      revoke.disabled = false;
+      fail(e.message, e);
+    });
   });
 
   $('key-list').addEventListener('keydown', function (e) {

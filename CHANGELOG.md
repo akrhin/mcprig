@@ -36,6 +36,22 @@ repository the project is built in.
 - Panel: the state badge of a set (sets list, host overview, servers table) took
   its colour from a class that does not exist and showed as a black dot —
   `paintBadge` now accepts both spellings the callers use.
+- Panel: a direct link to `#/set/<id>/<tab>` and a reload on it left the page
+  half-filled (health, calls and the tool catalogue arrived only with the 5 s
+  tick, the key profiles never); the first state now loads the set the address
+  names.
+- Panel: the saved key label was silently dropped while the overview tick held
+  the busy flag, and a refused refresh after a revoke said nothing.
+- Panel: the reason of a failed call and of a stopped set was cut to 80/60
+  characters in the markup itself, so pressing it on a touch screen could not
+  reveal the rest; the DOM carries the whole text and only the line clamps it.
+- Panel: deleting the open set jumped to the neighbour in the address bar before
+  returning to the list, leaving a foreign set in the history.
+- CLI: `mcprig logs` printed the child's stderr as is, so escape sequences from a
+  server could rewrite the operator's terminal; control characters are stripped.
+- Server log: a failed write, truncate or cleanup of the tail is now reported in
+  the set log instead of leaving "log is empty" for weeks, and one oversized
+  write can no longer push the file over its cap.
 
 ## [0.6.5] - 2026-11-17
 
