@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/safelog"
 	"github.com/akrhin/mcprig/internal/safepath"
 )
 
@@ -30,10 +31,10 @@ func (l *ServerLogs) warn(what, server string, err error) {
 		return
 	}
 	if err != nil {
-		l.log.Warn("хвост сервера: "+what, "server", server, "err", err)
+		l.log.Warn("хвост сервера: "+what, "server", safelog.Value(server), "err", safelog.Value(err.Error()))
 		return
 	}
-	l.log.Warn("хвост сервера: "+what, "server", server)
+	l.log.Warn("хвост сервера: "+what, "server", safelog.Value(server))
 }
 
 // serverLogLimit — сколько байт вывода держим на сервер. Хвост читается окном

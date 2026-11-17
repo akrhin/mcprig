@@ -396,7 +396,7 @@ func (rt *Runtime) stopProc(id string, p *process) {
 	// Хвосты серверов принадлежат прошлому запуску: набор погашен, и панель не
 	// должна выдавать старые строки за текущие.
 	if err := clearServerLogs(rt.dataDir, id); err != nil {
-		rt.log.Warn("хвосты серверов не удалены", "set", safelog.Value(id), "err", err)
+		rt.log.Warn("хвосты серверов не удалены", "set", safelog.Value(id), "err", safelog.Value(err.Error()))
 	}
 	if live {
 		rt.log.Info("набор " + safelog.Value(id) + ": остановлен")

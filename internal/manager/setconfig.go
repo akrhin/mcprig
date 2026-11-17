@@ -16,6 +16,7 @@ import (
 	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/safelog"
+	"github.com/akrhin/mcprig/internal/safepath"
 	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/akrhin/mcprig/internal/toollock"
 	"github.com/akrhin/mcprig/internal/toolout"
@@ -212,6 +213,9 @@ func ServerLogPath(dataDir, id, name string) string {
 // clearServerLogs убирает хвосты серверов: после остановки или перезапуска
 // строки прошлого запуска не должны выглядеть текущими.
 func clearServerLogs(dataDir, id string) error {
+	if !safepath.Name(id) {
+		return fmt.Errorf("имя набора %q вне шаблона", id)
+	}
 	return os.RemoveAll(filepath.Join(dataDir, "sets", id, "serverlogs"))
 }
 

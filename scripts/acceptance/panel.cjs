@@ -534,7 +534,9 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
 
   await browser.close();
   const failed = results.filter(r => !r.pass);
-  require("fs").writeFileSync("/tmp/opencode/lane-a.json", JSON.stringify(results, null, 1));
+  if (process.env.ACC_OUT) {
+    require("fs").writeFileSync(process.env.ACC_OUT, JSON.stringify(results, null, 1), { mode: 0o600 });
+  }
   console.log(JSON.stringify({ total: results.length, failed: failed.length, failedList: failed.map(f => f.name + " :: " + f.why) }, null, 1));
   process.exit(failed.length ? 1 : 0);
 })();
