@@ -43,7 +43,10 @@ type Server struct {
 	// Expose — какие поверхности сервера прокси отдаёт клиенту: "resources"
 	// и/или "prompts". Пусто — ни одной: без явного разрешения клиент видит
 	// только инструменты.
-	Expose      []string     `json:"expose,omitempty"`
+	Expose []string `json:"expose,omitempty"`
+	// Hint — одна строка «для чего сервер и с чего начать»: list_servers
+	// показывает её агенту вместо встроенной подсказки по имени сервера.
+	Hint        string       `json:"hint,omitempty"`
 	Permissions *Permissions `json:"permissions,omitempty"`
 	OAuth       *OAuth       `json:"oauth,omitempty"`
 	Sandbox     *Sandbox     `json:"sandbox,omitempty"`
@@ -367,12 +370,14 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 		Sandbox     json.RawMessage `json:"sandbox"`
 		EnvAllow    []string        `json:"envAllow"`
 		Expose      json.RawMessage `json:"expose"`
+		Hint        string          `json:"hint"`
 	}
 	var r raw
 	if err := json.Unmarshal(data, &r); err != nil {
 		return err
 	}
 	s.Name, s.Description, s.Cwd, s.URL, s.Tags = r.Name, r.Description, r.Cwd, r.URL, r.Tags
+	s.Hint = r.Hint
 	s.Transport = TransportKind(r.Transport)
 	s.Enabled = r.Enabled == nil || *r.Enabled
 	if len(r.Command) > 0 {

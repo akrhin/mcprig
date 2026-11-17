@@ -93,13 +93,20 @@ func ReadFile(path string) (File, error) {
 // отдаёт правку и пишет, если fn сказал, что изменил. Панель и процесс набора
 // пишут один файл из разных процессов, и без блокировки поздняя запись
 // затирала чужое одобрение.
+//
+// Битый файл — ошибка, а не пустой список: иначе все дескрипторы одобрились бы
+// заново как новые, и карантин снялся бы сам. Отсутствующий файл — обычный
+// старт набора, правка применяется.
 func Update(path string, fn func(f *File) bool) error {
 	unlock, err := lock(path + ".lock")
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	f := Read(path)
+	f, err := ReadFile(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	if !fn(&f) {
 		return nil
 	}

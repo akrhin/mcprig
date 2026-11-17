@@ -156,6 +156,21 @@ func sweepDir(dir string, cfg Config, now time.Time) (Report, error) {
 	}
 	var rep Report
 	var total int64
+	var failed int
+	var firstErr error
+	remove := func(e entry) bool {
+		if err := os.Remove(e.path); err != nil {
+			failed++
+			if firstErr == nil {
+				firstErr = err
+			}
+			return false
+		}
+		_ = os.Remove(OwnerPath(e.path))
+		rep.Removed++
+		rep.Freed += e.size
+		return true
+	}
 	fresh := make([]entry, 0, len(list))
 	for _, de := range list {
 		if de.IsDir() || strings.HasSuffix(de.Name(), ".owner") {
@@ -166,34 +181,32 @@ func sweepDir(dir string, cfg Config, now time.Time) (Report, error) {
 			continue // файл исчез между чтением каталога и Stat
 		}
 		e := entry{filepath.Join(dir, de.Name()), info.Size(), info.ModTime()}
-		if now.Sub(e.mod) > cfg.TTL && os.Remove(e.path) == nil {
-			_ = os.Remove(OwnerPath(e.path))
-			rep.Removed++
-			rep.Freed += e.size
+		// Неудалённый файл остаётся живым: иначе потолок объёма посчитает его
+		// освобождённым, и следующий проход не попробует снова.
+		if now.Sub(e.mod) > cfg.TTL && remove(e) {
 			continue
 		}
 		fresh = append(fresh, e)
 		total += e.size
 	}
-	if total <= cfg.Max {
-		return rep, nil
+	if total > cfg.Max {
+		// Превышен объём: самые старые первыми, но не моложе minAge — свежий
+		// файл может ещё читаться по пути из маркера.
+		sort.Slice(fresh, func(i, j int) bool { return fresh[i].mod.Before(fresh[j].mod) })
+		for _, e := range fresh {
+			if total <= cfg.Max {
+				break
+			}
+			if now.Sub(e.mod) < minAge {
+				continue
+			}
+			if remove(e) {
+				total -= e.size
+			}
+		}
 	}
-	// Превышен объём: самые старые первыми, но не моложе minAge — свежий файл
-	// может ещё читаться по пути из маркера.
-	sort.Slice(fresh, func(i, j int) bool { return fresh[i].mod.Before(fresh[j].mod) })
-	for _, e := range fresh {
-		if total <= cfg.Max {
-			break
-		}
-		if now.Sub(e.mod) < minAge {
-			continue
-		}
-		if os.Remove(e.path) == nil {
-			_ = os.Remove(OwnerPath(e.path))
-			rep.Removed++
-			rep.Freed += e.size
-			total -= e.size
-		}
+	if failed > 0 {
+		return rep, fmt.Errorf("не удалось удалить %d файлов: %w", failed, firstErr)
 	}
 	return rep, nil
 }

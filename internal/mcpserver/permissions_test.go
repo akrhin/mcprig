@@ -1,6 +1,9 @@
 package mcpserver
 
 import (
+	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/akrhin/mcprig/internal/config"
@@ -137,5 +140,78 @@ func TestDenyReason(t *testing.T) {
 				t.Fatalf("msg = %q, want %q", msg, tc.wantMsg)
 			}
 		})
+	}
+}
+
+// permissions.deny скрывает команду из каталога и схем: ключ не должен искать
+// работу через имя, которое invoke_command отклонит. Сам invoke остаётся
+// отказом политики, а не «неизвестным инструментом».
+func TestPermissionsFilterCatalog(t *testing.T) {
+	perms := &config.Permissions{Rules: []config.Rule{
+		{Server: "alpha", Pattern: "danger-*", Action: config.PermissionDeny, Message: "запрещено набором"},
+	}}
+	m := profileManager(t, nil, perms)
+	ctx := context.Background()
+
+	res, err := m.listCommands(ctx, toolReq("list_commands", `{"server":"alpha"}`))
+	if err != nil {
+		t.Fatalf("listCommands: %v", err)
+	}
+	names := listNames(t, res)
+	if hasName(names, "danger-zone") {
+		t.Fatalf("deny отдал запрещённый инструмент: %v", names)
+	}
+	if !hasName(names, "echo") {
+		t.Fatalf("deny унёс разрешённые: %v", names)
+	}
+
+	// Мультисерверный запрос фильтруется так же.
+	res, err = m.listCommands(ctx, toolReq("list_commands", `{"servers":["alpha","beta"]}`))
+	if err != nil {
+		t.Fatalf("listCommands: %v", err)
+	}
+	var byServer map[string][]struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(resultText(t, res)), &byServer); err != nil {
+		t.Fatalf("разбор: %v", err)
+	}
+	for _, c := range byServer["alpha"] {
+		if c.Name == "danger-zone" {
+			t.Fatalf("alpha отдал запрещённый инструмент")
+		}
+	}
+	// Правило привязано к alpha: соседа оно не задевает.
+	if len(byServer["beta"]) == 0 {
+		t.Fatalf("правило alpha опустошило beta")
+	}
+
+	// describe_commands: схемы запрещённого нет, имя — в missing.
+	res, err = m.describeCommands(ctx, toolReq("describe_commands", `{"server":"alpha","command_names":["danger-zone","echo"]}`))
+	if err != nil || res.IsError {
+		t.Fatalf("describeCommands: %v %s", err, resultText(t, res))
+	}
+	var out describeOut
+	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
+		t.Fatalf("разбор схем: %v", err)
+	}
+	if len(out.Commands) != 1 || out.Commands[0].Name != "echo" {
+		t.Fatalf("схемы запрещённого: %+v", out.Commands)
+	}
+	if len(out.Missing) != 1 || out.Missing[0] != "danger-zone" {
+		t.Fatalf("missing: %v", out.Missing)
+	}
+
+	// Вызов — отказ правила, а не подмена на «неизвестный инструмент».
+	res, err = m.invokeCommand(ctx, toolReq("invoke_command", `{"server":"alpha","command_name":"danger-zone"}`))
+	if err != nil {
+		t.Fatalf("invokeCommand: %v", err)
+	}
+	text := resultText(t, res)
+	if !res.IsError || !strings.Contains(text, "запрещено набором") {
+		t.Fatalf("ждали отказ политики, получили %q", text)
+	}
+	if strings.Contains(text, "неизвестн") {
+		t.Fatalf("отказ выдан за неизвестный инструмент: %q", text)
 	}
 }

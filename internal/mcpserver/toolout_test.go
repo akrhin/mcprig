@@ -36,11 +36,11 @@ func dumpPath(t *testing.T, text string) string {
 		t.Fatalf("нет маркера с путём: %q", text)
 	}
 	rest := text[i+len(lead):]
-	j := strings.Index(rest, "]")
-	if j < 0 {
-		t.Fatalf("маркер не закрыт: %q", text)
+	// Маркер живёт и в сыром тексте («… — путь]»), и внутри JSON-документа.
+	if j := strings.IndexAny(rest, "]\"\n"); j >= 0 {
+		rest = rest[:j]
 	}
-	return rest[:j]
+	return rest
 }
 
 // The file carries the whole answer even far past the old 4 MiB ceiling: a

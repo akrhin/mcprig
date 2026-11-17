@@ -14,6 +14,11 @@ import (
 var baseEnvKeep = map[string]bool{
 	"PATH": true, "HOME": true, "LANG": true, "TZ": true, "TMPDIR": true,
 	"NODE_EXTRA_CA_CERTS": true,
+	// Прокси — адрес сети, а не секрет; без них stdio-сервер за прокси видит
+	// «нет сети» и врёт про аутентификацию. Значения не логируются.
+	"HTTP_PROXY": true, "HTTPS_PROXY": true, "NO_PROXY": true,
+	"http_proxy": true, "https_proxy": true, "no_proxy": true,
+	"NODE_USE_ENV_PROXY": true,
 }
 
 var baseEnvPrefixes = []string{"LC_", "XDG_", "SSL_"}

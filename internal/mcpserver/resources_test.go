@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -111,9 +110,15 @@ func TestResourceTruncatedAndSpilled(t *testing.T) {
 	m := resourceManager(t, &config.Config{Servers: []*config.Server{srv}})
 
 	res := call(t, clientFor(t, m.Server()), "read_resource", map[string]any{"server": "alpha", "uri": "test://big"})
+	// Ответ на большой ресурс — тоже JSON, поэтому усечение структурное.
 	text := resultText(t, res)
-	if !regexp.MustCompile(`\[обрезано: \d+ из \d+ байт, полный ответ — `).MatchString(text) {
-		t.Fatalf("нет маркера усечения: %q", text[:min(len(text), 200)])
+	var out []any
+	if err := json.Unmarshal([]byte(text), &out); err != nil {
+		t.Fatalf("усечённый ресурс перестал быть JSON: %v", err)
+	}
+	last, _ := out[len(out)-1].(string)
+	if !strings.Contains(last, "ответ усечён") {
+		t.Fatalf("нет признака усечения: %q", text[:min(len(text), 200)])
 	}
 	path := dumpPath(t, text)
 	if !strings.HasPrefix(path, dir) {

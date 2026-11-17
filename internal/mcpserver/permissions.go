@@ -74,3 +74,26 @@ func blockedResult(serverName, command, message string) *mcp.CallToolResult {
 		Meta:    mcp.Meta{"lazyMcpPolicy": "blocked"},
 	}
 }
+
+// catalogPermissions drops the commands permissions deny, so the catalog never
+// offers a name invoke_command refuses: a rule or a profile that hides a call
+// must hide it everywhere the key can look.
+func (m *Manager) catalogPermissions(cmds []commandInfo) []commandInfo {
+	global := m.config().Permissions
+	perServer := make(map[string]*config.Permissions, 2)
+	out := make([]commandInfo, 0, len(cmds))
+	for _, cmd := range cmds {
+		srvPerms, seen := perServer[cmd.Server]
+		if !seen {
+			if e := m.find(cmd.Server); e != nil {
+				srvPerms = e.server().Permissions
+			}
+			perServer[cmd.Server] = srvPerms
+		}
+		if _, denied := denyReason(global, srvPerms, cmd.Server, cmd.Name); denied {
+			continue
+		}
+		out = append(out, cmd)
+	}
+	return out
+}

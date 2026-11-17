@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"reflect"
 	"strings"
@@ -43,8 +44,29 @@ func TestInvokeCommandTimeout(t *testing.T) {
 	if !res.IsError {
 		t.Fatal("медленный вызов должен истечь по таймауту")
 	}
-	if text := resultText(t, res); !strings.Contains(text, "таймаут вызова 20 мс") {
+	text := resultText(t, res)
+	if !strings.Contains(text, "таймаут вызова 20 мс") {
 		t.Fatalf("want a timeout naming 20 мс, got %q", text)
+	}
+	// Имя сервера и команды: без них отказ не говорит, что именно встало.
+	if !strings.Contains(text, "slow/wait") {
+		t.Fatalf("таймаут не называет сервер и команду: %q", text)
+	}
+}
+
+// callTimeout wraps the cause: errors.Is sees the deadline through it.
+func TestCallTimeoutWrapsCause(t *testing.T) {
+	m := New(&config.Config{RequestTimeout: 20}, "test", nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	<-ctx.Done()
+
+	err := m.callTimeout(ctx, 0, "alpha", "ping")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("причина потеряна: %v", err)
+	}
+	if !strings.Contains(err.Error(), "alpha/ping") {
+		t.Fatalf("нет адреса вызова: %v", err)
 	}
 }
 

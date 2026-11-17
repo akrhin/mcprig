@@ -45,6 +45,17 @@ func Open(dir string) (*Store, error) {
 			if rerr := os.Rename(s.path, backup); rerr != nil {
 				return nil, fmt.Errorf("реестр %s не разобран: %w. Отложить файл не удалось: %w", s.path, uerr, rerr)
 			}
+			// Файл отложен, реестр пуст: без записи в Dropped() владелец видит
+			// «всё пропало» и пересоздаёт наборы с новыми ключами поверх живых
+			// клиентов. Содержимое не разобрать, поэтому счёт наборов — по
+			// каталогам, оставшимся на диске.
+			lost := 0
+			if ents, derr := os.ReadDir(filepath.Join(dir, "sets")); derr == nil {
+				lost = len(ents)
+			}
+			s.dropped = append(s.dropped, fmt.Sprintf(
+				"реестр %s не разобран (%v), отложен в %s: наборы и серверы потеряны, каталогов наборов на диске %d, байт %d",
+				s.path, uerr, backup, lost, len(raw)))
 		} else {
 			s.data = data
 			s.validateProfiles(raw)
@@ -571,6 +582,8 @@ func (s *Store) IssueKey(setID, profile, label string) (string, error) {
 	key := newKey(now)
 	key.Profile = strings.TrimSpace(profile)
 	key.Label = strings.TrimSpace(label)
+	// note — прежнее имя подписи: старый бинарь читает только его.
+	key.Note = key.Label
 	keys = append(keys, key)
 	cp := *set
 	cp.Keys = keys
@@ -692,8 +705,12 @@ func (s *Store) allocPortLocked() (int, error) {
 // portBusy — порт занят в системе, а не только в реестре. Между проверкой и
 // стартом набора порт может занять кто-то ещё — тогда start вернёт «порт занят»,
 // это осознанно.
+//
+// Проба идёт на wildcard-адрес: набор слушает 0.0.0.0 (listenHost(bindIP)), и
+// слушатель на конкретном адресе хоста конфликтует с этим биндом, а проба на
+// 127.0.0.1 его не видела.
 func portBusy(port int) bool {
-	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		return true
 	}

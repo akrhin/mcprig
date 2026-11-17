@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,8 +78,44 @@ func TestInvokeCommandTruncatesOversizeAnswer(t *testing.T) {
 	}
 }
 
+// Ответ под лимитом уходит байт-в-байт и не заводит файл в tool-out: иначе
+// каждая мелочь оставляла бы мусор и маркер усечения.
+func TestUnderLimitAnswerUntouched(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MCPRIG_DATA_DIR", dir)
+	const fullText = "короткий ответ: 42"
+	cs := clientFor(t, managerWithTextTool(t, fullText).Server())
+
+	text := resultText(t, call(t, cs, "invoke_command", map[string]any{"server": "big", "command_name": "big"}))
+	if text != fullText {
+		t.Fatalf("ответ под лимитом изменён: %q", text)
+	}
+	if entries, err := os.ReadDir(filepath.Join(dir, "tool-out")); err == nil && len(entries) > 0 {
+		t.Fatalf("под лимитом создан файл в tool-out: %v", entries)
+	}
+}
+
+// maxBytes сверх потолка отвергается: иначе «побольше» молча означало бы
+// «сколько разрешено» уже после чтения аргументов.
+func TestInvokeCommandRejectsOversizeMaxBytes(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MCPRIG_DATA_DIR", dir)
+	cs := clientFor(t, managerWithTextTool(t, "ответ").Server())
+
+	res := call(t, cs, "invoke_command", map[string]any{
+		"server": "big", "command_name": "big", "maxBytes": maxAllowedBytes + 1,
+	})
+	if !res.IsError {
+		t.Fatalf("maxBytes сверх потолка принят: %s", resultText(t, res))
+	}
+	if text := resultText(t, res); !strings.Contains(text, "допустимо не больше 1048576") {
+		t.Fatalf("отказ не называет потолок: %q", text)
+	}
+}
+
 // Усечение structuredContent обязано называть файл: клиент со structured-смыслом
 // (ticktick и подобные) иначе получает пустоту и не знает, где искать данные.
+// Конверт режется структурно, поэтому остаётся валидным JSON.
 func TestTruncatedStructuredAnswerNamesFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("MCPRIG_DATA_DIR", dir)
@@ -103,22 +140,25 @@ func TestTruncatedStructuredAnswerNamesFile(t *testing.T) {
 	cs := clientFor(t, m.Server())
 
 	text := resultText(t, call(t, cs, "invoke_command", map[string]any{"server": "big", "command_name": "big"}))
-	const phrase = "[structuredContent больше maxBytes: полный ответ в файле]"
-	if !strings.Contains(text, phrase) {
-		t.Fatalf("нет пометки про structuredContent: %q", text)
+	var doc struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+		StructuredContent struct {
+			Items string `json:"items"`
+		} `json:"structuredContent"`
+		Truncated string `json:"_truncated"`
 	}
-	const marker = "полный ответ — "
-	i := strings.Index(text, marker)
-	if i < 0 {
-		t.Fatalf("нет маркера усечения: %q", text)
+	if err := json.Unmarshal([]byte(text), &doc); err != nil {
+		t.Fatalf("конверт перестал быть JSON: %v (%q)", err, text)
 	}
-	rest := text[i+len(marker):]
-	end := strings.Index(rest, "]")
-	if end < 0 {
-		t.Fatalf("нет конца пути в маркере: %q", rest)
+	if len(doc.Content) != 1 || doc.Content[0].Text != "ticktick" {
+		t.Fatalf("усечение потеряло текст конверта: %+v", doc.Content)
 	}
-	path := rest[:end]
-	data, err := os.ReadFile(path)
+	if n := len(doc.StructuredContent.Items); n == 0 || n >= 40000 {
+		t.Fatalf("structuredContent не укорочен: %d", n)
+	}
+	data, err := os.ReadFile(dumpPath(t, doc.Truncated))
 	if err != nil {
 		t.Fatalf("полный ответ не выгружен: %v", err)
 	}
@@ -127,53 +167,62 @@ func TestTruncatedStructuredAnswerNamesFile(t *testing.T) {
 	}
 }
 
-// An answer that fits is returned untouched: no marker, no file.
-func TestInvokeCommandSmallAnswerUntouched(t *testing.T) {
+// Длинная строка внутри JSON: ответ остаётся валидным документом, признак
+// усечения — в самом документе, полный ответ — в названном файле.
+func TestTruncatedJSONStaysValid(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("MCPRIG_DATA_DIR", dir)
-	cs := clientFor(t, managerWithTextTool(t, "short").Server())
+	answer := `{"total":1,"items":[{"id":1,"note":"` + strings.Repeat("z", 50000) + `"}]}`
+	cs := clientFor(t, managerWithTextTool(t, answer).Server())
 
-	res := call(t, cs, "invoke_command", map[string]any{"server": "big", "command_name": "big"})
-	if text := resultText(t, res); text != "short" {
-		t.Fatalf("малый ответ изменён: %q", text)
+	text := resultText(t, call(t, cs, "invoke_command", map[string]any{"server": "big", "command_name": "big"}))
+	if len(text) > defaultMaxBytes {
+		t.Fatalf("ответ больше лимита: %d байт", len(text))
 	}
-	if entries, err := os.ReadDir(filepath.Join(dir, "tool-out")); err == nil && len(entries) != 0 {
-		t.Fatalf("файл появился под лимитом: %v", entries)
+	var doc struct {
+		Total int `json:"total"`
+		Items []struct {
+			ID   int    `json:"id"`
+			Note string `json:"note"`
+		} `json:"items"`
+		Truncated string `json:"_truncated"`
 	}
-
-	// An explicit cap above the answer keeps it untouched as well.
-	big := strings.Repeat("y", 50000)
-	cs = clientFor(t, managerWithTextTool(t, big).Server())
-	res = call(t, cs, "invoke_command", map[string]any{
-		"server": "big", "command_name": "big", "maxBytes": 100000,
-	})
-	if text := resultText(t, res); text != big {
-		t.Fatalf("ответ под явным лимитом изменён: %d байт", len(text))
+	if err := json.Unmarshal([]byte(text), &doc); err != nil {
+		t.Fatalf("ответ перестал быть JSON: %v (%q)", err, text)
+	}
+	if doc.Total != 1 || len(doc.Items) != 1 || doc.Items[0].ID != 1 {
+		t.Fatalf("усечение потеряло структуру: %+v", doc)
+	}
+	if n := len(doc.Items[0].Note); n == 0 || n >= 50000 {
+		t.Fatalf("строка не укорочена: %d", n)
+	}
+	data, err := os.ReadFile(dumpPath(t, doc.Truncated))
+	if err != nil {
+		t.Fatalf("полный ответ не выгружен: %v", err)
+	}
+	if !strings.Contains(string(data), strings.Repeat("z", 50000)) {
+		t.Fatalf("в файле нет полного ответа: %d байт", len(data))
 	}
 }
 
-// maxBytes is validated like the other arguments: only 0..1048576.
-func TestInvokeCommandMaxBytesValidation(t *testing.T) {
-	cs := clientFor(t, managerWithTextTool(t, "x").Server())
+// Не-JSON ответ режется как раньше, но сообщение честно говорит, что он усечён
+// и где лежит полный.
+func TestTruncatedRawTextNamesFullAnswer(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MCPRIG_DATA_DIR", dir)
+	fullText := strings.Repeat("строка ", 5000)
+	cs := clientFor(t, managerWithTextTool(t, fullText).Server())
 
-	cases := []struct {
-		name string
-		arg  any
-		want string
-	}{
-		{"non-numeric", "abc", "maxBytes"},
-		{"negative", -1, "maxBytes: не может быть отрицательным"},
-		{"too big", 2000000, "maxBytes: допустимо не больше 1048576 байт"},
+	text := resultText(t, call(t, cs, "invoke_command", map[string]any{"server": "big", "command_name": "big"}))
+	if !strings.Contains(text, "[обрезано: ") || !strings.Contains(text, "полный ответ — ") {
+		t.Fatalf("сообщение не говорит про усечение и полный ответ: %q", text)
 	}
-	for _, tc := range cases {
-		res := call(t, cs, "invoke_command", map[string]any{
-			"server": "big", "command_name": "big", "maxBytes": tc.arg,
-		})
-		if !res.IsError {
-			t.Fatalf("%s: ожидалась ошибка", tc.name)
-		}
-		if text := resultText(t, res); !strings.Contains(text, tc.want) {
-			t.Fatalf("%s: ошибка не называет причину: %q", tc.name, text)
-		}
+	path := dumpPath(t, text)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("полный ответ не выгружен: %v", err)
+	}
+	if string(data) != fullText {
+		t.Fatalf("файл не равен полному ответу: %d байт", len(data))
 	}
 }

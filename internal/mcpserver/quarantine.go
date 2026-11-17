@@ -61,7 +61,9 @@ func (m *Manager) observe(e *entry, tools []*mcp.Tool) {
 		return dirty
 	})
 	if err != nil {
-		slog.Error("карантин: tools.lock.json не записан — вызовы отклоняются", "path", m.LockPath, "server", name, "err", err)
+		// Битый файл и несостоявшаяся запись равно значат «одобрений нет»:
+		// карантин не может ручаться ни за один дескриптор.
+		slog.Error("карантин: tools.lock.json не обновлён — вызовы отклоняются", "path", m.LockPath, "server", name, "err", err)
 	}
 	m.lockErr = err
 }
@@ -90,7 +92,7 @@ func (m *Manager) quarantine(serverName string, tool *mcp.Tool) (string, bool) {
 		return lockFailureMessage(serverName, tool.Name, "файл одобрений не прочитан", err), true
 	case writeErr != nil:
 		// Причина уже в логе (observe); повтор на каждый вызов только засорил бы его.
-		return lockFailureMessage(serverName, tool.Name, "файл одобрений не записан", writeErr), true
+		return lockFailureMessage(serverName, tool.Name, "файл одобрений не обновлён", writeErr), true
 	}
 	approved, ok := f.Tools[toollock.Key(serverName, tool.Name)]
 	if !ok {

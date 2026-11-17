@@ -144,6 +144,39 @@ func TestSweepCoversSetDirs(t *testing.T) {
 	}
 }
 
+// Неудачное удаление не должно прятаться: ретенция, которая молча не работает,
+// — это растущий диск. Ошибка едет в результат, а остальные каталоги дочищаются.
+func TestSweepReportsRemoveFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root игнорирует права каталога")
+	}
+	base := t.TempDir()
+	stuckDir := Dir(filepath.Join(base, "sets", "s1"))
+	stuck := put(t, stuckDir, "stuck.txt", 10, 25*time.Hour)
+	if err := os.Chmod(stuckDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(stuckDir, 0o700) })
+	free := put(t, Dir(base), "free.txt", 10, 25*time.Hour)
+
+	rep, err := Sweep(base, Config{TTL: 24 * time.Hour, Max: 1 << 20}, time.Now())
+	if err == nil {
+		t.Fatalf("ошибка удаления потерялась, отчёт: %+v", rep)
+	}
+	if !strings.Contains(err.Error(), "не удалось удалить 1") {
+		t.Fatalf("ошибка = %v", err)
+	}
+	if rep.Removed != 1 {
+		t.Fatalf("удалено %d, ждали 1 (почищенный каталог)", rep.Removed)
+	}
+	if _, statErr := os.Stat(stuck); statErr != nil {
+		t.Fatalf("неудалённый файл исчез из отчёта о живых: %v", statErr)
+	}
+	if _, statErr := os.Stat(free); !os.IsNotExist(statErr) {
+		t.Fatalf("соседний каталог не дочищен: %v", statErr)
+	}
+}
+
 // Запись и чистка идут одновременно: ни один только что созданный файл не
 // пропадает, старый при этом уходит.
 func TestSweepWhileWriting(t *testing.T) {
