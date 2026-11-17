@@ -19,7 +19,7 @@
 
   var DICT = {
     en: {
-      'title.panel': 'mcprig — panel',
+      'title.panel': 'mcprig',
       'title.set': 'mcprig — set {name}',
       'a11y.skip': 'Skip to content',
       'top.lang': 'Language',
@@ -394,7 +394,7 @@
       'add.nameRequired': 'a name is required'
     },
     ru: {
-      'title.panel': 'mcprig — панель',
+      'title.panel': 'mcprig',
       'title.set': 'mcprig — набор {name}',
       'a11y.skip': 'Перейти к содержимому',
       'top.lang': 'Язык',
@@ -875,6 +875,8 @@
     // probe — доказательства строки «Проверить»: они свежее кэша health (15 с)
     probeTools: {}, probeHealth: {}, healthBusy: false,
     tab: link.tab || 'overview', page: link.page, railPref: '',
+    // list — страница «Наборы» без набора в адресе: показывается список, а не обзор
+    list: link.page === 'sets' && !link.set,
     // host — что показать на обзоре хоста: серверы по каждому набору и
     // дескрипторы инструментов, ожидающие подтверждения
     host: { servers: null, pending: null, busy: false, at: '' },
@@ -986,6 +988,18 @@
   }
 
   function ms(v) { return v == null ? '—' : t('unit.ms', { n: fmtN(v) }); }
+
+  // Строка таблицы вызовов: пара «колонка, класс». data-col нужен узкому экрану —
+  // там запись читается сверху вниз, а не подпись-значение вразнобой.
+  function callRow(cols) {
+    var tr = el('tr');
+    cols.forEach(function (c) {
+      var td = tr.appendChild(el('td'));
+      if (c[1]) { td.className = c[1]; }
+      td.dataset.col = c[0];
+    });
+    return tr;
+  }
 
   /* ---------- синхронизация списков ---------- */
 
@@ -1570,7 +1584,8 @@
       renderServers(st.health);
       fillFilters();
       var ids = st.sets.map(function (s) { return s.id; });
-      if (ids.indexOf(st.sel) === -1) { select(ids[0] || null); }
+      if (st.list) { st.sel = null; }
+      else if (ids.indexOf(st.sel) === -1) { select(ids[0] || null); }
       else if (st.boot) { st.boot = false; select(st.sel, true); }
       else { renderHead(); renderSetServers(); }
       // обзор хоста собирается из того же /api/state, поэтому живёт с ним в такте
@@ -1585,15 +1600,21 @@
     $('f-updated').textContent = clock();
     $('f-version').textContent = st.version ? 'mcprig ' + st.version + ' ·' : '—';
     $('rail-count').textContent = fmtN(st.sets.length);
-    // шапка набора и его вкладки — только на странице наборов: на соседних
-    // страницах тот же набор ни к чему
-    var onSets = st.page === 'sets';
-    show($('empty-state'), none && (onSets || st.page === 'host'));
+    // шапка набора и его вкладки — только на странице набора: на списке и на
+    // соседних страницах тот же набор ни к чему
+    var onSets = st.page === 'sets' && !st.list;
+    show($('empty-state'), none && (st.list || onSets || st.page === 'host'));
     show($('rail-empty'), none);
+    // без наборов список пуст: там уже стоит общий экран «наборов нет»
+    show($('sets-list'), !none && st.page === 'sets' && st.list);
     show($('phead'), !none && onSets);
     show($('tabs'), !none && onSets);
-    applyTab(none ? null : st.tab);
+    if (st.list) { renderSetsList(); }
+    // на списке наборов панели вкладок не показываются вовсе: полотно списка
+    // не должно тащить под собой обзор последнего выбранного набора
+    applyTab(none || st.list ? null : st.tab);
     renderCrumb();
+    setTitle();
     var set = current();
     $('endpoint').textContent = set
       ? 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp' : '—';
@@ -1606,7 +1627,41 @@
   function renderCrumb() {
     var set = current();
     $('crumb-set').textContent = st.page !== 'sets' ? t('nav.' + st.page)
-      : set ? (set.name || set.id) : '—';
+      : st.list ? t('nav.sets') : set ? (set.name || set.id) : '—';
+  }
+
+  // Список наборов: страница «Наборы» отвечает на вопрос «какие наборы есть»,
+  // обзор хоста — на вопрос «что на этой машине происходит». Цифры — из /api/state.
+  function renderSetsList() {
+    var rows = st.sets.slice().sort(function (a, b) {
+      return (a.name || a.id) < (b.name || b.id) ? -1 : 1;
+    });
+    $('sets-note').textContent = cnt(st.sets.length, 'set');
+    sync($('sets-body'), rows, function (s) { return s.id; },
+      function () {
+        var tr = el('tr');
+        tr.appendChild(el('td', 'cell-name'));
+        tr.appendChild(el('td'));
+        tr.appendChild(el('td', 'num'));
+        tr.appendChild(el('td', 'num'));
+        return tr;
+      },
+      function (tr, s) {
+        var tds = tr.children;
+        var nm = tds[0];
+        nm.textContent = '';
+        nm.dataset.label = t('col.set');
+        var a = nm.appendChild(el('a', '', s.name || s.id));
+        a.href = setHash(s.id, '');
+        a.appendChild(el('span', 'cell-port', ' :' + s.port));
+        tds[1].dataset.label = t('host.thState');
+        tds[1].textContent = '';
+        paintBadge(tds[1].appendChild(el('span', 'badge')), setState(s));
+        tds[2].dataset.label = t('head.servers');
+        tds[2].textContent = fmtN((s.servers || []).length);
+        tds[3].dataset.label = t('tabs.keys');
+        tds[3].textContent = fmtN((s.keys || []).length);
+      });
   }
 
   // Переключение страницы: адрес уже сменён ссылкой или hashchange
@@ -1903,6 +1958,7 @@
     }
     // форма сервера привязана к списку прежнего набора — закрываем без возврата фокуса
     closeSrv(false);
+    st.list = false;
     st.sel = id;
     setDelErr('');
     st.health = null;
@@ -1923,6 +1979,8 @@
     }
     setTitle();
     renderRail();
+    // шапка и вкладки прятались на списке наборов — возвращаем их вместе с выбором
+    renderChrome();
     // после смены набора вкладка показывает уже его данные: плитки, список, лог
     afterTab(st.tab);
     renderSetServers();
@@ -1939,8 +1997,15 @@
     return '#/set/' + id + (tab && tab !== 'overview' ? '/' + tab : '');
   }
 
+  // заголовок окна называет страницу, а набор — только на его странице
   function setTitle() {
-    document.title = st.sel ? t('title.set', { name: st.sel }) : t('title.panel');
+    var set = st.page === 'sets' && !st.list ? current() : null;
+    if (set) {
+      var tab = st.tab && st.tab !== 'overview' ? ' · ' + t('tabs.' + st.tab) : '';
+      document.title = t('title.set', { name: (set.name || set.id) + tab });
+      return;
+    }
+    document.title = t('title.panel') + ' — ' + t('nav.' + st.page);
   }
 
   function renderHead() {
@@ -2198,14 +2263,8 @@
     show($('host-calls-empty'), rows.length === 0);
     sync($('host-calls-body'), rows, function (c) { return c.time + c.set + c.server + c.tool; },
       function () {
-        var tr = el('tr');
-        tr.appendChild(el('td', 'cell-time'));
-        tr.appendChild(el('td'));
-        tr.appendChild(el('td', 'cell-name'));
-        tr.appendChild(el('td'));
-        tr.appendChild(el('td', 'num'));
-        tr.appendChild(el('td'));
-        return tr;
+        return callRow([['time', 'cell-time'], ['set', ''], ['server', 'cell-name'],
+          ['tool', ''], ['ms', 'num'], ['status', '']]);
       },
       function (tr, c) {
         var tds = tr.children;
@@ -3801,6 +3860,7 @@
     if (TABS.indexOf(name) < 0) { name = 'overview'; }
     st.tab = name;
     applyTab(name);
+    setTitle();
     afterTab(name);
     // адрес пишется только на странице набора — на соседних вкладок не видно.
     // «Наборы» из адреса остаются наборной страницей: там живёт страница, а не набор
@@ -4135,6 +4195,9 @@
      и «вперёд» идут одним путём. route() читает hash и приводит панель к нему. */
   function route() {
     var r = routeOf(location.hash);
+    // адрес без набора — это список наборов: прежний выбор не остаётся на экране
+    st.list = r.page === 'sets' && !r.set;
+    if (st.list) { st.sel = null; }
     applyPage(r.page);
     if (r.page === 'stats') { setPeriod(r.period, true); }
     if (r.page === 'sets' && r.set) {

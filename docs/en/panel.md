@@ -19,7 +19,8 @@ CSP: no inline scripts or styles.
 | top bar | breadcrumbs `mcprig / <page or set>`, the MCP endpoint of the open set with a copy button, the appearance menu — **theme** (Default or Windows 98) and the colour scheme of that theme — the interface language, and a static `admin` chip that is hidden on narrow screens |
 | left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
 | pages | **Overview** at `#/`, **Sets** at `#/sets`, **Statistics** at `#/stats/<period>`, **All servers** at `#/servers` and **Variables** at `#/vars`, as pills at the top of the content; a set keeps `#/set/<id>` and each of its tabs has its own address, so a reload, a back button and a shared link all land where they should |
-| host overview | what the daemon is serving right now: sets running and sets stopped, servers ok, not checked and failing, tools waiting for approval, calls and error rate over the last 7 days, and the size and retention of `/tool-out` as a dash — the API has no field for it, so the panel says so instead of guessing. Under the tiles: every set by last call with its state and the daemon's reason, and the latest calls of all sets; a row opens that set |
+| sets page | the list of sets at `#/sets`: name with `:port`, state, the number of servers and of keys; a row opens the set. An address that names no set — the bare `#/sets` or a route the panel does not know — lands here, not on the set that was open last |
+| host overview | what the daemon is serving right now: sets running and sets stopped, servers ok, not checked and failing, tools waiting for approval, calls and error rate over the last 7 days, and the size and retention of `/tool-out` as a dash — the API has no field for it, so the panel says so instead of guessing. Under the tiles: every set by last call with its state and the daemon's reason, and the latest calls of all sets; a row opens that set. On a phone each call reads as a card — time and status, set and server, tool and duration — while the sets list keeps its columns |
 | set head | name, port chip, state badge, **Import / Export**, **Prompt**, **Restart**, **Start/Stop**, and the red **Delete set** that removes the set and its directory; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
 | tabs | **Overview**, **Servers**, **Keys**, **Tools**, **Calls** and **Logs** of the open set, at `#/set/<id>`, `#/set/<id>/servers`, `…/keys`, `…/tools`, `…/calls` and `…/logs`; an unknown tab opens **Overview**, a tab click adds a history entry, and the back and forward buttons walk through the tabs |
 | KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days, under the tiles of the set **Overview** |
@@ -40,6 +41,10 @@ probes it there, and a server of a stopped set says that the set is off.
 The tool count of one server is not part of the health answer, so the **Tools**
 column shows `—` until **Check** probes that server; the head of the set shows
 the total for the whole set.
+
+The browser title names what is open: `mcprig — Overview`, `mcprig — Sets` and
+the like for other pages, `mcprig — set <name>` on a set, and with ` · <tab>`
+when a tab other than **Overview** is open.
 
 Everything on the page comes from the panel API below plus `GET /stats` of the
 running sets. Nothing else is stored in the browser but the chosen theme, its

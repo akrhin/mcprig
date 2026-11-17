@@ -255,6 +255,25 @@
 
       <div id="page-sets">
 
+      <!-- список наборов: страница «Наборы» и всё, что не разобрано адресом -->
+      <section class="block" id="sets-list" aria-labelledby="sets-h" hidden>
+        <div class="block-head">
+          <h2 id="sets-h" data-i18n="nav.sets">Sets</h2>
+          <p class="block-meta" id="sets-note" role="status"></p>
+        </div>
+        <table class="table rtable" id="sets-table" aria-labelledby="sets-h">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="col.set">Set</th>
+              <th scope="col" data-i18n="host.thState">State</th>
+              <th scope="col" class="num" data-i18n="head.servers">Servers</th>
+              <th scope="col" class="num" data-i18n="tabs.keys">Keys</th>
+            </tr>
+          </thead>
+          <tbody id="sets-body"></tbody>
+        </table>
+      </section>
+
       <div class="set-head" id="phead" hidden>
         <div class="set-head-row">
           <h1 class="set-title" id="set-name">—</h1>

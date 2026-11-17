@@ -526,7 +526,7 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
 /* наборы, в которых стоит сервер: список имён переносится, а не рвёт таблицу */
 .cell-sets { font-size: var(--fs-2); color: var(--text-dim); min-width: 12ch; }
 /* ссылка в ячейке: цель нажатия 32px, а строка таблицы выше не становится */
-.cell-name a, #host-sets-body td a, #host-calls-body td a, #calls-body td a {
+.cell-name a, #sets-body td a, #host-sets-body td a, #host-calls-body td a, #calls-body td a {
   display: inline-block; padding: 8px 4px; margin: -8px -4px;
 }
 .cell-sets span { overflow-wrap: anywhere; }
@@ -856,6 +856,27 @@ body.rail-open .scrim { opacity: 1; pointer-events: auto; }
   .rtable td.cell-actions::before { display: none; }
   .rtable td.num { text-align: right; }
   .rtable td .share { flex: 1 1 auto; }
+
+  /* «Latest calls» на обзоре хоста: на узком экране запись читается сверху вниз —
+     время и статус, набор и сервер, инструмент и длительность. Вкладка «Вызовы»
+     свёрстана иначе и это правило не трогает. */
+  #host-calls-table tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--sp-3); align-items: baseline;
+  }
+  #host-calls-table td {
+    display: block; min-width: 0;
+    padding: 0; border: 0; text-align: left;
+  }
+  #host-calls-table td::before { display: none; }
+  #host-calls-table td[data-col="time"] { order: 1; font-family: var(--font-mono); color: var(--text-mute); }
+  #host-calls-table td[data-col="status"] { order: 2; justify-self: end; text-align: right; }
+  #host-calls-table td[data-col="set"] { order: 3; }
+  #host-calls-table td[data-col="server"] { order: 4; justify-self: end; text-align: right; }
+  #host-calls-table td[data-col="tool"] {
+    order: 5; font-family: var(--font-mono); overflow-wrap: anywhere;
+  }
+  #host-calls-table td[data-col="ms"] { order: 6; justify-self: end; text-align: right; }
   .table tr { background: transparent; }
   #set-srv-table tbody, #calls-table tbody { display: block; }
 }
