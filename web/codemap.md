@@ -21,23 +21,23 @@ included), `theme.js` (42, pre-paint theme, palette and language),
 
 **No framework, one closure, one state object.** `app.js` is an IIFE with
 `'use strict'` (`web/app.js:10-11`); everything lives in the `st` literal
-(`web/app.js:761-776`) — sets, servers, selected set id, health, calls, KPI,
+(`web/app.js:763-778`) — sets, servers, selected set id, health, calls, KPI,
 stats filters, dialog state, keys/calls pagination guards. Persisted browser
 state is only `mcprig.theme`, `mcprig.palette`, `mcprig.palette.win98`,
 `mcprig.lang` and `mcprig.rail`.
 
 **Screens.** The address is the state: `pageOf()` maps the hash to a page
 (`#/` host, `#/sets`, `#/stats/<period>`, `#/set/<id>[/<tab>]`, `#/servers`,
-`#/vars`, `web/app.js:846-855`), `routeOf()` adds the set and its tab
-(`:857-870`, unknown tab to overview, `#/sets` with no set is the list),
-`applyPage()` shows one page and repaints the page nav (`:1668-1685`), and
-`route()` runs on load and on every `hashchange` (`:4198-4212`).
-`setTab()` pushes `#/set/<id>/<tab>` (`:3861-3874`), `select()` pushes the set
+`#/vars`, `web/app.js:850-857`), `routeOf()` adds the set and its tab
+(`:861-871`, unknown tab to overview, `#/sets` with no set is the list),
+`applyPage()` shows one page and repaints the page nav (`:1681-1698`), and
+`route()` runs on load and on every `hashchange` (`:4220-4232`).
+`setTab()` pushes `#/set/<id>/<tab>` (`:3877-3891`), `select()` pushes the set
 address and opens the set page on an explicit choice (rail click, create,
-neighbour after delete) even from the host overview (`:1948-1996`);
-`setHash()` builds it (`:1998-2001`), `setTitle()` names the page (`:2003-2011`).
-The set list at `#/sets` is `renderSetsList()` (`:1635-1666`), the host overview
-`refreshHost()`/`renderHostCalls()` (`:2139`, `:2263`). Set head `#phead`, tabs
+neighbour after delete) even from the host overview (`:1962-2012`);
+`setHash()` builds it (`:2015-2017`), `setTitle()` names the page (`:2020-2028`).
+The set list at `#/sets` is `renderSetsList()` (`:1648-1678`), the host overview
+`refreshHost()`/`renderHostCalls()` (`:2156-2195`, `:2280-2311`). Set head `#phead`, tabs
 `#tab-overview|#tab-calls|#tab-stats` (`web/index.html:142,177-274`), rail
 `#rail-sets`, details drawer `#side` (`web/index.html:476`), statusbar
 `web/index.html:463-470`. Seven `<dialog>`s: server editor `srv-dlg:500`, server
@@ -47,10 +47,10 @@ OAuth `auth-dlg:722`, import/export `io-dlg:747`, prompt `prompt-dlg:800`.
 **Rendering is manual DOM with keyed reconciliation.** `el()` builds nodes
 (`web/app.js:780-785`); `sync(box, items, key, make, fill)` keeps a
 `Map` on the container, patches existing rows in place, inserts new ones, drops
-the rest (`web/app.js:867-882`). Every render function goes through it, so a 5 s
+the rest (`web/app.js:1018-1033`). Every render function goes through it, so a 5 s
 tick does not destroy scroll position, focus or an open menu. The statistics
-chart is drawn by hand as SVG (`web/app.js:3266-3285`), recomputed on resize
-(`web/app.js:3734`).
+chart is drawn by hand as SVG (`web/app.js:3776-3860`), recomputed on resize
+(`web/app.js:4236-4241`).
 
 **i18n** is one `DICT` with `en`/`ru` (`web/app.js:20-685`), `t()` with `{name}`
 substitution (`web/app.js:712-718`), Russian plurals via `PLURAL`/`word()`
@@ -69,14 +69,14 @@ on `<html>`; it also migrates a pre-0.6.4 `mcprig.theme` value (`dark`,
 (`w98`, `w98-cool`, `w98-warm`, `w98-hc`) which add the bevel tokens
 `--w98-face/hi/lo/dk/field/sel/title`; `w98-hc` paints them black, white and
 yellow and swaps the select arrow to a light one (`web/win98.css:430-438`).
-The menu flips either axis and stores both (`web/app.js:3779-3850`).
+The menu flips either axis and stores both (`web/app.js:4277-4290`).
 `prefers-contrast: more` thickens bevels to 3 px in any scheme
 (`web/win98.css:441-445`).
 
-**API layer.** `get()` (`web/app.js:945-973`): `fetch` with
+**API layer.** `get()` (`web/app.js:1103-1131`): `fetch` with
 `credentials: 'same-origin'`, `Accept: application/json`; `404` becomes `null`,
 any other non-ok throws `t('err.http', {status, path})`, a network failure throws
-`err.offline`. `send()` (`web/app.js:977-993`) posts JSON, sends `{}` for an
+`err.offline`. `send()` (`web/app.js:1135-1151`) posts JSON, sends `{}` for an
 empty POST, reads `data.error` on failure and calls `fail()` unless `quiet`.
 There is no 401 branch and no CSRF token in JS: an expired session arrives as a
 plain `HTTP 401` error line, while the server redirects navigations to `/login`
@@ -88,16 +88,16 @@ plain `HTTP 401` error line, while the server redirects navigations to `/login`
 **Demo mode.** `?mock=1` sets `MOCK` (`web/app.js:13`); `mockName()` maps a path
 to a JSON file (`web/app.js:888-897`), `mockSend` mutates an in-memory copy,
 `mockStats` recomputes slices from call rows so filters match the daemon
-(`web/app.js:1042,1291`).
+(`web/app.js:1046-1055`, `:1202-1369`).
 
 ## Flow
 
 1. `theme.js` sets theme and `lang`; deferred `app.js` then boots: `applyStatic`,
-   title, rail, theme menu, page, tab, period, `loadState` (`web/app.js:4120-4127`).
+   title, rail, theme menu, page, tab, period, `loadState` (`web/app.js:4074-4100`).
 2. `loadState()` = `GET /api/state` → `st.sets`, `st.servers`, `st.version`;
    renders chrome, rail, registry, filters; picks the URL's set or the first one
-   (`web/app.js:1392-1407`), and `select()` fires `loadHealth`, `loadCalls`,
-   `loadLog` (`web/app.js:1750`).
+   (`web/app.js:1587-1605`), and `select()` fires `loadHealth`, `loadCalls`,
+   `loadLog` (`web/app.js:3272-3279`, из `select()` `:1962-2012`).
 3. Authorization is outside the SPA: unauthenticated `GET /` redirects to
    `/login`, `POST /api/login` sets the cookie (`internal/manager/api.go:415-473`).
 4. Polling: `every(ms, fn)` with `document.hidden` guard (`web/app.js:4114`);
@@ -107,14 +107,14 @@ to a JSON file (`web/app.js:888-897`), `mockSend` mutates an in-memory copy,
    (`internal/manager/health.go:19`).
 5. Operator action: `act()` disables the button, `POST`s
    `/api/sets/<id>/{start,stop,restart}` and restores the label
-   (`web/app.js:3470-3485`, routes `internal/manager/api.go:624`). The POST body
+   (`web/app.js:3433-3470`, routes `internal/manager/api.go:624`). The POST body
    is not authoritative — callers re-read `loadState()`/`loadHealth()` and the
    `render*` functions paint the new truth from `st`.
 6. Dialogs write and then re-read: keys — issue `POST …/keys` (`:4037`), sign
    `PATCH …/keys/<id>` with `{note}` (`:3579`), revoke `DELETE` (`:4077`), with
    `restartError`/`reloadError` as an inline warning; server editor
    `POST /api/servers` / `PUT /api/servers/<name>` prints a backend refusal in
-   the form (`web/app.js:2175`, `srvErr` `:2053`); OAuth — `startAuth` posts
+   the form (`web/app.js:2523-2528`); OAuth — `startAuth` posts
    `…/servers/<n>/authorize`, `pollAuth` reads `…/authorize/status` every 1.5 s
    (3 s after a network error) until the flow leaves `pending` (`web/app.js:2009-2036`).
 7. Results reach the DOM only through the render functions, all reading `st`:
@@ -154,10 +154,10 @@ inside `setView` of `/api/state`).
   (`web/index.html:463-470` — crumb, endpoint, Details, theme, language; the
   statusbar holds counts, version, time). `web/app.css:214` still names it.
 - `panel.md:31` describes one footer line `N sets · M servers · K running`; the
-  UI splits it: rail summary "N sets · K running" (`web/app.js:1477-1481`) and
-  statusbar "M servers" (`web/app.js:1412`).
+  UI splits it: rail summary "N sets · K running" (`web/app.js:1726-1729`) and
+  statusbar "M servers" (`web/app.js:1614`).
 - `panel.md:262,264` document the key field as `label`; the panel now speaks it
-  too (`PATCH {label}` `web/app.js:3681`, issue body `body.label` `:4174`, reads
-  `k.label` `:3655`); `note` stays accepted on the backend as compatibility
+  too (`PATCH {label}` `web/app.js:4061`, issue body `body.label` `:4577`, reads
+  `k.label` `:4036`); `note` stays accepted on the backend as compatibility
   (`internal/registry/types.go:105-108`).
 - `?mock=1` and `web/mock/*.json` are documented nowhere under `docs/`.

@@ -323,6 +323,9 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   letter-spacing: .06em; color: var(--text-mute);
 }
 .meta-sep { width: 1px; height: 14px; background: var(--line); margin: 0 var(--sp-1); }
+/* подпись и значение — одна пара: перенос строки не должен их разлучать
+   («TOOLS» на одной строке, «117» на другой читалось как второе число) */
+.meta-pair { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .key-val {
   display: block; max-width: 24ch; min-width: 0;
   font-size: var(--fs-2); color: var(--text);
@@ -349,16 +352,23 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .badge-err { color: var(--err); background: color-mix(in srgb, var(--err) 14%, transparent); border-color: color-mix(in srgb, var(--err) 32%, transparent); }
 .badge-unknown { color: var(--text-mute); background: var(--surface-2); border-color: var(--line); }
 
-/* причина провала в строке вызова: обрезана, полный текст — в title */
-.call-err { color: var(--err); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* причина провала вызова или простоя набора: обрезана в строке, полный текст
+   раскрывается нажатием — на тач-экране подсказка title недоступна, а текст
+   ошибки нужен там же, где счёт. Раз это цель нажатия, у неё 32 px высоты и
+   своя ширина в знакоместах: без неё nowrap-строка распирала таблицу */
+.call-err, .cell-reason {
+  cursor: pointer; align-items: center; min-height: 32px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.call-err { display: inline-flex; max-width: 30ch; color: var(--err); font-size: var(--fs-2); }
+.call-err.is-open, .cell-reason.is-open { display: block; white-space: normal; overflow-wrap: anywhere; }
 
 /* порт рядом с именем набора и причина простоя под бейджем: вторая строка
    ячейки, тоже 12 px — мельче подпись не читается */
 .cell-port { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-mute); }
 .cell-reason {
-  display: block; max-width: 40ch; margin-top: 2px;
+  display: flex; max-width: 40ch; margin-top: 2px;
   font-size: var(--fs-2); color: var(--err);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
@@ -426,6 +436,10 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
   text-transform: uppercase; letter-spacing: .05em;
 }
 .tile-flat { border-style: dashed; }
+/* плитка с бедой: цифра в цвете ошибки и полоса у левой кромки — видно,
+   не читая подпись; полоса внутри рамки, чтобы плитка не сдвигалась */
+.tile.is-bad { box-shadow: inset 2px 0 0 var(--err); }
+.tile.is-bad .tile-num { color: var(--err); }
 
 /* ── блоки ──────────────────────────────────────────────────────────────── */
 .block { margin-top: var(--sp-7); }
@@ -465,7 +479,8 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
 .btn-primary:hover { background: var(--accent-hi); }
 .btn-ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
 .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
-.btn-sm { min-height: 27px; padding: 3px 9px; font-size: var(--fs-1); }
+/* мелкая кнопка тоже 32 px по высоте: 27 px было ниже цели под палец */
+.btn-sm { min-height: 32px; padding: 3px 9px; font-size: var(--fs-1); }
 /* 32 px по высоте: 24 px в строке таблицы давал 55 целей под палец по 24 px */
 .btn-xs { min-height: 32px; padding: 4px 8px; font-size: var(--fs-1); }
 .btn-danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); background: transparent; }
@@ -512,6 +527,8 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
 .table .num { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
 .table .num.bad { color: var(--err); }
 .table .num.slow { color: var(--warn); }
+/* «неизвестно» — прочерк приглушённым: он не равен нулю и не спорит с цифрами */
+.table .num.is-muted { color: var(--text-mute); }
 .table .cell-name { font-family: var(--font-mono); font-weight: 500; overflow-wrap: anywhere; min-width: 9ch; }
 .cell-sub {
   display: block; margin-top: 2px; max-width: 100%;
@@ -522,6 +539,9 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
 /* кнопки переносятся, а не выдавливают таблицу за край (ru-подписи длиннее) */
 .cell-actions { text-align: right; white-space: normal; }
 .cell-actions .btn + .btn { margin-left: 6px; }
+/* «Авторизовать» есть не у каждого сервера: её место в ряду сохраняется,
+   иначе остальные четыре кнопки уезжают влево и ряд читается иначе */
+#all-srv-table td.cell-actions [hidden] { display: inline-flex; visibility: hidden; }
 .cell-iso { color: var(--warn); }
 /* наборы, в которых стоит сервер: список имён переносится, а не рвёт таблицу */
 .cell-sets { font-size: var(--fs-2); color: var(--text-dim); min-width: 12ch; }
@@ -530,6 +550,15 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
   display: inline-block; padding: 8px 4px; margin: -8px -4px;
 }
 .cell-sets span { overflow-wrap: anywhere; }
+
+/* список наборов: числовые колонки по содержимому, остаток — колонке Set.
+   Авто-раскладка без ширин раздаёт запас почти поровну, и State распухает
+   вчетверо против собственного бейджа. На узком экране (≤ 760) таблица
+   становится карточками, и эти ширины ни на что не влияют. */
+#sets-table { table-layout: fixed; }
+#sets-table th:nth-child(2) { width: 140px; }
+#sets-table th:nth-child(3) { width: 110px; }
+#sets-table th:nth-child(4) { width: 96px; }
 
 /* доля в By set: тонкая полоса */
 .share { display: flex; align-items: center; gap: var(--sp-2); min-width: 96px; }
@@ -603,6 +632,15 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
   margin-top: var(--sp-7);
 }
 .stats-grid > .block { margin-top: 0; }
+/* имя — самое длинное поле в разбивке: одна строка, лишнее уходит многоточием,
+   полный текст пары — в подсказке. Иначе имя рвалось посередине слова, и
+   соседние таблицы («Top tools» и «Top servers») шли разной высоты строк.
+   Ширины фиксированные: с auto-layout процент на имени распирал таблицу
+   шире её колонки, и две таблицы наезжали друг на друга. */
+.stats-grid .table { width: 100%; table-layout: fixed; }
+.stats-grid th:nth-child(1) { width: 42%; }
+.stats-grid .cell-name { width: 42%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats-grid .bd-sub { color: var(--text-mute); font-size: var(--fs-1); }
 
 /* ── формы ──────────────────────────────────────────────────────────────── */
 .field { display: grid; gap: var(--sp-1); min-width: 0; }
@@ -618,19 +656,20 @@ a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
 
 .input {
   width: 100%; min-height: 34px; padding: 6px 10px;
-  border: 1px solid var(--line); border-radius: var(--r-2);
+  border: 1px solid var(--field-line); border-radius: var(--r-2);
   background: var(--surface); color: var(--text);
   font-size: var(--fs-3);
   transition: border-color var(--dur-1) linear;
 }
 /* подсказка в поле — текст, а не украшение: AA как у остального текста */
 .input::placeholder, textarea::placeholder { color: var(--text-mute); opacity: 1; }
-.input:hover { border-color: var(--line-strong); }
+.input:hover { border-color: var(--text-dim); }
 .input:focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 textarea.input { min-height: 60px; resize: vertical; line-height: 1.4; }
 select.input { padding-right: 6px; }
 
-.check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-3); color: var(--text-dim); }
+/* чекбокс мелкий, цель под палец — вся подпись вокруг него */
+.check { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: var(--fs-3); color: var(--text-dim); cursor: pointer; }
 .check input { accent-color: var(--accent); }
 .checklist { display: grid; gap: var(--sp-1); }
 /* состав набора: подпись своей строкой, селект и кнопка рядом — иначе
@@ -715,7 +754,7 @@ select.input { padding-right: 6px; }
 .key-badge { margin-left: 6px; vertical-align: middle; }
 .key-note { display: flex; gap: var(--sp-2); align-items: center; }
 /* подпись ключа — короткая: поле не растягивается на всю ширину панели */
-.key-note .input { min-height: 30px; font-size: var(--fs-2); max-width: 34ch; }
+.key-note .input { min-height: 32px; font-size: var(--fs-2); max-width: 34ch; }
 .key-acts { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 @media (max-width: 640px) {
   .keyitem { grid-template-columns: minmax(0, 1fr); }
@@ -777,13 +816,20 @@ select.input { padding-right: 6px; }
 /* ── статусбар ──────────────────────────────────────────────────────────── */
 .statusbar {
   position: sticky; bottom: 0; z-index: 30;
-  display: flex; align-items: center; gap: var(--sp-3);
-  height: var(--status-h); flex: none;
-  padding: 0 var(--sp-4);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--sp-3);
+  min-height: var(--status-h); flex: none;
+  padding: 4px var(--sp-4);
   background: var(--bg-rail); border-top: 1px solid var(--line);
   color: var(--text-mute); font-size: var(--fs-1);
 }
-.statusbar .right { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+/* правой части не всегда хватает ширины: уезжает вниз целиком и не рвётся.
+   Точку-разделитель рисует CSS у «обновлено» — в тексте версии она висела
+   в конце строки одна, когда хвост переносился */
+.statusbar .right {
+  display: flex; align-items: center; gap: 6px; margin-left: auto;
+  white-space: nowrap;
+}
+.statusbar #f-version + span::before { content: '·'; margin-right: 5px; }
 
 /* ── затемнение под рейлом ──────────────────────────────────────────────── */
 .scrim {
@@ -884,8 +930,12 @@ body.rail-open .scrim { opacity: 1; pointer-events: auto; }
 @media (max-width: 640px) {
   .content { padding: var(--sp-4) var(--sp-3) var(--sp-6); }
   .topbar { padding: 0 var(--sp-3); gap: var(--sp-2); }
-  .endpoint { max-width: 44px; padding: 5px 6px; }
-  .endpoint-label, .endpoint-url { display: none; }
+  /* адрес целиком не влезает, но один значок читается как случайный тёмный
+     квадрат: оставляем подпись. Место под неё освобождает корень крошек —
+     «mcprig» и так в заголовке окна и в рейле. */
+  .endpoint { max-width: 132px; padding: 5px 8px; }
+  .endpoint-url { display: none; }
+  .crumb-root, .crumbs .crumb-sep { display: none; }
   /* на телефоне чип пользователя — только имя без действия; он и вылезал за край */
   .who { display: none; }
 
@@ -903,12 +953,22 @@ body.rail-open .scrim { opacity: 1; pointer-events: auto; }
 
   .filters { gap: var(--sp-2); }
   .segmented { width: 100%; }
-  .segbtn { flex: 1 1 0; text-align: center; }
-  /* пять пилюль страниц не делятся поровну в 375 px: подписи переносятся */
-  /* пять страниц в строку не влезают: сетка 2×2 и последняя на всю ширину */
-  .pagenav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pagenav .segbtn { flex: none; }
-  .pagenav .segbtn:last-child { grid-column: 1 / -1; }
+  /* четыре периода должны влезать в 343 px, а не обрезаться справа: на узком
+     экране кнопки ужимаются по содержимому, а не делят поровну */
+  .segbtn { flex: 1 1 auto; padding: 6px 8px; text-align: center; }
+  /* группа периодов стоит в обёртке с подписью, как и селекты: на узком
+     экране она занимает всю строку, иначе кнопки не делят ширину (у .fsel
+     ниже flex-basis 45%) */
+  .filters > .fsel:first-child { flex: 1 1 100%; }
+  /* три уровня навигации не должны съедать треть экрана (54 + 98 + 75 px):
+     страницы и вкладки идут одной строкой и прокручиваются внутри себя,
+     страница по горизонтали не едет */
+  .pagenav { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .pagenav::-webkit-scrollbar { display: none; }
+  .pagenav .segbtn { flex: 0 0 auto; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs .tab { flex: 0 0 auto; }
   /* плитки обзора — две в ряд, ниже 360 px одна */
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
   .tile { min-height: 68px; padding: var(--sp-2) var(--sp-3); }
@@ -929,6 +989,9 @@ body.rail-open .scrim { opacity: 1; pointer-events: auto; }
   .menu-item { padding: 11px 10px; font-size: var(--fs-4); }
 
   .statusbar { font-size: var(--fs-1); padding: 0 var(--sp-3); }
+
+  /* лог не рвёт слова посередине: строка едет вбок внутри своего окна */
+  .log { white-space: pre; overflow-wrap: normal; overflow-x: auto; }
 
   .dialog.modal { width: 100vw; max-height: 92vh; margin: auto 0 0; border-radius: var(--r-3) var(--r-3) 0 0; }
   .dialog.drawer { width: 100vw; }

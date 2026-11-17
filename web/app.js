@@ -59,6 +59,7 @@
       'head.endpoint': 'Endpoint',
       'head.copy': 'copy',
       'head.copyTip': 'copy the MCP endpoint of this set',
+      'head.copyAria': 'Copy the MCP endpoint URL',
       'head.copied': 'copied',
       'head.copyFail': 'failed',
       'head.key': 'Key',
@@ -66,6 +67,7 @@
       'head.copyKey': 'Copy key',
       'head.noKey': 'no key',
       'head.schemaTip': "how much context the set's tool list costs",
+      'head.schemaLabel': 'Tools schema',
       'head.keyMarkTip': "the mark this key shows up under in the statistics: its note, or the key: fingerprint when it has none",
       'head.servers': 'Servers',
       'head.tools': 'Tools',
@@ -92,21 +94,19 @@
       'nav.vars': 'Variables',
       'host.title': 'Host',
       'host.sub': 'what this daemon is serving right now',
-      'host.sets': 'Sets by activity',
+      'host.sets': 'Sets needing attention',
       'host.latest': 'Latest calls',
-      'host.running': 'sets running',
-      'host.stopped': 'sets stopped',
-      'host.srvOk': 'servers ok',
+      'host.running': '{w} running',
+      'host.stopped': '{w} stopped',
+      'host.srvOk': '{w} ok',
       'host.srvUnchecked': 'not checked',
-      'host.srvFailed': 'servers failing',
-      'host.pending': 'tools to approve',
-      'host.calls': 'calls · 7 days',
-      'host.toolout': 'tool output',
+      'host.srvFailed': '{w} failing',
+      'host.pending': '{w} to approve',
+      'host.calls': '{w} · 7 days',
       'host.up': 'up for',
       'host.thState': 'State',
-      'host.setsEmpty': 'A set is one MCP endpoint; create one to see it here.',
       'host.callsEmpty': 'Calls appear here as soon as a set serves.',
-      'host.tooloutHelp': 'The proxy has no API for the size of /tool-out or how long it keeps files, so this panel shows a dash instead of a guess.',
+      'host.tooloutHelp': 'The proxy has no API for the size of /tool-out or how long it keeps files, so the panel leaves them out.',
       'reg.title': 'All servers',
       'reg.count': '{n} {serversW} in the registry',
       'reg.thSets': 'In sets',
@@ -184,6 +184,7 @@
       'stats.7d': '7 days',
       'stats.30d': '30 days',
       'stats.archive': 'Archive',
+      'stats.period': 'period',
       'stats.set': 'set',
       'stats.allSets': 'all sets',
       'stats.server': 'server',
@@ -291,6 +292,9 @@
       'keys.active': 'active',
       'keys.restartWarn': 'the note is saved, but the set did not restart: {err}',
       'keys.revokedStopped': 'the key is revoked and the set stopped — start it again',
+      'keys.revoking': 'revoking the key and stopping the set…',
+      // Выдача ключа перезапускает набор: без подсказки кнопка просто замирает на секунды.
+      'keys.issuing': 'issuing the key and reloading the set…',
       'status.running': 'running',
       'status.failed': 'failed',
       'status.stopped': 'stopped',
@@ -301,11 +305,10 @@
       'unit.b': 'B',
       'unit.kb': 'KB',
       'unit.tokens': 'tok',
-      'unit.tools': 'tools',
       'unit.h': 'h',
       'unit.m': 'm',
       'unit.ms': '{n} ms',
-      'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
+      'schema.line': '{bytes} · {tokens} {tok}',
       'srv.edit': 'edit',
       'srv.check': 'check',
       'srv.log': 'log',
@@ -376,6 +379,7 @@
       'prompt.stopped': 'The set is not running: the text gets tool names from the saved list only, without schemas.',
       'prompt.notesLabel': 'notes',
       'prompt.fail': 'could not build the prompt: {msg}',
+      'prompt.taskRequired': 'A task is required: the text is built around it.',
       'err.offline': 'no connection to the daemon',
       'err.http': 'HTTP {status} · {path}',
       // демо-реестр повторяет правила internal/registry, но говорит на языке панели
@@ -434,6 +438,7 @@
       'head.endpoint': 'Адрес',
       'head.copy': 'Копировать',
       'head.copyTip': 'скопировать адрес набора',
+      'head.copyAria': 'Скопировать адрес эндпоинта',
       'head.copied': 'скопировано',
       'head.copyFail': 'не удалось скопировать адрес',
       'head.key': 'Ключ',
@@ -441,6 +446,7 @@
       'head.copyKey': 'Скопировать ключ',
       'head.noKey': 'ключа нет',
       'head.schemaTip': 'сколько контекста стоит перечень инструментов набора',
+      'head.schemaLabel': 'Схема инструментов',
       'head.keyMarkTip': 'метка ключа набора в статистике: его подпись, а если подписи нет — отпечаток key:',
       'head.servers': 'Серверов',
       'head.tools': 'Инструментов',
@@ -467,21 +473,19 @@
       'nav.vars': 'Переменные',
       'host.title': 'Хост',
       'host.sub': 'что демон обслуживает прямо сейчас',
-      'host.sets': 'Наборы по активности',
+      'host.sets': 'Наборы, требующие внимания',
       'host.latest': 'Последние вызовы',
-      'host.running': 'наборов запущено',
-      'host.stopped': 'наборов не запущено',
-      'host.srvOk': 'серверов в порядке',
+      'host.running': '{w} в работе',
+      'host.stopped': '{w} не в работе',
+      'host.srvOk': '{w} в порядке',
       'host.srvUnchecked': 'не проверено',
-      'host.srvFailed': 'серверов с ошибкой',
-      'host.pending': 'инструментов на подтверждение',
-      'host.calls': 'вызовов за 7 дней',
-      'host.toolout': 'выгрузки /tool-out',
+      'host.srvFailed': '{w} с ошибкой',
+      'host.pending': '{w} на подтверждение',
+      'host.calls': '{w} за 7 дней',
       'host.up': 'без перезапуска',
       'host.thState': 'Состояние',
-      'host.setsEmpty': 'Набор — это один MCP-эндпоинт; создай его, и он появится здесь.',
       'host.callsEmpty': 'Вызовы появятся, как только набор начнёт отвечать.',
-      'host.tooloutHelp': 'У прокси нет API про размер /tool-out и срок хранения файлов, поэтому здесь прочерк, а не догадка.',
+      'host.tooloutHelp': 'У прокси нет API про размер /tool-out и срок хранения файлов, поэтому панель их не показывает.',
       'reg.title': 'Все серверы',
       'reg.count': '{n} {serversW} в реестре',
       'reg.thSets': 'В наборах',
@@ -559,6 +563,7 @@
       'stats.7d': '7 дней',
       'stats.30d': '30 дней',
       'stats.archive': 'Архив',
+      'stats.period': 'период',
       'stats.set': 'набор',
       'stats.allSets': 'все наборы',
       'stats.server': 'сервер',
@@ -666,6 +671,8 @@
       'keys.active': 'активен',
       'keys.restartWarn': 'подпись сохранена, но набор не перезапустился: {err}',
       'keys.revokedStopped': 'ключ отозван, набор остановлен — запустите его заново',
+      'keys.revoking': 'отзываем ключ и останавливаем набор…',
+      'keys.issuing': 'выдаём ключ и перезапускаем набор…',
       'status.running': 'работает',
       'status.failed': 'сбой',
       'status.stopped': 'остановлен',
@@ -676,11 +683,10 @@
       'unit.b': 'Б',
       'unit.kb': 'КБ',
       'unit.tokens': 'токенов',
-      'unit.tools': 'инструментов',
       'unit.h': 'ч',
       'unit.m': 'м',
       'unit.ms': '{n} мс',
-      'schema.line': '{bytes} · {tokens} {tok} · {tools} {tool}',
+      'schema.line': '{bytes} · {tokens} {tok}',
       'srv.edit': 'Изменить',
       'srv.check': 'Проверить',
       'srv.log': 'Лог',
@@ -751,6 +757,7 @@
       'prompt.stopped': 'Набор остановлен: в текст попадут только имена инструментов из сохранённого списка, без схем.',
       'prompt.notesLabel': 'примечания',
       'prompt.fail': 'не удалось собрать промт: {msg}',
+      'prompt.taskRequired': 'Нужна задача: текст собирается вокруг неё.',
       'err.offline': 'панель не отвечает — проверьте, запущен ли mcprig',
       'err.http': 'HTTP {status} · {path}',
       'mock.name': 'name: строчные латинские буквы, цифры, - и _',
@@ -885,7 +892,14 @@
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
     mock: null, mockEnv: null, srvEditing: '', srvReturn: null,
-    st: { period: link.period || 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' },
+    // фильтры статистики переживают перезагрузку: выбранный срез читается снова,
+    // если он ещё есть в списках facets (иначе его снимет сама загрузка)
+    st: {
+      period: link.period || 'today', set: '',
+      server: readLocal('mcprig.stats.server'), tool: readLocal('mcprig.stats.tool'),
+      client: readLocal('mcprig.stats.client'),
+      seq: 0, data: null, facets: null, facetKey: ''
+    },
     // paged — открыта вторая страница вызовов: тикер её не перезаписывает.
     // callsSeq — номер загрузки первой страницы: ответ догрузки из прошлого
     // окна отбрасывается, иначе он допишется в уже заменённый список
@@ -920,12 +934,13 @@
     return fmtN(Math.round(v / 1024)) + ' ' + t('unit.kb');
   }
 
-  // schemaLine — вес list_commands набора: байты, токены и число инструментов.
+  // schemaLine — вес list_commands набора: байты и токены. Число инструментов
+  // стоит рядом отдельным полем (#meta-tools), второй раз его не печатаем.
   function schemaLine(s) {
     if (!s) { return '—'; }
     return t('schema.line', {
       bytes: fmtBytes(s.schemaBytes), tokens: fmtN(s.schemaTokens),
-      tok: t('unit.tokens'), tools: fmtN(s.tools), tool: t('unit.tools')
+      tok: t('unit.tokens')
     });
   }
 
@@ -1573,8 +1588,15 @@
 
   /* ---------- /api/state ---------- */
 
+  // Ответы /api/state ходят внахлёст (такт и действие после правки): без счётчика
+  // более старый ответ, пришедший позже, откатывал состояние назад — выданный
+  // ключ или подпись пропадали из панели до следующего такта.
+  var stateSeq = 0;
+
   function loadState() {
+    var seq = ++stateSeq;
     return get('/api/state').then(function (data) {
+      if (seq !== stateSeq) { return; }
       if (!data) { return; }
       st.sets = data.sets || [];
       st.servers = data.servers || [];
@@ -1586,8 +1608,21 @@
       var ids = st.sets.map(function (s) { return s.id; });
       if (st.list) { st.sel = null; }
       else if (ids.indexOf(st.sel) === -1) { select(ids[0] || null); }
-      else if (st.boot) { st.boot = false; select(st.sel, true); }
-      else { renderHead(); renderSetServers(); }
+      else {
+        renderHead();
+        renderSetServers();
+        // такт — единственное место, где обновление приходит само: без этого
+        // список ключей жил до переключения вкладки, и отзыв ключа (он
+        // проставляется через несколько секунд после остановки набора) не
+        // появлялся в открытой панели
+        if (st.tab === 'keys') { renderKeys(current()); }
+        // каталог инструментов собирается, пока набор стартует: пустая таблица
+        // на открытой вкладке сама не наполнялась
+        var cur = current();
+        if (st.tab === 'tools' && !(st.tools || []).length && cur && cur.runtime && cur.runtime.running) {
+          loadTools();
+        }
+      }
       // обзор хоста собирается из того же /api/state, поэтому живёт с ним в такте
       if (st.page === 'host') { refreshHost(); }
     }).catch(function (e) { fail(e.message, e); });
@@ -1598,7 +1633,9 @@
     var none = st.sets.length === 0;
     $('status-counts').textContent = fmtN(st.servers.length) + ' ' + word(st.servers.length, 'server');
     $('f-updated').textContent = clock();
-    $('f-version').textContent = st.version ? 'mcprig ' + st.version + ' ·' : '—';
+    // точку-разделитель рисует CSS у «обновлено»: в тексте версии она оставалась
+    // висеть в конце строки, когда статусбар переносился на узком экране
+    $('f-version').textContent = st.version ? 'mcprig ' + st.version : '—';
     $('rail-count').textContent = fmtN(st.sets.length);
     // шапка набора и его вкладки — только на странице набора: на списке и на
     // соседних страницах тот же набор ни к чему
@@ -1616,8 +1653,12 @@
     renderCrumb();
     setTitle();
     var set = current();
-    $('endpoint').textContent = set
-      ? 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp' : '—';
+    var url = set ? 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp' : '—';
+    $('endpoint').textContent = url;
+    // у кнопки на узком экране подписи нет: имя для экранного диктора должно
+    // называть, что копируется, а полный адрес висит подсказкой на десктопе
+    $('copy').setAttribute('aria-label', url === '—' ? t('head.copyAria') : t('head.copyAria') + ': ' + url);
+    $('copy').title = url === '—' ? '' : url;
     if (none) { renderKpis(null); renderSetServers(); }
     // обзор хоста собирается из того же /api/state, поэтому живёт с ним в одном такте
     if (st.page === 'host') { renderHost(); }
@@ -1844,10 +1885,12 @@
           paintBadge(badge, st8);
           badge.title = (h && h.error) || (probed && !running ? t('srv.probeOkTip') : '');
         }
-        // у остановленного набора инструментов нет; у запущенного без проверки
-        // число неизвестно — «?» не спорит со счётчиком в шапке, «—» спорил
+        // у остановленного набора инструментов нет, до проверки число
+        // неизвестно: прочерк приглушённым — он не равен нулю и не загадка
         var tc = st.probeTools[row.name];
-        tr.children[3].textContent = !running ? '—' : tc != null ? fmtN(tc) : '?';
+        var tcell = tr.children[3];
+        tcell.textContent = !running || tc == null ? '—' : fmtN(tc);
+        tcell.classList.toggle('is-muted', tcell.textContent === '—');
         tr.children[4].textContent = last[row.name] ? clockAt(last[row.name]) : '—';
         var check = tr.querySelector('[data-check]');
         // У остановленного набора проверка поднимает процесс: кнопка называет
@@ -1992,6 +2035,9 @@
     renderCalls(null);
     renderLog([]);
     fillFilters();
+    // на #/stats/today набор известен только после /api/state: без этой строки
+    // страница ждала пятнадцатисекундного тика и показывала пустоту
+    if (st.page === 'stats') { loadStats(); }
     if (id) { loadHealth(); loadCalls(); loadLog(); loadTools(); }
   }
 
@@ -2104,6 +2150,20 @@
     if (n) { n.textContent = v; }
   }
 
+  // подпись плитки склоняется по числу: «1 набор в работе», «4 набора в работе»;
+  // у неизвестного числа (—) остаётся форма множественного
+  function tileWord(id, key, n, kind) {
+    var num = $(id);
+    var label = num && num.parentElement.querySelector('.tile-label');
+    if (label) { label.textContent = t(key, { w: word(n == null ? 0 : Number(n), kind) }); }
+  }
+
+  // беда видна без чтения подписи: цвет и полоса приходят из CSS
+  function badTile(id, on) {
+    var num = $(id);
+    if (num) { num.closest('.tile').classList.toggle('is-bad', !!on); }
+  }
+
   function renderSetTiles() {
     var set = current();
     var rows = (st.health && st.health.servers) || null;
@@ -2119,6 +2179,10 @@
     tile('t-keys', set ? fmtN((set.keys || []).length) : '—');
     tile('t-pending', st.tools ? fmtN(pendingTools(st.tools)) : '—');
     tile('t-up', set ? uptime(set) : '—');
+    tileWord('t-ok', 'host.srvOk', rows ? ok : 0, 'server');
+    tileWord('t-failed', 'host.srvFailed', rows ? failed : 0, 'server');
+    tileWord('t-pending', 'host.pending', st.tools ? pendingTools(st.tools) : 0, 'tool');
+    badTile('t-failed', !!rows && failed > 0);
   }
 
   /* ---------- обзор хоста ----------
@@ -2193,11 +2257,19 @@
     tile('h-unchecked', map ? fmtN(rest) : '—');
     tile('h-failed', map ? fmtN(failed) : '—');
     tile('h-pending', st.host.pending == null ? '—' : fmtN(st.host.pending));
-    // размера /tool-out и срока хранения в API нет: прочерк честнее выдумки
-    tile('h-toolout', '—');
     var tot = st.host.kpi && st.host.kpi.totals;
     tile('h-calls', tot ? fmtN(tot.calls) : '—');
     tile('h-err', tot && tot.calls ? pct(tot.failures, tot.calls) : '—');
+    // плитка «выгрузки /tool-out» снята: размера и срока хранения API не отдаёт,
+    // а прочерк в общей сетке читался как ноль. Пояснение — в подсказке статусбара
+    tileWord('h-running', 'host.running', running, 'set');
+    tileWord('h-stopped', 'host.stopped', sets.length - running, 'set');
+    tileWord('h-ok', 'host.srvOk', map ? ok : 0, 'server');
+    tileWord('h-failed', 'host.srvFailed', map ? failed : 0, 'server');
+    tileWord('h-pending', 'host.pending', st.host.pending || 0, 'tool');
+    tileWord('h-calls', 'host.calls', tot ? tot.calls : 0, 'call');
+    badTile('h-failed', !!map && failed > 0);
+    badTile('h-err', !!(tot && tot.calls && tot.failures));
     [].forEach.call(document.querySelectorAll('#host-tiles .tile-num'), function (n) {
       n.classList.toggle('is-muted', n.textContent === '—');
     });
@@ -2219,12 +2291,17 @@
 
   function renderHostSets() {
     var map = lastBySet();
-    var rows = (st.sets || []).slice().sort(function (a, b) {
+    // обзор хоста отвечает на вопрос «что требует внимания», полный список
+    // наборов живёт на своей странице: дублировать его здесь незачем
+    var rows = (st.sets || []).filter(function (s) {
+      return !(s.runtime && s.runtime.running);
+    }).sort(function (a, b) {
       var x = map[a.id] || 0, y = map[b.id] || 0;
       if (x !== y) { return y - x; }
       return (a.name || a.id) < (b.name || b.id) ? -1 : 1;
     });
-    show($('host-sets-empty'), rows.length === 0);
+    // нечего показать — блока нет: пустая таблица на обзоре только занимает экран
+    show($('host-sets-sec'), rows.length > 0);
     sync($('host-sets-body'), rows, function (s) { return s.id; },
       function () {
         var tr = el('tr');
@@ -2246,12 +2323,16 @@
         state.dataset.label = t('host.thState');
         state.textContent = '';
         paintBadge(state.appendChild(el('span', 'badge')), stc);
-        // причина простоя — рядом с состоянием, а не в подсказке
+        // причина простоя — рядом с состоянием, а не в подсказке; нажатие
+        // раскрывает её целиком, как и причину провала вызова
         var why = s.runtime && s.runtime.error;
         if (why) {
           var note = state.appendChild(el('span', 'cell-reason'));
           note.textContent = why.length > 60 ? why.slice(0, 60) + '…' : why;
           note.title = why;
+          note.tabIndex = 0;
+          note.setAttribute('role', 'button');
+          note.setAttribute('aria-expanded', 'false');
         }
         var last = map[s.id];
         var time = tds[2];
@@ -2744,17 +2825,16 @@
     if (!window.confirm(t('set.delConfirm', { name: name }))) { return; }
     var btn = $('set-del');
     var wasSel = st.sel === set.id;
-    var idx = st.sets.map(function (s) { return s.id; }).indexOf(set.id);
     st.busy = true;
     btn.disabled = true;
     setDelErr('');
     send('DELETE', '/api/sets/' + encodeURIComponent(set.id), null, true)
       .then(function () { return loadState(); })
       .then(function () {
-        // сосед по списку: следующий, а если его нет — предыдущий
+        // удалили открытый набор — возвращаемся к списку: сосед по списку
+        // оказывается выбранным сам, и это читается как «набор не тот»
         if (!wasSel) { return; }
-        var next = st.sets[Math.min(Math.max(idx, 0), st.sets.length - 1)];
-        if (next) { select(next.id); } else { $('empty-add').focus(); }
+        location.hash = '#/sets';
       })
       .catch(function (err) { setDelErr(err.message); })
       .then(function () { st.busy = false; btn.disabled = false; });
@@ -3031,7 +3111,7 @@
     var task = $('prompt-task').value.trim();
     // задача обязательна: демон ответил бы 400, но кнопка не должна обещать
     // сборку, которой не будет
-    if (!task) { $('prompt-task').focus(); return; }
+    if (!task) { promptErr(t('prompt.taskRequired')); $('prompt-task').focus(); return; }
     var chosen = [].map.call($('prompt-servers').querySelectorAll('input:checked'),
       function (i) { return i.value; });
     var body = { task: task, intro: $('prompt-intro').value.trim() };
@@ -3129,11 +3209,14 @@
       badge.appendChild(el('span', 'dot' + (c.failed ? '' : '')));
       badge.appendChild(document.createTextNode(c.failed ? t('calls.bad') : t('calls.ok')));
       badge.title = c.error || '';
-      // Причина провала видна в строке: полный текст — в title, чтобы длинное
-      // тело ошибки не растягивало таблицу.
+      // Причина провала обрезана в строке: нажатие раскрывает её целиком,
+      // title остаётся для мыши. На тач-экране подсказки не существует.
       if (c.failed && c.error) {
         var why = el('span', 'call-err', ' · ' + (c.error.length > 80 ? c.error.slice(0, 80) + '…' : c.error));
         why.title = c.error;
+        why.tabIndex = 0;
+        why.setAttribute('role', 'button');
+        why.setAttribute('aria-expanded', 'false');
         stc.appendChild(why);
       }
       frag.appendChild(tr);
@@ -3663,8 +3746,13 @@
       var name = tr.appendChild(el('td', 'cell-name'));
       name.dataset.label = label;
       name.appendChild(el('span', 'bd-name', g[field] || '—'));
-      var sub = name.appendChild(el('span', 'cell-sub', subField ? (g[subField] || '') : ''));
-      sub.hidden = !sub.textContent;
+      // источник стоит в той же строке приглушённым хвостом: отдельной
+      // колонкой он сжимал имя, второй строкой — делал строки вдвое выше,
+      // чем у соседней таблицы. Полная пара — в подсказке.
+      if (subField && g[subField]) {
+        name.appendChild(el('span', 'bd-sub', ' · ' + g[subField]));
+        name.title = (g[field] || '') + ' — ' + g[subField];
+      }
       addNum(tr, g.calls, t('stats.thCalls'));
       var f = addNum(tr, pct(g.failures, g.calls), t('stats.thErr'));
       if (g.failures) { f.classList.add('bad'); }
@@ -3675,7 +3763,7 @@
     if (limit && list.length > limit) {
       var rest = frag.appendChild(el('tr'));
       var td = rest.appendChild(el('td', 'block-meta', t('stats.more', { n: fmtN(list.length - limit) })));
-      td.colSpan = 5;
+      td.colSpan = tbody.closest('table').tHead.rows[0].cells.length;
     }
     tbody.replaceChildren(frag);
   }
@@ -4018,7 +4106,8 @@
           ? day(k.createdAt) + ' · ' + t('keys.revoked', { date: day(k.revokedAt) })
           : day(k.createdAt) + ' · ' + t('keys.active');
         var input = li.querySelector('.key-note .input');
-        input.value = k.label || '';
+        // поле в фокусе — человек печатает: его значение не перетираем тактом
+        if (document.activeElement !== input) { input.value = k.label || ''; }
         input.placeholder = t('keys.notePh');
         input.disabled = revoked;
         input.dataset.note = k.id;
@@ -4161,12 +4250,31 @@
   $('q').addEventListener('input', function () { renderCalls(st.calls); });
   $('only-err').addEventListener('change', function () { renderCalls(st.calls); });
 
+  // причина провала раскрывается нажатием и с клавиатуры: одна делегированная
+  // пара обработчиков на весь документ, а не по обработчику в каждой строке
+  function toggleWhy(node) {
+    var open = node.classList.toggle('is-open');
+    node.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  document.addEventListener('click', function (e) {
+    var why = e.target.closest && e.target.closest('.call-err, .cell-reason');
+    if (why) { toggleWhy(why); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') { return; }
+    var why = e.target.closest && e.target.closest('.call-err, .cell-reason');
+    if (why) { e.preventDefault(); toggleWhy(why); }
+  });
+
   ['s-set', 's-server', 's-tool', 's-client'].forEach(function (id) {
     $(id).addEventListener('change', function () {
       st.st.set = $('s-set').value;
       st.st.server = $('s-server').value;
       st.st.tool = $('s-tool').value;
       st.st.client = $('s-client').value;
+      storeLocal('mcprig.stats.server', st.st.server);
+      storeLocal('mcprig.stats.tool', st.st.tool);
+      storeLocal('mcprig.stats.client', st.st.client);
       loadStats();
     });
   });
@@ -4175,6 +4283,9 @@
     st.st.server = '';
     st.st.tool = '';
     st.st.client = '';
+    storeLocal('mcprig.stats.server', '');
+    storeLocal('mcprig.stats.tool', '');
+    storeLocal('mcprig.stats.client', '');
     fillFilters();
     loadStats();
   }
@@ -4319,8 +4430,11 @@
     var done = function (ok) {
       btn.textContent = ok ? t('head.copied') : t('head.copyFail');
       clearTimeout(copyTimer);
-      // кнопки здесь иконочные: текст возвращается разметкой, а не строкой
-      copyTimer = setTimeout(function () { btn.innerHTML = back; }, 1200);
+      // кнопки здесь иконочные: текст возвращается разметкой, а не строкой;
+      // элемент с data-i18n (подпись адреса) берёт строку заново — язык мог смениться
+      copyTimer = setTimeout(function () {
+        btn.innerHTML = btn.dataset && btn.dataset.i18n ? t(btn.dataset.i18n) : back;
+      }, 1200);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
@@ -4329,8 +4443,10 @@
     }
   }
 
+  // подпись внутри кнопки, а не она сама: в кнопке живёт адрес эндпоинта, и
+  // замена содержимого уносила его из DOM на всю секунду показа «copied»
   $('copy').addEventListener('click', function () {
-    copyText($('endpoint').textContent, this);
+    copyText($('endpoint').textContent, $('copy-label'), t('head.endpoint'));
   });
 
   // токена в панели нет: копируется префикс, без многоточия — так его и вставляют
@@ -4553,19 +4669,25 @@
     st.busy = true;
     btn.disabled = true;
     show($('keys-warn'), false);
+    var warnBox = $('keys-warn');
+    warnBox.className = 'form-alert';
+    warnBox.textContent = t('keys.issuing');
+    show(warnBox, true);
     send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', body)
       .then(function (r) {
         $('key-label').value = '';
         $('new-key').textContent = (r && r.token) || '';
         show($('new-key-box'), !!(r && r.token));
+        show(warnBox, false);
         if (r && r.restartError) { fail(t('keys.restartWarn', { err: r.restartError })); }
         return loadState().then(function () { renderKeys(current() || set); });
       })
       .catch(function (err) {
         // Отказ демона (400 на неизвестный профиль) — ответ формы, а не сбой
         // связи: показываем его текст здесь, диалог не закрываем.
-        $('keys-warn').textContent = err.message;
-        show($('keys-warn'), true);
+        warnBox.className = 'form-alert form-alert-warn';
+        warnBox.textContent = err.message;
+        show(warnBox, true);
       })
       .then(function () { st.busy = false; btn.disabled = false; });
   });
@@ -4582,7 +4704,10 @@
     var revoke = e.target.closest('[data-revoke]');
     if (!revoke) { return; }
     revoke.disabled = true;
-    show($('keys-warn'), false);
+    // отзыв активного ключа останавливает набор: это несколько секунд, и молчать
+    // в них нельзя — кнопка гаснет, но причина не видна
+    $('keys-warn').textContent = t('keys.revoking');
+    show($('keys-warn'), true);
     send('DELETE', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' +
       encodeURIComponent(revoke.dataset.revoke)).then(function (r) {
       return loadState().then(function () {
@@ -4590,12 +4715,13 @@
         renderKeys(now);
         // Отзыв активного ключа останавливает набор: без токена он не слушает.
         // Молчать об этом нельзя — панель выглядела бы просто «остановленной».
+        show($('keys-warn'), false);
         if (r && r.wasActive && !(now.runtime && now.runtime.running)) {
           $('keys-warn').textContent = t('keys.revokedStopped');
           show($('keys-warn'), true);
         }
       });
-    }).catch(function () { revoke.disabled = false; });
+    }).catch(function () { show($('keys-warn'), false); revoke.disabled = false; });
   });
 
   $('key-list').addEventListener('keydown', function (e) {
