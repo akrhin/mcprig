@@ -299,6 +299,29 @@ func TestInvokeManyUnknownServerKeepsSlotsBounded(t *testing.T) {
 	}
 }
 
+// Упало всё — ответ ошибка, как у одиночного invoke_command: успех с
+// ошибками внутри клиент принимает за выполненную работу.
+func TestInvokeManyAllFailedIsError(t *testing.T) {
+	f := newFanTracker()
+	m := fanManager(t, f, nil, "a")
+	cs := clientFor(t, m.Server())
+
+	boom := map[string]any{"server": "a", "command_name": "boom", "parameters": map[string]any{}}
+	all := call(t, cs, "invoke_many", map[string]any{"calls": []any{boom, boom}})
+	if !all.IsError {
+		t.Fatalf("полный отказ выдан за успех: %s", resultText(t, all))
+	}
+	out := manyAnswers(t, all)
+	if len(out) != 2 || out[0].OK || out[1].OK {
+		t.Fatalf("ответы: %+v", out)
+	}
+
+	part := call(t, cs, "invoke_many", map[string]any{"calls": []any{boom, echoCall("a", "ok", 0)}})
+	if part.IsError {
+		t.Fatalf("частичный отказ выдан за ошибку: %s", resultText(t, part))
+	}
+}
+
 // requestTimeout bounds the whole fan-out, not each call.
 func TestInvokeManyTimeoutBoundsWholeBatch(t *testing.T) {
 	f := newFanTracker()
@@ -321,6 +344,73 @@ func TestInvokeManyTimeoutBoundsWholeBatch(t *testing.T) {
 		if !strings.Contains(ans.Error, "таймаут вызова 40 мс") {
 			t.Fatalf("calls[%d]: ошибка не называет таймаут: %q", i, ans.Error)
 		}
+	}
+}
+
+// requestTimeout 0 — общего дедлайна у веера нет: вызов без своего timeoutMs
+// не срезается пределом соседа и работает дольше него.
+func TestInvokeManyWithoutRequestTimeoutKeepsNeighbourOut(t *testing.T) {
+	f := newFanTracker()
+	m := fanManager(t, f, &config.Config{RequestTimeout: 0}, "a")
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_many", map[string]any{"calls": []any{
+		map[string]any{
+			"server": "a", "command_name": "echo", "timeoutMs": 1000,
+			"parameters": map[string]any{"text": "capped", "ms": 2000},
+		},
+		echoCall("a", "free", 1500),
+	}})
+	out := manyAnswers(t, res)
+	if len(out) != 2 {
+		t.Fatalf("ответов %d, want 2", len(out))
+	}
+	if out[0].OK || !strings.Contains(out[0].Error, "таймаут вызова 1000 мс") {
+		t.Fatalf("вызов со своим timeoutMs не назвал свой предел: %+v", out[0])
+	}
+	if out[0].TimeoutMS != 1000 {
+		t.Fatalf("timeout_ms = %d, want 1000", out[0].TimeoutMS)
+	}
+	if !out[1].OK || out[1].MS <= 1000 {
+		t.Fatalf("вызов без timeoutMs срезан пределом соседа: %+v", out[1])
+	}
+	if out[1].TimeoutMS != 0 {
+		t.Fatalf("у вызова без предела указан timeout_ms=%d", out[1].TimeoutMS)
+	}
+	if res.IsError {
+		t.Fatalf("частичный отказ выдан за ошибку: %s", resultText(t, res))
+	}
+}
+
+// Ожидание слота — не таймаут вызова: вызов не уходил, и отказ говорит об
+// очереди, её лимите и времени ожидания.
+func TestInvokeManySlotWaitIsNotCallTimeout(t *testing.T) {
+	f := newFanTracker()
+	m := fanManager(t, f, &config.Config{RequestTimeout: 40}, "a")
+	// Слоты сервера заняты: вызов встанет в очередь и вниз не уйдёт.
+	slot := m.slots.get("a")
+	for range cap(slot) {
+		slot <- struct{}{}
+	}
+	cs := clientFor(t, m.Server())
+
+	res := call(t, cs, "invoke_many", map[string]any{"calls": []any{echoCall("a", "late", 0)}})
+	out := manyAnswers(t, res)
+	if len(out) != 1 || out[0].OK {
+		t.Fatalf("вызов без слота не отбит: %+v", out)
+	}
+	want := fmt.Sprintf("нет свободного слота у сервера a (лимит %d)", cap(slot))
+	if !strings.Contains(out[0].Error, want) || !strings.Contains(out[0].Error, "вызов не отправлен") {
+		t.Fatalf("отказ не про очередь: %q", out[0].Error)
+	}
+	if !strings.Contains(out[0].Error, "ждали ") {
+		t.Fatalf("отказ не говорит, сколько ждали: %q", out[0].Error)
+	}
+	if strings.Contains(out[0].Error, "таймаут вызова") {
+		t.Fatalf("ожидание очереди выдано за таймаут вызова: %q", out[0].Error)
+	}
+	if peak := f.peak("a"); peak != 0 {
+		t.Fatalf("вызов без слота дошёл до сервера: %d", peak)
 	}
 }
 

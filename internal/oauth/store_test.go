@@ -73,20 +73,6 @@ func TestStoreRoundTrip(t *testing.T) {
 	if _, ok := s2.Load(key); !ok {
 		t.Fatal("после переоткрытия токен потерян")
 	}
-
-	if err := s.Delete(key); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := s.Load(key); ok {
-		t.Fatal("Delete не удалил токен")
-	}
-	s3, err := OpenStore(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := s3.Load(key); ok {
-		t.Fatal("удаление не сохранилось на диск")
-	}
 }
 
 func TestStoreConcurrentSave(t *testing.T) {

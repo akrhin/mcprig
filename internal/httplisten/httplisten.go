@@ -74,12 +74,6 @@ type tokenSet struct {
 	v atomic.Pointer[[][sha256.Size]byte]
 }
 
-func newTokenSet(tokens ...string) *tokenSet {
-	ts := &tokenSet{}
-	ts.set(tokens)
-	return ts
-}
-
 func (ts *tokenSet) set(tokens []string) {
 	hashes := make([][sha256.Size]byte, 0, len(tokens))
 	for _, token := range tokens {

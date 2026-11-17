@@ -165,6 +165,10 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	hint, err := optionalString(in, "hint")
+	if err != nil {
+		return nil, err
+	}
 	cwd, err := optionalString(in, "cwd")
 	if err != nil {
 		return nil, err
@@ -257,6 +261,7 @@ func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
 
 	srv.Transport = config.TransportKind(transport)
 	srv.Description = description
+	srv.Hint = hint
 	srv.Command = command
 	srv.URL = url
 	srv.Cwd = cwd
@@ -386,10 +391,17 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 			return nil, invalidf("servers: ожидался массив имён")
 		}
 		var missing []string
+		seen := make(map[string]bool, len(names))
 		for _, name := range names {
 			if s.serverLocked(name) == nil {
 				missing = append(missing, name)
 			}
+			if seen[name] {
+				// Дубль в составе — не опечатка в ответе, а второй экземпляр
+				// того же сервера: набор откроет его дважды и подменит ключи.
+				return nil, invalidf("сервер %q указан в наборе дважды", name)
+			}
+			seen[name] = true
 		}
 		if len(missing) > 0 {
 			return nil, invalidf("в реестре нет серверов: %s", strings.Join(missing, ", "))

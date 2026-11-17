@@ -19,12 +19,10 @@ import (
 
 // approveConfig — что нужно одобрению; в тестах подставляется целиком.
 type approveConfig struct {
-	Set      string
-	All      bool
-	Panel    string
-	Password string
-	Secret   string
-	User     string
+	Set   string
+	All   bool
+	Panel string
+	panelCreds
 }
 
 func newApproveFlags() (*flag.FlagSet, *approveConfig) {
@@ -32,10 +30,7 @@ func newApproveFlags() (*flag.FlagSet, *approveConfig) {
 	fs := flag.NewFlagSet("approve", flag.ContinueOnError)
 	fs.StringVar(&c.Set, "set", "main", "имя набора, в котором одобряется инструмент")
 	fs.BoolVar(&c.All, "all", false, "одобрить все изменившиеся инструменты набора")
-	fs.StringVar(&c.Panel, "panel", "", "адрес панели (по умолчанию MCPRIG_PANEL_URL, иначе MCPRIG_PORT)")
-	fs.StringVar(&c.Password, "password", "", "пароль панели (по умолчанию MCPRIG_PASSWORD)")
-	fs.StringVar(&c.Secret, "secret", "", "секрет обратного прокси панели (по умолчанию MCPRIG_PROXY_SECRET)")
-	fs.StringVar(&c.User, "user", "", "пользователь панели для входа (по умолчанию admin)")
+	panelFlags(fs, &c.Panel, panelHelp, &c.panelCreds)
 	return fs, c
 }
 
@@ -61,7 +56,7 @@ func runApprove(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	base := strings.TrimRight(panelBaseURL(o.Panel), "/")
-	creds := panelCreds{Password: o.Password, Secret: o.Secret, User: o.User}
+	creds := o.panelCreds
 	client, err := newPanelClient(ctx, base, creds)
 	if err != nil {
 		return err

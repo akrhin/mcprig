@@ -122,6 +122,9 @@ func exportServer(srv Server) map[string]any {
 	if srv.Description != "" {
 		out["description"] = srv.Description
 	}
+	if srv.Hint != "" {
+		out["hint"] = srv.Hint
+	}
 	if srv.Cwd != "" {
 		out["cwd"] = srv.Cwd
 	}

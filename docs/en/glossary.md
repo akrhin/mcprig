@@ -8,16 +8,17 @@ from. Where a term is a config key, the key is spelled as in the file.
 
 **set** (also *набор*) — a named group of MCP servers published at one endpoint
 with one port and one key. A set is configured by a single `servers.json` and runs
-as its own process (`mcprig serve --config …`), supervised by the panel. All five
+as its own process (`mcprig serve --config …`), supervised by the panel. All nine
 meta-tools belong to a set, and the same server may appear in two sets with two
 independent processes. See [configuration.md](configuration.md#top-level) and
 [architecture.md](architecture.md#one-process-per-set).
 
-**meta-tool** — one of the five `tools/list` entries a client of a set sees:
+**meta-tool** — one of the nine `tools/list` entries a client of a set sees:
 `list_servers`, `list_commands`, `describe_commands`, `invoke_command`,
-`invoke_many`. The tools of the servers behind the set are never listed to the
-client; they are reached through `invoke_command`. See
-[meta-tools.md](meta-tools.md).
+`invoke_many`, plus `list_resources`, `read_resource`, `list_prompts`,
+`get_prompt` for the servers that expose resources or prompts. The tools of the
+servers behind the set are never listed to the client; they are reached through
+`invoke_command`. See [meta-tools.md](meta-tools.md).
 
 **downstream** — the actual MCP server behind the proxy: a stdio process mcprig
 spawns, or a remote HTTP endpoint. The Go package is `internal/downstream`. The

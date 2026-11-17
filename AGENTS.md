@@ -59,3 +59,18 @@ archify finalize architecture docs/diagrams/mcprig.why.en.json docs/diagrams/mcp
 - Стенд на настоящих серверах: `docs/dev-real-servers.md` (serena, socraticode, xerj).
 - Эталон: замороженный `lazy-mcp@5a963c5` (upstream-совместимый пакет); поведение, которое переносим, — `docs/history/reference/ts-manager-contract.md`.
 - MCP Go SDK: `github.com/modelcontextprotocol/go-sdk` v1.8.0, протокол по умолчанию `2026-07-28`.
+
+## Repository Map
+
+Полная карта кода — `codemap.md` в корне проекта.
+
+Перед работой над задачей читай `codemap.md`: архитектура и точки входа,
+ответственность каталогов, поток данных между модулями.
+
+Для глубокой работы по конкретному каталогу читай `codemap.md` этого каталога.
+Карта хранится в репозитории, а её состояние — `.slim/codemap.json`
+(`node …/scripts/codemap.mjs changes --root ./` показывает, что устарело).
+
+Следи за картой: меняешь код каталога — обновляешь его `codemap.md` (и корневой
+атлас, если изменился состав каталогов), затем `codemap.mjs update`. Ссылки
+`file:line` в картах ручные и сдвигаются при любой правке файла.

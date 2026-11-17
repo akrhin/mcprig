@@ -103,7 +103,7 @@ func NewRuntime(dataDir, cliPath, bindIP string, sec *Secrets, log *slog.Logger)
 		dataDir:   dataDir,
 		cliPath:   cliPath,
 		bindIP:    bindIP,
-		probeAddr: loopbackAddr(bindIP),
+		probeAddr: LoopbackAddr(bindIP),
 		sec:       sec,
 		log:       log,
 		notify:    newNotifier(log),
@@ -114,9 +114,9 @@ func NewRuntime(dataDir, cliPath, bindIP string, sec *Secrets, log *slog.Logger)
 	}
 }
 
-// loopbackAddr — адрес, по которому пробы достают набор: сам bindIP, а для
+// LoopbackAddr — адрес, по которому пробы достают набор: сам bindIP, а для
 // «все интерфейсы» — соответствующий loopback.
-func loopbackAddr(bindIP string) string {
+func LoopbackAddr(bindIP string) string {
 	switch bindIP {
 	case "", "0.0.0.0":
 		return "127.0.0.1"

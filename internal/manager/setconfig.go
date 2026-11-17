@@ -2,6 +2,7 @@ package manager
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -59,10 +60,14 @@ type setFile struct {
 	Profiles map[string]*config.Profile `json:"profiles,omitempty"`
 }
 
+// ErrNoKey — набор ни закрыт, ни с ключом: собирать конфиг не из чего, старт
+// такой набор всё равно отобьёт.
+var ErrNoKey = errors.New("нет активного ключа — выдайте новый")
+
 // BuildSetConfig собирает конфиг набора из реестра.
 func BuildSetConfig(set *registry.Set, servers []registry.Server, bindIP string, allowedHosts []string) ([]byte, error) {
 	if set.Token == "" && !set.Open {
-		return nil, fmt.Errorf("у набора %s нет активного ключа — выдайте новый", set.ID)
+		return nil, fmt.Errorf("у набора %s %w", set.ID, ErrNoKey)
 	}
 	if bindIP == "" {
 		bindIP = "0.0.0.0"

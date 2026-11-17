@@ -156,7 +156,7 @@ func TestQuery7dExactPercentiles(t *testing.T) {
 	}
 	writeRaw(t, dir, base, lines)
 
-	res := QueryHistory([]string{dir}, Query{Period: Period7d}, now)
+	res := QuerySets([]Source{{Dir: dir}}, Query{Period: Period7d}, now)
 	if res.Approximate {
 		t.Fatal("7d должна быть точной")
 	}
@@ -193,7 +193,7 @@ func TestQuery30dApproximateFromHistogram(t *testing.T) {
 		t.Fatalf("Rotate: %v", err)
 	}
 
-	res := QueryHistory([]string{dir}, Query{Period: Period30d}, now)
+	res := QuerySets([]Source{{Dir: dir}}, Query{Period: Period30d}, now)
 	if !res.Approximate {
 		t.Fatal("30d должна быть приблизительной")
 	}
@@ -216,7 +216,7 @@ func TestQueryArchiveFromMonth(t *testing.T) {
 		t.Fatalf("Rotate: %v", err)
 	}
 
-	res := QueryHistory([]string{dir}, Query{Period: PeriodArchive}, now)
+	res := QuerySets([]Source{{Dir: dir}}, Query{Period: PeriodArchive}, now)
 	if !res.Approximate || res.Totals.Calls != 1 || res.Totals.Failures != 1 {
 		t.Fatalf("архив = %+v", res.Totals)
 	}
@@ -239,7 +239,7 @@ func TestQueryMergesAllSets(t *testing.T) {
 		{Time: now.Add(-2 * time.Minute), Client: "claude", Server: "b", Tool: "u", MS: 30},
 	})
 
-	res := QueryHistory([]string{d1, d2}, Query{Period: PeriodToday}, now)
+	res := QuerySets([]Source{{Dir: d1}, {Dir: d2}}, Query{Period: PeriodToday}, now)
 	if res.Totals.Calls != 3 || res.Totals.Failures != 1 {
 		t.Fatalf("слияние: %+v", res.Totals)
 	}
@@ -266,7 +266,7 @@ func TestBrokenJournalLinesAreSkipped(t *testing.T) {
 	}
 	f.Close()
 
-	res := QueryHistory([]string{dir}, Query{Period: PeriodToday}, now)
+	res := QuerySets([]Source{{Dir: dir}}, Query{Period: PeriodToday}, now)
 	if res.Totals.Calls != 1 {
 		t.Fatalf("битые строки учтены: %+v", res.Totals)
 	}
@@ -405,7 +405,7 @@ func TestQueryTodayFilters(t *testing.T) {
 		{Time: now.Add(-2 * time.Minute), Client: "claude", Server: "beta", Tool: "fetch", MS: 20, Failed: true},
 	})
 
-	res := QueryHistory([]string{dir}, Query{Period: PeriodToday, Server: "alpha"}, now)
+	res := QuerySets([]Source{{Dir: dir}}, Query{Period: PeriodToday, Server: "alpha"}, now)
 	if res.Totals.Calls != 1 || res.Totals.Failures != 0 || res.Totals.P95Ms != 10 {
 		t.Fatalf("фильтр server: %+v", res.Totals)
 	}
@@ -424,13 +424,13 @@ func TestQueryTodayFilters(t *testing.T) {
 	}
 
 	// Три фильтра вместе оставляют ровно одну тройку.
-	res = QueryHistory([]string{dir}, Query{Period: PeriodToday, Server: "alpha", Tool: "echo", Client: "opencode"}, now)
+	res = QuerySets([]Source{{Dir: dir}}, Query{Period: PeriodToday, Server: "alpha", Tool: "echo", Client: "opencode"}, now)
 	if res.Totals.Calls != 1 || len(res.Tools) != 1 || len(res.Clients) != 1 {
 		t.Fatalf("фильтр тройки: %+v %+v %+v", res.Totals, res.Tools, res.Clients)
 	}
 
 	// bucket=day на сегодняшних сутках — одна точка.
-	res = QueryHistory([]string{dir}, Query{Period: PeriodToday, Bucket: "day"}, now)
+	res = QuerySets([]Source{{Dir: dir}}, Query{Period: PeriodToday, Bucket: "day"}, now)
 	if len(res.Series) != 1 || res.Series[0].Calls != 2 || !res.Series[0].T.Equal(today) {
 		t.Fatalf("серия по дню: %+v", res.Series)
 	}
@@ -497,7 +497,7 @@ func TestArchiveSeesUnfoldedDays(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := QueryHistory([]string{dir}, Query{Period: PeriodArchive}, now)
+	res := QuerySets([]Source{{Dir: dir}}, Query{Period: PeriodArchive}, now)
 	if res.Totals.Calls != 4 {
 		t.Fatalf("calls = %d, ожидалось 4 (1 из месяца + 3 из несвёрнутого дня)", res.Totals.Calls)
 	}

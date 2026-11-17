@@ -24,7 +24,7 @@ go test ./... -race -count=1 -p 1
 ```
 
 The race-enabled suite is the stage gate. It covers config loading, both
-transports, the five meta-tools, permissions, OAuth against a fake authorization
+transports, the nine meta-tools, permissions, OAuth against a fake authorization
 server, HTTP transport rules, the manager API, supervision and statistics.
 
 `-p 1` is required: `internal/manager` and `e2e` start real sets on the shared

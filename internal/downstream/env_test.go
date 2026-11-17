@@ -39,6 +39,37 @@ func TestEnvWhitelist(t *testing.T) {
 	}
 }
 
+// Прокси-переменные — часть whitelist: без них сервер за прокси не выходит в
+// сеть и отвечает «нет сети» вместо настоящего отказа.
+func TestEnvKeepProxyVariables(t *testing.T) {
+	proxies := map[string]string{
+		"HTTP_PROXY":         "http://proxy:3128",
+		"HTTPS_PROXY":        "http://proxy:3128",
+		"NO_PROXY":           "localhost,127.0.0.1",
+		"http_proxy":         "http://proxy:3128",
+		"https_proxy":        "http://proxy:3128",
+		"no_proxy":           "localhost,127.0.0.1",
+		"NODE_USE_ENV_PROXY": "1",
+		"OWN_PROXY_IV":       "не прокси",
+	}
+	for name, value := range proxies {
+		t.Setenv(name, value)
+	}
+
+	got := strings.Join(EnvFor(&config.Server{}), "\n")
+	for name, value := range proxies {
+		if name == "OWN_PROXY_IV" {
+			continue
+		}
+		if !strings.Contains(got, name+"="+value) {
+			t.Errorf("прокси %s не дошёл до сервера: %s", name, got)
+		}
+	}
+	if strings.Contains(got, "OWN_PROXY_IV") {
+		t.Errorf("whitelist перестал быть fail-closed: %s", got)
+	}
+}
+
 // Резервные имена не доходят до exec.Cmd.Env, даже когда перечислены в
 // envAllow или заданы в env сервера.
 func TestReservedEnvNeverPassesDown(t *testing.T) {

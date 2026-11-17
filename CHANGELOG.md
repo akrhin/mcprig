@@ -8,6 +8,133 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Fixed
+
+- `mcprig panel -h` / `--help` lists all twenty-seven environment variables the
+  panel reads — grouped as paths, network, auth, TLS, proxy and OpenBao — and
+  exits `0`; any other argument is a usage error with exit code 2. `XDG_STATE_HOME`,
+  `BAO_ADDR`/`OPENBAO_ADDR`, `BAO_TOKEN`/`OPENBAO_TOKEN`, `BAO_MOUNT` and
+  `BAO_PREFIX` were missing although the panel already read them, and the count
+  in `docs/{en,ru}/cli.md` matches again (`cmd/mcprig/main.go`,
+  `cmd/mcprig/main_test.go`).
+- The panel's **Keys** dialog says `label`, as its API always did: issuing a key
+  is one `POST /api/sets/<id>/keys` with `{"label":…,"profile":…}`, and editing a
+  label sends `{"label":…}`; `note` survives only as the old name the daemon
+  still accepts (`web/app.js`, `internal/manager/api.go`,
+  `internal/registry/types.go`).
+- A corrupt `registry.json` no longer disappears silently: it still moves to
+  `registry.json.corrupt-<unix>`, but startup logs an ERROR naming the backup,
+  the byte size and the number of set directories left on disk, and the same
+  line is available through `Dropped()`. Before, the panel came up with an empty
+  registry and the log said nothing (`internal/registry/store.go`,
+  `internal/manager/api.go`).
+- `PUT /api/servers/<name>` with a changed `env`/`envAllow` now names the set
+  whose restart failed in `reloadErrors`, like the sibling branch that reloads
+  keys, instead of leaving the failure in the log behind a 200.
+- Changing or deleting an `env` value waits for the restart in the response
+  (bounded by the existing 60 s `restartTimeout`) and puts a set that did not
+  come back into `reloadErrors`; `restarted` now lists sets that actually
+  restarted. A failed background restart used to leave a set serving with a
+  revoked secret while the answer promised `restarted`.
+- `PUT /api/sets/<id>` answers 200 with `failed[setID]` when the edit is already
+  in the registry but the restart or reload could not apply it: a 500 made the
+  panel treat a committed edit as lost.
+- The panel shows both of those: a set named under the variables form with the
+  reason from `reloadErrors`, and the same line under the set composition when
+  `failed` or `reloadError` comes back with the edit. A secret rotation that did
+  not restart the set used to look applied (`web/app.js`).
+- `GET /api/sets/<id>/servers/<name>/authorize/status` checks the same
+  conditions as the launch — the server exists, belongs to the set and is
+  remote — and answers 400 otherwise. A server removed from the set used to
+  report `200 idle`, and the panel dialog spun forever.
+- The tool-out sweep counts files it could not delete, logs them and returns
+  the aggregated error (`не удалось удалить N файлов`), while still cleaning the
+  other directories. Retention that failed silently let `tool-out` grow
+  unbounded (`internal/toolout/toolout.go`).
+- `POST /api/sets/<id>/reload` on a stopped set answers
+  `200 {"reloaded":false,"reason":…}` instead of 500 when the set has no active
+  key: nothing runs, so there is nothing to refuse. `servers.json` is not
+  written, and the reason names the missing key. A 500 is now only a real
+  failure to build or write the config (`internal/manager/api.go`,
+  `internal/manager/setconfig.go`).
+- A stdio server now receives `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, the
+  lowercase forms and `NODE_USE_ENV_PROXY` from the proxy's environment: behind
+  a proxy it used to see "no network" and report a fake authentication failure.
+  The rest of the environment stays whitelisted (`internal/downstream/env.go`).
+- A truncated answer stays valid JSON: long string values are shortened and the
+  fact is recorded inside the document (`_truncated`), the marker no longer
+  promises a `/tool-out/<name>` URL for an open set, and a non-JSON answer says
+  plainly that it was cut and where the full one lives
+  (`internal/mcpserver/toolout.go`).
+- Timeouts name the server and the command and wrap the cause, so
+  `errors.Is(err, context.DeadlineExceeded)` answers; waiting for a slot is
+  reported as a queue refusal with its limit and wait time instead of a call
+  timeout that never happened (`internal/mcpserver/manager.go`,
+  `internal/mcpserver/invokemany.go`).
+- `list_commands` and `describe_commands` apply `permissions.deny`: a command
+  the key may not call no longer appears in the catalog or its schemas, while
+  `invoke_command` keeps answering with the policy refusal.
+- `refresh:true` drops the catalog cache at most once per 5 s per caller and
+  server — the caller is the key's fingerprint, or the client address on an open
+  set, so one client no longer pays for another's refresh; a throttled refresh
+  returns the cached catalog with a `refreshDeferred` marker instead of an error.
+- A fan-out budget exists only when the set carries a `requestTimeout`: a call
+  of `invoke_many` that brought no `timeoutMs` of its own is no longer cut short
+  by a neighbour's limit, and the answer names the limit the call actually ran
+  under instead of `0 ms` (`internal/mcpserver/invokemany.go`).
+- Issuing a key writes both `label` and the old `note` field, so a daemon from
+  an earlier release still shows the label after a downgrade
+  (`internal/registry/store.go`).
+- A corrupt `tools.lock.json` is a refusal, not an empty file: descriptors are
+  no longer auto-approved behind the quarantine, the corruption is logged and
+  `list_servers` shows `approval: "quarantine"` for the set.
+- The port probe binds the wildcard address a set listens on, not
+  `127.0.0.1`: a port taken on the host's own address no longer looks free
+  (`internal/registry/store.go`).
+- `invoke_many` answers `isError` when every call failed, like `invoke_command`,
+  and a set can no longer list the same server twice.
+- `list_servers` names each server's URL or command, the declared tool count
+  against what the key actually sees, and whether approvals are enforced.
+
+### Changed
+
+- A tag no longer publishes unchecked code: `.github/workflows/release.yml`
+  runs `go vet ./...` and `go test ./... -race -count=1 -p 1` before building the
+  archives, because `ci.yml` does not trigger on tags and the Gitea workflow
+  that used to gate releases is gone.
+- `.gitea/workflows/images.yml` builds on a `v*` tag only: the manual dispatch
+  used to publish `latest` from an arbitrary branch to the host registry.
+- `.golangci.yml` stops excluding `gosec` `G301`/`G302`/`G306` globally; every
+  write in the tree already uses `0600`/`0700`, and the exclusion hid the next
+  permissive one.
+- `invoke_command` and every call of `invoke_many` take their own `timeoutMs`
+  (1000..600000 ms): the call is bounded by it instead of the set's
+  `requestTimeout`, the answer names the limit actually used in
+  `_meta.timeoutMs` (`timeout_ms` per batch entry, the batch's budget in its
+  `_meta`), and an out-of-range value is refused before anything runs
+  (`internal/mcpserver/manager.go`).
+
+### Added
+
+- `list_servers` carries a `hint` per server — one line on what it solves and
+  where to start — from a built-in table of the servers this box knows
+  (`internal/mcpserver/hints.go`); a set's own `hint` field overrides it, and an
+  unknown server has no field at all (`internal/config/config.go`,
+  `internal/registry/validate.go`).
+- Appearance splits into two axes switched from one menu in the header: the
+  theme (`default` or `win98`) and the colour scheme of that theme. The new
+  `win98` theme is the Windows 98 look — a navy title bar with the pixel logo
+  and the three window buttons (decoration; every action stays in the toolbar),
+  square corners, two-tone bevels, MS Sans Serif, dotted focus inset 3 px,
+  sunken fields and selects, folder tabs, segmented status bar, grey scrollbars
+  — in `web/win98.css`, with four schemes (Classic, Slate, Wheat and High
+  Contrast: black body and fields, white text and outlines, yellow accent) that
+  differ in shades only, and 3 px bevels under `prefers-contrast: more`. Theme
+  and scheme are stored in `mcprig.theme` and `mcprig.palette`, the Win98 scheme
+  in `mcprig.palette.win98`; names written by earlier versions open as the
+  `default` theme with the same colours, without a reload
+  (`web/theme.js`, `web/index.html:20-29`, `web/app.js:3779-3855`).
+
 ## [0.6.3] - 2026-11-16
 
 ### Changed

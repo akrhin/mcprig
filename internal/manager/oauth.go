@@ -38,25 +38,9 @@ func authKey(setID, server string) string { return setID + "\x00" + server }
 // состояние отдельным GET .../authorize/status.
 func (m *Manager) apiServerAuthorize(req *request) error {
 	setID, name := req.args[0], req.args[1]
-	set := m.store.Set(setID)
-	if set == nil {
-		return notFound("набор " + setID + " не найден")
-	}
-	srv := m.store.Server(name)
-	if srv == nil {
-		return notFound("сервер " + name + " не найден")
-	}
-	inSet := false
-	for _, n := range set.Servers {
-		if n == name {
-			inSet = true
-		}
-	}
-	if !inSet {
-		return badRequest("сервер " + name + " не входит в набор " + setID)
-	}
-	if srv.URL == "" {
-		return badRequest("OAuth поддерживается только у удалённого сервера (transport: http)")
+	srv, err := m.authorizeTarget(setID, name)
+	if err != nil {
+		return err
 	}
 	if cur := m.flowView(authKey(setID, name)); cur.State == "pending" {
 		writeJSON(req.w, http.StatusAccepted, cur)
@@ -77,18 +61,35 @@ func (m *Manager) apiServerAuthorize(req *request) error {
 
 // apiAuthorizeStatus отдаёт состояние входа для опроса из панели: GET менять
 // состояние не может, поэтому запуск и чтение разведены по разным маршрутам.
+// Условия те же, что у запуска: без них статус «idle» обещает живой вход в
+// набор, которого нет, и диалог панели крутится вечно.
 func (m *Manager) apiAuthorizeStatus(req *request) error {
 	setID, name := req.args[0], req.args[1]
-	// Несуществующая пара отвечает 404, как запуск: иначе опрос "idle"
-	// выглядит как живой вход в набор, которого нет.
-	if m.store.Set(setID) == nil {
-		return notFound("набор " + setID + " не найден")
-	}
-	if m.store.Server(name) == nil {
-		return notFound("сервер " + name + " не найден")
+	if _, err := m.authorizeTarget(setID, name); err != nil {
+		return err
 	}
 	writeJSON(req.w, http.StatusOK, m.flowView(authKey(setID, name)))
 	return nil
+}
+
+// authorizeTarget — общие условия входа: набор и сервер существуют, сервер
+// входит в набор и он удалённый.
+func (m *Manager) authorizeTarget(setID, name string) (*config.Server, error) {
+	set := m.store.Set(setID)
+	if set == nil {
+		return nil, notFound("набор " + setID + " не найден")
+	}
+	srv := m.store.Server(name)
+	if srv == nil {
+		return nil, notFound("сервер " + name + " не найден")
+	}
+	if !containsName(set.Servers, name) {
+		return nil, badRequest("сервер " + name + " не входит в набор " + setID)
+	}
+	if srv.URL == "" {
+		return nil, badRequest("OAuth поддерживается только у удалённого сервера (transport: http)")
+	}
+	return srv, nil
 }
 
 // authorize повторяет подключение сервера тем же соединителем, что и набор:

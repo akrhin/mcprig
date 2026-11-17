@@ -32,8 +32,8 @@ func get(t *testing.T, url string) (int, string) {
 
 func TestCallbackSuccess(t *testing.T) {
 	cb := newTestCallback(t, "st-1")
-	if !strings.HasPrefix(cb.URL(), "http://127.0.0.1:") || !strings.HasSuffix(cb.URL(), "/callback") {
-		t.Fatalf("URL = %q", cb.URL())
+	if !strings.HasPrefix(cb.url, "http://127.0.0.1:") || !strings.HasSuffix(cb.url, "/callback") {
+		t.Fatalf("URL = %q", cb.url)
 	}
 
 	type outcome struct {
@@ -47,7 +47,7 @@ func TestCallbackSuccess(t *testing.T) {
 	}()
 	waitUntilWaiting(t, cb)
 
-	code, body := get(t, cb.URL()+"?code=abc&state=st-1&iss=https%3A%2F%2Fas.example")
+	code, body := get(t, cb.url+"?code=abc&state=st-1&iss=https%3A%2F%2Fas.example")
 	if code != http.StatusOK {
 		t.Fatalf("статус = %d, want 200", code)
 	}
@@ -83,7 +83,7 @@ func TestCallbackStateMismatch(t *testing.T) {
 	}()
 	waitUntilWaiting(t, cb)
 
-	code, _ := get(t, cb.URL()+"?code=abc&state=wrong")
+	code, _ := get(t, cb.url+"?code=abc&state=wrong")
 	if code != http.StatusBadRequest {
 		t.Fatalf("статус = %d, want 400", code)
 	}
@@ -94,7 +94,7 @@ func TestCallbackStateMismatch(t *testing.T) {
 	}
 
 	// Верный редирект после чужого по-прежнему доходит.
-	if code, _ := get(t, cb.URL()+"?code=abc&state=st-1"); code != http.StatusOK {
+	if code, _ := get(t, cb.url+"?code=abc&state=st-1"); code != http.StatusOK {
 		t.Fatalf("верный редирект: статус = %d, want 200", code)
 	}
 	select {
@@ -122,7 +122,7 @@ func TestCallbackForeignErrorKeepsWaiting(t *testing.T) {
 	}()
 	waitUntilWaiting(t, cb)
 
-	code, _ := get(t, cb.URL()+"?error=access_denied&state=wrong")
+	code, _ := get(t, cb.url+"?error=access_denied&state=wrong")
 	if code != http.StatusBadRequest {
 		t.Fatalf("статус = %d, want 400", code)
 	}
@@ -132,7 +132,7 @@ func TestCallbackForeignErrorKeepsWaiting(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 
-	if code, _ := get(t, cb.URL()+"?code=abc&state=st-1"); code != http.StatusOK {
+	if code, _ := get(t, cb.url+"?code=abc&state=st-1"); code != http.StatusOK {
 		t.Fatalf("верный редирект: статус = %d, want 200", code)
 	}
 	select {
@@ -158,7 +158,7 @@ func TestCallbackEmptyStateRejected(t *testing.T) {
 	}()
 	waitUntilWaiting(t, cb)
 
-	if code, _ := get(t, cb.URL()+"?code=abc"); code != http.StatusBadRequest {
+	if code, _ := get(t, cb.url+"?code=abc"); code != http.StatusBadRequest {
 		t.Fatalf("статус = %d, want 400", code)
 	}
 	select {
@@ -166,7 +166,7 @@ func TestCallbackEmptyStateRejected(t *testing.T) {
 		t.Fatalf("редирект без state снял ожидание: %+v", o)
 	case <-time.After(100 * time.Millisecond):
 	}
-	if code, _ := get(t, cb.URL()+"?code=abc&state=st-1"); code != http.StatusOK {
+	if code, _ := get(t, cb.url+"?code=abc&state=st-1"); code != http.StatusOK {
 		t.Fatalf("верный редирект: статус = %d, want 200", code)
 	}
 	select {
@@ -188,7 +188,7 @@ func TestCallbackAuthorizationError(t *testing.T) {
 	}()
 	waitUntilWaiting(t, cb)
 
-	code, _ := get(t, cb.URL()+"?error=access_denied&error_description=user+denied&state=st-1")
+	code, _ := get(t, cb.url+"?error=access_denied&error_description=user+denied&state=st-1")
 	if code != http.StatusBadRequest {
 		t.Fatalf("статус = %d, want 400", code)
 	}

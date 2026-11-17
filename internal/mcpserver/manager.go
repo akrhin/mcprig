@@ -26,18 +26,11 @@ import (
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/healthconst"
 	"github.com/akrhin/mcprig/internal/stats"
 )
 
 const (
-	// healthTTL keeps one probe result (including a failure) before re-checking.
-	// Должен совпадать с healthTTL в internal/manager/health.go: иначе панель и
-	// прокси расходятся в том, кто «здоров».
-	healthTTL = 15 * time.Second
-	// healthTimeout bounds one server's status probe; такой же, как healthTimeout
-	// в internal/manager/health.go. Холодный stdio (npx, uvx) и первый коннект к
-	// LSP поднимаются дольше 15 с, и сервер выглядел мёртвым, хотя вызовы проходят.
-	healthTimeout = 15 * time.Second
 	// maxPages stops a server that keeps handing out cursors.
 	maxPages = 20
 	// maxProbes caps concurrent status probes in one list_servers call.
@@ -124,6 +117,12 @@ type Manager struct {
 	// карантин не может ручаться за одобрения, и вызовы отклоняются; успешный
 	// обход каталога её снимает.
 	lockErr error
+
+	// refreshMu и refreshAt — тормоз refresh:true. Ключ — (клиент, сервер):
+	// частый сброс кэша гонял бы апстрим без пользы, а сосед не должен
+	// платить за чужой refresh.
+	refreshMu sync.Mutex
+	refreshAt map[string]time.Time
 
 	// ToolOutURL, when set, names a truncated answer by its /tool-out URL
 	// instead of a path: the caller reached this process over HTTP with a key
@@ -564,7 +563,8 @@ func (m *Manager) Server() *mcp.Server {
 		Name: "list_servers",
 		Description: "List all available MCP servers with their capabilities and tags. " +
 			"Use the filter parameter to search by name, description, or tag. " +
-			"Includes health status for each server.",
+			"Includes health status for each server. " +
+			"Each server carries a hint: what it solves and where to start.",
 		InputSchema: objectSchema(map[string]any{
 			"filter": map[string]any{"type": "string", "description": "Optional: filter servers by name, description, or tag keyword"},
 		}),
@@ -623,7 +623,7 @@ func (m *Manager) Server() *mcp.Server {
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_command",
 		Description: "Execute a command from a specific server (auto-discovers if needed). " +
-			"This is a wrapper tool: keep only server, command_name (or command) and maxBytes at the top level, " +
+			"This is a wrapper tool: keep only server, command_name (or command), maxBytes and timeoutMs at the top level, " +
 			"and put downstream tool inputs inside parameters.",
 		InputSchema: withAnyOf(objectSchema(map[string]any{
 			"server":       map[string]any{"type": "string", "description": "Server name"},
@@ -637,12 +637,17 @@ func (m *Manager) Server() *mcp.Server {
 				"type":        "integer",
 				"description": "Optional: cap the returned answer at this many bytes (default 32768, at most 1048576). A longer answer is cut and the full one is saved to a file named in the marker.",
 			},
+			"timeoutMs": map[string]any{
+				"type":        "integer",
+				"description": "Optional: timeout of this call in ms (1000..600000); without it the set's requestTimeout applies. The answer carries _meta.timeoutMs with the limit actually used.",
+			},
 		}, "server"), "command_name", "command"),
 	}, m.invokeCommand)
 	s.AddTool(&mcp.Tool{
 		Name: "invoke_many",
 		Description: "Выполнить до 8 независимых вызовов одним запросом. " +
-			"Каждый вызов — как invoke_command: server, command_name (синоним — command) и parameters. " +
+			"Каждый вызов — как invoke_command: server, command_name (синоним — command) и parameters, " +
+			"плюс необязательный timeoutMs (1000..600000 мс) на этот вызов. " +
 			"Ответ — массив в порядке calls; ошибка одного вызова не отменяет остальные.",
 		InputSchema: objectSchema(map[string]any{
 			"calls": map[string]any{
@@ -657,6 +662,10 @@ func (m *Manager) Server() *mcp.Server {
 						"parameters": map[string]any{
 							"type":        "object",
 							"description": "Optional downstream command input object. Put the target command inputs here.",
+						},
+						"timeoutMs": map[string]any{
+							"type":        "integer",
+							"description": "Optional: timeout of this call in ms (1000..600000); without it the set's requestTimeout applies. The answer entry carries timeout_ms with the limit actually used.",
 						},
 					},
 					"required": []string{"server"},
@@ -711,6 +720,19 @@ type serverInfo struct {
 	// Isolation — "bwrap", когда песочница применена, и "без изоляции: …",
 	// когда она запрошена, но недоступна. Пусто — сервер без песочницы.
 	Isolation string `json:"isolation,omitempty"`
+	// URL — адрес remote-сервера, Command — первое слово команды stdio:
+	// без них в списке не видно, куда сервер ходит. Секреты маскируются.
+	URL     string `json:"url,omitempty"`
+	Command string `json:"command,omitempty"`
+	// Tools — объявленный каталог, Visible — что из него видит этот ключ;
+	// Visible выводится только когда профиль или правила его урезали.
+	Tools   int `json:"tools,omitempty"`
+	Visible int `json:"visible,omitempty"`
+	// Approval — "quarantine": набор сверяет дескрипторы с одобренными.
+	Approval string `json:"approval,omitempty"`
+	// Hint — для чего сервер и с чего начать: своя строка из конфига набора
+	// или встроенная по имени; пусто — сервер незнаком.
+	Hint string `json:"hint,omitempty"`
 }
 
 func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -733,6 +755,7 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 		Servers []serverInfo `json:"servers"`
 		Version string       `json:"version"`
 	}{Servers: make([]serverInfo, len(targets)), Version: m.version}
+	profileName, profile := callerProfile(ctx, m.config())
 
 	var wg sync.WaitGroup
 	for i, e := range targets {
@@ -753,11 +776,50 @@ func (m *Manager) listServers(ctx context.Context, req *mcp.CallToolRequest) (*m
 				Error:     config.ScrubSecrets(errText, e.secrets),
 				Tags:      srv.Tags,
 				Isolation: config.ScrubSecrets(e.isolationNote(), e.secrets),
+				URL:       config.ScrubSecrets(srv.URL, e.secrets),
+				Command:   commandWord(srv),
+				Approval:  approvalMode(m.LockPath),
+				Hint:      serverHint(srv),
+			}
+			// Счётчики — только по уже прочитанному каталогу: list_servers не
+			// поднимает апстрим ради цифры.
+			if cached := e.cachedTools(); cached != nil {
+				out.Servers[i].Tools = len(cached)
+				if visible := m.visibleTools(srv.Name, profileName, profile, cached); visible != len(cached) {
+					out.Servers[i].Visible = visible
+				}
 			}
 		}()
 	}
 	wg.Wait()
 	return jsonResult(out)
+}
+
+// commandWord — первое слово команды stdio: полный argv повторяет флаги и
+// пути, а для списка хватает исполнителя.
+func commandWord(srv *config.Server) string {
+	if len(srv.Command) == 0 {
+		return ""
+	}
+	return config.ScrubSecrets(srv.Command[0], srv.Secrets())
+}
+
+// approvalMode names whether the set demands approved descriptors.
+func approvalMode(lockPath string) string {
+	if lockPath == "" {
+		return ""
+	}
+	return "quarantine"
+}
+
+// visibleTools counts the catalog this key actually sees: the same profile and
+// permissions list_commands applies.
+func (m *Manager) visibleTools(name, profileName string, profile *config.Profile, tools []*mcp.Tool) int {
+	cmds := make([]commandInfo, 0, len(tools))
+	for _, tool := range tools {
+		cmds = append(cmds, commandInfo{Server: name, Name: tool.Name})
+	}
+	return len(m.catalogPermissions(profileCommands(profileName, profile, cmds)))
 }
 
 // matches reports whether name, description or a tag carries the filter.
@@ -780,7 +842,7 @@ func (m *Manager) status(ctx context.Context, e *entry) (bool, string, bool) {
 	e.healthMu.Lock()
 	h := e.health
 	e.healthMu.Unlock()
-	if !h.at.IsZero() && time.Since(h.at) < healthTTL {
+	if !h.at.IsZero() && time.Since(h.at) < healthconst.TTL {
 		return h.ok, h.errText, false
 	}
 
@@ -802,9 +864,9 @@ func (m *Manager) status(ctx context.Context, e *entry) (bool, string, bool) {
 	return ok, errText, false
 }
 
-// probe connects within healthTimeout so one hung server cannot stall a list.
+// probe connects within healthconst.Timeout so one hung server cannot stall a list.
 func (m *Manager) probe(ctx context.Context, e *entry) error {
-	probeCtx, cancel := context.WithTimeout(ctx, healthTimeout)
+	probeCtx, cancel := context.WithTimeout(ctx, healthconst.Timeout)
 	defer cancel()
 	select {
 	case probeSlots <- struct{}{}:
@@ -861,15 +923,8 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 			return errResult(err)
 		}
 	}
-	if in.Refresh {
-		// Только запрошенные серверы: refresh одного не должен опустошать кэш
-		// остальных — по нему сверяется карантин, и пустой кэш открывал обход.
-		for _, name := range in.refreshNames() {
-			if e := m.find(name); e != nil {
-				m.storeTools(e, nil)
-			}
-		}
-	}
+	deferred := m.refreshCatalogs(ctx, in.Refresh, in.refreshNames())
+
 	// Профиль читается один раз: у ключа он один на все серверы запроса.
 	profileName, profile := callerProfile(ctx, m.config())
 	switch {
@@ -880,7 +935,11 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 		if err != nil {
 			return errResult(err)
 		}
-		return m.jsonTruncResult(ctx, filterCommands(profileCommands(profileName, profile, cmds), in.Prefix, in.NamesOnly), maxBytes)
+		// Правила permissions — до профиля: каталог не предлагает того, что
+		// invoke_command отклонит.
+		cmds = m.catalogPermissions(profileCommands(profileName, profile, cmds))
+		res, err := m.jsonTruncResult(ctx, filterCommands(cmds, in.Prefix, in.NamesOnly), maxBytes)
+		return withRefreshDeferred(res, deferred), err
 	case len(in.Servers) > 0:
 		// Ответ остальных не теряется из-за одного упавшего: у него в карте
 		// {"error": "…"}, ошибку отдаём, только если не ответил никто.
@@ -914,14 +973,16 @@ func (m *Manager) listCommands(ctx context.Context, req *mcp.CallToolRequest) (*
 					}
 					return
 				}
-				out[name] = filterCommands(profileCommands(profileName, profile, cmds), in.Prefix, in.NamesOnly)
+				cmds = m.catalogPermissions(profileCommands(profileName, profile, cmds))
+				out[name] = filterCommands(cmds, in.Prefix, in.NamesOnly)
 			}(name)
 		}
 		wg.Wait()
 		if failed == len(in.Servers) {
 			return errResult(firstErr)
 		}
-		return m.jsonTruncResult(ctx, out, maxBytes)
+		res, err := m.jsonTruncResult(ctx, out, maxBytes)
+		return withRefreshDeferred(res, deferred), err
 	}
 	return errResult(errNoTargets)
 }
@@ -998,9 +1059,7 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	if srv := e.server(); !usable(srv) {
 		return errResult(serverProblem(srv))
 	}
-	if in.Refresh {
-		m.storeTools(e, nil)
-	}
+	deferred := m.refreshCatalogs(ctx, in.Refresh, []string{in.Server})
 	var tools []*mcp.Tool
 	if cached := e.cachedTools(); cached != nil {
 		tools = cached
@@ -1015,9 +1074,20 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 	// list_commands имя не должно возвращаться здесь своей схемой.
 	profileName, profile := callerProfile(ctx, m.config())
 	tools = profileTools(profileName, profile, in.Server, tools)
+	// То же, что в каталоге: запрещённое правилом имя остаётся missing.
+	visible := make(map[string]bool, len(tools))
+	catalog := make([]commandInfo, 0, len(tools))
+	for _, tool := range tools {
+		catalog = append(catalog, commandInfo{Server: in.Server, Name: tool.Name})
+	}
+	for _, cmd := range m.catalogPermissions(catalog) {
+		visible[cmd.Name] = true
+	}
 	byName := make(map[string]*mcp.Tool, len(tools))
 	for _, tool := range tools {
-		byName[tool.Name] = tool
+		if visible[tool.Name] {
+			byName[tool.Name] = tool
+		}
 	}
 	out := describeOut{Commands: make([]commandSchema, 0, len(in.CommandNames)), Missing: []string{}}
 	for _, name := range in.CommandNames {
@@ -1034,7 +1104,8 @@ func (m *Manager) describeCommands(ctx context.Context, req *mcp.CallToolRequest
 			OutputSchema: tool.OutputSchema,
 		})
 	}
-	return m.jsonTruncResult(ctx, out, maxBytes)
+	res, err := m.jsonTruncResult(ctx, out, maxBytes)
+	return withRefreshDeferred(res, deferred), err
 }
 
 // ─── invoke_command ───────────────────────────────────────────────────────────
@@ -1045,11 +1116,13 @@ type invokeCommandInput struct {
 	Command     string          `json:"command"` // синоним command_name: list_commands называет это поле command
 	Parameters  json.RawMessage `json:"parameters"`
 	MaxBytes    int             `json:"maxBytes,omitempty"`
+	// TimeoutMs — свой предел этого вызова; 0 — requestTimeout набора.
+	TimeoutMs int `json:"timeoutMs,omitempty"`
 }
 
 func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in invokeCommandInput
-	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "command", "parameters", "maxBytes"); err != nil {
+	if err := strictArgs(req, &in, "аргументы инструмента кладутся в parameters", "server", "command_name", "command", "parameters", "maxBytes", "timeoutMs"); err != nil {
 		return errResult(err)
 	}
 	if in.CommandName == "" {
@@ -1065,6 +1138,9 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	}
 	maxBytes, err := resolveMaxBytes(in.MaxBytes)
 	if err != nil {
+		return errResult(err)
+	}
+	if err := checkTimeoutMs(in.TimeoutMs); err != nil {
 		return errResult(err)
 	}
 	e := m.find(in.Server)
@@ -1110,7 +1186,7 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 		return errResult(err)
 	}
 
-	callCtx, cancel := m.callCtx(ctx)
+	callCtx, cancel := m.callCtxFor(ctx, in.TimeoutMs)
 	defer cancel()
 	// Тот же слот, что у invoke_many: без него один клиент держит у апстрима
 	// столько одновременных вызовов, сколько пришлёт, и топит его вместе с
@@ -1125,14 +1201,20 @@ func (m *Manager) invokeCommand(ctx context.Context, req *mcp.CallToolRequest) (
 	res, err := m.callWithRetry(callCtx, labelOf(ctx, req), e, in.CommandName, args)
 	if err != nil {
 		if callCtx.Err() == context.DeadlineExceeded {
-			return errResult(fmt.Errorf("таймаут вызова %d мс", m.config().RequestTimeout))
+			return errResult(m.callTimeout(callCtx, in.TimeoutMs, srv.Name, in.CommandName))
 		}
 		return errResult(err)
 	}
 	if res == nil {
 		return res, nil
 	}
-	return m.truncateResult(ctx, res, maxBytes)
+	res, err = m.truncateResult(ctx, res, maxBytes)
+	if err != nil {
+		return res, err
+	}
+	// Фактический предел — в _meta: с ним агент сравнивает время ответа, а
+	// при своём timeoutMs таймаут набора был бы неверной догадкой.
+	return withTimeoutMeta(res, m.callTimeoutMs(in.TimeoutMs)), nil
 }
 
 // callWithRetry runs one downstream call under invoke_command's retry rule and
@@ -1187,6 +1269,26 @@ func resolveMaxBytes(requested int) (int, error) {
 		return defaultMaxBytes, nil
 	}
 	return requested, nil
+}
+
+const (
+	// minCallTimeoutMs и maxCallTimeoutMs — границы per-call timeoutMs: короче
+	// секунды отрезает нормальный ответ, а за десять минут зависший вызов
+	// дешевле снять руками.
+	minCallTimeoutMs = 1000
+	maxCallTimeoutMs = 600000
+)
+
+// checkTimeoutMs validates the optional per-call timeout: 0 — не задан, и
+// действует requestTimeout набора.
+func checkTimeoutMs(requested int) error {
+	if requested == 0 {
+		return nil
+	}
+	if requested < minCallTimeoutMs || requested > maxCallTimeoutMs {
+		return fmt.Errorf("timeoutMs: допустимо от %d до %d мс", minCallTimeoutMs, maxCallTimeoutMs)
+	}
+	return nil
 }
 
 // parametersOf decodes the wrapper's parameters: absent and null mean {}.
@@ -1340,6 +1442,35 @@ func (m *Manager) callCtx(ctx context.Context) (context.Context, context.CancelF
 		return context.WithTimeout(ctx, time.Duration(timeout)*time.Millisecond)
 	}
 	return ctx, func() {}
+}
+
+// callCtxFor bounds one downstream operation: the caller's own timeoutMs when
+// it is set, the set's requestTimeout otherwise.
+func (m *Manager) callCtxFor(ctx context.Context, timeoutMs int) (context.Context, context.CancelFunc) {
+	if timeoutMs <= 0 {
+		return m.callCtx(ctx)
+	}
+	return context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
+}
+
+// callTimeoutMs — фактический предел вызова: свой timeoutMs важнее
+// requestTimeout набора; 0 — предела нет.
+func (m *Manager) callTimeoutMs(requested int) int {
+	if requested > 0 {
+		return requested
+	}
+	return m.config().RequestTimeout
+}
+
+// callTimeout names what timed out and keeps the cause in the chain: the caller
+// sees which server and command stalled, and errors.Is(err,
+// context.DeadlineExceeded) still answers.
+func (m *Manager) callTimeout(ctx context.Context, timeoutMs int, server, command string) error {
+	cause := ctx.Err()
+	if cause == nil {
+		cause = context.DeadlineExceeded
+	}
+	return fmt.Errorf("таймаут вызова %d мс: %s/%s не ответил: %w", m.callTimeoutMs(timeoutMs), server, command, cause)
 }
 
 // withSession runs fn on the server's session. A dead cached session
@@ -1657,6 +1788,20 @@ func errResult(err error) (*mcp.CallToolResult, error) {
 		IsError: true,
 		Content: []mcp.Content{&mcp.TextContent{Text: "Error: " + err.Error()}},
 	}, nil
+}
+
+// withTimeoutMeta tells the caller which limit this call ran under: an answer
+// is compared against its own timeoutMs, and a per-call value makes the set
+// default a wrong guess. Zero — no limit was applied, nothing to report.
+func withTimeoutMeta(res *mcp.CallToolResult, timeoutMs int) *mcp.CallToolResult {
+	if res == nil || timeoutMs <= 0 {
+		return res
+	}
+	if res.Meta == nil {
+		res.Meta = mcp.Meta{}
+	}
+	res.Meta["timeoutMs"] = timeoutMs
+	return res
 }
 
 // ─── one session per server, single-flight ────────────────────────────────────

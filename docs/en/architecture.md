@@ -79,8 +79,8 @@ What one reload applies:
 | `permissions`, `enabled`, `description`, `tags` | updated in place, session and tool cache kept |
 | untouched server | same record, same session, same cache |
 | set `rateLimit`, `profiles` | applied in place; `requestTimeout` and `healthMonitor` are constants the manager writes and never change |
-| `authToken`, `authTokens` | applied live: the panel swaps the listener's token set on reload, so a key issued or revoked arrives without a restart. A changed single `authToken` — the set's primary key — still lands in `restartNeeded` for older processes, and the panel then reports `reloadError` instead of claiming the change applied |
-| `host`, `port`, `path`, `type`, `allowAnonymous`, `allowedHosts`, `clientNames` | listed in `restartNeeded`, the old values stay in force |
+| `authToken`, `authTokens`, `allowAnonymous`, `clientNames`, `keyProfiles` | applied live: on reload the panel hands the new token list and the set's openness to the listener (`SetAuth`), and a key's profile is resolved per request — a key rotation or a switch to an open set needs no restart |
+| `host`, `port`, `path`, `type`, `allowedHosts`, a `transport` block that appears or disappears | listed in `restartNeeded`, the old values stay in force |
 
 `keyProfiles` is applied live: the manager reads it per request, unlike the
 listener fields above. A file that does not load at all leaves the process on
@@ -98,6 +98,34 @@ call, not cached forever.
 If the downstream closes the session (`ErrConnectionClosed`), `invoke_command`
 resets the session, reconnects once and repeats the call. A second failure is
 returned with its reason.
+
+## Process supervision
+
+A stdio server is not the direct child of the set process. The set starts
+
+```text
+<mcprig executable> child-guard -- <server command> [arguments…]
+```
+
+(`guardArgv`, `internal/downstream/connect.go:311`), and the guard — the same
+binary in a hidden mode (`RunChildGuardMode` `internal/downstream/guard.go:83`,
+`GuardMain` `guard.go:23`) — starts the server with stdin, stdout and stderr
+inherited, so the protocol channel is not proxied.
+
+| mechanism | what it buys |
+| --- | --- |
+| `Pdeathsig: SIGTERM` and `Setpgid: true` on the direct child (`internal/downstream/procattr_linux.go:10`) | the kernel signals the guard when the set dies, including SIGKILL, where no handler of the set can run |
+| the guard stays in the process group the set created — `setsid` would break this | one `kill(-pgid)` reaches the guard, the server and its children |
+| on SIGTERM the guard kills the whole group with SIGKILL and exits `143` (`killGuardGroup` `guard.go:92`) | grandchildren of `sh -c "npx … & wait"` do not outlive a dead set |
+| when the server exits on its own, the guard exits with the server's code | the transport reports the real exit status |
+
+The guard wraps the sandboxed command, so a `bwrap`-confined server sits inside
+the guard too. The parent signal is Linux-only: on other platforms only
+`Setpgid` is set (`internal/downstream/procattr_other.go`), the guard dies with
+the set on a normal close, and after SIGKILL the grandchildren survive. When the
+binary was replaced by a rename, `/proc/self/exe` ends with ` (deleted)` and
+cannot be executed: the server then starts without a guard and the set log says
+`child-guard недоступен: сервер стартует без сторожа`.
 
 ## Health
 
@@ -156,7 +184,9 @@ Each set serves one stateless endpoint:
   matched;
 - 4 MiB request body cap;
 - no read timeout (an SSE stream must not be cut), 60 s idle timeout;
-- `GET /healthz` public, `GET /stats` protected by the same bearer.
+- `GET /healthz` public, `GET /stats` protected by the same bearer; an open set
+  has no key, so an anonymous `GET /stats` is answered with a redacted snapshot —
+  no client labels, no upstream error text ([panel.md](panel.md#health)).
 
 ## OAuth
 
@@ -170,7 +200,7 @@ registration, code exchange and refresh are handled by the MCP SDK
 | redirect listener | `127.0.0.1:<callbackPort>`, default 8947 |
 | redirect URI | `http://127.0.0.1:<port>/callback`, overridable |
 | default port | fixed on purpose: some authorization servers only accept a hand-registered URI |
-| token storage | `<data dir>/oauth.json` (`0600`), client registrations in `oauth-clients.json` |
+| token storage | `<data dir>/sets/<id>/oauth.json` for a set the panel runs, `<data dir>/oauth.json` for a standalone `serve`/`stdio` (`0600`); client registrations in `oauth-clients.json` beside it |
 | token key | first 32 hex of `sha256(serverName + "\x00" + serverURL)` |
 
 The panel runs the same flow for a person at a browser: **authorize** in the

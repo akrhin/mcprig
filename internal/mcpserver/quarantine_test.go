@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -376,7 +377,7 @@ func TestQuarantineFailsClosedOnWriteError(t *testing.T) {
 	if !res.IsError {
 		t.Fatalf("вызов прошёл при неудавшейся записи: %s", resultText(t, res))
 	}
-	if text := resultText(t, res); !strings.Contains(text, "не записан") {
+	if text := resultText(t, res); !strings.Contains(text, "не обновлён") {
 		t.Fatalf("отказ не назвал причину: %s", text)
 	}
 }
@@ -409,5 +410,41 @@ func TestQuarantineRecoversAfterWriteError(t *testing.T) {
 	catalog(t, cs2)
 	if res := invoke(t, cs2, "echo"); res.IsError {
 		t.Fatalf("запрет не снялся после успешной записи: %s", resultText(t, res))
+	}
+}
+
+// Битый файл блокировок — отказ, а не повод одобрить всё заново: карантин не
+// ручается за дескрипторы, лог называет причину, файл остаётся как был.
+func TestQuarantineCorruptLockIsRefusal(t *testing.T) {
+	dir := t.TempDir()
+	lock := filepath.Join(dir, "tools.lock.json")
+	const garbage = "{не json"
+	if err := os.WriteFile(lock, []byte(garbage), 0o600); err != nil {
+		t.Fatalf("подготовка файла: %v", err)
+	}
+	var log strings.Builder
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&log, nil)))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	cs := clientFor(t, descriptorManager(t, "v1", lock).Server())
+	catalog(t, cs)
+
+	res := invoke(t, cs, "echo")
+	if !res.IsError {
+		t.Fatalf("вызов прошёл с битым файлом блокировок: %s", resultText(t, res))
+	}
+	if text := resultText(t, res); !strings.Contains(text, "не прочитан") {
+		t.Fatalf("отказ не назвал причину: %s", text)
+	}
+	if !strings.Contains(log.String(), "tools.lock.json") {
+		t.Fatalf("лог молчит о битом файле: %q", log.String())
+	}
+	raw, err := os.ReadFile(lock)
+	if err != nil {
+		t.Fatalf("файл: %v", err)
+	}
+	if string(raw) != garbage {
+		t.Fatalf("битый файл переписан: %q", raw)
 	}
 }

@@ -65,8 +65,8 @@ func TestLoopbackAddr(t *testing.T) {
 		"10.1.2.3": "10.1.2.3",
 	}
 	for bindIP, want := range cases {
-		if got := loopbackAddr(bindIP); got != want {
-			t.Errorf("loopbackAddr(%q) = %q, ждали %q", bindIP, got, want)
+		if got := LoopbackAddr(bindIP); got != want {
+			t.Errorf("LoopbackAddr(%q) = %q, ждали %q", bindIP, got, want)
 		}
 	}
 }

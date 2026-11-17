@@ -79,19 +79,6 @@ func (h *scryptHash) verify(password string) bool {
 	return subtle.ConstantTimeCompare(key, h.key) == 1
 }
 
-// hashPassword — формат scrypt$N$r$p$соль$хеш, как в контракте.
-func hashPassword(password string) (string, error) {
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
-		return "", err
-	}
-	key, err := scryptKey([]byte(password), salt, 16384, 8, 1, 32)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("scrypt$16384$8$1$%s$%s", hex.EncodeToString(salt), hex.EncodeToString(key)), nil
-}
-
 type session struct {
 	user    string
 	expires time.Time

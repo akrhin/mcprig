@@ -101,6 +101,57 @@ func newServeFlagsNamed(name string) (fs *flag.FlagSet, cfgPath *string, showVer
 	return fs, cfgPath, showVersion, addr
 }
 
+// newPanelFlags: у panel нет флагов — он настраивается переменными окружения,
+// поэтому -h печатает их список. FlagSet нужен ради этого списка и ради
+// отказа на любой другой аргумент.
+func newPanelFlags() *flag.FlagSet {
+	fs := flag.NewFlagSet("panel", flag.ContinueOnError)
+	fs.Usage = func() {
+		out := fs.Output()
+		fmt.Fprintln(out, "usage: mcprig panel")
+		fmt.Fprintln(out, "панель настраивается переменными окружения:")
+		for _, e := range panelEnv {
+			fmt.Fprintf(out, "  %-24s %s\n", e[0], e[1])
+		}
+	}
+	return fs
+}
+
+// panelEnv — переменные, которые режим panel действительно читает: строки
+// manager.FromEnv, затем OpenBao из manager.NewSecrets, затем tool-out и pprof,
+// которые живут в run этого режима. Порядок сгруппирован: пути, сеть, вход,
+// TLS, прокси, OpenBao, прочее. Число строк и набор имён — контракт: их
+// повторяют docs/*/cli.md и тест TestPanelHelpListsEnv.
+var panelEnv = [][2]string{
+	{"MCPRIG_DATA_DIR", "реестр, ключи, логи, токены OAuth (по умолчанию $XDG_STATE_HOME/mcprig)"},
+	{"XDG_STATE_HOME", "база каталога состояния, если MCPRIG_DATA_DIR пуст (по умолчанию ~/.local/state)"},
+	{"MCPRIG_CLI", "бинарник набора (по умолчанию текущий исполняемый файл)"},
+	{"MCPRIG_SEED_FILE", "JSON servers[]/sets[] для пустого реестра (пусто — реестр остаётся пустым)"},
+	{"MCPRIG_HOST", "адрес прослушивания панели (127.0.0.1)"},
+	{"MCPRIG_PORT", "порт панели (9091)"},
+	{"MCPRIG_PUBLIC_URL", "публичный адрес панели: redirect OAuth и Secure-cookie (пусто — из HOST и PORT)"},
+	{"MCPRIG_BIND_IP", "transport.host в servers.json каждого набора (0.0.0.0)"},
+	{"MCPRIG_PASSWORD", "пароль входа в панель (пусто — нужен прокси-секрет или MCPRIG_AUTH=off)"},
+	{"MCPRIG_PASSWORD_HASH", "scrypt-хеш пароля; задан — пароль из MCPRIG_PASSWORD не читается"},
+	{"MCPRIG_USER", "имя входа (admin)"},
+	{"MCPRIG_AUTH", "off — без входа в панель (по умолчанию вход обязателен)"},
+	{"MCPRIG_TLS_CERT", "сертификат панели, только вместе с MCPRIG_TLS_KEY (пусто — http)"},
+	{"MCPRIG_TLS_KEY", "ключ панели, только вместе с MCPRIG_TLS_CERT"},
+	{"MCPRIG_PROXY_SECRET", "общий секрет с доверенным прокси, короче 32 символов — предупреждение"},
+	{"MCPRIG_TRUSTED_PROXIES", "IP/CIDR через запятую, чьи X-Forwarded-* верят (loopback)"},
+	{"MCPRIG_USER_HEADER", "заголовок с именем пользователя от прокси (Remote-User)"},
+	{"MCPRIG_ALLOWED_HOSTS", "Host через запятую (только loopback-хосты)"},
+	{"BAO_ADDR", "адрес OpenBao KV для секретов наборов (пусто — только локальный env-файл)"},
+	{"OPENBAO_ADDR", "то же, что BAO_ADDR, если тот пуст"},
+	{"BAO_TOKEN", "токен OpenBao; без него и BAO_ADDR секреты только локальные"},
+	{"OPENBAO_TOKEN", "то же, что BAO_TOKEN, если тот пуст"},
+	{"BAO_MOUNT", "KV v2 mount в OpenBao (secret)"},
+	{"BAO_PREFIX", "префикс путей внутри mount (mcp)"},
+	{"MCPRIG_TOOLOUT_TTL", "срок жизни обрезанных ответов в tool-out (24h)"},
+	{"MCPRIG_TOOLOUT_MAX", "объём tool-out, K/M/G (256MiB)"},
+	{"MCPRIG_PPROF", "адрес pprof-сервера, например 127.0.0.1:6060 (пусто — выключен)"},
+}
+
 func newStdioFlags() (fs *flag.FlagSet, cfgPath *string) {
 	fs = flag.NewFlagSet("stdio", flag.ContinueOnError)
 	cfgPath = fs.String("config", defaultConfigPath(), "путь к файлу servers.json")
@@ -187,8 +238,8 @@ func parseArgs(args []string) (mode string, rest []string, err error) {
 		}
 		return "logs", args[1:], nil
 	case "panel":
-		if len(args) > 1 {
-			return "", nil, &usageError{fmt.Sprintf("panel не принимает аргументов: %q", args[1:])}
+		if err := parseFlags(newPanelFlags(), args[1:]); err != nil {
+			return "", nil, err
 		}
 		return "panel", nil, nil
 	}

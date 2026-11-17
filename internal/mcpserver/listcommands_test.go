@@ -135,18 +135,17 @@ func TestListCommandsTruncatesHugeCatalog(t *testing.T) {
 		t.Fatalf("без maxBytes каталог обрезан")
 	}
 
+	// Обрезанный каталог остаётся JSON: маркер — элемент внутри документа,
+	// а не строка поверх него.
 	text := resultText(t, call(t, cs, "list_commands", map[string]any{"server": "wide", "maxBytes": 2000}))
-	const cutMark = "[обрезано: "
-	i := strings.Index(text, cutMark)
-	if i < 0 {
-		t.Fatalf("нет маркера усечения: %q", text)
+	var cut []any
+	if err := json.Unmarshal([]byte(text), &cut); err != nil {
+		t.Fatalf("усечённый каталог перестал быть JSON: %v", err)
 	}
-	rest := text[strings.Index(text, "полный ответ — ")+len("полный ответ — "):]
-	end := strings.Index(rest, "]")
-	if end < 0 {
-		t.Fatalf("нет конца пути в маркере: %q", rest)
+	if len(cut) >= 40 {
+		t.Fatalf("каталог не урезан: %d элементов", len(cut))
 	}
-	path := rest[:end]
+	path := dumpPath(t, text)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("полный каталог не выгружен: %v", err)

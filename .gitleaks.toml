@@ -12,3 +12,7 @@ paths = [
 ]
 regexTarget = "match"
 regexes = ['''sk-live-0123456789''']
+
+[[allowlists]]
+description = "Состояние карты кода: md5 файлов и каталогов, не секреты"
+paths = ['''^\.slim/codemap\.json$''']

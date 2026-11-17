@@ -16,7 +16,7 @@ CSP: no inline scripts or styles.
 
 | area | contents |
 | --- | --- |
-| top bar | breadcrumbs `mcprig / <page or set>`, the endpoint with a copy button, colour scheme, language, user |
+| top bar | breadcrumbs `mcprig / <page or set>`, the MCP endpoint of the open set with a copy button, the button that opens the details drawer, the appearance menu — **theme** (Default or Windows 98) and the colour scheme of that theme — the interface language, and a static `admin` chip that is hidden on narrow screens |
 | left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
 | pages | **Sets**, **All servers** and **Variables** as pills at the top of the content, at `#/sets`, `#/servers` and `#/vars`; **Statistics** keeps `#/stats/<period>` and a set keeps `#/set/<id>`, so a reload or a shared link lands where it left off |
 | set head | name, port chip, state badge, **Import / Export**, **Keys**, **Prompt**, **Restart**, **Start/Stop**, and the red **Delete set** that removes the set and its directory; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
@@ -28,7 +28,7 @@ CSP: no inline scripts or styles.
 | calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
 | variables page | every `${NAME}` your servers reference with whether a value is set and where it comes from, a form that writes a value, and the **×** that forgets it |
 | details drawer | the log tail of the set; opens from the header and covers the panel width on a phone |
-| footer | `N sets · M servers · K running` and the last refresh time |
+| footer | the status bar: `M servers` of the registry, `mcprig <version>` and the time it was updated. The sets and how many are running are the line at the bottom of the left rail — `N sets · M running` |
 
 Health is shown as it is: `Healthy`, `Failed` with the daemon's reason on the
 second line, and `Not checked` for a server nothing has probed yet. While a
@@ -41,8 +41,26 @@ column shows `—` until **Check** probes that server; the head of the set shows
 the total for the whole set.
 
 Everything on the page comes from the panel API below plus `GET /stats` of the
-running sets. Nothing else is stored in the browser but the chosen colour scheme
-and the interface language.
+running sets. Nothing else is stored in the browser but the chosen theme, its
+colour scheme and the interface language.
+
+## Demo mode
+
+`?mock=1` on the panel URL runs the UI against `web/mock/*.json`: the same API
+URLs the page asks for are answered from those files instead of `/api/…`
+(`mockName` in `web/app.js`), so no registry, set or stats need to exist. The
+files are embedded in the binary (`web/embed.go`) and served only under `mock/`
+(`internal/manager/panel.go:36`), behind the same session check as the rest of
+the panel.
+
+It shows five sets — `main`, `demo`, `ops`, `dev` and `lab` — with servers,
+health, calls, quarantine rows, logs and all four statistics periods. Everything
+in them is fictional: names, ports, clients and numbers are made up, so a
+screenshot or a walkthrough exposes nothing real. Writes — editing a server,
+approving a descriptor, adding or forgetting a variable — are applied in memory
+and vanish on reload; nothing reaches the registry. Statistics are computed in
+the browser from the generated rows, so filters and periods behave like the
+live ones.
 
 ## Server editor
 
@@ -93,15 +111,17 @@ value comes from the same `isolation` field MCP clients see in `list_servers`.
 
 The **Keys** dialog lists key ids, creation and revocation dates and notes. It
 shows only the 8-character prefix. When the set has a `profiles` block, the
-issue form carries a **Profile** select (empty means no profile); the chosen name
-goes to `POST /api/sets/<id>/keys` as `{"profile":…}`, a `400` from the daemon is
-shown in the dialog itself and the dialog stays open, and every key row shows its
-profile as a badge. A set without profiles keeps the form as it was. The note of
-an existing key is edited in
-place: the row has a label field and a **Save** button that appears once the
-value differs from the stored one; the panel sends `PATCH` with `{"note":…}`,
-redraws the list and shows a `reloadError` of the set as its own warning rather
-than swallowing it. A newly issued token is displayed once, and
+issue form carries a **Profile** select (empty means no profile); one
+`POST /api/sets/<id>/keys` carries both the label and the chosen profile as
+`{"label":…,"profile":…}`, a `400` from the daemon (an unknown profile) is shown
+in the dialog itself and the dialog stays open, and every key row shows its
+profile as a badge. A set without profiles keeps the form as it was. The label of
+an existing key is edited in place: the row has a label field and a **Save**
+button that appears once the value differs from the stored one; the panel sends
+`PATCH /api/sets/<id>/keys/<key>` with `{"label":…}`, redraws the list and shows
+a failed restart as its own warning rather than swallowing it. The daemon still
+accepts `note` as the old name of `label`, for clients written before the rename;
+the panel never sends it. A newly issued token is displayed once, and
 so is the token of a newly created closed set: `POST /api/sets` returns it in
 the `201` body, while `GET /api/sets` never repeats it. Issuing a key neither
 revokes the previous active key nor restarts the set: the new token reaches a
@@ -129,8 +149,11 @@ configured, the file otherwise — `OpenBao` or the file), and the **×** forget
 one everywhere with `DELETE /api/env/<NAME>` and no `store` parameter. Both
 answers come back at once, and sets that use the variable restart in the
 background; the page says which ones and adds a note when no server references
-the name yet. A written value is never read back: the panel cannot show it, and
-the page says so under the list.
+the name yet. A set that did not come back is named under the form as well: both
+answers carry `reloadErrors`, one `set: reason` per set that failed, and the page
+prints that line next to the restarted ones — a value that is stored but not
+applied must not read as success. A written value is never read back: the panel
+cannot show it, and the page says so under the list.
 
 ## Set composition
 
@@ -140,7 +163,10 @@ not in the set yet, and the **×** at the end of a row detaches that server. Bot
 send `PUT /api/sets/<id>` with the whole `servers` list — never a diff — so one
 request carries one intent; the panel then reads `GET /api/state` again and
 redraws the head, the table and the picker. The request is quiet: a refusal
-appears as text right under the block, not as a toast.
+appears as text right under the block, not as a toast — and so does a save that
+was written but not applied: an answer carrying `failed` (one entry: the set and
+the reason) or `reloadError` puts that reason in the same line, because the edit
+is in the registry and the running set does not have it.
 
 A running set takes the change by reload ([reload](#reload-without-a-restart)): a
 new server joins lazily and its tools appear after the first `list_commands` or
@@ -191,7 +217,10 @@ and draws a dialog with the link; the browser is the user's, so the panel never
 waits for it in a request — the flow is started with
 `POST /api/sets/<set>/servers/<name>/authorize` and its state is polled with
 `GET /api/sets/<set>/servers/<name>/authorize/status`. A `GET` on the starting
-route answers `405`: only the POST changes anything.
+route answers `405`: only the POST changes anything. Both routes check that the
+server belongs to the set and has a `url`: a server that is not in it answers
+`400` with `сервер X не входит в набор Y`, so the dialog shows why instead of
+polling forever, and a wrong set or server name is `404`.
 
 | item | value |
 | --- | --- |
@@ -210,15 +239,35 @@ listener — see [cli.md](cli.md#auth).
 
 ## Themes
 
-The panel ships four colour schemes — dark (default), light, Nord and Gruvbox —
-behind one set of CSS variables: colours, radii, the 4 px spacing step and the
-type scale. The theme menu sits in the header and switches the `data-theme`
-attribute on `<html>` without a reload; the choice is stored in
-`localStorage['mcprig.theme']`. The names kept from earlier versions still work
-and are rewritten to the new ones on first paint: `mcprig` and `tokyo` mean
-dark, `solarized` means light. The dark palette lives in `themes.css` on
-`:root`, so an unknown name falls back to it; the CSP is unchanged (no inline
-styles).
+Appearance has two independent axes, both switched from the one menu in the
+header, without a reload: the **theme** is the look, the **colour scheme** is
+what that look is painted in. `<html>` carries both — `data-theme` (`default` or
+`win98`) and `data-palette`.
+
+- `default` is the modern look with four schemes: dark (its default), light,
+  Nord and Gruvbox, all on one set of CSS variables — colours, radii, the 4 px
+  spacing step and the type scale.
+- `win98` is the look of Windows 98: a navy title bar with the pixel logo and the
+  three window buttons (decoration only — every action stays in the toolbar),
+  square corners, two-tone bevels, MS Sans Serif at 11 px, a dotted focus
+  rectangle inset 3 px, dark-blue selection, sunken white fields, folder tabs, a
+  status bar of segments and grey scrollbars. Its rules live in `win98.css`,
+  every selector under `html[data-theme="win98"]`. Four schemes share that
+  geometry and change shades only (or, for High Contrast, lose them): Classic
+  (`#c0c0c0` face, navy title bar), Slate (cool grey), Wheat (warm beige) and
+  High Contrast (`#000` body and fields, `#fff` text and outlines, `#ffff00`
+  accent and title bar text). Under `prefers-contrast: more` the bevels grow to
+  3 px and the focus rectangle to 2 px in every scheme.
+
+`theme.js` runs before first paint and sets both attributes; `themes.css` holds
+the schemes — dark on `:root`, the rest under `html[data-palette="…"]`, and the
+Win98 ones add the bevel tokens (`--w98-face`, `--w98-hi`, `--w98-lo`, …).
+Choices are stored in `localStorage['mcprig.theme']` and `['mcprig.palette']`,
+the scheme of the Win98 theme in `['mcprig.palette.win98']`, so each theme comes
+back with the scheme it was left in. Names stored by earlier versions (`dark`,
+`light`, `nord`, `gruvbox`, `mcprig`, `tokyo`, `solarized`) open as the `default`
+theme with the same colours and no reload; an unknown value falls back to dark,
+which lives on `:root`. The CSP is unchanged (no inline styles).
 
 ## Language
 
@@ -249,7 +298,7 @@ shipped unit, the panel's stdout in a foreground run.
 | `GET /login`, `POST /api/login`, `POST /api/logout` | session login |
 | `GET /api/state` | servers, sets, `firstPort` and `version` of the running binary (the footer prints it) — the first paint. A set's `keyMark` is the label its primary key carries in the statistics: the key's label when it has one, otherwise `key:<mark>`; empty for an open set |
 | `GET /api/sets`, `POST /api/sets` | list and create sets; a new closed set returns its token once in the `201` body |
-| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). A running set applies the change by reloading, not restarting; when the process did not apply it, the answer is still 200 with the edit plus `reloadError`. A change of `port`, or a new `${VAR}` brought by a new server, restarts the set; `open` reaches the live listener by reload. A `token` in the body replaces the primary key and creates one when the set has no active key |
+| `PUT /api/sets/<id>`, `DELETE /api/sets/<id>` | update and delete (stops it). The edit is written before it is applied, so a failed apply is never a 500: a restart that did not come back is `failed` (`{"<id>":"<cause>"}`) next to the set view, and a process that refused a reload reports it in the view's `reloadError`, so the panel does not show a saved edit as lost. A change of `port`, or a new `${VAR}` brought by a new server, restarts the set; `open` reaches the live listener by reload. A `token` in the body replaces the primary key and creates one when the set has no active key |
 | `POST /api/sets/<id>/start`, `/stop`, `/restart` | lifecycle |
 | `POST /api/sets/<id>/reload` | apply `servers.json` without a restart: `{"reloaded":true,"generation":N,"applied":[…],"restartNeeded":[…],"error":"…"}`. A stopped set answers `{"reloaded":false,"reason":"набор не запущен"}` and the file is written anyway. A non-empty `restartNeeded` or a set `error` gives `reloaded:false` with the cause in `reason`; a write failure is `500` |
 | `GET /api/sets/<id>/servers` | per-server health for one set |
@@ -268,7 +317,7 @@ shipped unit, the panel's stdout in a foreground run.
 | `POST /api/servers/<name>/probe` | `initialize` + `tools/list`, 60 s budget, error text in the body |
 | `GET /api/calls?set=<id>&limit=<N>&before=<time>&after=<time>` | merged call tail of the running sets plus the on-disk history of the stopped ones; default 50, max 500; `before`/`after` are RFC3339 times bounding a row's `time` (strictly older / strictly newer, one at a time); for one running set it also carries `schema` |
 | `GET /api/stats?set=<id\|all>&period=today\|7d\|30d\|archive&server=&tool=&client=&bucket=hour\|day\|month` | call history from disk: totals, series, per-tool, per-server and per-client breakdown, `bySet` for all sets |
-| `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; the answer returns at once, sets using the variable restart in the background (60 s budget) and `restarted` lists them; a running set that would not start for want of a variable after the change is left untouched and named in `skipped` (`{set, reason, missing}`), still working on its previous environment; stopping the panel cancels the background restart |
+| `GET /api/env`, `PUT /api/env/<NAME>`, `DELETE /api/env/<NAME>` | variables: names, set flag and source only — never values; a write waits for the sets that use the variable to restart (up to 60 s, `restartTimeout`) and then answers, so `restarted` lists sets that really came back and a set that did not is named in `reloadErrors` (id → cause). A running set that would not start for want of a variable after the change is left untouched and named in `skipped` (`{set, reason, missing}`), still working on its previous environment; stopping the panel cancels the wait |
 | `POST /api/import` | import an `mcpServers` object; returns `added` and `skipped` |
 | `GET /api/export/registry`, `GET /api/export?set=<id>` | export the registry or one set |
 | `POST /api/browse` | open a live session to a server for tool inspection |
@@ -317,7 +366,9 @@ servers at all: it can be created and started before its first server, and then
 only the meta-tools answer — `list_servers` returns an empty list. The key and
 port outlive the server list, so removing its last server does not require
 removing the set. In an update, `servers: []` clears the list and a missing
-`servers` key leaves it untouched. When `port` is not given the manager
+`servers` key leaves it untouched; a name repeated in the list is `400` —
+`сервер "x" указан в наборе дважды` — because the set would open one server
+twice and swap its keys. When `port` is not given the manager
 allocates a free port from 9100–9199, and a given one must be free in the
 system, otherwise `409` «порт N занят другим процессом». `id` and `token` in a
 create body are ignored.
@@ -387,7 +438,7 @@ directory `0700`.
 
 | file | contents | kept |
 | --- | --- | --- |
-| `raw-YYYY-MM-DD.jsonl` | one line per call: `{time, client, server, tool, ms, failed, err}`; `err` is the failure reason, a single line of at most 300 bytes, absent on success | today + 7 days |
+| `raw-YYYY-MM-DD.jsonl` | one line per call: `{time, client, server, tool, ms, failed, err}`; `err` is the failure reason, a single line of at most 300 bytes, absent on success | today plus the 7 days before it — 8 files |
 | `day-YYYY-MM-DD.json` | per `(client, server, tool)`: `{client, server, tool, calls, failures, totalMs, hist, lastMs}` | up to 30 days |
 | `month-YYYY-MM.json` | the same triples per day under `days` — a repeated fold overwrites a day instead of doubling it | always |
 
@@ -396,7 +447,9 @@ directory `0700`.
 
 Rotation and cleanup run when the set starts and then once a day: a finished day
 gets its day file built from the raw journal, days older than 30 move into their
-month file, and journals older than 7 days are removed. Writing never blocks a
+month file, and a raw journal is removed once its day is older than `today − 7`
+(`internal/stats/history.go:35-36`, `:306`), so eight files stay. The `7d`
+period reads today plus the six days before it. Writing never blocks a
 tool call: the line goes to a bounded channel served by one goroutine, and a
 full channel drops the line, which is reported as `stats.dropped` in the set's
 `/stats`.

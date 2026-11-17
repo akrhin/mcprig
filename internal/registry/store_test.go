@@ -285,14 +285,25 @@ func TestPortRange(t *testing.T) {
 
 	// Занять остаток диапазона: свободных портов быть не должно. Занятые в
 	// системе порты пропускаем — их и AllocatePort не выдаст.
+	busyFill := 0
 	for p := FirstPort; p <= LastPort; p++ {
 		if p == first || p == second || portBusy(p) {
+			busyFill++
 			continue
 		}
 		addSet(t, store, `{"name":"fill`+strconv.Itoa(p)+`","servers":["fs"],"port":`+strconv.Itoa(p)+`}`)
 	}
-	if _, err := store.AllocatePort(); err == nil {
-		t.Error("AllocatePort не вернул ошибку при полном диапазоне")
+	// Соседний процесс (другая полоса гоняет свои тесты на том же диапазоне)
+	// мог освободить порт между заливкой и выдачей: тогда он свободен по-настоящему.
+	// Требование к AllocatePort — не выдавать занятый порт, а полный отказ
+	// проверить можно только когда в системе ничего не занято.
+	fresh, err := store.AllocatePort()
+	switch {
+	case err != nil:
+	case busyFill == 0:
+		t.Errorf("AllocatePort = %d при полном диапазоне", fresh)
+	case portBusy(fresh):
+		t.Errorf("AllocatePort выдал занятый порт %d", fresh)
 	}
 }
 
@@ -312,6 +323,57 @@ func TestAllocatePortSkipsBusyOSPort(t *testing.T) {
 	if port == 9100 {
 		t.Fatalf("AllocatePort выдал занятый 9100")
 	}
+}
+
+// Слушатель на адресе хоста вне loopback тоже занимает порт: набор слушает
+// wildcard, и такой бинд конфликтует с ним.
+// Второй экземпляр того же сервера — не опечатка: набор открыл бы его дважды.
+func TestAddSetRejectsDuplicateServers(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	addServer(t, store, `{"name":"a","command":["x"]}`)
+	addServer(t, store, `{"name":"b","command":["y"]}`)
+
+	_, err := store.AddSet(json.RawMessage(`{"name":"demo","servers":["a","b","a"],"port":` + strconv.Itoa(freePort(t)) + `}`))
+	if err == nil {
+		t.Fatal("дубль в составе принят")
+	}
+	if !strings.Contains(err.Error(), `"a"`) || !strings.Contains(err.Error(), "дважды") {
+		t.Fatalf("ошибка не называет дубль: %v", err)
+	}
+	if store.Set("demo") != nil {
+		t.Fatal("набор с дублем записан")
+	}
+}
+
+func TestPortBusySeesListenerOutsideLoopback(t *testing.T) {
+	host := hostIPv4(t)
+	ln, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+	if err != nil {
+		t.Skipf("не удалось занять %s: %v", host, err)
+	}
+	defer ln.Close()
+	port := ln.Addr().(*net.TCPAddr).Port
+	if !portBusy(port) {
+		t.Fatalf("порт %d занят на %s, а portBusy считает его свободным", port, host)
+	}
+}
+
+// hostIPv4 — первый адрес хоста вне loopback; тест пропускается, если такого нет.
+func hostIPv4(t *testing.T) string {
+	t.Helper()
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		t.Skipf("адреса интерфейсов: %v", err)
+	}
+	for _, addr := range addrs {
+		ip, ok := addr.(*net.IPNet)
+		if !ok || ip.IP.IsLoopback() || ip.IP.To4() == nil {
+			continue
+		}
+		return ip.IP.String()
+	}
+	t.Skip("нет адреса вне loopback")
+	return ""
 }
 
 func TestDeleteServerStripsSets(t *testing.T) {

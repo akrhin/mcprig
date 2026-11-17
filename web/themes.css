@@ -1,11 +1,18 @@
 /*
-  mcprig — палитры. Один набор имён на все схемы; переключается атрибутом
-  data-theme на <html> (theme.js ставит его до первой отрисовки).
-  Имена старых схем (mcprig, tokyo, solarized) переводятся в новые в theme.js,
-  поэтому панель с прежним значением в localStorage открывается без перезагрузки.
+  mcprig — две независимые оси оформления:
+
+  data-theme   — как выглядят элементы: default (плоский, скруглённый) или
+                 win98 (фаски, ноль радиусов, 11px — правила в win98.css).
+  data-palette — какая схема цветов: dark, light, nord, gruvbox для default;
+                 w98, w98-cool, w98-warm, w98-hc для win98 в High Contrast цветах
+                 системы. Геометрия одна, меняются оттенки.
+
+  Оба атрибута ставит theme.js до первой отрисовки. Имена старых схем
+  (mcprig, tokyo, solarized) переводятся там же, поэтому панель с прежним
+  значением в localStorage открывается без перезагрузки.
 */
 
-/* Dark — схема по умолчанию: значения на :root, любой незнакомый data-theme читается как она. */
+/* Dark — схема по умолчанию: значения на :root, любой незнакомый data-palette читается как она. */
 :root {
   color-scheme: dark;
 
@@ -19,7 +26,7 @@
 
   --text: #e7edf4;
   --text-dim: #9aa8b6;
-  --text-mute: #7b8896;
+  --text-mute: #8b98a7;
 
   --accent: #6ea8fe;
   --accent-hi: #8bbdff;
@@ -35,7 +42,7 @@
   --chart-grid: #232b35;
 }
 
-html[data-theme="light"] {
+html[data-palette="light"] {
   color-scheme: light;
 
   --bg: #f7f8fa;
@@ -48,14 +55,15 @@ html[data-theme="light"] {
 
   --text: #0f151d;
   --text-dim: #4a5563;
-  --text-mute: #68737f;
+  --text-mute: #5b6672;
 
   --accent: #1d5fd0;
   --accent-hi: #164ea8;
   --accent-ink: #ffffff;
   --accent-soft: #e7effc;
 
-  --ok: #197a4c;
+  /* ok темнее канона #197a4c: на своём 14%-тинте бейджа канон даёт 4.17 */
+  --ok: #166b43;
   --warn: #8a5b00;
   --err: #b62d22;
 
@@ -64,7 +72,7 @@ html[data-theme="light"] {
   --chart-grid: #e2e7ee;
 }
 
-html[data-theme="nord"] {
+html[data-palette="nord"] {
   color-scheme: dark;
 
   --bg: #2e3440;
@@ -77,7 +85,7 @@ html[data-theme="nord"] {
 
   --text: #eceff4;
   --text-dim: #c6cdd8;
-  --text-mute: #9aa5b5;
+  --text-mute: #b4bece;
 
   --accent: #88c0d0;
   --accent-hi: #8fbcbb;
@@ -86,14 +94,15 @@ html[data-theme="nord"] {
 
   --ok: #a3be8c;
   --warn: #ebcb8b;
-  --err: #bf616a;
+  /* err светлее канона #bf616a: на тинте badge-err канон даёт 2.67 */
+  --err: #f0bcc0;
 
   --chart-ok: #81a1c1;
   --chart-err: #bf616a;
   --chart-grid: #3f4756;
 }
 
-html[data-theme="gruvbox"] {
+html[data-palette="gruvbox"] {
   color-scheme: dark;
 
   --bg: #1d2021;
@@ -106,18 +115,183 @@ html[data-theme="gruvbox"] {
 
   --text: #ebdbb2;
   --text-dim: #d5c4a1;
-  --text-mute: #a89984;
+  --text-mute: #b3a694;
 
-  --accent: #83a598;
+  --accent: #90b2a4;
   --accent-hi: #8ec07c;
   --accent-ink: #1d2021;
   --accent-soft: #323c34;
 
   --ok: #b8bb26;
   --warn: #fabd2f;
-  --err: #fb4934;
+  /* err светлее канона #fb4934: на своём 14%-тинте канон даёт 3.68 */
+  --err: #fd7f6c;
 
   --chart-ok: #458588;
   --chart-err: #fb4934;
   --chart-grid: #3c3836;
+}
+
+/* ── схемы темы win98 ───────────────────────────────────────────────────────
+   Общие имена те же, что у остальных схем, плюс --w98-*: два тона фаски,
+   лицо окна, поле ввода, выделение строки и заголовок окна. Фаски берутся
+   только отсюда, поэтому смена схемы не трогает геометрию. */
+
+html[data-palette="w98"] {
+  color-scheme: light;
+
+  --bg: #c0c0c0;
+  --bg-rail: #c0c0c0;
+  --surface: #c0c0c0;
+  --surface-2: #d4d4d4;
+  --line: #808080;
+  --line-soft: #a8a8a8;
+  --line-strong: #808080;
+
+  --text: #000000;
+  --text-dim: #202020;
+  --text-mute: #4a4a4a;
+
+  --accent: #000080;
+  --accent-hi: #0000a0;
+  --accent-ink: #ffffff;
+  --accent-soft: #c8c8c8;
+
+  --ok: #005a00;
+  --warn: #6b4500;
+  --err: #a00000;
+
+  --chart-ok: #000080;
+  --chart-err: #a00000;
+  --chart-grid: #808080;
+
+  --w98-face: #c0c0c0;
+  --w98-field: #ffffff;
+  --w98-hi: #ffffff;        /* светлый тон фаски: сверху-слева */
+  --w98-lo: #808080;        /* тёмный тон фаски: снизу-справа */
+  --w98-dk: #000000;        /* рамка окна и пунктир фокуса */
+  --w98-sel: #000080;
+  --w98-sel-ink: #ffffff;
+  --w98-title: #000080;
+  --w98-title-ink: #ffffff;
+}
+
+html[data-palette="w98-cool"] {
+  color-scheme: light;
+
+  --bg: #b9c0cb;
+  --bg-rail: #b9c0cb;
+  --surface: #b9c0cb;
+  --surface-2: #c9d0da;
+  --line: #7f8794;
+  --line-soft: #a6aeb9;
+  --line-strong: #7f8794;
+
+  --text: #000000;
+  --text-dim: #1f2833;
+  --text-mute: #434d59;
+
+  --accent: #123a6b;
+  --accent-hi: #1a4a82;
+  --accent-ink: #ffffff;
+  --accent-soft: #c3cad4;
+
+  --ok: #00523f;
+  --warn: #6b4500;
+  --err: #8c0f22;
+
+  --chart-ok: #123a6b;
+  --chart-err: #8c0f22;
+  --chart-grid: #7f8794;
+
+  --w98-face: #b9c0cb;
+  --w98-field: #ffffff;
+  --w98-hi: #ffffff;
+  --w98-lo: #78808d;
+  --w98-dk: #000000;
+  --w98-sel: #123a6b;
+  --w98-sel-ink: #ffffff;
+  --w98-title: #123a6b;
+  --w98-title-ink: #ffffff;
+}
+
+html[data-palette="w98-warm"] {
+  color-scheme: light;
+
+  --bg: #d6cdbb;
+  --bg-rail: #d6cdbb;
+  --surface: #d6cdbb;
+  --surface-2: #e2dbc9;
+  --line: #8a8070;
+  --line-soft: #bfb6a3;
+  --line-strong: #8a8070;
+
+  --text: #000000;
+  --text-dim: #2a241a;
+  --text-mute: #4f4635;
+
+  --accent: #7b3d00;
+  --accent-hi: #96480a;
+  --accent-ink: #ffffff;
+  --accent-soft: #cfc5b0;
+
+  --ok: #2f5200;
+  --warn: #6b4500;
+  --err: #8f1d00;
+
+  --chart-ok: #7b3d00;
+  --chart-err: #8f1d00;
+  --chart-grid: #8a8070;
+
+  --w98-face: #d6cdbb;
+  --w98-field: #fffdf5;
+  --w98-hi: #fffdf5;
+  --w98-lo: #8a8070;
+  --w98-dk: #000000;
+  --w98-sel: #7b3d00;
+  --w98-sel-ink: #ffffff;
+  --w98-title: #7b3d00;
+  --w98-title-ink: #ffffff;
+}
+
+/* High Contrast: цвета темы системы «чёрный фон — белый текст — жёлтый акцент».
+   Геометрия та же; --w98-lo остаётся серым, иначе фаска перестала бы читаться
+   как фаска. Поля чёрные с белой рамкой, выделение — жёлтое с чёрным текстом. */
+html[data-palette="w98-hc"] {
+  color-scheme: dark;
+
+  --bg: #000000;
+  --bg-rail: #000000;
+  --surface: #000000;
+  --surface-2: #000000;
+  --line: #ffffff;
+  --line-soft: #ffffff;
+  --line-strong: #ffffff;
+
+  --text: #ffffff;
+  --text-dim: #ffffff;
+  --text-mute: #ffffff;
+
+  --accent: #ffff00;
+  --accent-hi: #ffff00;
+  --accent-ink: #000000;
+  --accent-soft: #ffff00;
+
+  --ok: #00ff00;
+  --warn: #ffff00;
+  --err: #ff6060;
+
+  --chart-ok: #ffff00;
+  --chart-err: #ff6060;
+  --chart-grid: #ffffff;
+
+  --w98-face: #000000;
+  --w98-field: #000000;
+  --w98-hi: #ffffff;
+  --w98-lo: #808080;
+  --w98-dk: #ffffff;
+  --w98-sel: #ffff00;
+  --w98-sel-ink: #000000;
+  --w98-title: #000000;
+  --w98-title-ink: #ffff00;
 }

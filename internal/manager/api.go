@@ -33,8 +33,9 @@ import (
 
 const maxBody = 1 << 20
 
-// restartTimeout — сколько фоновый перезапуск после правки секрета ждёт все
-// наборы. Два больных набора укладываются в него с запасом.
+// restartTimeout — сколько правка секрета ждёт перезапуск всех наборов, чьи
+// серверы ссылаются на переменную. Два больных набора укладываются в него с
+// запасом.
 const restartTimeout = 60 * time.Second
 
 // Options — всё, что нужно менеджеру. FromEnv читает MCPRIG_*.
@@ -182,8 +183,10 @@ func New(opts Options) (*Manager, error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	for _, id := range store.Dropped() {
-		log.Warn("набор выброшен: некорректный id", "id", id)
+	// Error, не Warn: отброшенная при загрузке запись — это пропавший набор или
+	// сервер, и владелец должен узнать причину из журнала, а не искать файл-сироту.
+	for _, entry := range store.Dropped() {
+		log.Error("реестр: запись отброшена при загрузке", "причина", entry)
 	}
 	// Свёртка при старте панели: набор мог быть остановлен навсегда, и тогда
 	// никто не переведёт его day-файлы в месячные.
@@ -1082,10 +1085,14 @@ func (m *Manager) apiEnvPut(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted, skipped := m.restartSetsUsingEnv(name)
-	writeJSON(req.w, http.StatusOK, map[string]any{
+	restarted, failed, skipped := m.restartSetsUsingEnv(name)
+	resp := map[string]any{
 		"name": name, "set": true, "source": source, "restarted": restarted, "skipped": skipped,
-	})
+	}
+	if len(failed) > 0 {
+		resp["reloadErrors"] = failed
+	}
+	writeJSON(req.w, http.StatusOK, resp)
 	return nil
 }
 
@@ -1095,10 +1102,14 @@ func (m *Manager) apiEnvDelete(req *request) error {
 	if err != nil {
 		return badRequest(err.Error())
 	}
-	restarted, skipped := m.restartSetsUsingEnv(name)
-	writeJSON(req.w, http.StatusOK, map[string]any{
+	restarted, failed, skipped := m.restartSetsUsingEnv(name)
+	resp := map[string]any{
 		"name": name, "removed": removed, "source": source, "restarted": restarted, "skipped": skipped,
-	})
+	}
+	if len(failed) > 0 {
+		resp["reloadErrors"] = failed
+	}
+	writeJSON(req.w, http.StatusOK, resp)
 	return nil
 }
 
@@ -1346,9 +1357,9 @@ func (m *Manager) apiServerUpdate(req *request) error {
 	// Окружение — исключение: процесс набора получает его при старте, поэтому
 	// env/envAllow требуют перезапуска наборов с этим сервером.
 	var reloaded []string
-	reloadErrors := map[string]string{}
+	var reloadErrors map[string]string
 	if envChanged(old, srv) {
-		reloaded = m.restartSetsUsing(name)
+		reloaded, reloadErrors = m.restartSetsUsing(name)
 	} else {
 		reloaded, reloadErrors = m.reloadSetsUsing(name)
 	}
@@ -1466,17 +1477,26 @@ func (m *Manager) apiSetUpdate(req *request) error {
 	if running {
 		// Порт набор читает только при старте; ключи, открытость и правила
 		// применяются живьём, по SIGHUP.
+		var failed map[string]string
 		if restart, why := needsRestart(old, set, m.store.Servers()); restart {
 			m.log.Info("набор "+id+": правка транспорта — перезапуск", "причина", why)
 			if _, err := m.RestartSet(context.Background(), set); err != nil {
-				return err
+				failed = map[string]string{id: err.Error()}
 			}
+		} else if view, err := m.reloadSetView(req.r.Context(), set); err != nil {
+			failed = map[string]string{id: err.Error()}
 		} else {
-			view, err := m.reloadSetView(req.r.Context(), set)
-			if err != nil {
-				return err
-			}
 			writeJSON(req.w, http.StatusOK, view)
+			return nil
+		}
+		if failed != nil {
+			// Правка уже в реестре: отказ применения — поле failed, а не 500.
+			// Иначе клиент считает правку потерянной и повторяет запрос, хотя
+			// она сохранена и набор лежит ровно с ней.
+			writeJSON(req.w, http.StatusOK, struct {
+				setView
+				Failed map[string]string `json:"failed"`
+			}{m.setView(set), failed})
 			return nil
 		}
 	}
@@ -1551,6 +1571,15 @@ func (m *Manager) apiSetReload(req *request) error {
 			_, err = WriteSetConfig(m.rt.dataDir, id, body)
 		}
 		l.Unlock()
+		// Набор не запущен — применять правку некуда: reload был идемпотентным
+		// «запиши, что просят». Отказом считается только то, что и старту
+		// помешает: конфиг не собрался или не записался.
+		if errors.Is(err, ErrNoKey) {
+			writeJSON(req.w, http.StatusOK, map[string]any{
+				"reloaded": false, "reason": "набор не запущен: нет активного ключа — конфигурация не собрана, выдайте ключ",
+			})
+			return nil
+		}
 		if err != nil {
 			return serverError("не удалось записать конфигурацию набора " + id + ": " + err.Error())
 		}
@@ -1812,7 +1841,8 @@ func (m *Manager) keyIssueInput(set *registry.Set, req *request) (profile, label
 	var in struct {
 		Profile string `json:"profile"`
 		Label   string `json:"label"`
-		// Note — прежнее имя label.
+		// Note — только совместимость: прежнее имя label, его шлют старые
+		// клиенты. Панель шлёт Label.
 		Note string `json:"note"`
 	}
 	if len(body) > 0 {
@@ -1849,7 +1879,8 @@ func (m *Manager) apiKeyNote(req *request) error {
 	id, keyID := req.args[0], req.args[1]
 	var body struct {
 		Label string `json:"label"`
-		Note  string `json:"note"`
+		// Note — только совместимость: прежнее имя label для старых клиентов.
+		Note string `json:"note"`
 	}
 	if err := decodeJSON(req.r, &body); err != nil {
 		return err
@@ -1984,11 +2015,14 @@ type skippedRestart struct {
 // restartSetsUsingEnv перезапускает работающие наборы, чьи серверы ссылаются на
 // переменную. Набор, которому после правки не хватит переменных, не трогаем:
 // он продолжает работать со старым окружением, а ответ называет причину.
-// Перезапуск идёт в фоне: правка секрета не должна ждать до ~40 s двух больных
-// наборов; ошибки рестарта — в лог, не в ответ.
-func (m *Manager) restartSetsUsingEnv(name string) ([]string, []skippedRestart) {
+// Перезапуск ждётся в ответе: иначе 200 «restarted» обещает то, чего ещё нет, а
+// провал уносит отозванный ключ в набор, который остался жив на старом.
+func (m *Manager) restartSetsUsingEnv(name string) ([]string, map[string]string, []skippedRestart) {
 	restarted := []string{}
+	failed := map[string]string{}
 	skipped := []skippedRestart{}
+	ctx, cancel := context.WithTimeout(m.ctx, restartTimeout)
+	defer cancel()
 	sets := []*registry.Set{}
 	servers := m.store.Servers()
 	for _, set := range m.store.Sets() {
@@ -2004,25 +2038,21 @@ func (m *Manager) restartSetsUsingEnv(name string) ([]string, []skippedRestart) 
 			})
 			continue
 		}
-		restarted = append(restarted, set.ID)
 		sets = append(sets, set)
 	}
-	if len(sets) == 0 {
-		return restarted, skipped
-	}
-	go func() {
-		ctx, cancel := context.WithTimeout(m.ctx, restartTimeout)
-		defer cancel()
-		for _, set := range sets {
-			if ctx.Err() != nil {
-				return
-			}
-			if _, err := m.RestartSet(ctx, set); err != nil {
-				m.log.Warn("перезапуск набора после смены секрета не удался", "set", set.ID, "err", err)
-			}
+	for _, set := range sets {
+		if ctx.Err() != nil {
+			failed[set.ID] = "перезапуск не дождался: " + ctx.Err().Error()
+			continue
 		}
-	}()
-	return restarted, skipped
+		if _, err := m.RestartSet(ctx, set); err != nil {
+			m.log.Warn("перезапуск набора после смены секрета не удался", "set", set.ID, "err", err)
+			failed[set.ID] = err.Error()
+			continue
+		}
+		restarted = append(restarted, set.ID)
+	}
+	return restarted, failed, skipped
 }
 
 // envChanged — окружение процесса набора фиксируется при старте
@@ -2049,23 +2079,27 @@ func envChanged(old, new registry.Server) bool {
 }
 
 // restartSetsUsing перезапускает работающие наборы с этим сервером — путь для
-// того, что без рестарта не применится (окружение сервера).
-func (m *Manager) restartSetsUsing(server string) []string {
+// того, что без рестарта не применится (окружение сервера). Отказ по каждому
+// набору уходит в ответ тем же полем, что и у reload: набор, не поднявшийся с
+// новым окружением, остаётся остановленным, и ответ 200 не должен это скрывать.
+func (m *Manager) restartSetsUsing(server string) ([]string, map[string]string) {
 	restarted := []string{}
+	failed := map[string]string{}
 	for _, set := range m.setsUsing(server) {
 		if !m.rt.status(set).Running {
 			continue
 		}
 		if m.ctx.Err() != nil {
-			return restarted
+			return restarted, failed
 		}
 		if _, err := m.RestartSet(m.ctx, set); err != nil {
 			m.log.Warn("перезапуск набора после правки окружения сервера не удался", "set", set.ID, "err", err)
+			failed[set.ID] = err.Error()
 			continue
 		}
 		restarted = append(restarted, set.ID)
 	}
-	return restarted
+	return restarted, failed
 }
 
 // reloadSetsUsing перезагружает работающие наборы с этим сервером вместо

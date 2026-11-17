@@ -12,15 +12,15 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/akrhin/mcprig/internal/healthconst"
 	"github.com/akrhin/mcprig/internal/stats"
 )
 
 const (
-	healthTTL = 15 * time.Second
-	// healthTimeout — такой же, как healthTimeout в internal/mcpserver: сервер,
-	// который поднимается дольше (stdio-обёртка npx, холодный LSP), иначе
-	// выглядит мёртвым, хотя вызовы проходят. Числа обязаны совпадать.
-	healthTimeout = 15 * time.Second
+	// Числа общие с internal/mcpserver через healthconst: панель и прокси
+	// обязаны одинаково решать, кто «здоров».
+	healthTTL     = healthconst.TTL
+	healthTimeout = healthconst.Timeout
 	// healthLoadTimeout — бюджет самого запроса: набор тратит до healthTimeout
 	// на пробу и ещё немного на ответ, поэтому внешний ровно тот же 15 с
 	// истекал одновременно с внутренним и панель показывала «не ответил».
@@ -179,7 +179,7 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 			Isolation string `json:"isolation"`
 		} `json:"servers"`
 	}
-	if text := firstText(res); text != "" {
+	if text := FirstText(res); text != "" {
 		if err := json.Unmarshal([]byte(text), &payload); err != nil {
 			return healthError(out, err)
 		}
@@ -208,7 +208,7 @@ func fetchSetHealth(ctx context.Context, host string, port int, token string, op
 			continue
 		}
 		errText := fmt.Sprintf("набор не ответил за %s", healthLoadTimeout)
-		if firstText(res) != "" {
+		if FirstText(res) != "" {
 			errText = "нет в ответе list_servers"
 		}
 		out.Servers[i].Error = errText
@@ -308,7 +308,9 @@ func (m *Manager) noteHealth(id string, view setHealth) {
 	}
 }
 
-func firstText(res *mcp.CallToolResult) string {
+// FirstText returns the first text block of a tool result: панель и CLI читают
+// один текст одинаково.
+func FirstText(res *mcp.CallToolResult) string {
 	if res == nil {
 		return ""
 	}

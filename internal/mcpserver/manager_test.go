@@ -88,17 +88,25 @@ func resultText(t *testing.T, res *mcp.CallToolResult) string {
 	return res.Content[0].(*mcp.TextContent).Text
 }
 
+type serversOutServer struct {
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Enabled  bool     `json:"enabled"`
+	Healthy  bool     `json:"healthy"`
+	Unknown  bool     `json:"unknown"`
+	Error    string   `json:"error"`
+	Tags     []string `json:"tags"`
+	URL      string   `json:"url"`
+	Command  string   `json:"command"`
+	Tools    int      `json:"tools"`
+	Visible  int      `json:"visible"`
+	Approval string   `json:"approval"`
+	Hint     string   `json:"hint"`
+}
+
 type serversOut struct {
-	Servers []struct {
-		Name    string   `json:"name"`
-		Type    string   `json:"type"`
-		Enabled bool     `json:"enabled"`
-		Healthy bool     `json:"healthy"`
-		Unknown bool     `json:"unknown"`
-		Error   string   `json:"error"`
-		Tags    []string `json:"tags"`
-	} `json:"servers"`
-	Version string `json:"version"`
+	Servers []serversOutServer `json:"servers"`
+	Version string             `json:"version"`
 }
 
 func listServersOut(t *testing.T, cs *mcp.ClientSession) serversOut {
@@ -1130,5 +1138,45 @@ func TestInvokeCommandSlotHonorsContext(t *testing.T) {
 	}
 	if n := atomic.LoadInt32(&dials); n != 0 {
 		t.Fatalf("вызов дошёл до апстрима без слота: %d", n)
+	}
+}
+
+// list_servers называет адрес сервера, сколько тулов видит этот ключ из
+// объявленных и включён ли карантин: без этого список говорит только живость.
+func TestListServersShowsRouteToolsApproval(t *testing.T) {
+	var dials int32
+	remote := &config.Server{Name: "remote", Transport: config.TransportHTTP, URL: "https://example.test/mcp", Enabled: true}
+	cfg := &config.Config{
+		Servers: []*config.Server{stdio("alpha"), remote},
+		Permissions: &config.Permissions{Rules: []config.Rule{
+			{Server: "alpha", Pattern: "danger-*", Action: config.PermissionDeny, Message: "нет"},
+		}},
+	}
+	m := testManager(cfg, &dials, 0)
+	m.LockPath = filepath.Join(t.TempDir(), "tools.lock.json")
+	t.Cleanup(func() { _ = m.Close() })
+	m.storeTools(m.find("alpha"), []*mcp.Tool{{Name: "echo"}, {Name: "danger-zone"}})
+
+	out := listServersOut(t, clientFor(t, m.Server()))
+	byName := map[string]int{}
+	for i, s := range out.Servers {
+		byName[s.Name] = i
+	}
+	alpha := out.Servers[byName["alpha"]]
+	if alpha.Type != "stdio" || alpha.Command != "downstream" {
+		t.Fatalf("alpha: transport %q команда %q", alpha.Type, alpha.Command)
+	}
+	if alpha.Tools != 2 || alpha.Visible != 1 {
+		t.Fatalf("alpha: объявлено %d, видно %d", alpha.Tools, alpha.Visible)
+	}
+	if alpha.Approval != "quarantine" {
+		t.Fatalf("alpha: одобрение %q", alpha.Approval)
+	}
+	remoteInfo := out.Servers[byName["remote"]]
+	if remoteInfo.URL != "https://example.test/mcp" {
+		t.Fatalf("remote: адрес %q", remoteInfo.URL)
+	}
+	if remoteInfo.Tools != 0 || remoteInfo.Visible != 0 {
+		t.Fatalf("remote без каталога показал счётчики: %+v", remoteInfo)
 	}
 }

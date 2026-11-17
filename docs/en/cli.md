@@ -41,7 +41,11 @@ mcprig serve --config ~/.config/mcprig/sets/demo/servers.json
 
 `-addr` changes only the listener; `transport.path` (default `/mcp`),
 `authToken`, `allowAnonymous` and `allowedHosts` still come from the file. An
-empty `authToken` is a startup error unless `allowAnonymous` is true.
+empty `authToken` is a startup error unless `allowAnonymous` is true. A set the
+panel created keeps its file in the state directory —
+`$MCPRIG_DATA_DIR/sets/<id>/servers.json` — while
+`~/.config/mcprig/sets/<set>/` is where the `mcprig-set@` systemd unit keeps
+its own ([install.md](install.md#state-on-disk)).
 
 Output goes to stderr:
 
@@ -132,27 +136,39 @@ token the set reports the server unhealthy; `auth` is the way past it.
 MCPRIG_PASSWORD='change-me' mcprig panel
 ```
 
-No flags. Everything is environment:
+`-h` / `--help` prints the twenty-seven environment variables the panel reads,
+one per line and in the same order as below, and exits `0`; any other argument is
+a usage error and exits `2`. The panel takes no flags: everything is environment —
+the twenty-four rows in the table, plus `MCPRIG_TOOLOUT_TTL` and
+`MCPRIG_TOOLOUT_MAX` ([tool-out retention](#tool-out-retention)) and
+`MCPRIG_PPROF` ([serve](#serve)).
 
 | variable | default | meaning |
 | --- | --- | --- |
 | `MCPRIG_DATA_DIR` | `$XDG_STATE_HOME/mcprig`, else `~/.local/state/mcprig` | registry, keys, logs, OAuth tokens |
+| `XDG_STATE_HOME` | `~/.local/state` | base of the state directory; `MCPRIG_DATA_DIR` overrides it |
+| `MCPRIG_CLI` | the running executable | binary spawned for each set (`serve --config …`) |
+| `MCPRIG_SEED_FILE` | empty | JSON with `servers[]` and `sets[]`; used only when the registry is empty; new keys are generated for closed sets |
 | `MCPRIG_HOST` | `127.0.0.1` | panel listen address |
 | `MCPRIG_PORT` | `9091` | panel port |
 | `MCPRIG_PUBLIC_URL` | empty | public address of the panel, `http(s)://host[:port][/prefix]`; when set it is the only source of the OAuth redirect and of the `Secure` cookie decision. Validated at startup: scheme, host, no query/fragment, no trailing `/` |
-| `MCPRIG_TLS_CERT` | empty | certificate for the panel listener; set together with `MCPRIG_TLS_KEY` — one without the other refuses to start, and an unreadable file fails startup |
-| `MCPRIG_TLS_KEY` | empty | private key for the panel listener |
-| `MCPRIG_CLI` | the running executable | binary spawned for each set (`serve --config …`) |
 | `MCPRIG_BIND_IP` | `0.0.0.0` | `transport.host` written into every set's `servers.json` |
-| `MCPRIG_SEED_FILE` | empty | JSON with `servers[]` and `sets[]`; used only when the registry is empty; new keys are generated for closed sets |
 | `MCPRIG_PASSWORD` | empty | panel password |
 | `MCPRIG_PASSWORD_HASH` | empty | `scrypt$N$r$p$salt$hash`; when set, the plain password is ignored |
+| `MCPRIG_USER` | `admin` | login name |
+| `MCPRIG_AUTH` | empty | `off` disables panel auth |
+| `MCPRIG_TLS_CERT` | empty | certificate for the panel listener; set together with `MCPRIG_TLS_KEY` — one without the other refuses to start, and an unreadable file fails startup |
+| `MCPRIG_TLS_KEY` | empty | private key for the panel listener |
 | `MCPRIG_PROXY_SECRET` | empty | shared secret for proxy auth; a value shorter than 32 characters logs a warning |
 | `MCPRIG_TRUSTED_PROXIES` | loopback | comma-separated IPs or CIDRs whose `X-Forwarded-*` are believed; an entry that is neither stops the panel at startup |
-| `MCPRIG_USER` | `admin` | login name |
 | `MCPRIG_USER_HEADER` | `Remote-User` | header carrying the user name from a trusted proxy |
 | `MCPRIG_ALLOWED_HOSTS` | loopback only | comma-separated `Host` allowlist |
-| `MCPRIG_AUTH` | empty | `off` disables panel auth |
+| `BAO_ADDR` | empty | OpenBao address for set secrets; empty leaves secrets in the local env file only |
+| `OPENBAO_ADDR` | empty | same as `BAO_ADDR`, used when that one is empty |
+| `BAO_TOKEN` | empty | OpenBao token; without it and `BAO_ADDR` secrets stay local |
+| `OPENBAO_TOKEN` | empty | same as `BAO_TOKEN`, used when that one is empty |
+| `BAO_MOUNT` | `secret` | KV v2 mount inside OpenBao |
+| `BAO_PREFIX` | `mcp` | path prefix inside that mount |
 
 Setting `MCPRIG_PROXY_SECRET` is what makes `X-Forwarded-*` trusted, and only
 from a peer the panel believes: loopback, or an address in
@@ -315,8 +331,8 @@ Key precedence: `-token`, `-token-file`, `MCPRIG_TOKEN`, then
 to `mcprig init`. An open set is warmed without a key.
 
 ```text
-example: 421 инструмент(ов), 5.6 мс
-итог: 1 набор, 421 инструмент(ов), 5.6 мс
+example: 421 инструмент, 5.6 мс
+итог: 1 набор, 421 инструмент, 5.6 мс
 ```
 
 `-json` prints the same rows:

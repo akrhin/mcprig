@@ -103,7 +103,8 @@ type PublicKey struct {
 	CreatedAt string `json:"createdAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
 	Label     string `json:"label,omitempty"`
-	// Note повторяет Label для клиентов, написанных до переименования.
+	// Note — только совместимость: повторяет Label для клиентов, написанных до
+	// переименования поля. Новый код читает Label.
 	Note    string `json:"note,omitempty"`
 	Profile string `json:"profile,omitempty"`
 }

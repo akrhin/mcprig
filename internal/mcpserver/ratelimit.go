@@ -1,11 +1,14 @@
 package mcpserver
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/time/rate"
 
 	"github.com/akrhin/mcprig/internal/config"
@@ -26,6 +29,63 @@ const (
 	// заново; лимит — тормоз, не граница безопасности.
 	maxBuckets = 4096
 )
+
+// catalogRefreshEvery — как часто одна идентичность может сбрасывать каталог
+// одного сервера. refresh стоит обхода апстрима, а внутри окна не даёт нового:
+// это тормоз, а не граница безопасности.
+const catalogRefreshEvery = 5 * time.Second
+
+// withRefreshDeferred marks an answer built on a cached catalog: the refresh
+// was held back by the throttle, and the caller deserves to know why.
+func withRefreshDeferred(res *mcp.CallToolResult, names []string) *mcp.CallToolResult {
+	if res == nil || len(names) == 0 {
+		return res
+	}
+	res.Meta = mcp.Meta{"refreshDeferred": strings.Join(names, ", ") + ": обновление каталога не чаще раза в " + catalogRefreshEvery.String()}
+	return res
+}
+
+// mayRefresh reports whether this identity may drop the server's cache now, and
+// remembers the attempt.
+func (m *Manager) mayRefresh(ctx context.Context, server string) bool {
+	// Та же идентичность, что у лимитов: отпечаток ключа, а у открытого набора
+	// адрес — иначе у всех клиентов набора ключ пустой и один общий.
+	key := identityOf(ctx) + "\x00" + server
+	m.refreshMu.Lock()
+	defer m.refreshMu.Unlock()
+	if m.refreshAt == nil {
+		m.refreshAt = make(map[string]time.Time, 2)
+	}
+	now := time.Now()
+	if last, ok := m.refreshAt[key]; ok && now.Sub(last) < catalogRefreshEvery {
+		return false
+	}
+	m.refreshAt[key] = now
+	return true
+}
+
+// refreshCatalogs drops the named servers' cached catalogs, honouring the
+// throttle, and returns the names the throttle held back. Only the requested
+// servers: refreshing one must not empty the others' cache, which the
+// quarantine compares against.
+func (m *Manager) refreshCatalogs(ctx context.Context, wanted bool, names []string) []string {
+	if !wanted {
+		return nil
+	}
+	var deferred []string
+	for _, name := range names {
+		e := m.find(name)
+		if e == nil {
+			continue
+		}
+		if m.mayRefresh(ctx, name) {
+			m.storeTools(e, nil)
+			continue
+		}
+		deferred = append(deferred, name)
+	}
+	return deferred
+}
 
 // bucket — token bucket одной пары (клиент, server/tool) и метка последнего
 // использования для уборки. ident лежит рядом, чтобы вытеснять корзины того,

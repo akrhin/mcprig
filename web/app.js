@@ -1,8 +1,8 @@
 /*
   mcprig — панель. Vanilla JS, без зависимостей.
-  Данные: /api/state (5 с), выбранный набор — health и /api/calls (5 с), сводка по
-  всем запущенным наборам для раздела «Статистика» — /api/calls без set (15 с), лог —
-  по кнопке и 10 с, пока набор запущен.
+  Данные: /api/state и /api/calls выбранного набора — 5 с, health — 5 с,
+  /api/stats — 15 с (пока открыта вкладка), лог — по кнопке и 10 с, /api/env — 30 с;
+  скрытая вкладка не опрашивается, листаемую историю вызовов опрос не перезаписывает.
   Каркас: три региона со своим скроллом (рельс, основная область, панель деталей),
   поэтому страница не растягивается и горизонтальной прокрутки у окна нет.
   ?mock=1 — единственная отладочная ветка: те же URL читаются из web/mock/*.json.
@@ -24,7 +24,20 @@
       'a11y.skip': 'Skip to content',
       'top.details': 'Details',
       'top.lang': 'Language',
-      'top.theme': 'Color scheme',
+      'top.theme': 'Appearance',
+      'theme.group': 'Theme',
+      'theme.scheme': 'Color scheme',
+      'theme.scheme98': 'Windows 98 scheme',
+      'theme.default': 'Default',
+      'theme.win98': 'Windows 98',
+      'pal.dark': 'Dark',
+      'pal.light': 'Light',
+      'pal.nord': 'Nord',
+      'pal.gruvbox': 'Gruvbox',
+      'pal.w98': 'Classic',
+      'pal.w98cool': 'Slate',
+      'pal.w98warm': 'Wheat',
+      'pal.w98hc': 'High contrast',
       'top.updatedLabel': 'updated',
       'rail.title': 'Sets',
       'rail.open': 'Open the set list',
@@ -95,6 +108,7 @@
       'vars.restarted': 'restarted: {list}',
       'vars.skippedOne': '{set} stays on its old value: {what}',
       'vars.skippedMissing': 'missing {names}',
+      'vars.reloadWarn': 'the value is applied, but the set did not restart: {err}',
       'vars.del': 'forget the value',
       'vars.delConfirm': 'Forget {name}? A running set keeps the value it started with; only sets that no longer need it restart.',
       'vars.honest': 'Values live in OpenBao or in a file only this host can read: the panel shows a name, whether it is set and where it comes from, never a value. A name saved here stays in the list even when no server mentions it, marked as unused.',
@@ -140,6 +154,7 @@
       'calls.bad': 'error',
       'calls.ok': 'ok',
       'calls.emptyText': 'Requests appear here as soon as the set serves.',
+      'calls.noMatchText': 'Calls are there: clear the search or uncheck “errors only”.',
       'calls.more': 'Show more',
       'calls.paused': 'auto-refresh paused',
       'calls.resume': 'resume',
@@ -284,7 +299,6 @@
       'auth.open': 'open link',
       'auth.copy': 'copy link',
       'auth.copied': 'link copied',
-      'srv.notProbed': 'not probed',
       'srv.setOff': 'set {name} is not running',
       'srv.unchecked': 'not checked',
       'srv.noResponse': 'no response',
@@ -347,6 +361,19 @@
       'prompt.fail': 'could not build the prompt: {msg}',
       'err.offline': 'no connection to the daemon',
       'err.http': 'HTTP {status} · {path}',
+      // демо-реестр повторяет правила internal/registry, но говорит на языке панели
+      'mock.name': 'name: lowercase latin letters, digits, - and _',
+      'mock.exists': 'server {name} already exists',
+      'mock.httpUrl': 'http requires url',
+      'mock.httpCmd': 'http cannot have a command',
+      'mock.stdioCmd': 'stdio requires a command',
+      'mock.stdioUrl': 'stdio cannot have a url',
+      'mock.sandboxStdio': 'sandbox is only for stdio',
+      'mock.sandboxFields': 'sandbox: unknown fields: {list}',
+      'mock.untrusted': 'tag untrusted needs a sandbox: a server without isolation will not start',
+      'mock.exposeKind': 'expose: unknown kind "{kind}" (allowed {list})',
+      'mock.noServer': 'no server {name}',
+      'mock.noSet': 'no set {id}',
       'add.nameRequired': 'a name is required'
     },
     ru: {
@@ -355,7 +382,20 @@
       'a11y.skip': 'Перейти к содержимому',
       'top.details': 'Детали',
       'top.lang': 'Язык',
-      'top.theme': 'Цветовая схема',
+      'top.theme': 'Оформление',
+      'theme.group': 'Тема',
+      'theme.scheme': 'Цветовая схема',
+      'theme.scheme98': 'Схема Windows 98',
+      'theme.default': 'Обычная',
+      'theme.win98': 'Windows 98',
+      'pal.dark': 'Тёмная',
+      'pal.light': 'Светлая',
+      'pal.nord': 'Nord',
+      'pal.gruvbox': 'Gruvbox',
+      'pal.w98': 'Классическая',
+      'pal.w98cool': 'Холодная серая',
+      'pal.w98warm': 'Тёплая бежевая',
+      'pal.w98hc': 'Высокая контрастность',
       'top.updatedLabel': 'обновлено',
       'rail.title': 'Наборы',
       'rail.open': 'Открыть список наборов',
@@ -426,6 +466,7 @@
       'vars.restarted': 'перезапущены: {list}',
       'vars.skippedOne': '{set} остался на прежнем значении: {what}',
       'vars.skippedMissing': 'нет переменной {names}',
+      'vars.reloadWarn': 'значение применено, но набор не перезапустился: {err}',
       'vars.del': 'забыть значение',
       'vars.delConfirm': 'Забыть {name}? Работающий набор остаётся со значением, с которым запустился; перезапускаются только наборы, которым это значение больше не нужно.',
       'vars.honest': 'Значения живут в OpenBao или в файле, который читает только этот хост: видно имя, стоит ли значение и откуда оно берётся, — но не само значение. Имя, сохранённое здесь, остаётся в списке, даже если его не упоминает ни один сервер, — с пометкой «не используется».',
@@ -471,6 +512,7 @@
       'calls.bad': 'ошибка',
       'calls.ok': 'ок',
       'calls.emptyText': 'Вызовы появятся здесь, как только набор начнёт их принимать.',
+      'calls.noMatchText': 'Вызовы есть: сбросьте поиск или снимите «только ошибки».',
       'calls.more': 'Показать ещё',
       'calls.paused': 'автообновление приостановлено',
       'calls.resume': 'возобновить',
@@ -615,7 +657,6 @@
       'auth.open': 'открыть ссылку',
       'auth.copy': 'скопировать ссылку',
       'auth.copied': 'ссылка скопирована',
-      'srv.notProbed': 'не проверен',
       'srv.setOff': 'набор {name} не запущен',
       'srv.unchecked': 'не проверен',
       'srv.noResponse': 'нет ответа',
@@ -678,6 +719,18 @@
       'prompt.fail': 'не удалось собрать промт: {msg}',
       'err.offline': 'панель не отвечает — проверьте, запущен ли mcprig',
       'err.http': 'HTTP {status} · {path}',
+      'mock.name': 'name: строчные латинские буквы, цифры, - и _',
+      'mock.exists': 'сервер {name} уже есть',
+      'mock.httpUrl': 'http требует url',
+      'mock.httpCmd': 'http не может иметь command',
+      'mock.stdioCmd': 'stdio требует command',
+      'mock.stdioUrl': 'stdio не может иметь url',
+      'mock.sandboxStdio': 'sandbox допустим только для stdio',
+      'mock.sandboxFields': 'sandbox: неизвестные поля: {list}',
+      'mock.untrusted': 'тег untrusted требует sandbox: сервер без изоляции не стартует',
+      'mock.exposeKind': 'expose: неизвестный вид "{kind}" (допустимо {list})',
+      'mock.noServer': 'нет сервера {name}',
+      'mock.noSet': 'нет набора {id}',
       'add.nameRequired': 'Укажите имя набора'
     }
   };
@@ -831,6 +884,17 @@
     return fmtCached('hm', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms));
   }
 
+  // хвост вызовов переходит через сутки: у не-сегодняшней строки день важнее секунд
+  function clockAt(v) {
+    var d = new Date(v);
+    if (isNaN(d.getTime())) { return '—'; }
+    var n = new Date();
+    if (d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()) {
+      return clock(v);
+    }
+    return fmtCached('clockAt', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+  }
+
   function day(iso) {
     var d = new Date(iso);
     if (isNaN(d.getTime())) { return '—'; }
@@ -882,6 +946,13 @@
   }
 
   function show(node, on) { if (node) { node.hidden = !on; } }
+
+  // Карта «{id: причина}» из ответа — одной строкой: так приходят reloadErrors и failed.
+  function reloadReason(m) {
+    if (!m) { return ''; }
+    return Object.keys(m).filter(function (k) { return m[k]; })
+      .map(function (k) { return k + ': ' + m[k]; }).join('; ');
+  }
 
   /* ---------- сеть ---------- */
 
@@ -1000,28 +1071,30 @@
   var MOCK_SANDBOX_KEYS = ['mode', 'onUnavailable', 'ro', 'rw', 'network', 'memoryMb', 'pids', 'timeoutSec'];
   var MOCK_EXPOSE_KINDS = ['resources', 'prompts'];
 
+  // Отказ демо-реестра — ключ словаря и значения, а не готовая строка: панель
+  // повторяет правила internal/registry, но говорит на языке интерфейса.
   function mockServerErr(inp, name, exists) {
-    if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) { return 'name: строчные латинские буквы, цифры, - и _'; }
-    if (exists) { return 'сервер ' + name + ' уже есть'; }
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) { return { k: 'mock.name' }; }
+    if (exists) { return { k: 'mock.exists', v: { name: name } }; }
     var http = inp.transport === 'http';
-    if (http && !inp.url) { return 'http требует url'; }
-    if (http && inp.command && inp.command.length) { return 'http не может иметь command'; }
-    if (!http && !(inp.command && inp.command.length)) { return 'stdio требует command'; }
-    if (!http && inp.url) { return 'stdio не может иметь url'; }
-    if (http && inp.sandbox) { return 'sandbox допустим только для stdio'; }
+    if (http && !inp.url) { return { k: 'mock.httpUrl' }; }
+    if (http && inp.command && inp.command.length) { return { k: 'mock.httpCmd' }; }
+    if (!http && !(inp.command && inp.command.length)) { return { k: 'mock.stdioCmd' }; }
+    if (!http && inp.url) { return { k: 'mock.stdioUrl' }; }
+    if (http && inp.sandbox) { return { k: 'mock.sandboxStdio' }; }
     if (inp.sandbox) {
       var extra = Object.keys(inp.sandbox).filter(function (k) { return MOCK_SANDBOX_KEYS.indexOf(k) < 0; });
-      if (extra.length) { return 'sandbox: неизвестные поля: ' + extra.join(', '); }
+      if (extra.length) { return { k: 'mock.sandboxFields', v: { list: extra.join(', ') } }; }
     }
     if ((inp.tags || []).indexOf('untrusted') >= 0 && !inp.sandbox) {
-      return 'тег untrusted требует sandbox: сервер без изоляции не стартует';
+      return { k: 'mock.untrusted' };
     }
     // та же строгость, что у config.Check: опечатка не должна молча значить «не отдавать»
     var bad = (inp.expose || []).filter(function (k) { return MOCK_EXPOSE_KINDS.indexOf(k) < 0; });
     if (bad.length) {
-      return 'expose: неизвестный вид "' + bad[0] + '" (допустимо ' + MOCK_EXPOSE_KINDS.join(', ') + ')';
+      return { k: 'mock.exposeKind', v: { kind: bad[0], list: MOCK_EXPOSE_KINDS.join(', ') } };
     }
-    return '';
+    return null;
   }
 
   function mockServer(name, body) {
@@ -1063,7 +1136,11 @@
     if (tm && method === 'PUT' && st.mock) {
       var tset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(tm[1]); })[0];
       if (tset && body && Array.isArray(body.servers)) { tset.servers = body.servers.slice(); }
-      return Promise.resolve(tset || {});
+      // ответ как у живой правки: вид набора, а при неудавшемся рестарте рядом
+      // failed (internal/manager/api.go, apiSetPut) — в state.json этого поля нет
+      var tfail = tset && tset.id === 'lab'
+        ? { failed: { lab: 'перезапуск набора lab не прошёл: порт 9108 занят (демо)' } } : null;
+      return Promise.resolve(tset && Object.assign({}, tset, tfail) || {});
     }
     // Промт собирается и в демо: пустой ответ показал бы в диалоге «undefined».
     var pm = /^\/api\/sets\/([^/]+)\/prompt$/.exec(path);
@@ -1102,7 +1179,7 @@
       var nset = st.mock.sets.filter(function (s) { return s.id === decodeURIComponent(nm[1]); })[0];
       var keyID = decodeURIComponent(nm[2]);
       (nset ? nset.keys : []).forEach(function (k) {
-        if (k.id === keyID) { k.note = String((body && body.note) || ''); }
+        if (k.id === keyID) { k.label = String((body && body.label) || ''); }
       });
       return Promise.resolve({ ok: true });
     }
@@ -1123,15 +1200,45 @@
           if (row && row.used === false) {
             d.vars = d.vars.filter(function (v) { return v.name !== envName; });
           } else if (row) { row.set = false; row.source = ''; }
-          return { name: envName, removed: had, source: was, restarted: [] };
+          return { name: envName, removed: had, source: was, restarted: [], reloadErrors: row && row.reloadErrors };
         }
         // source — из store тела, как storeName в secrets.go: local и пусто → file
         var from = String((body && (body.store || body.source)) || 'file');
         var source = from === 'local' || from === 'automatic' ? 'file' : from;
         if (row) { row.set = true; row.source = source; }
         else { d.vars.push({ name: envName, set: true, used: false, source: source }); }
-        return { name: envName, set: true, source: source, restarted: [] };
+        return { name: envName, set: true, source: source, restarted: [], reloadErrors: row && row.reloadErrors };
       });
+    }
+    // Жизненный цикл и удаление набора: демо меняет строку, иначе кнопка
+    // выглядит мёртвой — глухой ok на такое действие хуже отказа.
+    var lf = /^\/api\/sets\/([^/]+)(?:\/(start|stop|restart|reload))?$/.exec(path);
+    if (lf && st.mock && (lf[2] || method === 'DELETE')) {
+      var sid = decodeURIComponent(lf[1]);
+      var one = st.mock.sets.filter(function (s) { return s.id === sid; })[0];
+      if (!one) {
+        fail(t('mock.noSet', { id: sid }));
+        return Promise.reject(new Error(t('mock.noSet', { id: sid })));
+      }
+      if (!lf[2]) {
+        st.mock.sets = st.mock.sets.filter(function (s) { return s.id !== sid; });
+        return Promise.resolve({ ok: true });
+      }
+      var rt = one.runtime || (one.runtime = { id: one.id, port: one.port });
+      if (lf[2] === 'stop') {
+        rt.running = false;
+        delete rt.pid;
+      } else {
+        // start/restart/reload: набор оживает и получает свежий startedAt — на
+        // строке видно, что действие прошло
+        rt.running = true;
+        rt.pid = rt.pid || 30000 + (sid.length * 7);
+        rt.startedAt = new Date().toISOString();
+        delete rt.error;
+        delete rt.exitCode;
+        delete rt.restarts;
+      }
+      return Promise.resolve({ ok: true, running: rt.running, port: rt.port });
     }
     var m = /^\/api\/servers(?:\/([^/]+))?$/.exec(path);
     if (!m || !st.mock) { return Promise.resolve({ ok: true, ms: 14, tools: [] }); }
@@ -1140,17 +1247,18 @@
     var has = function (n) {
       return st.mock.servers.some(function (s) { return s.name === n; });
     };
-    var err = '';
+    var err = null;
     if (method === 'DELETE') {
-      if (!has(name)) { err = 'нет сервера ' + name; }
+      if (!has(name)) { err = { k: 'mock.noServer', v: { name: name } }; }
     } else if (method === 'PUT' && !has(name)) {
-      err = 'нет сервера ' + name;
+      err = { k: 'mock.noServer', v: { name: name } };
     } else {
       err = mockServerErr(body || {}, name, method === 'POST' && has(name));
     }
     if (err) {
-      fail(err);
-      return Promise.reject(new Error(err));
+      var why = t(err.k, err.v);
+      fail(why);
+      return Promise.reject(new Error(why));
     }
     if (method === 'DELETE') {
       st.mock.servers = st.mock.servers.filter(function (s) { return s.name !== name; });
@@ -1495,7 +1603,7 @@
       }
       return { cls: 'badge-unknown', text: t('srv.setOff', { name: name }), hollow: true };
     }
-    if (!h) { return { cls: 'badge-unknown', text: t('srv.notProbed'), hollow: true }; }
+    if (!h) { return { cls: 'badge-unknown', text: t('srv.unchecked'), hollow: true }; }
     if (h.healthy === false) { return { cls: 'badge-err', text: t('srv.failed') }; }
     if (h.unknown) { return { cls: 'badge-unknown', text: t('srv.unchecked'), hollow: true }; }
     return { cls: 'badge-ok', text: t('srv.healthy') };
@@ -1607,9 +1715,11 @@
           paintBadge(badge, st8);
           badge.title = (h && h.error) || (probed && !running ? t('srv.probeOkTip') : '');
         }
-        // у остановленного набора инструментов нет: число здесь врало бы о составе
-        tr.children[3].textContent = running && st.probeTools[row.name] != null ? fmtN(st.probeTools[row.name]) : '—';
-        tr.children[4].textContent = last[row.name] ? hm(last[row.name]) : '—';
+        // у остановленного набора инструментов нет; у запущенного без проверки
+        // число неизвестно — «?» не спорит со счётчиком в шапке, «—» спорил
+        var tc = st.probeTools[row.name];
+        tr.children[3].textContent = !running ? '—' : tc != null ? fmtN(tc) : '?';
+        tr.children[4].textContent = last[row.name] ? clockAt(last[row.name]) : '—';
         var check = tr.querySelector('[data-check]');
         // У остановленного набора проверка поднимает процесс: кнопка называет
         // действие тем, что оно делает, а не тем, как оно выглядит.
@@ -1669,7 +1779,10 @@
     send('PUT', '/api/sets/' + encodeURIComponent(set.id), { servers: names }, true)
       .then(function (r) {
         return loadState().then(function () {
-          if (r && r.reloadError) { setSrvErr(t('setSrv.reloadWarn', { err: r.reloadError })); }
+          // failed — правка закоммичена, а рестарт набора не прошёл: причина та же,
+          // что у reloadError, поэтому одна ветка и один текст
+          var why = reloadReason(r && r.failed) || (r && r.reloadError);
+          if (why) { setSrvErr(t('setSrv.reloadWarn', { err: why })); }
           // пустой набор законен, но «нет инструментов» — не то, что видно по таблице
           else if (!names.length) { setSrvErr(t('setSrv.emptyWarn')); }
         });
@@ -2209,10 +2322,7 @@
         // Правка записана, но работающие наборы её не применили: форма
         // остаётся открытой с причиной, а не закрывается молча.
         if (st.srvReloadErrors) {
-          var parts = Object.keys(st.srvReloadErrors).map(function (id) {
-            return id + ': ' + st.srvReloadErrors[id];
-          });
-          srvErr(t('srv.reloadWarn', { err: parts.join('; ') }));
+          srvErr(t('srv.reloadWarn', { err: reloadReason(st.srvReloadErrors) }));
           return;
         }
         closeSrv();
@@ -2661,8 +2771,9 @@
     var frag = document.createDocumentFragment();
     rows.forEach(function (c) {
       var tr = el('tr');
-      var time = tr.appendChild(el('td', 'cell-time', clock(c.time)));
+      var time = tr.appendChild(el('td', 'cell-time', clockAt(c.time)));
       time.dataset.label = t('tail.thTime');
+      time.title = day(c.time) + ' ' + clock(c.time);
       var srv = tr.appendChild(el('td', '', c.server || '—'));
       srv.dataset.label = t('tail.thServer');
       var tool = tr.appendChild(el('td', 'cell-name', c.tool || '—'));
@@ -2691,8 +2802,10 @@
     $('calls-count').textContent = rows.length === all.length
       ? cnt(all.length, 'call') : t('calls.of', { n: fmtN(rows.length), m: fmtN(all.length) });
     show(note, rows.length === 0);
-    note.querySelector('.empty-title').textContent = all.length ? t('calls.noMatch') : t('tail.empty');
-    note.querySelector('.empty-text').textContent = t('calls.emptyText');
+    // фильтр врёт о причине: пустой набор и «всё отсеяно» — разные вещи
+    var filtered = !!(term || onlyErr);
+    note.querySelector('.empty-title').textContent = filtered ? t('calls.noMatch') : t('tail.empty');
+    note.querySelector('.empty-text').textContent = filtered ? t('calls.noMatchText') : t('calls.emptyText');
   }
 
   function loadEnv() {
@@ -2737,7 +2850,8 @@
 
   // Плашка под формой: строка исхода одна, ошибка и «сохранено» не стоят рядом.
   // skipped — наборы, оставленные на старом окружении: это предупреждение, не ошибка.
-  function envNote(ok, text, skipped) {
+  // reload — карта reloadErrors из ответа: значение записано, но набор не поднялся
+  function envNote(ok, text, skipped, reload) {
     show($('env-err'), !ok);
     show($('env-msg'), ok);
     $(ok ? 'env-msg' : 'env-err').textContent = text;
@@ -2748,9 +2862,11 @@
         ? t('vars.skippedMissing', { names: s.missing.join(', ') })
         : (s.reason || '');
       return t('vars.skippedOne', { set: s.set, what: what });
-    }).join(' · ');
-    show($('env-warn'), !!warn);
-    $('env-warn').textContent = warn;
+    });
+    var why = reloadReason(ok && reload);
+    if (why) { warn.push(t('vars.reloadWarn', { err: why })); }
+    show($('env-warn'), warn.length > 0);
+    $('env-warn').textContent = warn.join(' · ');
   }
 
   function saveEnv(e) {
@@ -2768,12 +2884,12 @@
       .then(function (r) {
         r = r || {};
         envNote(true, t('vars.saved', { name: r.name || name, source: r.source || store || 'auto' }) +
-          (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped);
+          (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped, r.reloadErrors);
         $('env-value').value = '';
         return loadEnv().then(function () {
           // значение записано, но имени нет в списке: его пока не упоминает ни один сервер
           var seen = (st.env || []).some(function (v) { return v.name === (r.name || name); });
-          if (!seen) { envNote(true, t('vars.saved', { name: r.name || name, source: r.source || 'auto' }) + ' · ' + t('vars.savedUnref', { name: name }), r.skipped); }
+          if (!seen) { envNote(true, t('vars.saved', { name: r.name || name, source: r.source || 'auto' }) + ' · ' + t('vars.savedUnref', { name: name }), r.skipped, r.reloadErrors); }
         });
       })
       .catch(function (err) { envNote(false, err.message); })
@@ -2790,7 +2906,7 @@
       .then(function (r) {
         r = r || {};
         envNote(true, t('vars.forgot', { name: r.name || name })
-          + (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped);
+          + (r.restarted && r.restarted.length ? ' · ' + t('vars.restarted', { list: r.restarted.join(', ') }) : ''), r.skipped, r.reloadErrors);
         return loadEnv();
       })
       .catch(function (err) { envNote(false, err.message); })
@@ -3480,7 +3596,8 @@
     }).then(function () {
       st.busy = false;
       btn.disabled = false;
-      btn.textContent = label;
+      // состояние уже перерисовано: подпись не должна откатываться к старой
+      if (btn.textContent === '…') { btn.textContent = label; }
     });
   }
 
@@ -3551,7 +3668,7 @@
           ? day(k.createdAt) + ' · ' + t('keys.revoked', { date: day(k.revokedAt) })
           : day(k.createdAt) + ' · ' + t('keys.active');
         var input = li.querySelector('.key-note .input');
-        input.value = k.note || '';
+        input.value = k.label || '';
         input.placeholder = t('keys.notePh');
         input.disabled = revoked;
         input.dataset.note = k.id;
@@ -3559,7 +3676,7 @@
         var save = li.querySelector('[data-note-save]');
         save.textContent = t('common.save');
         save.dataset.note = k.id;
-        save.hidden = revoked || input.value.trim() === (k.note || '');
+        save.hidden = revoked || input.value.trim() === (k.label || '');
         var rev = li.querySelector('.key-acts .btn');
         rev.textContent = t('keys.revoke');
         rev.dataset.revoke = k.id;
@@ -3577,7 +3694,7 @@
     btn.disabled = true;
     show($('keys-warn'), false);
     send('PATCH', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' + encodeURIComponent(keyID),
-      { note: input.value.trim() }).then(function (r) {
+      { label: input.value.trim() }).then(function (r) {
         if (r && r.restartError) {
           $('keys-warn').textContent = t('keys.restartWarn', { err: r.restartError });
           show($('keys-warn'), true);
@@ -3750,13 +3867,40 @@
     relang();
   });
 
-  /* ---------- тема ---------- */
+  /* ---------- оформление: тема и схема ----------
+     Две независимые оси, как в theme.js: data-theme (вид) и data-palette (цвета).
+     У каждой темы свои схемы, поэтому в меню показана группа своей семьи, а
+     выбор запоминается отдельно — вернулся к теме, вернулись её цвета. */
 
-  // сам атрибут ставит theme.js до первой отрисовки; меню только меняет его
+  var SCHEMES = {
+    'default': { dark: 1, light: 1, nord: 1, gruvbox: 1 },
+    win98: { 'w98': 1, 'w98-cool': 1, 'w98-warm': 1, 'w98-hc': 1 }
+  };
+  var FIRST = { 'default': 'dark', win98: 'w98' };
+
+  function schemeKey(theme) { return theme === 'win98' ? 'mcprig.palette.win98' : 'mcprig.palette'; }
+
+  function storeLocal(key, val) {
+    try { localStorage.setItem(key, val); } catch (e) { /* приватный режим */ }
+  }
+
+  function readLocal(key) {
+    try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
+  }
+
+  // сам атрибуты ставит theme.js до первой отрисовки; меню только меняет их
   function applyThemeMenu() {
-    var on = document.documentElement.getAttribute('data-theme') || 'dark';
+    var root = document.documentElement;
+    var theme = root.getAttribute('data-theme') || 'default';
+    var palette = root.getAttribute('data-palette') || 'dark';
     [].forEach.call(document.querySelectorAll('[data-theme-opt]'), function (b) {
-      b.setAttribute('aria-checked', String(b.dataset.themeOpt === on));
+      b.setAttribute('aria-checked', String(b.dataset.themeOpt === theme));
+    });
+    [].forEach.call(document.querySelectorAll('[data-palette-opt]'), function (b) {
+      b.setAttribute('aria-checked', String(b.dataset.paletteOpt === palette));
+    });
+    [].forEach.call(document.querySelectorAll('[data-family]'), function (g) {
+      g.hidden = g.dataset.family !== theme;
     });
   }
 
@@ -3778,11 +3922,22 @@
   });
 
   $('theme-menu').addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-theme-opt]');
+    var btn = e.target.closest('[data-theme-opt], [data-palette-opt]');
     if (!btn) { return; }
-    var name = btn.dataset.themeOpt;
-    document.documentElement.setAttribute('data-theme', name);
-    try { localStorage.setItem('mcprig.theme', name); } catch (err) { /* приватный режим */ }
+    var root = document.documentElement;
+    if (btn.dataset.themeOpt) {
+      var theme = btn.dataset.themeOpt;
+      root.setAttribute('data-theme', theme);
+      storeLocal('mcprig.theme', theme);
+      // у новой темы своя семья схем: берём её прошлый выбор или первую из семьи
+      var kept = readLocal(schemeKey(theme));
+      var palette = SCHEMES[theme] && SCHEMES[theme][kept] ? kept : FIRST[theme];
+      root.setAttribute('data-palette', palette);
+      storeLocal(schemeKey(theme), palette);
+    } else {
+      root.setAttribute('data-palette', btn.dataset.paletteOpt);
+      storeLocal(schemeKey(root.getAttribute('data-theme') || 'default'), btn.dataset.paletteOpt);
+    }
     applyThemeMenu();
     closeThemeMenu(true);
   });
@@ -4022,35 +4177,28 @@
     copyText($('new-key').textContent, this);
   });
 
-  // Выдача ключа подписью не принимает — подпись ставим отдельным PATCH,
-  // а ошибку второго рестарта показываем тем же предупреждением.
+  // Подпись уходит в теле выдачи: ключ получает её тем же запросом, и набор
+  // перезагружается один раз, а не дважды.
   $('key-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var set = current();
     if (!set || st.busy) { return; }
     var label = $('key-label').value.trim();
     var profile = $('key-profile').value;
+    var body = {};
+    if (profile) { body.profile = profile; }
+    if (label) { body.label = label; }
     var btn = this.querySelector('button[type="submit"]');
     st.busy = true;
     btn.disabled = true;
     show($('keys-warn'), false);
-    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', profile ? { profile: profile } : {})
+    send('POST', '/api/sets/' + encodeURIComponent(set.id) + '/keys', body)
       .then(function (r) {
         $('key-label').value = '';
         $('new-key').textContent = (r && r.token) || '';
         show($('new-key-box'), !!(r && r.token));
         if (r && r.restartError) { fail(t('keys.restartWarn', { err: r.restartError })); }
-        var key = r && r.key && r.key.id;
-        var note = label && key
-          ? send('PATCH', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' + encodeURIComponent(key), { note: label })
-          : Promise.resolve(null);
-        return note.then(function (signed) {
-          if (signed && signed.restartError) {
-            $('keys-warn').textContent = t('keys.restartWarn', { err: signed.restartError });
-            show($('keys-warn'), true);
-          }
-          return loadState().then(function () { renderKeys(current() || set); });
-        });
+        return loadState().then(function () { renderKeys(current() || set); });
       })
       .catch(function (err) {
         // Отказ демона (400 на неизвестный профиль) — ответ формы, а не сбой
@@ -4106,7 +4254,7 @@
     var stored = (current() || { keys: [] }).keys.filter(function (k) {
       return k.id === save.dataset.note;
     })[0];
-    save.hidden = e.target.value.trim() === ((stored && stored.note) || '');
+    save.hidden = e.target.value.trim() === ((stored && stored.label) || '');
   });
 
   /* ---------- цикл обновления ---------- */

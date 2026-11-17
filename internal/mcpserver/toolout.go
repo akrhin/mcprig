@@ -1,5 +1,11 @@
 package mcpserver
 
+// Tool-out has two homes: the cut of an oversized answer is this file, while
+// retention of those files (TTL, size cap, `.owner` sidecars) is
+// `internal/toolout`. The names coincide on purpose — both are about the
+// tool-out directory; renaming the package would touch 9 imports, 24 call sites
+// and 34 doc mentions for no behaviour change.
+
 import (
 	"context"
 	"crypto/rand"
@@ -9,6 +15,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -39,12 +46,17 @@ const (
 // A variable so a test can point the dump at a directory of its own.
 var toolOutDir = func() string { return toolout.Dir(toolout.Base()) }
 
+// maxStructBytes bounds the structural cut: a JSON document is parsed whole, so
+// an answer above this is cut raw instead of costing that much memory.
+const maxStructBytes = 8 << 20
+
 // truncateResult caps a downstream answer at maxBytes and points at the full
-// one. An answer that fits is returned untouched: no file, no marker. Nothing
-// is buffered whole: the head that the caller sees is kept in memory, the rest
-// streams to the file. The marker names the file by path, or by its /tool-out
-// URL when the manager serves HTTP with a key. The dump remembers the caller's
-// key fingerprint, so another key cannot read it by name alone.
+// one. An answer that fits is returned untouched: no file, no marker. The head
+// that the caller sees is kept in memory, the rest streams to the file. A JSON
+// answer is cut structurally, so it stays valid JSON; anything else gets a
+// trailing marker. The marker names the file by path, or by its /tool-out URL
+// when the manager serves HTTP with a key. The dump remembers the caller's key
+// fingerprint, so another key cannot read it by name alone.
 func (m *Manager) truncateResult(ctx context.Context, res *mcp.CallToolResult, maxBytes int) (*mcp.CallToolResult, error) {
 	// headLimit carries maxBytes plus one rune of slack: the cut may land
 	// inside a multi-byte rune and the check needs the byte after it.
@@ -64,6 +76,18 @@ func (m *Manager) truncateResult(ctx context.Context, res *mcp.CallToolResult, m
 	if err := w.finish(); err != nil {
 		return nil, err
 	}
+	ref := m.toolOutRef(path)
+	mark := fmt.Sprintf("ответ усечён: %d байт, полный ответ — %s", w.total, ref)
+	if w.total <= maxStructBytes {
+		if raw, err := os.ReadFile(path); err == nil {
+			if text, ok := truncateJSON(raw, maxBytes, mark); ok {
+				return &mcp.CallToolResult{
+					IsError: res.IsError,
+					Content: []mcp.Content{&mcp.TextContent{Text: text}},
+				}, nil
+			}
+		}
+	}
 	cut := maxBytes
 	if cut > len(w.head) {
 		cut = len(w.head)
@@ -71,7 +95,7 @@ func (m *Manager) truncateResult(ctx context.Context, res *mcp.CallToolResult, m
 	for cut > 0 && cut < len(w.head) && !utf8.RuneStart(w.head[cut]) {
 		cut--
 	}
-	text := string(w.head[:cut]) + fmt.Sprintf("\n[обрезано: %d из %d байт, полный ответ — %s]", cut, w.total, m.toolOutRef(path))
+	text := string(w.head[:cut]) + fmt.Sprintf("\n[обрезано: %d из %d байт, полный ответ — %s]", cut, w.total, ref)
 	if res.StructuredContent != nil {
 		// Без этой строки клиент со structured-смыслом (ticktick и подобные)
 		// видит пустой ответ: структура в текстовый срез не попадает.
@@ -81,6 +105,149 @@ func (m *Manager) truncateResult(ctx context.Context, res *mcp.CallToolResult, m
 		IsError: res.IsError,
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
 	}, nil
+}
+
+// truncateJSON keeps the answer valid JSON: it shortens string values until the
+// document fits maxBytes and records the cut inside the document — a marker
+// appended after JSON text would break it. ok is false when the payload is not
+// one JSON document, and the caller falls back to a raw cut.
+func truncateJSON(raw []byte, maxBytes int, mark string) (string, bool) {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return "", false
+	}
+	// Место под признак усечения: ключ, кавычки, запятая.
+	target := maxBytes - len(mark) - 24
+	if target <= 0 {
+		return "", false
+	}
+	for range 32 {
+		out, err := json.Marshal(v)
+		if err != nil {
+			return "", false
+		}
+		over := len(out) - target
+		if over <= 0 {
+			break
+		}
+		if !shrinkStrings(&v, over) {
+			arr, ok := v.([]any)
+			if !ok || len(arr) < 2 {
+				break
+			}
+			// Документ без строк — массив: срезаем хвост.
+			v = arr[:len(arr)/2]
+		}
+	}
+	marked, ok := withMark(v, mark)
+	if !ok {
+		return "", false
+	}
+	out, err := json.Marshal(marked)
+	if err != nil || len(out) > maxBytes {
+		return "", false
+	}
+	return string(out), true
+}
+
+// stringFloor keeps short values (ids, paths, names) intact while the long
+// fields shrink: cutting every string by a share mangles identifiers and makes
+// the answer useless in a different way than a raw cut.
+const stringFloor = 32
+
+// shrinkStrings cuts at least over bytes off the document's longest strings,
+// longest first. False — nothing left above the floor, yet the answer is still
+// too big (shortcut: many medium strings fall back to the raw cut).
+func shrinkStrings(v *any, over int) bool {
+	var lens []int
+	eachString(*v, func(s string) {
+		if len(s) > stringFloor {
+			lens = append(lens, len(s))
+		}
+	})
+	if len(lens) == 0 {
+		return false
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(lens)))
+	// Самый высокий порог, который освобождает over байт: чем он выше, тем
+	// меньше строк укорочено.
+	keep := stringFloor
+	prefix := 0
+	for j, n := range lens {
+		prefix += n
+		cand := (prefix - over) / (j + 1)
+		if cand < stringFloor {
+			cand = stringFloor
+		}
+		keep = cand
+		if cand <= n {
+			break
+		}
+	}
+	*v = mapStrings(*v, func(s string) string {
+		if len(s) <= keep {
+			return s
+		}
+		return cutRunes(s, keep)
+	})
+	return true
+}
+
+func eachString(v any, f func(string)) {
+	switch t := v.(type) {
+	case string:
+		f(t)
+	case map[string]any:
+		for _, item := range t {
+			eachString(item, f)
+		}
+	case []any:
+		for _, item := range t {
+			eachString(item, f)
+		}
+	}
+}
+
+func mapStrings(v any, f func(string) string) any {
+	switch t := v.(type) {
+	case string:
+		return f(t)
+	case map[string]any:
+		for k, item := range t {
+			t[k] = mapStrings(item, f)
+		}
+		return t
+	case []any:
+		for i, item := range t {
+			t[i] = mapStrings(item, f)
+		}
+		return t
+	}
+	return v
+}
+
+// cutRunes keeps the first n bytes of s without splitting a rune.
+func cutRunes(s string, n int) string {
+	if n >= len(s) {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
+
+// withMark puts the cut into the document itself: an object gains the key, an
+// array an element. A scalar has nowhere to put it.
+func withMark(v any, mark string) (any, bool) {
+	switch t := v.(type) {
+	case map[string]any:
+		t["_truncated"] = mark
+		return t, true
+	case []any:
+		return append(t, mark), true
+	}
+	return nil, false
 }
 
 // toolOutRef names the dump the way the caller can actually reach it: the

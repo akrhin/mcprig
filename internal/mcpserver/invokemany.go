@@ -32,6 +32,8 @@ type manyCall struct {
 	CommandName string          `json:"command_name"`
 	Command     string          `json:"command"` // синоним command_name: list_commands называет это поле command
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
+	// TimeoutMs — предел этого вызова; 0 — requestTimeout набора.
+	TimeoutMs int `json:"timeoutMs,omitempty"`
 }
 
 // manyAnswer is one entry of the fan-out answer. Result carries what
@@ -46,11 +48,14 @@ type manyAnswer struct {
 	Result      any    `json:"result,omitempty"`
 	Error       string `json:"error,omitempty"`
 	MS          int64  `json:"ms"`
+	// TimeoutMS — предел, под которым шёл этот вызов: свой timeoutMs или
+	// requestTimeout набора. 0 — предела не было.
+	TimeoutMS int `json:"timeout_ms,omitempty"`
 }
 
 func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var in invokeManyInput
-	if err := strictArgs(req, &in, "каждый вызов: server, command_name (синоним — command), parameters", "calls", "maxBytes"); err != nil {
+	if err := strictArgs(req, &in, "каждый вызов: server, command_name (синоним — command), parameters, timeoutMs", "calls", "maxBytes"); err != nil {
 		return errResult(err)
 	}
 	if len(in.Calls) == 0 {
@@ -69,9 +74,22 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 	}
 
 	// Один бюджет на весь веер: медленный downstream не должен растягивать
-	// ответ на восемь requestTimeout подряд.
-	ctx, cancel := m.callCtx(ctx)
-	defer cancel()
+	// ответ на восемь requestTimeout подряд. Свой timeoutMs вызова бюджет
+	// поднимает — иначе вызов, попросивший больше, срезался бы раньше срока;
+	// предел самого вызова ставится ниже, после получения слота.
+	// requestTimeout 0 — предела нет: дедлайн соседа не должен срезать вызов,
+	// который своего timeoutMs не просил.
+	budget := m.config().RequestTimeout
+	if budget > 0 {
+		for _, c := range calls {
+			if c.TimeoutMs > budget {
+				budget = c.TimeoutMs
+			}
+		}
+		callCtx, cancel := m.callCtxFor(ctx, budget)
+		defer cancel()
+		ctx = callCtx
+	}
 	label := labelOf(ctx, req)
 
 	out := make([]manyAnswer, len(calls))
@@ -82,7 +100,8 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 		go func() {
 			defer wg.Done()
 			start := time.Now()
-			ans := manyAnswer{Server: c.Server, CommandName: c.CommandName}
+			limit := m.callTimeoutMs(c.TimeoutMs)
+			ans := manyAnswer{Server: c.Server, CommandName: c.CommandName, TimeoutMS: limit}
 			e := m.find(c.Server)
 			if e == nil {
 				ans.Error = fmt.Sprintf("неизвестный сервер %q", c.Server)
@@ -99,21 +118,46 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 			}
 			// Слот ключуется именем: запись перезагрузка подменяет, имя — нет.
 			slot := slots.get(e.server().Name)
+			wait := time.Now()
 			select {
 			case slot <- struct{}{}:
 				defer func() { <-slot }()
-				if err := m.runManyCall(ctx, label, e, c, maxBytes, &ans); err != nil {
+				// Свой предел — только после слота: очередь не должна
+				// съедать таймаут самого вызова.
+				callCtx, stop := m.callCtxFor(ctx, limit)
+				if err := m.runManyCall(callCtx, label, e, c, limit, maxBytes, &ans); err != nil {
 					ans.Error = err.Error()
 				}
+				stop()
 			case <-ctx.Done():
-				ans.Error = m.timeoutText()
+				// Слота не дождались, вызов не уходил: это очередь, а не
+				// молчание апстрима, и отказ обязан это сказать.
+				ans.Error = fmt.Sprintf("нет свободного слота у сервера %s (лимит %d): ждали %s, вызов не отправлен: %v",
+					e.server().Name, slots.limit, time.Since(wait).Round(time.Millisecond), ctx.Err())
 			}
 			ans.MS = time.Since(start).Milliseconds()
 			out[i] = ans
 		}()
 	}
 	wg.Wait()
-	return jsonResult(out)
+	res, err := jsonResult(out)
+	if err != nil {
+		return res, err
+	}
+	// Как у одиночного вызова: упало всё — ответ ошибка, а не успех с
+	// ошибками внутри. Частичный отказ остаётся данными.
+	failed := 0
+	for _, ans := range out {
+		if !ans.OK {
+			failed++
+		}
+	}
+	if len(out) > 0 && failed == len(out) {
+		res.IsError = true
+	}
+	// Бюджет веера — фактический предел слота и очереди: с ним агент
+	// сравнивает всю пачку, у элементов свой timeout_ms.
+	return withTimeoutMeta(res, budget), nil
 }
 
 // parseManyCalls validates every call before anything runs: a malformed entry
@@ -121,12 +165,12 @@ func (m *Manager) invokeMany(ctx context.Context, req *mcp.CallToolRequest) (*mc
 func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 	calls := make([]manyCall, len(raw))
 	for i, item := range raw {
-		extra, err := extraKeys(item, "server", "command_name", "command", "parameters")
+		extra, err := extraKeys(item, "server", "command_name", "command", "parameters", "timeoutMs")
 		if err != nil {
 			return nil, fmt.Errorf("calls[%d]: нужен объект вызова", i)
 		}
 		if len(extra) > 0 {
-			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s. Допустимые: server, command_name, command, parameters. Аргументы кладутся в parameters", i, strings.Join(extra, ", "))
+			return nil, fmt.Errorf("calls[%d]: лишние ключи: %s. Допустимые: server, command_name, command, parameters, timeoutMs. Аргументы кладутся в parameters", i, strings.Join(extra, ", "))
 		}
 		if err := json.Unmarshal(item, &calls[i]); err != nil {
 			if text, ok := typeErrorText(err, fmt.Sprintf("calls[%d]: ", i)); ok {
@@ -148,13 +192,17 @@ func parseManyCalls(raw []json.RawMessage) ([]manyCall, error) {
 		if _, err := parametersOf(calls[i].Parameters); err != nil {
 			return nil, fmt.Errorf("calls[%d]: %w", i, err)
 		}
+		if err := checkTimeoutMs(calls[i].TimeoutMs); err != nil {
+			return nil, fmt.Errorf("calls[%d]: %w", i, err)
+		}
 	}
 	return calls, nil
 }
 
 // runManyCall executes one call and fills ans. A downstream isError counts as a
-// failed call, as it does in the counter.
-func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c manyCall, maxBytes int, ans *manyAnswer) error {
+// failed call, as it does in the counter. limit — предел, под которым вызов
+// шёл: свой timeoutMs или requestTimeout набора, 0 — предела не было.
+func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c manyCall, limit, maxBytes int, ans *manyAnswer) error {
 	// Снимок на весь вызов: перезагрузка может подменить конфиг посередине,
 	// а вызов должен проверяться по одному правилу, не по двум.
 	srv := e.server()
@@ -193,7 +241,7 @@ func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c man
 	res, err := m.callWithRetry(ctx, label, e, c.CommandName, args)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return errors.New(m.timeoutText())
+			return m.callTimeout(ctx, limit, e.server().Name, c.CommandName)
 		}
 		return err
 	}
@@ -211,10 +259,6 @@ func (m *Manager) runManyCall(ctx context.Context, label string, e *entry, c man
 	ans.OK = true
 	ans.Result = value
 	return nil
-}
-
-func (m *Manager) timeoutText() string {
-	return fmt.Sprintf("таймаут вызова %d мс", m.config().RequestTimeout)
 }
 
 // serverSlots hands out one bounded channel per server, created on first use.

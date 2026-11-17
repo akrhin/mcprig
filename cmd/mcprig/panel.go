@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,11 +17,25 @@ import (
 	"time"
 )
 
-// panelCreds — поля входа в панель; флаги warm, status и logs повторяют их.
+// panelCreds — поля входа в панель; флаги warm, status, logs и approve
+// регистрируют их через panelFlags.
 type panelCreds struct {
 	Password string
 	Secret   string
 	User     string
+}
+
+// panelHelp — подсказка --panel у команд, которым адрес нужен только для
+// входа; у warm она своя (адрес ещё и резолвит порт набора).
+const panelHelp = "адрес панели (по умолчанию MCPRIG_PANEL_URL, иначе MCPRIG_PORT)"
+
+// panelFlags регистрирует общий блок флагов панели. Имена, help-текст и
+// env-фолбэки описаны в docs/*/cli.md — менять их значит менять документацию.
+func panelFlags(fs *flag.FlagSet, panel *string, helpPanel string, creds *panelCreds) {
+	fs.StringVar(panel, "panel", "", helpPanel)
+	fs.StringVar(&creds.Password, "password", "", "пароль панели (по умолчанию MCPRIG_PASSWORD)")
+	fs.StringVar(&creds.Secret, "secret", "", "секрет обратного прокси панели (по умолчанию MCPRIG_PROXY_SECRET)")
+	fs.StringVar(&creds.User, "user", "", "пользователь панели для входа (по умолчанию admin)")
 }
 
 // panelBaseURL: --panel, иначе MCPRIG_PANEL_URL, иначе локальная панель на

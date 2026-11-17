@@ -23,15 +23,13 @@ var logsPollInterval = time.Second
 
 // logsConfig — всё, что нужно logs; в тестах подставляется целиком.
 type logsConfig struct {
-	Panel    string
-	Set      string
-	Server   string
-	Lines    int
-	Follow   bool
-	JSON     bool
-	Password string
-	Secret   string
-	User     string
+	Panel  string
+	Set    string
+	Server string
+	Lines  int
+	Follow bool
+	JSON   bool
+	panelCreds
 }
 
 // logLine — строка лога: панель отдаёт строку либо объект {line, ts}.
@@ -44,15 +42,12 @@ type logLine struct {
 func newLogsFlags() (*flag.FlagSet, *logsConfig) {
 	c := &logsConfig{}
 	fs := flag.NewFlagSet("logs", flag.ContinueOnError)
-	fs.StringVar(&c.Panel, "panel", "", "адрес панели (по умолчанию MCPRIG_PANEL_URL, иначе MCPRIG_PORT)")
 	fs.StringVar(&c.Set, "set", "", "набор, чей лог читать (обязательно)")
 	fs.StringVar(&c.Server, "server", "", "лог одного сервера набора, а не всего набора")
 	fs.IntVar(&c.Lines, "n", 200, "сколько последних строк взять")
 	fs.BoolVar(&c.Follow, "f", false, "следить: опрос раз в секунду, печатать только новые строки")
 	fs.BoolVar(&c.JSON, "json", false, "машинный вывод: объект на строку")
-	fs.StringVar(&c.Password, "password", "", "пароль панели (по умолчанию MCPRIG_PASSWORD)")
-	fs.StringVar(&c.Secret, "secret", "", "секрет обратного прокси панели (по умолчанию MCPRIG_PROXY_SECRET)")
-	fs.StringVar(&c.User, "user", "", "пользователь панели для входа (по умолчанию admin)")
+	panelFlags(fs, &c.Panel, panelHelp, &c.panelCreds)
 	return fs, c
 }
 
@@ -75,7 +70,7 @@ func runLogsContext(ctx context.Context, o *logsConfig) error {
 		return &usageError{"--n должен быть положительным"}
 	}
 	base := strings.TrimRight(panelBaseURL(o.Panel), "/")
-	creds := panelCreds{Password: o.Password, Secret: o.Secret, User: o.User}
+	creds := o.panelCreds
 	client, err := newPanelClient(ctx, base, creds)
 	if err != nil {
 		return err

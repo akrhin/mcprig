@@ -126,11 +126,7 @@ func TestLoginRateLimit(t *testing.T) {
 // запросов, лишние ждут, а сверх очереди — сразу 429 с Retry-After: 5.
 func TestLoginQueueLimitsScrypt(t *testing.T) {
 	// Именно хеш: с plaintext-паролем проверка мгновенная и очередь не растёт.
-	hash, err := hashPassword("pw")
-	if err != nil {
-		t.Fatalf("hashPassword: %v", err)
-	}
-	e := newEnv(t, AuthOptions{PasswordHash: hash})
+	e := newEnv(t, AuthOptions{PasswordHash: pwHash})
 	const n = 10
 	start := make(chan struct{})
 	codes := make([]int, n)
@@ -175,7 +171,7 @@ func TestLoginQueueLimitsScrypt(t *testing.T) {
 	}
 
 	// Верный пароль по-прежнему пускает и ставит cookie.
-	e2 := newEnv(t, AuthOptions{PasswordHash: hash})
+	e2 := newEnv(t, AuthOptions{PasswordHash: pwHash})
 	w := e2.do(t, http.MethodPost, "/api/login", map[string]any{"user": "admin", "password": "pw"})
 	status(t, w, http.StatusOK)
 	found := false
