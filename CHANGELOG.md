@@ -8,6 +8,8 @@ repository the project is built in.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-11-17
+
 ### Added
 
 - Panel: an overview page at `#/` — sets running and stopped, servers by health,
@@ -21,6 +23,24 @@ repository the project is built in.
 
 - Panel: the set log is a **Logs** tab, keys and tool approvals are tabs of their
   own, and the details drawer is gone.
+- CodeQL analyses the code only: the generated diagram pages under
+  `docs/diagrams/` and the design mockups under `design/ui/` are excluded
+  (`.github/codeql/codeql-config.yml`), which is where most of the 112 open
+  alerts came from.
+
+### Fixed
+
+- A path segment taken from a request — a set name in the statistics directory, a
+  history file — is checked against the registry's name rule before it is joined
+  into a path (`internal/safepath`). A bad segment reads as "nothing to read"
+  instead of reaching outside the data directory.
+- A mount path of the sandbox is cleaned and rejected when it contains `..`,
+  instead of relying on `filepath.Join` to collapse it later.
+- A notification webhook is parsed before the request is built: only `http` and
+  `https`, a non-empty host, no `user:pass@` in the address.
+- Values that reach a log from a request or from configuration no longer carry
+  control characters, so a name cannot forge an extra log line
+  (`internal/safelog`).
 
 ## [0.6.4] - 2026-11-17
 
