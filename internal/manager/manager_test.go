@@ -611,19 +611,10 @@ func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
 		t.Fatalf("ответ на PUT: restarted=%v skipped=%+v", out.Restarted, out.Skipped)
 	}
 
-	// Перезапуск после ответа — в горутине: ждём замену процесса. Во время
-	// рестарта запись набора на мгновение отсутствует, поэтому ждём непустой.
-	deadline := time.Now().Add(5 * time.Second)
-	var gotDB, gotOther *process
-	for {
-		e.m.rt.mu.Lock()
-		gotDB, gotOther = e.m.rt.procs[dbSet], e.m.rt.procs[otherSet]
-		e.m.rt.mu.Unlock()
-		if (gotDB != nil && gotDB != dbProc) || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	// Перезапуск идёт в ответе: запись набора уже заменена новым процессом.
+	e.m.rt.mu.Lock()
+	gotDB, gotOther := e.m.rt.procs[dbSet], e.m.rt.procs[otherSet]
+	e.m.rt.mu.Unlock()
 	if gotDB == nil || gotDB == dbProc {
 		t.Fatal("набор со ссылкой на переменную не перезапускался")
 	}
@@ -643,8 +634,8 @@ func TestEnvPutRestartsOnlySetsUsingVar(t *testing.T) {
 	}
 }
 
-// Фоновый рестарт после смены секрета не переживает панель: иначе после
-// Close остаётся живой дочерний процесс и держит порт набора.
+// Рестарт после смены секрета не переживает панель: после Close не остаётся
+// живой дочерний процесс, который держит порт набора.
 func TestEnvRestartStopsWithManager(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServerWithEnv(t, "db", map[string]string{"PASSWORD": "${DB_PASSWORD}"})
@@ -682,6 +673,100 @@ func TestEnvRestartStopsWithManager(t *testing.T) {
 	}
 }
 
+// Правка env сервера, чей набор не перезапустился, едет в reloadErrors: иначе
+// панель показывает «сохранено», а набор живёт на старом окружении.
+func TestServerEnvUpdateReportsFailedRestart(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+	port := e.m.store.Set(id).Port
+	markRunning(e.m, id, port)
+	// Порт занят: рестарт с новым окружением упирается в него.
+	ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	if err != nil {
+		t.Fatalf("занять порт %d: %v", port, err)
+	}
+	defer ln.Close()
+
+	w := e.do(t, http.MethodPut, "/api/servers/a", map[string]any{
+		"name": "a", "transport": "stdio", "command": []string{"/bin/true"}, "env": map[string]string{"X": "1"},
+	})
+	status(t, w, http.StatusOK)
+	got := decode[struct {
+		Reloaded     []string          `json:"reloaded"`
+		ReloadErrors map[string]string `json:"reloadErrors"`
+	}](t, w)
+	if len(got.Reloaded) != 0 {
+		t.Fatalf("reloaded = %v, ждали пусто", got.Reloaded)
+	}
+	if !strings.Contains(got.ReloadErrors[id], "занят другим процессом") {
+		t.Fatalf("reloadErrors = %v", got.ReloadErrors)
+	}
+}
+
+// Правка секрета ждётся в ответе: набор, который не перезапустился, назван в
+// reloadErrors, а не остаётся жить с отозванным ключом под 200 «restarted».
+func TestEnvPutReportsFailedRestart(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServerWithEnv(t, "db", map[string]string{"PASSWORD": "${DB_PASSWORD}"})
+	id := e.addSet(t, "db", "db")
+	port := e.m.store.Set(id).Port
+	markRunning(e.m, id, port)
+	ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	if err != nil {
+		t.Fatalf("занять порт %d: %v", port, err)
+	}
+	defer ln.Close()
+
+	w := e.do(t, http.MethodPut, "/api/env/DB_PASSWORD", map[string]any{"value": "s3cret"})
+	status(t, w, http.StatusOK)
+	got := decode[struct {
+		Restarted    []string          `json:"restarted"`
+		ReloadErrors map[string]string `json:"reloadErrors"`
+	}](t, w)
+	if len(got.Restarted) != 0 {
+		t.Fatalf("restarted = %v, ждали пусто", got.Restarted)
+	}
+	if !strings.Contains(got.ReloadErrors[id], "занят другим процессом") {
+		t.Fatalf("reloadErrors = %v", got.ReloadErrors)
+	}
+}
+
+// Reload остановленного набора без действующего ключа — не ошибка: применять
+// нечего и собирать нечего, поэтому 200 с причиной, и servers.json на диске не
+// появляется — иначе старт взял бы половинный конфиг молча.
+func TestReloadStoppedSetWithoutKey(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "a")
+	id := e.addSet(t, "s", "a")
+
+	keys := decode[struct {
+		Keys []struct {
+			ID string `json:"id"`
+		} `json:"keys"`
+	}](t, e.do(t, http.MethodGet, "/api/sets/"+id+"/keys", nil))
+	if len(keys.Keys) == 0 {
+		t.Fatal("ключей нет: набор создан без ключа")
+	}
+	status(t, e.do(t, http.MethodDelete, "/api/sets/"+id+"/keys/"+keys.Keys[0].ID, nil), http.StatusOK)
+
+	w := e.do(t, http.MethodPost, "/api/sets/"+id+"/reload", nil)
+	status(t, w, http.StatusOK)
+	got := decode[struct {
+		Reloaded bool   `json:"reloaded"`
+		Reason   string `json:"reason"`
+	}](t, w)
+	if got.Reloaded {
+		t.Fatalf("reloaded = true: %s", w.Body.String())
+	}
+	if !strings.Contains(got.Reason, "нет активного ключа") {
+		t.Fatalf("причина = %q", got.Reason)
+	}
+	if _, err := os.Stat(filepath.Join(e.dir, "sets", id, "servers.json")); !os.IsNotExist(err) {
+		t.Fatalf("servers.json записан при отказе: %v", err)
+	}
+}
+
 // Набор с id вне шаблона отбрасывается при загрузке — но не молча.
 func TestNewLogsDroppedSets(t *testing.T) {
 	dir := t.TempDir()
@@ -705,8 +790,48 @@ func TestNewLogsDroppedSets(t *testing.T) {
 	if m.store.Set("Demo Set") != nil {
 		t.Fatal("набор Demo Set не отброшен")
 	}
-	if !strings.Contains(buf.String(), "набор выброшен") {
+	if !strings.Contains(buf.String(), "запись отброшена") {
 		t.Fatalf("предупреждения в логе нет: %s", buf.String())
+	}
+}
+
+// Нечитаемый реестр уезжает в .corrupt-*: панель встаёт с пустым реестром, и
+// владелец должен узнать об этом из журнала — с путём к резервной копии и
+// масштабом потери, а не догадываться, куда пропали наборы.
+func TestNewLogsCorruptRegistry(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "registry.json"), []byte(`{"sets":[`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "sets", "one"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	m, err := New(Options{
+		DataDir: dir, Version: "test", CLIPath: fakeBin,
+		Auth: AuthOptions{Off: true},
+		Log:  slog.New(slog.NewTextHandler(&buf, nil)),
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(m.Close)
+
+	if n := len(m.store.Sets()); n != 0 {
+		t.Fatalf("наборов после битого реестра: %d", n)
+	}
+	backups, err := filepath.Glob(filepath.Join(dir, "registry.json.corrupt-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(backups) != 1 {
+		t.Fatalf("резервных копий: %v", backups)
+	}
+	logged := buf.String()
+	for _, want := range []string{"level=ERROR", backups[0], "каталогов наборов на диске 1"} {
+		if !strings.Contains(logged, want) {
+			t.Fatalf("в логе нет %q: %s", want, logged)
+		}
 	}
 }
 
@@ -800,8 +925,10 @@ func failRestart(t *testing.T, e *env) {
 	e.m.rt.mu.Unlock()
 }
 
-// Ошибка перезапуска после правки возвращается клиенту, а не только в лог.
-func TestSetUpdateReturnsRestartError(t *testing.T) {
+// Правка уже в реестре к моменту применения: неудача рестарта — поле failed в
+// ответе 200, а не 500. Иначе клиент считает правку потерянной, хотя она на
+// диске, и повторяет запрос поверх собственного результата.
+func TestSetUpdateKeepsCommittedEditWhenRestartFails(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
 	e.addServer(t, "a")
 	id := e.addSet(t, "s", "a")
@@ -809,9 +936,43 @@ func TestSetUpdateReturnsRestartError(t *testing.T) {
 	failRestart(t, e)
 
 	w := e.do(t, http.MethodPut, "/api/sets/"+id, map[string]any{"description": "x"})
-	status(t, w, http.StatusInternalServerError)
-	if !strings.Contains(w.Body.String(), "менеджер остановлен") {
-		t.Fatalf("причина рестарта не в ответе: %s", w.Body.String())
+	status(t, w, http.StatusOK)
+	got := decode[struct {
+		Description string            `json:"description"`
+		Failed      map[string]string `json:"failed"`
+	}](t, w)
+	if !strings.Contains(got.Failed[id], "менеджер остановлен") {
+		t.Fatalf("причина отказа не в failed: %s", w.Body.String())
+	}
+	if got.Description != "x" {
+		t.Fatalf("описание в ответе = %q", got.Description)
+	}
+
+	// Правка сохранена на диске, а не только в ответе.
+	raw, err := os.ReadFile(filepath.Join(e.dir, "registry.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved struct {
+		Sets []struct {
+			ID          string `json:"id"`
+			Description string `json:"description"`
+		} `json:"sets"`
+	}
+	if err := json.Unmarshal(raw, &saved); err != nil {
+		t.Fatalf("registry.json: %v", err)
+	}
+	found := false
+	for _, s := range saved.Sets {
+		if s.ID == id {
+			found = true
+			if s.Description != "x" {
+				t.Fatalf("описание на диске = %q", s.Description)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("набора %s нет в registry.json", id)
 	}
 }
 

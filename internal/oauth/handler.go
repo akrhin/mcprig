@@ -17,16 +17,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Handler — OAuth-обработчик MCP-транспорта: SDK-обработчик (методы продвинуты
-// встраиванием) плюс адрес приёмника, выведенный из redirect_uri.
+// Handler — OAuth-обработчик MCP-транспорта: SDK-обработчик, методы продвинуты
+// встраиванием.
 type Handler struct {
 	*auth.AuthorizationCodeHandler
-	addr  string
+	// тестовый шов: тесты гоняют поток входа без браузера и приёмника; тот же
+	// fetch SDK получает в AuthorizationCodeFetcher, других читателей нет.
 	fetch func(context.Context, *auth.AuthorizationArgs) (*auth.AuthorizationResult, error)
 }
-
-// Addr — loopback-адрес приёмника кода из redirect_uri (для логов и проверок).
-func (h *Handler) Addr() string { return h.addr }
 
 // Options — параметры фабрики обработчика.
 type Options struct {
@@ -179,7 +177,7 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("oauth %s: %w", o.ServerName, err)
 	}
-	return &Handler{AuthorizationCodeHandler: h, addr: addr, fetch: fetch}, nil
+	return &Handler{AuthorizationCodeHandler: h, fetch: fetch}, nil
 }
 
 // savedTokenSource отдаёт сохранённый токен и, если для него известны

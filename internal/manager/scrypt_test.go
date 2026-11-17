@@ -33,14 +33,14 @@ func TestScryptVectors(t *testing.T) {
 	}
 }
 
+// pwHash — готовая запись для пароля "pw" (scrypt N=16384, r=8, p=1): формат
+// проверяется разбором фикстуры, а не генератором.
+const pwHash = "scrypt$16384$8$1$cc95d973c412a864f5629dad909794e5$ab0c3cbef9d1c91e090ff6166418d825356538c2ea2be441543211d3b5f64f7b"
+
 func TestPasswordHash(t *testing.T) {
-	encoded, err := hashPassword("pw")
+	h, err := parseScryptHash(pwHash)
 	if err != nil {
-		t.Fatalf("hashPassword: %v", err)
-	}
-	h, err := parseScryptHash(encoded)
-	if err != nil {
-		t.Fatalf("parseScryptHash(%q): %v", encoded, err)
+		t.Fatalf("parseScryptHash(%q): %v", pwHash, err)
 	}
 	if !h.verify("pw") {
 		t.Error("верный пароль не прошёл проверку")

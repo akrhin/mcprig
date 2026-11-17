@@ -190,52 +190,8 @@ func renderDoctor(rep doctorReport) []byte {
 			fmt.Fprintf(&b, "%s%s\n", prefix, text)
 		}
 	}
-	fmt.Fprintf(&b, "\nитог: %d %s\n", rep.Problems, problemWord(rep.Problems))
+	fmt.Fprintf(&b, "\nитог: %d %s\n", rep.Problems, pluralBy(rep.Problems, "проблема", "проблемы", "проблем"))
 	return []byte(b.String())
-}
-
-// problemWord — «1 проблема», «2 проблемы», «5 проблем».
-func problemWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "проблема"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "проблемы"
-	}
-	return "проблем"
-}
-
-// keyWord — «1 ключ», «2 ключа», «5 ключей».
-func keyWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "ключ"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "ключа"
-	}
-	return "ключей"
-}
-
-// variableWord — «1 переменная», «2 переменные», «5 переменных».
-func variableWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "переменная"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "переменные"
-	}
-	return "переменных"
-}
-
-// fileWord — «1 файл», «2 файла», «5 файлов».
-func fileWord(n int) string {
-	if n%10 == 1 && n%100 != 11 {
-		return "файл"
-	}
-	if n%10 >= 2 && n%10 <= 4 && (n%100 < 10 || n%100 >= 20) {
-		return "файла"
-	}
-	return "файлов"
 }
 
 // dec — число с одним знаком после запятой: «1,5», как принято в русском выводе.
@@ -317,7 +273,7 @@ func checkSets(reg *registry.Data, regErr error, dataDir, bindIP string) (sets, 
 		return []doctorLine{line}, []doctorLine{line}
 	}
 
-	dialHost := loopbackHost(bindIP)
+	dialHost := manager.LoopbackAddr(bindIP)
 	for _, set := range reg.Sets {
 		if set == nil {
 			continue
@@ -327,9 +283,9 @@ func checkSets(reg *registry.Data, regErr error, dataDir, bindIP string) (sets, 
 		case active:
 			keys = append(keys, doctorLine{true, fmt.Sprintf("%s: ключей %d, активный — %s", set.ID, len(set.Keys), prefix)})
 		case set.Open:
-			keys = append(keys, doctorLine{true, fmt.Sprintf("%s: %d %s, набор открыт (ключ не нужен)", set.ID, len(set.Keys), keyWord(len(set.Keys)))})
+			keys = append(keys, doctorLine{true, fmt.Sprintf("%s: %d %s, набор открыт (ключ не нужен)", set.ID, len(set.Keys), pluralBy(len(set.Keys), "ключ", "ключа", "ключей"))})
 		default:
-			keys = append(keys, doctorLine{false, fmt.Sprintf("%s: %d %s, активного ключа нет — набор не стартует", set.ID, len(set.Keys), keyWord(len(set.Keys)))})
+			keys = append(keys, doctorLine{false, fmt.Sprintf("%s: %d %s, активного ключа нет — набор не стартует", set.ID, len(set.Keys), pluralBy(len(set.Keys), "ключ", "ключа", "ключей"))})
 		}
 
 		if set.Port < registry.FirstPort || set.Port > registry.LastPort {
@@ -384,7 +340,7 @@ func loadPanelEnv(dir string) (doctorLine, bool) {
 	if len(paths) == 0 {
 		return doctorLine{}, false
 	}
-	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d %s", strings.Join(paths, ", "), added, variableWord(added))}, true
+	return doctorLine{true, fmt.Sprintf("env панели %s: добавлено %d %s", strings.Join(paths, ", "), added, pluralBy(added, "переменная", "переменные", "переменных"))}, true
 }
 
 // parseEnvFile разбирает подмножество systemd EnvironmentFile, которого
@@ -558,7 +514,7 @@ func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLi
 
 	lines = append(lines, toolOutLine(o.DataDir))
 
-	addr := net.JoinHostPort(loopbackHost(o.PanelHost), strconv.Itoa(o.PanelPort))
+	addr := net.JoinHostPort(manager.LoopbackAddr(o.PanelHost), strconv.Itoa(o.PanelPort))
 	code, err := healthz(addr)
 	switch {
 	case err != nil:
@@ -647,25 +603,13 @@ func portOpen(addr string) bool {
 	return true
 }
 
-// loopbackHost превращает wildcard адрес в тот, по которому реально ответит
-// локальный процесс.
-func loopbackHost(host string) string {
-	switch host {
-	case "", "0.0.0.0":
-		return "127.0.0.1"
-	case "[::]", "::":
-		return "::1"
-	}
-	return host
-}
-
 // toolOutLine describes the saved truncated answers: how many, how big and how
 // old the next one to expire is.
 func toolOutLine(dataDir string) doctorLine {
 	size, count, oldest, err := toolout.Usage(dataDir)
 	switch {
 	case err == nil:
-		line := fmt.Sprintf("tool-out: %d %s, %s", count, fileWord(count), humanBytes(size))
+		line := fmt.Sprintf("tool-out: %d %s, %s", count, pluralBy(count, "файл", "файла", "файлов"), humanBytes(size))
 		if count > 0 {
 			line += fmt.Sprintf(", самый старый %s", humanAge(time.Since(oldest)))
 		}

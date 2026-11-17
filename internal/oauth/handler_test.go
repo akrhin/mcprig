@@ -102,19 +102,6 @@ func TestNewHandlerBindsRedirectPort(t *testing.T) {
 	BrowserOpen = func(string) error { return nil }
 	t.Cleanup(func() { BrowserOpen = saved })
 
-	newHandler := func(redirect string) *Handler {
-		t.Helper()
-		h, err := NewHandler(context.Background(), Options{
-			ServerName:  testServer,
-			ServerURL:   testServerUL,
-			RedirectURL: redirect,
-		})
-		if err != nil {
-			t.Fatalf("NewHandler(%s): %v", redirect, err)
-		}
-		return h
-	}
-
 	// P занят: приём кода обязан упасть на нём, а не молча слушать 8947.
 	busy, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -126,29 +113,19 @@ func TestNewHandlerBindsRedirectPort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h := newHandler("http://127.0.0.1:" + port + "/callback")
-	if got, want := h.Addr(), "127.0.0.1:"+port; got != want {
-		t.Fatalf("Addr = %q, want %q", got, want)
+	h, err := NewHandler(context.Background(), Options{
+		ServerName:  testServer,
+		ServerURL:   testServerUL,
+		RedirectURL: "http://127.0.0.1:" + port + "/callback",
+	})
+	if err != nil {
+		t.Fatalf("NewHandler: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	_, err = h.fetch(ctx, &auth.AuthorizationArgs{URL: "https://as.example/authorize?state=st-1"})
 	if err == nil || !strings.Contains(err.Error(), "занять порт") {
 		t.Fatalf("занятый порт: err = %v", err)
-	}
-
-	// Свободный порт P2 — адрес приёмника тот же, что в redirect_uri.
-	ln2, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, port2, err := net.SplitHostPort(ln2.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	ln2.Close()
-	if got, want := newHandler("http://127.0.0.1:"+port2+"/callback").Addr(), "127.0.0.1:"+port2; got != want {
-		t.Fatalf("Addr = %q, want %q", got, want)
 	}
 }
 

@@ -339,7 +339,7 @@ func fetchSetCatalog(ctx context.Context, host string, port int, token string, o
 		return out
 	}
 	listed := map[string]json.RawMessage{}
-	if text := firstText(res); text != "" {
+	if text := FirstText(res); text != "" {
 		if err := json.Unmarshal([]byte(text), &listed); err != nil {
 			out.Notes = append(out.Notes, "list_commands: ответ не разобран: "+err.Error())
 			return out
@@ -397,7 +397,7 @@ func fetchSchemas(ctx context.Context, session *mcp.ClientSession, server string
 			InputSchema any    `json:"inputSchema"`
 		} `json:"commands"`
 	}
-	if text := firstText(res); text != "" {
+	if text := FirstText(res); text != "" {
 		if err := json.Unmarshal([]byte(text), &payload); err != nil {
 			return nil
 		}

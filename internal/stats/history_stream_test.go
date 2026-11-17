@@ -34,7 +34,7 @@ func TestQuery7dMatchesExactQuantiles(t *testing.T) {
 		writeRaw(t, dir, day, dayLines)
 	}
 
-	res := QueryHistory([]string{dir}, Query{Period: Period7d}, now)
+	res := QuerySets([]Source{{Dir: dir}}, Query{Period: Period7d}, now)
 	if res.Approximate {
 		t.Fatal("7d не должен быть приблизительным")
 	}

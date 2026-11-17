@@ -19,13 +19,11 @@ import (
 
 // statusConfig — всё, что нужно status; в тестах подставляется целиком.
 type statusConfig struct {
-	Panel    string
-	Set      string
-	JSON     bool
-	Timeout  time.Duration
-	Password string
-	Secret   string
-	User     string
+	Panel   string
+	Set     string
+	JSON    bool
+	Timeout time.Duration
+	panelCreds
 }
 
 // statusSet — одна строка отчёта и один элемент -json.
@@ -69,13 +67,10 @@ type panelKey struct {
 func newStatusFlags() (*flag.FlagSet, *statusConfig) {
 	c := &statusConfig{}
 	fs := flag.NewFlagSet("status", flag.ContinueOnError)
-	fs.StringVar(&c.Panel, "panel", "", "адрес панели (по умолчанию MCPRIG_PANEL_URL, иначе MCPRIG_PORT)")
 	fs.StringVar(&c.Set, "set", "", "только один набор")
 	fs.BoolVar(&c.JSON, "json", false, "машинный вывод")
 	fs.DurationVar(&c.Timeout, "timeout", 10*time.Second, "бюджет запроса к панели")
-	fs.StringVar(&c.Password, "password", "", "пароль панели (по умолчанию MCPRIG_PASSWORD)")
-	fs.StringVar(&c.Secret, "secret", "", "секрет обратного прокси панели (по умолчанию MCPRIG_PROXY_SECRET)")
-	fs.StringVar(&c.User, "user", "", "пользователь панели для входа (по умолчанию admin)")
+	panelFlags(fs, &c.Panel, panelHelp, &c.panelCreds)
 	return fs, c
 }
 
@@ -111,7 +106,7 @@ func collectStatus(o *statusConfig) (statusReport, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), o.Timeout)
 	defer cancel()
 
-	creds := panelCreds{Password: o.Password, Secret: o.Secret, User: o.User}
+	creds := o.panelCreds
 	client, err := newPanelClient(ctx, base, creds)
 	if err != nil {
 		return statusReport{}, err

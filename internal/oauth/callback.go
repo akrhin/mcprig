@@ -87,9 +87,6 @@ func NewCallback(addr, state string) (*Callback, error) {
 	return c, nil
 }
 
-// URL — адрес редиректа, который должен совпадать с RedirectURL обработчика.
-func (c *Callback) URL() string { return c.url }
-
 // Wait ждёт редирект. Одновременно допускается один ожидающий.
 func (c *Callback) Wait(ctx context.Context) (*Result, error) {
 	c.mu.Lock()

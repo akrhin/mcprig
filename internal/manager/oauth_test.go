@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -93,6 +94,24 @@ func TestAuthorizeRequiresMembership(t *testing.T) {
 	rec := e.do(t, http.MethodPost, "/api/sets/s1/servers/remote/authorize", nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("код %d, ожидался 400: %s", rec.Code, rec.Body)
+	}
+}
+
+// Опрос состояния проверяет то же, что запуск: сервер, выброшенный из набора,
+// иначе отвечает 200 idle, и диалог панели крутится вечно.
+func TestAuthorizeStatusRequiresMembership(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	addServer(t, e, `{"name":"remote","transport":"http","url":"https://example.test/mcp","enabled":true}`)
+	addServer(t, e, `{"name":"other","transport":"http","url":"https://other.test/mcp","enabled":true}`)
+	if _, err := e.m.store.AddSet(json.RawMessage(`{"id":"s1","name":"s1","servers":["other"]}`)); err != nil {
+		t.Fatalf("AddSet: %v", err)
+	}
+	rec := e.do(t, http.MethodGet, "/api/sets/s1/servers/remote/authorize/status", nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("код %d, ожидался 400: %s", rec.Code, rec.Body)
+	}
+	if msg := decode[map[string]string](t, rec)["error"]; !strings.Contains(msg, "не входит в набор") {
+		t.Fatalf("ошибка = %q", msg)
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/downstream"
+	"github.com/akrhin/mcprig/internal/manager"
 	"github.com/akrhin/mcprig/internal/mcpserver"
 	"github.com/akrhin/mcprig/internal/oauth"
 )
@@ -40,9 +41,7 @@ type warmConfig struct {
 	TokenFile string
 	Config    string
 	JSON      bool
-	Password  string
-	Secret    string
-	User      string
+	panelCreds
 
 	// setOpen — набор открыт: отсутствующий токен не ошибка (только --all).
 	setOpen bool
@@ -60,7 +59,6 @@ func newWarmFlags() (*flag.FlagSet, *warmConfig) {
 	c := &warmConfig{}
 	fs := flag.NewFlagSet("warm", flag.ContinueOnError)
 	fs.StringVar(&c.URL, "url", "", "MCP-адрес набора, напр. http://127.0.0.1:9101/mcp (минует панель)")
-	fs.StringVar(&c.Panel, "panel", "", "адрес панели для --all и для резолва порта по имени набора (по умолчанию MCPRIG_PANEL_URL, иначе MCPRIG_PORT)")
 	fs.StringVar(&c.Set, "set", "main", "имя набора: под ним берётся ~/.config/mcprig/<set>.token и печатается строка")
 	fs.BoolVar(&c.All, "all", false, "все наборы из панели")
 	fs.DurationVar(&c.Timeout, "timeout", 2*time.Minute, "бюджет одного набора")
@@ -68,9 +66,7 @@ func newWarmFlags() (*flag.FlagSet, *warmConfig) {
 	fs.StringVar(&c.TokenFile, "token-file", "", "файл с bearer-ключом набора")
 	fs.StringVar(&c.Config, "config", "", "локальный servers.json: прогрев без сети, через internal/mcpserver")
 	fs.BoolVar(&c.JSON, "json", false, "машинный вывод")
-	fs.StringVar(&c.Password, "password", "", "пароль панели (по умолчанию MCPRIG_PASSWORD)")
-	fs.StringVar(&c.Secret, "secret", "", "секрет обратного прокси панели (по умолчанию MCPRIG_PROXY_SECRET)")
-	fs.StringVar(&c.User, "user", "", "пользователь панели для входа (по умолчанию admin)")
+	panelFlags(fs, &c.Panel, "адрес панели для --all и для резолва порта по имени набора (по умолчанию MCPRIG_PANEL_URL, иначе MCPRIG_PORT)", &c.panelCreds)
 	return fs, c
 }
 
@@ -221,14 +217,14 @@ func warmSession(ctx context.Context, cs *mcp.ClientSession) (int, error) {
 		return 0, err
 	}
 	if res.IsError {
-		return 0, errors.New(toolText(res))
+		return 0, errors.New(manager.FirstText(res))
 	}
 	var state struct {
 		Servers []struct {
 			Name string `json:"name"`
 		} `json:"servers"`
 	}
-	if text := toolText(res); text != "" {
+	if text := manager.FirstText(res); text != "" {
 		if err := json.Unmarshal([]byte(text), &state); err != nil {
 			return 0, fmt.Errorf("list_servers: %w", err)
 		}
@@ -249,10 +245,10 @@ func warmSession(ctx context.Context, cs *mcp.ClientSession) (int, error) {
 		return 0, err
 	}
 	if res.IsError {
-		return 0, errors.New(toolText(res))
+		return 0, errors.New(manager.FirstText(res))
 	}
 	var perServer map[string]json.RawMessage
-	if text := toolText(res); text != "" {
+	if text := manager.FirstText(res); text != "" {
 		if err := json.Unmarshal([]byte(text), &perServer); err != nil {
 			return 0, fmt.Errorf("list_commands: %w", err)
 		}
@@ -272,18 +268,6 @@ func warmSession(ctx context.Context, cs *mcp.ClientSession) (int, error) {
 		return total, fmt.Errorf("не ответили серверы: %s — проверьте, что они запущены, или поднимите --timeout", strings.Join(down, ", "))
 	}
 	return total, nil
-}
-
-func toolText(res *mcp.CallToolResult) string {
-	if res == nil {
-		return ""
-	}
-	for _, c := range res.Content {
-		if t, ok := c.(*mcp.TextContent); ok {
-			return t.Text
-		}
-	}
-	return ""
 }
 
 // bearerAuth добавляет токен набора к каждому запросу клиента MCP.
@@ -381,7 +365,7 @@ func setEndpoint(panelURL string, port int) string {
 
 func fetchPanelSets(ctx context.Context, o *warmConfig) ([]panelSet, error) {
 	base := strings.TrimRight(panelBaseURL(o.Panel), "/")
-	creds := panelCreds{Password: o.Password, Secret: o.Secret, User: o.User}
+	creds := o.panelCreds
 	client, err := newPanelClient(ctx, base, creds)
 	if err != nil {
 		return nil, err

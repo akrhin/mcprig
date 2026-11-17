@@ -130,22 +130,6 @@ func (s *Store) Save(key string, tok *oauth2.Token) error {
 	return nil
 }
 
-// Delete удаляет токен для key и сразу пишет файл.
-func (s *Store) Delete(key string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	prev, had := s.tokens[key]
-	if !had {
-		return nil
-	}
-	delete(s.tokens, key)
-	if err := s.writeAtomic(s.path, s.tokens); err != nil {
-		s.tokens[key] = prev
-		return err
-	}
-	return nil
-}
-
 // LoadClient возвращает регистрационные данные клиента для key.
 func (s *Store) LoadClient(key string) (ClientInfo, bool) {
 	s.mu.Lock()

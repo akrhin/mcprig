@@ -355,19 +355,9 @@ func rowOf(r Row, a *acc, approx bool) Row {
 	return r
 }
 
-// QueryHistory answers one period from the given stats directories — one per
-// set, so set=all is just every directory. A missing directory contributes
-// nothing, a broken journal line is skipped. The answer carries no bySet
-// breakdown: the caller did not say which set a directory belongs to.
-func QueryHistory(dirs []string, q Query, now time.Time) Result {
-	sources := make([]Source, len(dirs))
-	for i, dir := range dirs {
-		sources[i].Dir = dir
-	}
-	return QuerySets(sources, q, now)
-}
-
-// QuerySets is QueryHistory with each directory's set attached: the answer then
+// QuerySets answers one period from the given sources — one directory per set,
+// so set=all is just every source. A missing directory contributes nothing, a
+// broken journal line is skipped. With a set attached to each source the answer
 // carries the bySet breakdown, counted in the same pass as the totals.
 func QuerySets(sources []Source, q Query, now time.Time) Result {
 	today := startOfDay(now)

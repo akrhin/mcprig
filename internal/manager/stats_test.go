@@ -88,7 +88,7 @@ func TestAPIStatsReadsHistory(t *testing.T) {
 	status(t, e.do(t, http.MethodGet, "/api/stats?period=year", nil), http.StatusBadRequest)
 }
 
-// Фильтры из строки запроса доходят до QueryHistory, а set=all называет
+// Фильтры из строки запроса доходят до QuerySets, а set=all называет
 // набор без каталога истории, как обещает док.
 func TestAPIStatsFiltersAndAll(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})
