@@ -22,7 +22,6 @@
       'title.panel': 'mcprig — panel',
       'title.set': 'mcprig — set {name}',
       'a11y.skip': 'Skip to content',
-      'top.details': 'Details',
       'top.lang': 'Language',
       'top.theme': 'Appearance',
       'theme.group': 'Theme',
@@ -79,12 +78,35 @@
       'head.exitCode': 'exit code {code}',
       'head.restarts': 'restarts: {n}',
       'tabs.overview': 'Overview',
+      'tabs.servers': 'Servers',
+      'tabs.keys': 'Keys',
+      'tabs.tools': 'Tools',
       'tabs.calls': 'Calls',
-      'tabs.stats': 'Statistics',
+      'tabs.logs': 'Logs',
+      'col.set': 'Set',
       'nav.label': 'Panel pages',
+      'nav.host': 'Overview',
       'nav.sets': 'Sets',
+      'nav.stats': 'Statistics',
       'nav.servers': 'All servers',
       'nav.vars': 'Variables',
+      'host.title': 'Host',
+      'host.sub': 'what this daemon is serving right now',
+      'host.sets': 'Sets by activity',
+      'host.latest': 'Latest calls',
+      'host.running': 'sets running',
+      'host.stopped': 'sets stopped',
+      'host.srvOk': 'servers ok',
+      'host.srvUnchecked': 'not checked',
+      'host.srvFailed': 'servers failing',
+      'host.pending': 'tools to approve',
+      'host.calls': 'calls · 7 days',
+      'host.toolout': 'tool output',
+      'host.up': 'up for',
+      'host.thState': 'State',
+      'host.setsEmpty': 'A set is one MCP endpoint; create one to see it here.',
+      'host.callsEmpty': 'Calls appear here as soon as a set serves.',
+      'host.tooloutHelp': 'The proxy has no API for the size of /tool-out or how long it keeps files, so this panel shows a dash instead of a guess.',
       'reg.title': 'All servers',
       'reg.count': '{n} {serversW} in the registry',
       'reg.thSets': 'In sets',
@@ -202,9 +224,7 @@
       'stats.more': '{n} more — narrow the filter',
       'stats.colTip': '{label} · {n} calls',
       'stats.colTipErr': '{label} · {n} calls, {err} errors',
-      'side.label': 'Details',
       'side.server': 'server',
-      'side.close': 'Close the details panel',
       'form.sub': 'Changes apply to the host registry and take effect on the next set restart.',
       'form.description': 'description',
       'form.transport': 'transport',
@@ -237,15 +257,13 @@
       'env.set': 'set',
       'env.unset': 'not set',
       'log.tail': 'log tail of the set',
-      'log.wide': 'wider',
-      'log.wideTip': 'expand the log panel',
       'log.refresh': 'refresh',
       'log.empty': 'log is empty',
       'srvlog.sub': 'lines that mention this server — the tail of the set log',
       'srvlog.title': 'Log · {server} · {set}',
       'srvlog.fail': 'could not load the log',
       'srv.tools': 'tools',
-      'tools.title': 'Tools · {server} · {set}',
+      'tools.all': 'all servers',
       'tools.sub': 'descriptors the proxy remembers — a changed one waits for your approval',
       'tools.thTool': 'Tool',
       'tools.thState': 'State',
@@ -256,7 +274,6 @@
       'tools.approve': 'approve',
       'tools.fail': 'could not load the tool list',
       'tools.approveFail': 'could not approve the tool',
-      'keys.title': 'Set keys',
       'keys.sub': 'A key authenticates one client. It is shown once, right after it is created.',
       'keys.newLabel': 'New key label',
       'keys.profile': 'Profile',
@@ -380,7 +397,6 @@
       'title.panel': 'mcprig — панель',
       'title.set': 'mcprig — набор {name}',
       'a11y.skip': 'Перейти к содержимому',
-      'top.details': 'Детали',
       'top.lang': 'Язык',
       'top.theme': 'Оформление',
       'theme.group': 'Тема',
@@ -437,12 +453,35 @@
       'head.exitCode': 'код выхода {code}',
       'head.restarts': 'автоперезапусков: {n}',
       'tabs.overview': 'Обзор',
+      'tabs.servers': 'Серверы',
+      'tabs.keys': 'Ключи',
+      'tabs.tools': 'Инструменты',
       'tabs.calls': 'Вызовы',
-      'tabs.stats': 'Статистика',
+      'tabs.logs': 'Лог',
+      'col.set': 'Набор',
       'nav.label': 'Страницы панели',
+      'nav.host': 'Обзор',
       'nav.sets': 'Наборы',
+      'nav.stats': 'Статистика',
       'nav.servers': 'Все серверы',
       'nav.vars': 'Переменные',
+      'host.title': 'Хост',
+      'host.sub': 'что демон обслуживает прямо сейчас',
+      'host.sets': 'Наборы по активности',
+      'host.latest': 'Последние вызовы',
+      'host.running': 'наборов запущено',
+      'host.stopped': 'наборов не запущено',
+      'host.srvOk': 'серверов в порядке',
+      'host.srvUnchecked': 'не проверено',
+      'host.srvFailed': 'серверов с ошибкой',
+      'host.pending': 'инструментов на подтверждение',
+      'host.calls': 'вызовов за 7 дней',
+      'host.toolout': 'выгрузки /tool-out',
+      'host.up': 'без перезапуска',
+      'host.thState': 'Состояние',
+      'host.setsEmpty': 'Набор — это один MCP-эндпоинт; создай его, и он появится здесь.',
+      'host.callsEmpty': 'Вызовы появятся, как только набор начнёт отвечать.',
+      'host.tooloutHelp': 'У прокси нет API про размер /tool-out и срок хранения файлов, поэтому здесь прочерк, а не догадка.',
       'reg.title': 'Все серверы',
       'reg.count': '{n} {serversW} в реестре',
       'reg.thSets': 'В наборах',
@@ -560,9 +599,7 @@
       'stats.more': 'ещё {n} — сузьте фильтр',
       'stats.colTip': '{label} · вызовов {n}',
       'stats.colTipErr': '{label} · вызовов {n}, ошибок {err}',
-      'side.label': 'Детали',
       'side.server': 'сервер',
-      'side.close': 'Закрыть панель деталей',
       'form.sub': 'Изменения попадают в реестр хоста и действуют после перезапуска набора.',
       'form.description': 'описание',
       'form.transport': 'транспорт',
@@ -595,15 +632,13 @@
       'env.set': 'задана',
       'env.unset': 'не задана',
       'log.tail': 'хвост лога набора',
-      'log.wide': 'Развернуть лог',
-      'log.wideTip': 'развернуть панель лога',
       'log.refresh': 'Обновить',
       'log.empty': 'лог пуст',
       'srvlog.sub': 'строки, где встречается имя сервера, — хвост лога набора',
       'srvlog.title': 'Лог · {server} · {set}',
       'srvlog.fail': 'не удалось получить лог',
       'srv.tools': 'Инструменты',
-      'tools.title': 'Инструменты · {server} · {set}',
+      'tools.all': 'все серверы',
       'tools.sub': 'дескрипторы, которые помнит прокси, — изменившийся ждёт вашего одобрения',
       'tools.thTool': 'Инструмент',
       'tools.thState': 'Состояние',
@@ -614,7 +649,6 @@
       'tools.approve': 'Одобрить',
       'tools.fail': 'не удалось получить список инструментов',
       'tools.approveFail': 'не удалось одобрить инструмент',
-      'keys.title': 'Ключи набора',
       'keys.sub': 'Ключ даёт доступ одному клиенту. Он показывается один раз — сразу после создания.',
       'keys.newLabel': 'Подпись нового ключа',
       'keys.profile': 'Профиль',
@@ -749,7 +783,8 @@
     call: { en: ['call', 'calls'], ru: ['вызов', 'вызова', 'вызовов'] },
     tool: { en: ['tool', 'tools'], ru: ['инструмент', 'инструмента', 'инструментов'] },
     client: { en: ['client', 'clients'], ru: ['клиент', 'клиента', 'клиентов'] },
-    line: { en: ['line', 'lines'], ru: ['строка', 'строки', 'строк'] }
+    line: { en: ['line', 'lines'], ru: ['строка', 'строки', 'строк'] },
+    key: { en: ['key', 'keys'], ru: ['ключ', 'ключа', 'ключей'] }
   };
 
   function word(n, kind) {
@@ -801,27 +836,54 @@
   }
 
   /* ---------- страницы панели ----------
-     Адрес называет открытую страницу: #/sets, #/servers, #/vars. Набор и его
-     вкладки живут внутри #/sets и остаются в адресе как #/set/<id> и #/stats/<p>. */
+     Адрес называет открытую страницу и то, что на ней открыто: #/ — обзор
+     хоста, #/sets — наборы, #/set/<id>/<вкладка> — вкладка набора,
+     #/stats/<период> — срез, #/servers и #/vars — остальное. Неизвестная
+     вкладка — обзор набора, неизвестный адрес — список наборов: ссылка не
+     должна вести в пустоту. */
+  var TABS = ['overview', 'servers', 'keys', 'tools', 'calls', 'logs'];
+
   function pageOf(hash) {
+    if (hash === '' || hash === '#' || /^#\/$/.test(hash)) { return 'host'; }
+    if (/^#\/set\/[^/]+/.test(hash) || /^#\/sets(\/|$)/.test(hash)) { return 'sets'; }
+    if (/^#\/stats\//.test(hash)) { return 'stats'; }
     if (/^#\/servers$/.test(hash)) { return 'servers'; }
     if (/^#\/vars$/.test(hash)) { return 'vars'; }
     return 'sets';
   }
 
-  // набор из адреса (#/set/demo) выбирается сразу, данные подтягивает первый /api/state
-  var linkId = (/^#\/set\/([^/]+)$/.exec(location.hash) || [])[1];
+  // один разбор адреса на всех: страница, набор и вкладка достаются из hash
+  // одинаково — и на старте, и на hashchange, и когда hash пишет сама панель
+  function routeOf(hash) {
+    var h = hash || '';
+    var m = /^#\/set\/([^/?#]+)(?:\/([^/?#]+))?/.exec(h);
+    if (m) {
+      var tab = m[2] || 'overview';
+      return { page: 'sets', set: m[1], tab: TABS.indexOf(tab) < 0 ? 'overview' : tab };
+    }
+    var s = /^#\/stats\/([a-z0-9]+)/.exec(h);
+    if (s) { return { page: 'stats', period: s[1] }; }
+    return { page: pageOf(h) };
+  }
+
+  // набор и вкладка из адреса выбираются сразу, данные подтягивает первый /api/state
+  var link = routeOf(location.hash);
   var st = {
-    sets: [], servers: [], sel: linkId ? decodeURIComponent(linkId) : null,
-    health: null, calls: null, kpi: null, env: null, logKey: '', errTimer: 0, busy: false, boot: !!linkId,
+    sets: [], servers: [], sel: link.set || null,
+    health: null, calls: null, kpi: null, env: null, logKey: '', errTimer: 0, busy: false, boot: !!link.set,
     version: '',
     // probe — доказательства строки «Проверить»: они свежее кэша health (15 с)
     probeTools: {}, probeHealth: {}, healthBusy: false,
-    tab: 'overview', page: pageOf(location.hash), railPref: '',
+    tab: link.tab || 'overview', page: link.page, railPref: '',
+    // host — что показать на обзоре хоста: серверы по каждому набору и
+    // дескрипторы инструментов, ожидающие подтверждения
+    host: { servers: null, pending: null, busy: false, at: '' },
+    // tools — дескрипторы выбранного набора целиком; toolsFilter — выбранный сервер
+    tools: null, toolsFilter: '',
     // mock — состояние демо-реестра, правки в нём живут до перезагрузки;
     // srvEditing/srvReturn — какая строка открыта в форме и куда вернётся фокус
     mock: null, mockEnv: null, srvEditing: '', srvReturn: null,
-    st: { period: 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' },
+    st: { period: link.period || 'today', set: '', server: '', tool: '', client: '', seq: 0, data: null, facets: null, facetKey: '' },
     // paged — открыта вторая страница вызовов: тикер её не перезаписывает.
     // callsSeq — номер загрузки первой страницы: ответ догрузки из прошлого
     // окна отбрасывается, иначе он допишется в уже заменённый список
@@ -1511,6 +1573,8 @@
       if (ids.indexOf(st.sel) === -1) { select(ids[0] || null); }
       else if (st.boot) { st.boot = false; select(st.sel, true); }
       else { renderHead(); renderSetServers(); }
+      // обзор хоста собирается из того же /api/state, поэтому живёт с ним в такте
+      if (st.page === 'host') { refreshHost(); }
     }).catch(function (e) { fail(e.message, e); });
   }
 
@@ -1524,7 +1588,7 @@
     // шапка набора и его вкладки — только на странице наборов: на соседних
     // страницах тот же набор ни к чему
     var onSets = st.page === 'sets';
-    show($('empty-state'), none && onSets);
+    show($('empty-state'), none && (onSets || st.page === 'host'));
     show($('rail-empty'), none);
     show($('phead'), !none && onSets);
     show($('tabs'), !none && onSets);
@@ -1534,6 +1598,8 @@
     $('endpoint').textContent = set
       ? 'http://' + (location.hostname || '127.0.0.1') + ':' + set.port + '/mcp' : '—';
     if (none) { renderKpis(null); renderSetServers(); }
+    // обзор хоста собирается из того же /api/state, поэтому живёт с ним в одном такте
+    if (st.page === 'host') { renderHost(); }
   }
 
   // Крошка называет то, что открыто: набор — на его странице, иначе страницу
@@ -1545,8 +1611,10 @@
 
   // Переключение страницы: адрес уже сменён ссылкой или hashchange
   function applyPage(name) {
-    if (st.page !== name) { st.page = name; }
+    st.page = name;
+    show($('page-host'), name === 'host');
     show($('page-sets'), name === 'sets');
+    show($('page-stats'), name === 'stats');
     show($('page-servers'), name === 'servers');
     show($('page-vars'), name === 'vars');
     [].forEach.call(document.querySelectorAll('#pagenav .segbtn'), function (a) {
@@ -1554,6 +1622,10 @@
     });
     if (name === 'servers') { renderServers(st.health); }
     if (name === 'vars') { loadEnv(); }
+    // срез и обзор показываются только на своей странице: их запросы не нужны
+    // остальным, а после возврата цифры должны быть свежими
+    if (name === 'stats') { fillFilters(); loadStats(); }
+    if (name === 'host') { refreshHost(); }
     renderChrome();
   }
 
@@ -1630,6 +1702,7 @@
   /* ---------- серверы набора ---------- */
 
   function renderSetServers() {
+    renderSetTiles();
     var set = current();
     var names = (set && set.servers) || [];
     var setNm = set ? (set.name || set.id) : '';
@@ -1823,7 +1896,7 @@
       if (st.st.set !== (id || '')) {
         st.st.set = id || '';
         fillFilters();
-        if (st.tab === 'stats') { loadStats(); }
+        if (st.page === 'stats') { loadStats(); }
       }
       renderHead();
       return;
@@ -1841,27 +1914,29 @@
     // статистика идёт за рельсом: свой фильтр набора начинается с текущего,
     // ручной выбор в списке фильтра живёт до следующего переключения набора
     st.st.set = id || '';
-    // адрес повторяет открытое: на статистике его держит setTab, набор его не перебивает;
-    // на соседних страницах выбранный набор в адрес не попадает — там живёт страница,
-    // а вкладка «Наборы» из адреса остаётся наборной страницей и его не переписывает
-    if (st.page === 'sets' && st.tab !== 'stats' && location.hash !== '#/sets') {
-      if (id) {
-        history.replaceState(null, '', '#/set/' + id);
-      } else {
-        history.replaceState(null, '', location.pathname);
-      }
+    // Адрес повторяет открытое: набор и его вкладку. Пишем его только на
+    // осознанный выбор (клик, ссылка, перезагрузка) и на адрес, где набор уже
+    // назван: автовыбор первого набора на #/sets адрес не переписывает.
+    if (st.page === 'sets' && id && (force || location.hash.indexOf('#/set/') === 0)) {
+      var next = setHash(id, st.tab);
+      if (location.hash !== next) { history.pushState(null, '', next); }
     }
     setTitle();
     renderRail();
-    applyTab(st.tab);
+    // после смены набора вкладка показывает уже его данные: плитки, список, лог
+    afterTab(st.tab);
     renderSetServers();
     renderHead();
     renderServers(null);
     renderCalls(null);
     renderLog([]);
     fillFilters();
-    if (id) { loadHealth(); loadCalls(); loadLog(); }
-    if (st.tab === 'stats') { loadStats(); }
+    if (id) { loadHealth(); loadCalls(); loadLog(); loadTools(); }
+  }
+
+  // адрес набора: обзор — короткая ссылка (#/set/x), остальные вкладки названы явно
+  function setHash(id, tab) {
+    return '#/set/' + id + (tab && tab !== 'overview' ? '/' + tab : '');
   }
 
   function setTitle() {
@@ -1896,7 +1971,7 @@
     keyBtn.disabled = !hasKey;
     keyBtn.dataset.i18nTitle = hasKey ? 'head.copyKey' : 'head.noKey';
     keyBtn.title = t(keyBtn.dataset.i18nTitle);
-    $('keys-count').textContent = fmtN((set.keys || []).length);
+    $('keys-count').textContent = cnt((set.keys || []).length, 'key');
     // метка основного ключа — ровно та строка, что печатает статистика
     var mark = $('key-mark');
     show(mark, !!set.keyMark);
@@ -1910,7 +1985,6 @@
     $('run').textContent = running ? t('head.stop') : t('head.start');
     $('run').className = running ? 'btn' : 'btn btn-primary';
     show($('restart'), running);
-    $('dlg-set').textContent = name;
 
     var r = set.runtime || {};
     var bad = !r.running && (r.error || (r.exitCode != null && r.exitCode > 0));
@@ -1947,10 +2021,215 @@
     $('k-p50').textContent = tot && tot.calls ? ms(tot.p50ms) : '—';
     $('k-p95').textContent = tot && tot.calls ? ms(tot.p95ms) : '—';
     // прочерк бледнее цифры: пустая полоса не притворяется нулём
-    [].forEach.call(document.querySelectorAll('.kpi'), function (k) {
+    [].forEach.call(document.querySelectorAll('#kpis .kpi'), function (k) {
       var n = k.querySelector('.kpi-num');
       n.classList.toggle('is-muted', !tot || n.textContent === '—');
     });
+  }
+
+  /* ---------- обзор набора ----------
+     Плитки отвечают на «всё ли в порядке» и ведут туда, где это разбирается
+     по частям. Значения — из того же health и того же карантина, что и вкладки. */
+
+  function tile(id, v) {
+    var n = $(id);
+    if (n) { n.textContent = v; }
+  }
+
+  function renderSetTiles() {
+    var set = current();
+    var rows = (st.health && st.health.servers) || null;
+    var ok = 0, failed = 0, rest = 0;
+    if (rows) {
+      rows.forEach(function (h) {
+        if (healthy(h)) { ok++; } else if (h && h.healthy === false) { failed++; } else { rest++; }
+      });
+    }
+    tile('t-ok', rows ? fmtN(ok) : '—');
+    tile('t-unchecked', rows ? fmtN(rest) : '—');
+    tile('t-failed', rows ? fmtN(failed) : '—');
+    tile('t-keys', set ? fmtN((set.keys || []).length) : '—');
+    tile('t-pending', st.tools ? fmtN(pendingTools(st.tools)) : '—');
+    tile('t-up', set ? uptime(set) : '—');
+  }
+
+  /* ---------- обзор хоста ----------
+     Отвечает на «что происходит на этой машине», а не «какие есть наборы»:
+     наборы, серверы, трафик и самое свежее. Прочерк в плитке означает «демон
+     такого поля не отдаёт», а не ноль — догадку в число не превращаем. */
+
+  var HOST_CALLS = 200;
+  var HOST_SHOWN = 12;
+
+  // сервер может стоять в нескольких наборах: «ошибка» старше «ок», потому что
+  // окно одного набора не должно затирать провал, который видел другой
+  function hostServerState(map, name, v) {
+    var prev = map[name];
+    if (prev === 'failed' || (prev === 'ok' && v !== 'failed')) { return; }
+    map[name] = v;
+  }
+
+  function refreshHost() {
+    // не чаще раза в 8 с: снимок хоста — это N запросов, а /api/state идёт каждые 5
+    if (st.host.busy) { return; }
+    if (!st.sets.length && !st.servers.length) { return; }
+    if (st.host.at && Date.now() - Date.parse(st.host.at) < 8000) { return; }
+    st.host.busy = true;
+    var sets = st.sets.slice();
+    var live = sets.filter(function (s) { return s.runtime && s.runtime.running; });
+    var jobs = live.map(function (s) {
+      return get('/api/sets/' + encodeURIComponent(s.id) + '/servers')
+        .then(function (d) { return (d && d.servers) || []; }).catch(function () { return []; });
+    }).concat(sets.map(function (s) {
+      return get('/api/sets/' + encodeURIComponent(s.id) + '/tools')
+        .then(function (d) { return (d && d.tools) || []; }).catch(function () { return []; });
+    })).concat([
+      get('/api/stats?set=all&period=7d&bucket=day').catch(function () { return null; }),
+      get('/api/calls?limit=' + HOST_CALLS).catch(function () { return null; })
+    ]);
+    return Promise.all(jobs).then(function (out) {
+      var map = {}, pending = 0, i = 0;
+      for (; i < live.length; i++) {
+        out[i].forEach(function (h) {
+          if (!h || !h.name) { return; }
+          hostServerState(map, h.name, healthy(h) ? 'ok' : h.healthy === false ? 'failed' : 'unknown');
+        });
+      }
+      for (; i < live.length + sets.length; i++) { pending += pendingTools(out[i]); }
+      var stats = out[i], calls = out[i + 1];
+      st.host.servers = map;
+      st.host.pending = pending;
+      st.host.kpi = stats;
+      st.host.calls = (calls && calls.calls) || [];
+      st.host.at = new Date().toISOString();
+      st.host.busy = false;
+      renderHost();
+    }).catch(function (e) {
+      st.host.busy = false;
+      fail(e.message, e);
+    });
+  }
+
+  function renderHost() {
+    var sets = st.sets || [];
+    var running = 0;
+    sets.forEach(function (s) { if (s.runtime && s.runtime.running) { running++; } });
+    tile('h-running', fmtN(running));
+    tile('h-stopped', fmtN(sets.length - running));
+    var map = st.host.servers, ok = 0, failed = 0, rest = 0;
+    (st.servers || []).forEach(function (s) {
+      var v = map && map[s.name];
+      if (v === 'ok') { ok++; } else if (v === 'failed') { failed++; } else { rest++; }
+    });
+    tile('h-ok', map ? fmtN(ok) : '—');
+    tile('h-unchecked', map ? fmtN(rest) : '—');
+    tile('h-failed', map ? fmtN(failed) : '—');
+    tile('h-pending', st.host.pending == null ? '—' : fmtN(st.host.pending));
+    // размера /tool-out и срока хранения в API нет: прочерк честнее выдумки
+    tile('h-toolout', '—');
+    var tot = st.host.kpi && st.host.kpi.totals;
+    tile('h-calls', tot ? fmtN(tot.calls) : '—');
+    tile('h-err', tot && tot.calls ? pct(tot.failures, tot.calls) : '—');
+    [].forEach.call(document.querySelectorAll('#host-tiles .tile-num'), function (n) {
+      n.classList.toggle('is-muted', n.textContent === '—');
+    });
+    $('host-calls-note').textContent = st.host.at ? clock(st.host.at) : '';
+    renderHostSets();
+    renderHostCalls();
+  }
+
+  // последний вызов по набору — из того же хвоста, что и таблица ниже
+  function lastBySet() {
+    var map = {};
+    (st.host.calls || []).forEach(function (c) {
+      var at = new Date(c.time).getTime();
+      if (!c.set || isNaN(at)) { return; }
+      if (!map[c.set] || map[c.set] < at) { map[c.set] = at; }
+    });
+    return map;
+  }
+
+  function renderHostSets() {
+    var map = lastBySet();
+    var rows = (st.sets || []).slice().sort(function (a, b) {
+      var x = map[a.id] || 0, y = map[b.id] || 0;
+      if (x !== y) { return y - x; }
+      return (a.name || a.id) < (b.name || b.id) ? -1 : 1;
+    });
+    show($('host-sets-empty'), rows.length === 0);
+    sync($('host-sets-body'), rows, function (s) { return s.id; },
+      function () {
+        var tr = el('tr');
+        tr.appendChild(el('td', 'cell-name'));
+        tr.appendChild(el('td'));
+        tr.appendChild(el('td', 'cell-time'));
+        return tr;
+      },
+      function (tr, s) {
+        var tds = tr.children;
+        var nm = tds[0];
+        nm.textContent = '';
+        nm.dataset.label = t('col.set');
+        var a = nm.appendChild(el('a', '', s.name || s.id));
+        a.href = setHash(s.id, '');
+        a.appendChild(el('span', 'cell-port', ' :' + s.port));
+        var stc = setState(s);
+        var state = tds[1];
+        state.dataset.label = t('host.thState');
+        state.textContent = '';
+        paintBadge(state.appendChild(el('span', 'badge')), stc);
+        // причина простоя — рядом с состоянием, а не в подсказке
+        var why = s.runtime && s.runtime.error;
+        if (why) {
+          var note = state.appendChild(el('span', 'cell-reason'));
+          note.textContent = why.length > 60 ? why.slice(0, 60) + '…' : why;
+          note.title = why;
+        }
+        var last = map[s.id];
+        var time = tds[2];
+        time.dataset.label = t('setSrv.thLast');
+        time.textContent = last ? clockAt(new Date(last).toISOString()) : '—';
+        time.title = last ? day(new Date(last).toISOString()) + ' ' + clock(new Date(last).toISOString()) : '';
+      });
+  }
+
+  function renderHostCalls() {
+    var rows = (st.host.calls || []).slice(0, HOST_SHOWN);
+    show($('host-calls-empty'), rows.length === 0);
+    sync($('host-calls-body'), rows, function (c) { return c.time + c.set + c.server + c.tool; },
+      function () {
+        var tr = el('tr');
+        tr.appendChild(el('td', 'cell-time'));
+        tr.appendChild(el('td'));
+        tr.appendChild(el('td', 'cell-name'));
+        tr.appendChild(el('td'));
+        tr.appendChild(el('td', 'num'));
+        tr.appendChild(el('td'));
+        return tr;
+      },
+      function (tr, c) {
+        var tds = tr.children;
+        tds[0].dataset.label = t('tail.thTime');
+        tds[0].textContent = clockAt(c.time);
+        tds[0].title = day(c.time) + ' ' + clock(c.time);
+        tds[1].dataset.label = t('col.set');
+        tds[1].textContent = '';
+        var a = tds[1].appendChild(el('a', '', c.set || '—'));
+        a.href = setHash(c.set || '', 'calls');
+        tds[2].dataset.label = t('tail.thServer');
+        tds[2].textContent = c.server || '—';
+        tds[3].dataset.label = t('tail.thTool');
+        tds[3].textContent = c.tool || '—';
+        tds[4].dataset.label = t('tail.thMs');
+        tds[4].className = 'num' + (c.ms > 1000 ? ' slow' : '');
+        tds[4].textContent = fmtN(c.ms);
+        tds[5].dataset.label = t('tail.thStatus');
+        tds[5].textContent = '';
+        var badge = tds[5].appendChild(el('span', 'badge ' + (c.failed ? 'badge-err' : 'badge-ok')));
+        badge.appendChild(el('span', 'dot'));
+        badge.appendChild(document.createTextNode(c.failed ? t('calls.bad') : t('calls.ok')));
+        badge.title = c.error || '';
+      });
   }
 
   function loadHealth() {
@@ -2931,7 +3210,7 @@
     var key = lines.join('\n');
     if (key === st.logKey) { return; }
     st.logKey = key;
-    $('log-count').textContent = fmtN(lines.length);
+    $('log-count').textContent = cnt(lines.length, 'line');
     show($('log'), lines.length > 0);
     show($('log-empty'), lines.length === 0);
     sync($('log'), lines, function (l, i) { return String(i); },
@@ -3014,61 +3293,72 @@
 
   /* ---------- карантин дескрипторов ----------
      Панель показывает то, что помнит прокси: новый инструмент одобрен сам,
-     изменившийся ждёт человека, иначе вызов нижестоящего сервера отбит. */
+     изменившийся ждёт человека, иначе вызов нижестоящего сервера отбит.
+     Демон отдаёт дескрипторы всего набора, поэтому фильтр по серверу —
+     это выбор в списке, а не отдельный запрос. */
 
-  var toolLock = { set: '', server: '', seq: 0, rows: [] };
+  var toolsSeq = 0;
 
-  function openTools(server) {
-    var set = current();
-    if (!set) { return; }
-    toolLock.set = set.id;
-    toolLock.server = server;
-    toolLock.returnFocus = document.activeElement;
-    $('tools-h').textContent = t('tools.title', { server: server, set: set.id });
-    $('tools-err').hidden = true;
-    var dlg = $('tools-dlg');
-    if (typeof dlg.showModal === 'function' && !dlg.open) { dlg.showModal(); }
-    $('tools-refresh').focus();
-    loadTools();
-  }
-
-  function closeTools() {
-    var dlg = $('tools-dlg');
-    if (!dlg.open) { return; }
-    dlg.close();
-    toolLock.server = '';
-    toolLock.seq++;
-    var back = toolLock.returnFocus;
-    toolLock.returnFocus = null;
-    if (back && document.contains(back) && back.offsetParent !== null) { back.focus(); }
+  function fillToolsServers(rows) {
+    var sel8 = $('tools-server');
+    var names = [], seen = {};
+    ((current() && current().servers) || []).forEach(function (n) { seen[n] = 1; names.push(n); });
+    (rows || []).forEach(function (r) { if (!seen[r.server]) { seen[r.server] = 1; names.push(r.server); } });
+    if (st.toolsFilter && !seen[st.toolsFilter]) { names.push(st.toolsFilter); }
+    var want = st.toolsFilter;
+    sel8.textContent = '';
+    var all = sel8.appendChild(el('option'));
+    all.value = '';
+    all.textContent = t('tools.all');
+    names.sort().forEach(function (n) {
+      var o = sel8.appendChild(el('option'));
+      o.value = n;
+      o.textContent = n;
+    });
+    sel8.value = names.indexOf(want) >= 0 ? want : '';
+    st.toolsFilter = sel8.value;
   }
 
   function loadTools() {
-    if (!toolLock.server) { return; }
-    var id = toolLock.set, seq = ++toolLock.seq;
+    if (!st.sel) { return; }
+    var id = st.sel, seq = ++toolsSeq;
     var btn = $('tools-refresh');
     btn.disabled = true;
     $('tools-err').hidden = true;
     return get('/api/sets/' + encodeURIComponent(id) + '/tools')
       .then(function (data) {
-        if (seq !== toolLock.seq) { return; }
-        // демон отдаёт весь набор, дровер показывает один сервер
-        renderTools(((data && data.tools) || []).filter(function (x) { return x.server === toolLock.server; }));
+        if (seq !== toolsSeq || id !== st.sel) { return; }
+        st.tools = (data && data.tools) || [];
+        fillToolsServers(st.tools);
+        renderTools();
       })
       .catch(function (e) {
-        if (seq !== toolLock.seq) { return; }
+        if (seq !== toolsSeq) { return; }
         var box = $('tools-err');
         box.textContent = t('tools.fail') + ' · ' + e.message;
         box.hidden = false;
       })
-      .then(function () { if (seq === toolLock.seq) { btn.disabled = false; } });
+      .then(function () { if (seq === toolsSeq) { btn.disabled = false; } });
   }
 
-  function renderTools(rows) {
-    toolLock.rows = rows;
+  // строки, ожидающие подтверждения: пара «сервер + инструмент» считается один
+  // раз, иначе таблица одного сервера раздувает счётчик обзора
+  function pendingTools(rows) {
+    var seen = {}, n = 0;
+    (rows || []).forEach(function (r) {
+      if (r.state !== 'changed') { return; }
+      var k = r.server + '/' + r.tool;
+      if (!seen[k]) { seen[k] = 1; n++; }
+    });
+    return n;
+  }
+
+  function renderTools() {
+    renderSetTiles();
+    var rows = (st.tools || []).filter(function (r) { return !st.toolsFilter || r.server === st.toolsFilter; });
     $('tools-count').textContent = cnt(rows.length, 'tool');
     show($('tools-empty'), rows.length === 0);
-    sync($('lock-body'), rows, function (r) { return r.tool; },
+    sync($('lock-body'), rows, function (r) { return r.server + '/' + r.tool; },
       function () {
         var tr = el('tr');
         var nm = tr.appendChild(el('td', 'cell-name'));
@@ -3084,9 +3374,11 @@
       },
       function (tr, row) {
         tr.dataset.tool = row.tool;
+        tr.dataset.server = row.server;
         var nm = tr.querySelector('.cell-name');
-        nm.textContent = row.tool;
-        nm.title = row.tool;
+        // без фильтра в имени нужен и сервер: одно имя инструмента живёт у разных
+        nm.textContent = st.toolsFilter ? row.tool : row.server + ' · ' + row.tool;
+        nm.title = row.server + ' / ' + row.tool;
         var changed = row.state === 'changed';
         var badge = tr.querySelector('.badge');
         badge.className = 'badge ' + (changed ? 'badge-warn' : 'badge-ok');
@@ -3100,11 +3392,18 @@
       });
   }
 
-  function approveTool(tool, btn) {
-    if (!toolLock.server) { return; }
+  // строка сервера в наборе: «инструменты» этого сервера — вкладка с фильтром
+  function openTools(server) {
+    if (!st.sel) { return; }
+    st.toolsFilter = server || '';
+    setTab('tools', true);
+  }
+
+  function approveTool(server, tool, btn) {
+    if (!st.sel) { return; }
     if (btn) { btn.disabled = true; }
-    return send('POST', '/api/sets/' + encodeURIComponent(toolLock.set) + '/tools/approve',
-      { server: toolLock.server, tool: tool })
+    return send('POST', '/api/sets/' + encodeURIComponent(st.sel) + '/tools/approve',
+      { server: server, tool: tool })
       .then(function () { return loadTools(); })
       .catch(function (e) {
         fail(t('tools.approveFail') + ' · ' + e.message, e);
@@ -3484,8 +3783,9 @@
   }
 
   function applyTab(name) {
-    ['overview', 'calls', 'stats'].forEach(function (tab) {
+    TABS.forEach(function (tab) {
       var btn = $('tabbtn-' + tab);
+      if (!btn) { return; }
       var on = tab === name;
       btn.setAttribute('aria-selected', on ? 'true' : 'false');
       btn.tabIndex = on ? 0 : -1;
@@ -3493,25 +3793,35 @@
     });
   }
 
-  /* ---------- вкладки основной области ---------- */
+  /* ---------- вкладки набора ----------
+     У каждой вкладки свой адрес (#/set/<id>/keys): ссылку можно переслать,
+     положить в закладки и вернуть кнопкой «назад» — история помнит переход. */
 
-  function setTab(name) {
+  function setTab(name, push) {
+    if (TABS.indexOf(name) < 0) { name = 'overview'; }
     st.tab = name;
     applyTab(name);
-    // адрес повторяет то, что открыто: у статистики в нём ещё и период.
-    // На соседних страницах вкладки не видны и адрес не трогают; на «Наборах»
-    // из адреса набор в адрес не переезжает — там живёт страница.
-    var hash = '';
-    if (st.page === 'sets') {
-      if (name === 'stats') { hash = '#/stats/' + st.st.period; }
-      else if (st.sel && location.hash !== '#/sets') { hash = '#/set/' + st.sel; }
+    afterTab(name);
+    // адрес пишется только на странице набора — на соседних вкладок не видно.
+    // «Наборы» из адреса остаются наборной страницей: там живёт страница, а не набор
+    if (st.page === 'sets' && st.sel && location.hash !== '#/sets') {
+      var hash = setHash(st.sel, name);
+      if (location.hash !== hash) {
+        if (push) { history.pushState(null, '', hash); } else { history.replaceState(null, '', hash); }
+      }
     }
-    if (hash && location.hash !== hash) { history.replaceState(null, '', hash); }
-    if (name === 'stats') {
-      if (!st.st.data) { loadStats(); }
-      // ширина контейнера известна только после показа вкладки
-      renderSeries((st.st.data && st.st.data.series) || []);
-    }
+  }
+
+  // afterTab — что догрузить для показанной вкладки. Одно место на все вызовы:
+  // первый показ набора и переключение вкладки идут этим же путём
+  function afterTab(name) {
+    if (!st.sel) { return; }
+    if (name === 'overview') { renderSetTiles(); }
+    if (name === 'servers') { renderSetServers(); }
+    if (name === 'keys') { openKeys(); }
+    if (name === 'tools') { renderTools(); loadTools(); }
+    if (name === 'calls') { renderCalls(st.calls); }
+    if (name === 'logs') { loadLog(); }
   }
 
   /* Стрелки/Home/End внутри группы кнопок: roving tabindex сам по себе оставлял
@@ -3528,30 +3838,7 @@
     btns[j].focus();
   }
 
-  /* ---------- панель деталей ---------- */
-
-  function openSide() {
-    st.sideReturn = document.activeElement;
-    document.body.classList.add('side-open');
-    $('side-open').setAttribute('aria-expanded', 'true');
-    $('side').setAttribute('aria-hidden', 'false');
-    show($('scrim'), true);
-    if (window.innerWidth < 1200) { $('side-close').focus(); }
-  }
-
-  function closeSide() {
-    var was = document.body.classList.contains('side-open');
-    document.body.classList.remove('side-open');
-    $('side-open').setAttribute('aria-expanded', 'false');
-    $('side').setAttribute('aria-hidden', 'true');
-    if (!document.body.classList.contains('rail-open')) { show($('scrim'), false); }
-    // фокус не должен оставаться в скрытой панели: возвращаем туда, откуда открыли,
-    // а если оттуда некуда (открыли программно) — на саму кнопку «Детали»
-    var back = st.sideReturn && document.contains(st.sideReturn) && st.sideReturn.offsetParent !== null
-      ? st.sideReturn : ($('side-open').offsetParent !== null ? $('side-open') : null);
-    st.sideReturn = null;
-    if (was && back) { back.focus(); }
-  }
+  /* ---------- рейл ---------- */
 
   function openRail() {
     document.body.classList.add('rail-open');
@@ -3565,7 +3852,7 @@
     var was = document.body.classList.contains('rail-open');
     document.body.classList.remove('rail-open');
     $('rail-open').setAttribute('aria-expanded', 'false');
-    if (!document.body.classList.contains('side-open')) { show($('scrim'), false); }
+    show($('scrim'), false);
     if (was) { $('rail-open').focus(); }
   }
 
@@ -3578,7 +3865,7 @@
     var btn = $('rail-toggle');
     btn.setAttribute('aria-pressed', String(compact));
     btn.setAttribute('aria-label', compact ? t('rail.expand') : t('rail.collapse'));
-    if (w >= 860) { closeRail(); } else { closeSide(); }
+    if (w >= 860) { closeRail(); }
   }
 
   /* ---------- действия ---------- */
@@ -3601,6 +3888,8 @@
     });
   }
 
+  // вход во вкладку ключей: список, профили и пустая плашка нового ключа —
+  // выданный ключ показывается один раз и при возврате во вкладку уже скрыт
   function openKeys() {
     var set = current();
     if (!set) { return; }
@@ -3609,8 +3898,6 @@
     show($('new-key-box'), false);
     show($('keys-warn'), false);
     $('key-label').value = '';
-    var dlg = $('keys-dlg');
-    if (typeof dlg.showModal === 'function') { dlg.showModal(); }
   }
 
   // Профиль — сужение прав, записанное в наборе: панель знает только имена,
@@ -3714,10 +4001,14 @@
     renderRail();
     renderHead();
     renderKpis(st.kpi);
+    renderSetTiles();
     renderSetServers();
     renderServers(st.health);
     renderCalls(st.calls);
+    renderHost();
     renderEnv();
+    // список ключей перерисовывается, а выданный токен в #new-key-box остаётся:
+    // смена языка не должна съедать секрет, показанный один раз
     renderKeys(current() || {});
     fillKeyProfiles(current());
     fillFilters();
@@ -3734,7 +4025,8 @@
   $('rail-sets').addEventListener('click', function (e) {
     var row = e.target.closest('.set-item');
     if (!row) { return; }
-    select(row.dataset.id);
+    // выбор в рейле — шаг истории: «назад» возвращает на прежний набор
+    select(row.dataset.id, true);
     closeRail();
   });
 
@@ -3748,20 +4040,25 @@
     applyRail();
   });
 
-  $('scrim').addEventListener('click', function () { closeSide(); closeRail(); });
+  $('scrim').addEventListener('click', closeRail);
 
+  // клик по вкладке — шаг истории: «назад» возвращает на прежнюю вкладку
   $('tabs').addEventListener('click', function (e) {
     var btn = e.target.closest('.tab');
-    if (btn) { setTab(btn.dataset.tab); }
+    if (btn) { setTab(btn.dataset.tab, true); }
+  });
+  // плитки обзора набора — кнопки: ведут на свою вкладку той же страницы
+  $('set-tiles').addEventListener('click', function (e) {
+    var tile = e.target.closest('[data-goto]');
+    if (tile) { setTab(tile.dataset.goto, true); }
   });
   $('tabs').addEventListener('keydown', function (e) {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') { return; }
-    var order = ['overview', 'calls', 'stats'];
-    var i = order.indexOf(st.tab) + (e.key === 'ArrowRight' ? 1 : -1);
-    if (i < 0) { i = order.length - 1; }
-    if (i >= order.length) { i = 0; }
-    setTab(order[i]);
-    $('tabbtn-' + order[i]).focus();
+    var i = TABS.indexOf(st.tab) + (e.key === 'ArrowRight' ? 1 : -1);
+    if (i < 0) { i = TABS.length - 1; }
+    if (i >= TABS.length) { i = 0; }
+    setTab(TABS[i], true);
+    $('tabbtn-' + TABS[i]).focus();
   });
 
   $('s-period').addEventListener('keydown', function (e) {
@@ -3774,15 +4071,12 @@
       if ($('theme-menu').hidden === false) { closeThemeMenu(true); return; }
       if ($('srv-dlg').open) { closeSrv(); return; }
       if ($('srvlog-dlg').open) { closeSrvLog(); return; }
-      if ($('tools-dlg').open) { closeTools(); return; }
-      if (document.body.classList.contains('side-open')) { closeSide(); return; }
       if (document.body.classList.contains('rail-open')) { closeRail(); }
       return;
     }
     if (e.key !== 'Tab') { return; }
-    var root = $('srv-dlg').open ? $('srv-dlg') : $('srvlog-dlg').open ? $('srvlog-dlg') : $('tools-dlg').open ? $('tools-dlg') : null;
-    if (!root && !document.body.classList.contains('side-open')) { return; }
-    root = root || $('side');
+    var root = $('srv-dlg').open ? $('srv-dlg') : $('srvlog-dlg').open ? $('srvlog-dlg') : null;
+    if (!root) { return; }
     var f = [].slice.call(root.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
       .filter(function (n) { return n.offsetParent !== null; });
     if (!f.length) { return; }
@@ -3800,8 +4094,6 @@
   $('srvform').addEventListener('submit', saveSrv);
   $('srv-del').addEventListener('click', delSrv);
 
-  $('side-open').addEventListener('click', openSide);
-  $('side-close').addEventListener('click', closeSide);
 
   $('q').addEventListener('input', function () { renderCalls(st.calls); });
   $('only-err').addEventListener('change', function () { renderCalls(st.calls); });
@@ -3834,26 +4126,32 @@
     var tag = document.activeElement && document.activeElement.tagName;
     if (e.key !== '/' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { return; }
     e.preventDefault();
-    if (st.tab !== 'calls') { setTab('calls'); }
+    if (st.page !== 'sets') { applyPage('sets'); }
+    if (st.tab !== 'calls') { setTab('calls', true); }
     $('q').focus();
   });
 
-  window.addEventListener('hashchange', function () {
-    var m = /^#\/set\/([^/]+)$/.exec(location.hash);
-    if (m) { applyPage('sets'); if (m[1] !== st.sel) { select(decodeURIComponent(m[1])); } return; }
-    var s = /^#\/stats\/([a-z0-9]+)$/.exec(location.hash);
-    if (s) { applyPage('sets'); setTab('stats'); setPeriod(s[1], true); return; }
-    // «Наборы» из адреса, а не из вкладки: статистика на этой странице не открыта
-    if (location.hash === '#/sets' && st.tab === 'stats') { setTab('overview'); }
-    applyPage(pageOf(location.hash));
-  });
+  /* Адрес — единственный источник правды о том, что открыто: ссылка, «назад»
+     и «вперёд» идут одним путём. route() читает hash и приводит панель к нему. */
+  function route() {
+    var r = routeOf(location.hash);
+    applyPage(r.page);
+    if (r.page === 'stats') { setPeriod(r.period, true); }
+    if (r.page === 'sets' && r.set) {
+      if (r.set !== st.sel) { select(r.set, true); }
+      // вкладка из адреса: неизвестная уже сведена к обзору в routeOf
+      if (r.tab !== st.tab) { setTab(r.tab); }
+    }
+  }
+
+  window.addEventListener('hashchange', route);
 
   var resizeTimer = 0;
   window.addEventListener('resize', function () {
     applyRail();
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
-      if (st.tab === 'stats' && st.st.data) { renderSeries(st.st.data.series || []); }
+      if (st.page === 'stats' && st.st.data) { renderSeries(st.st.data.series || []); }
     }, 120);
   });
 
@@ -4049,10 +4347,6 @@
   });
 
   $('log-refresh').addEventListener('click', function () { loadLog(); });
-  $('log-wide').addEventListener('click', function () {
-    var on = document.body.classList.toggle('log-wide');
-    this.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
   $('errbar-close').addEventListener('click', function () { show($('errbar'), false); });
 
   /* ---------- список серверов набора и реестра ---------- */
@@ -4083,11 +4377,16 @@
 
   $('srvlog-close').addEventListener('click', closeSrvLog);
   $('srvlog-refresh').addEventListener('click', loadSrvLog);
-  $('tools-close').addEventListener('click', closeTools);
   $('tools-refresh').addEventListener('click', loadTools);
+  $('tools-server').addEventListener('change', function () {
+    st.toolsFilter = this.value;
+    renderTools();
+  });
   $('lock-body').addEventListener('click', function (e) {
     var btn = e.target.closest('[data-approve]');
-    if (btn) { approveTool(btn.dataset.approve, btn); }
+    if (!btn) { return; }
+    var tr = btn.closest('tr');
+    approveTool(tr.dataset.server, btn.dataset.approve, btn);
   });
   $('calls-more').addEventListener('click', loadMoreCalls);
   $('calls-resume').addEventListener('click', resumeCalls);
@@ -4160,7 +4459,7 @@
       form.reset();
       form.hidden = true;
       err.hidden = true;
-      return loadState().then(function () { if (set && set.id) { select(set.id); } });
+      return loadState().then(function () { if (set && set.id) { select(set.id, true); } });
     }).catch(function (ex) {
       err.textContent = ex.message;
       err.hidden = false;
@@ -4168,10 +4467,6 @@
   });
 
   /* ---------- ключи ---------- */
-
-  $('keys').addEventListener('click', openKeys);
-  $('keys-close').addEventListener('click', function () { $('keys-dlg').close(); });
-  $('keys-done').addEventListener('click', function () { $('keys-dlg').close(); });
 
   $('new-key-copy').addEventListener('click', function () {
     copyText($('new-key').textContent, this);
@@ -4262,16 +4557,15 @@
   function every(ms, fn) { setInterval(function () { if (!document.hidden) { fn(); } }, ms); }
 
   try { var rp = localStorage.getItem('mcprig.rail'); st.railPref = rp === 'compact' || rp === 'full' ? rp : ''; } catch (e) { /* приватный режим */ }
-  // ссылка на срез статистики открывает сразу её
-  var statLink = /^#\/stats\/([a-z0-9]+)$/.exec(location.hash);
-  if (statLink) { st.st.period = PERIODS.indexOf(statLink[1]) < 0 ? 'today' : statLink[1]; st.tab = 'stats'; }
   applyStatic();
   setTitle();
   applyRail();
   applyThemeMenu();
+  // первый кадр показывает то, что назвал адрес: страницу и вкладку набора.
+  // Иначе ссылка на #/set/x/logs мигала бы чужим обзором до первого ответа
   applyPage(st.page);
-  setTab(st.tab);
-  setPeriod(st.st.period, true);
+  applyTab(st.sel ? st.tab : null);
+  if (st.page === 'stats') { setPeriod(st.st.period, true); }
   loadState().then(function () {
     every(5000, loadState);
     every(5000, function () {
@@ -4280,11 +4574,15 @@
       // пока листают историю, страница не перезаписывается первой
       if (!st.callsMore.paged) { loadCalls(); }
     });
+    // лог читается, только когда открыта вкладка лога: у скрытой незачем
     every(10000, function () {
       var set = current();
-      if (set && set.runtime && set.runtime.running) { loadLog(); }
+      if (set && set.runtime && set.runtime.running && st.tab === 'logs') { loadLog(); }
     });
-    every(15000, function () { if (st.tab === 'stats') { loadStats(); } });
+    every(15000, function () {
+      if (st.page === 'stats') { loadStats(); }
+      if (st.page === 'host') { refreshHost(); }
+    });
     every(30000, loadEnv);
   });
 })();

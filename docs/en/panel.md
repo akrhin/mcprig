@@ -16,18 +16,19 @@ CSP: no inline scripts or styles.
 
 | area | contents |
 | --- | --- |
-| top bar | breadcrumbs `mcprig / <page or set>`, the MCP endpoint of the open set with a copy button, the button that opens the details drawer, the appearance menu — **theme** (Default or Windows 98) and the colour scheme of that theme — the interface language, and a static `admin` chip that is hidden on narrow screens |
+| top bar | breadcrumbs `mcprig / <page or set>`, the MCP endpoint of the open set with a copy button, the appearance menu — **theme** (Default or Windows 98) and the colour scheme of that theme — the interface language, and a static `admin` chip that is hidden on narrow screens |
 | left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
-| pages | **Sets**, **All servers** and **Variables** as pills at the top of the content, at `#/sets`, `#/servers` and `#/vars`; **Statistics** keeps `#/stats/<period>` and a set keeps `#/set/<id>`, so a reload or a shared link lands where it left off |
-| set head | name, port chip, state badge, **Import / Export**, **Keys**, **Prompt**, **Restart**, **Start/Stop**, and the red **Delete set** that removes the set and its directory; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
-| tabs | **Overview**, **Calls**, **Statistics** — of the open set, on the **Sets** page |
-| KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days, as a one-line summary under the servers table |
-| servers of the set | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check**, **Log**, **Tools**, **Edit** and the **×** that detaches the server from the set; under the table sit the registry picker and **add to set** |
+| pages | **Overview** at `#/`, **Sets** at `#/sets`, **Statistics** at `#/stats/<period>`, **All servers** at `#/servers` and **Variables** at `#/vars`, as pills at the top of the content; a set keeps `#/set/<id>` and each of its tabs has its own address, so a reload, a back button and a shared link all land where they should |
+| host overview | what the daemon is serving right now: sets running and sets stopped, servers ok, not checked and failing, tools waiting for approval, calls and error rate over the last 7 days, and the size and retention of `/tool-out` as a dash — the API has no field for it, so the panel says so instead of guessing. Under the tiles: every set by last call with its state and the daemon's reason, and the latest calls of all sets; a row opens that set |
+| set head | name, port chip, state badge, **Import / Export**, **Prompt**, **Restart**, **Start/Stop**, and the red **Delete set** that removes the set and its directory; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
+| tabs | **Overview**, **Servers**, **Keys**, **Tools**, **Calls** and **Logs** of the open set, at `#/set/<id>`, `#/set/<id>/servers`, `…/keys`, `…/tools`, `…/calls` and `…/logs`; an unknown tab opens **Overview**, a tab click adds a history entry, and the back and forward buttons walk through the tabs |
+| KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days, under the tiles of the set **Overview** |
+| servers of the set, on the **Servers** tab | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check**, **Log**, **Tools**, **Edit** and the **×** that detaches the server from the set; under the table sit the registry picker and **add to set** |
 | all servers page | the whole registry of the host: name with the daemon's reason on the second line, type, health, tool count from the last **Check**, the sets the server belongs to, and **Check**, **Authorize**, **Log**, **Edit** and the **×** that deletes it from the registry; **Add server** sits in the head |
 | import and export | the **Import / Export** dialog: the whole registry or one set as JSON, with **Download JSON** and **Copy**; import from a JSON file or a pasted `mcpServers` object — the preview names the servers that will be added, sets found in the file are skipped with a note (sets are made in the panel), and `env` and `headers` go out and come in as written |
 | calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
 | variables page | every `${NAME}` your servers reference with whether a value is set and where it comes from, a form that writes a value, and the **×** that forgets it |
-| details drawer | the log tail of the set; opens from the header and covers the panel width on a phone |
+| logs tab | the log tail of the set with **refresh**; it is a tab, not a drawer, so the log keeps its place in the address `#/set/<id>/logs` |
 | footer | the status bar: `M servers` of the registry, `mcprig <version>` and the time it was updated. The sets and how many are running are the line at the bottom of the left rail — `N sets · M running` |
 
 Health is shown as it is: `Healthy`, `Failed` with the daemon's reason on the
@@ -92,13 +93,14 @@ drawer reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the
 lines as text; a name that never appears in the log shows `log is empty`, and a
 failed request keeps the lines already shown and reports the reason above them.
 
-The **Tools** button of a row opens the descriptor drawer for that server
+The **Tools** button of a row switches to the **Tools** tab with that server
+picked in its **Server** filter
 ([meta-tools.md](meta-tools.md#descriptor-quarantine)): one line per tool with
 its state — `approved`, or `changed` in warning colour with an **approve**
 button. It reads `GET /api/sets/<id>/tools` and keeps the server's entries;
 **approve** sends `POST /api/sets/<id>/tools/approve` and the list is read
 again, so the row turns `approved` on the spot. Until then the proxy refuses
-that tool's calls. The drawer shows what the set process wrote, so without a set
+that tool's calls. The tab shows what the set process wrote, so without a set
 data directory (`MCPRIG_DATA_DIR`) every tool reads `approved`; entries of a
 server removed from the set are pruned when the set config is rebuilt.
 
@@ -109,12 +111,12 @@ is in the tooltip), and `config rejected` in error colour for a record with
 `_configError`. A valid server without a `sandbox` block carries no marker. The
 value comes from the same `isolation` field MCP clients see in `list_servers`.
 
-The **Keys** dialog lists key ids, creation and revocation dates and notes. It
+The **Keys** tab lists key ids, creation and revocation dates and notes. It
 shows only the 8-character prefix. When the set has a `profiles` block, the
 issue form carries a **Profile** select (empty means no profile); one
 `POST /api/sets/<id>/keys` carries both the label and the chosen profile as
 `{"label":…,"profile":…}`, a `400` from the daemon (an unknown profile) is shown
-in the dialog itself and the dialog stays open, and every key row shows its
+in the tab itself and the form stays as it is, and every key row shows its
 profile as a badge. A set without profiles keeps the form as it was. The label of
 an existing key is edited in place: the row has a label field and a **Save**
 button that appears once the value differs from the stored one; the panel sends

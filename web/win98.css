@@ -361,18 +361,7 @@ html[data-theme="win98"] .dialog-head .ghost-icon:hover { background: var(--w98-
 html[data-theme="win98"] .dialog-body { padding: var(--sp-3); gap: var(--sp-3); }
 html[data-theme="win98"] .dialog-foot { padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--w98-lo); }
 
-html[data-theme="win98"] .drawer-head {
-  padding: 2px var(--sp-2);
-  background: var(--w98-title); color: var(--w98-title-ink);
-  border-bottom: 2px solid var(--w98-face);
-}
-html[data-theme="win98"] .drawer-head h2 { font-size: var(--fs-3); font-weight: 700; }
-html[data-theme="win98"] :is(.dialog-head, .drawer-head) .count { color: var(--w98-title-ink); }
-html[data-theme="win98"] .drawer-head .ghost-icon { color: var(--w98-title-ink); border: 1px solid var(--w98-hi); }
-html[data-theme="win98"] .drawer-head .ghost-icon:hover { background: var(--w98-face); color: var(--text); }
-html[data-theme="win98"] .drawer-seg { margin: var(--sp-2) var(--sp-2) 0; }
-html[data-theme="win98"] .drawer-body { padding: var(--sp-2); gap: var(--sp-2); }
-html[data-theme="win98"] #side.drawer { border-left: 2px solid var(--w98-lo); }
+html[data-theme="win98"] .dialog-head .count { color: var(--w98-title-ink); }
 
 html[data-theme="win98"] .log {
   padding: var(--sp-2);
@@ -421,10 +410,19 @@ html[data-theme="win98"] ::-webkit-scrollbar-thumb {
 html[data-theme="win98"] ::-webkit-scrollbar-thumb:hover { background: var(--surface-2); }
 html[data-theme="win98"] ::-webkit-scrollbar-corner { background: var(--w98-face); }
 
-/* ── затемнение под дровером ────────────────────────────────────────────── */
+/* ── плитки обзора: вдавленное поле с объёмной рамкой ───────────────────── */
+html[data-theme="win98"] .tile {
+  border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-face); color: var(--text);
+}
+html[data-theme="win98"] a.tile:hover { background: var(--w98-face); border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi); }
+html[data-theme="win98"] .tile-num { color: var(--text); }
+html[data-theme="win98"] .tile-flat { border-style: solid; }
+
+/* ── затемнение под рейлом ──────────────────────────────────────────────── */
 /* закрыто видимостью, а не opacity: в этом слое прозрачность не живёт */
 html[data-theme="win98"] .scrim { opacity: 1; visibility: hidden; background: rgba(0, 0, 0, .35); }
-html[data-theme="win98"] body.side-open .scrim,
 html[data-theme="win98"] body.rail-open .scrim { visibility: visible; }
 
 /* ── High Contrast: чёрное поле, белые кромки, жёлтый акцент ────────────── */

@@ -234,7 +234,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 }
 
 .endpoint {
-  display: flex; align-items: center; gap: var(--sp-2); min-width: 0; max-width: 340px;
+  display: flex; align-items: center; gap: var(--sp-2); min-width: 0; max-width: 340px; min-height: 32px;
   padding: 5px 8px 5px 10px; border: 1px solid var(--line); border-radius: var(--r-2);
   background: var(--surface); color: var(--text-dim);
 }
@@ -276,7 +276,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .sw i { display: block; width: 9px; height: 14px; }
 
 .langsel { flex: none; }
-.langsel select { width: auto; min-height: 30px; padding: 3px 6px; font-size: var(--fs-2); }
+.langsel select { width: auto; min-height: 32px; padding: 3px 6px; font-size: var(--fs-2); }
 
 .who {
   display: inline-flex; align-items: center; gap: 6px; flex: none;
@@ -352,14 +352,24 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 /* причина провала в строке вызова: обрезана, полный текст — в title */
 .call-err { color: var(--err); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* порт рядом с именем набора и причина простоя под бейджем: вторая строка
+   ячейки, тоже 12 px — мельче подпись не читается */
+.cell-port { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-mute); }
+.cell-reason {
+  display: block; max-width: 40ch; margin-top: 2px;
+  font-size: var(--fs-2); color: var(--err);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .dot-hollow { background: transparent; width: 7px; height: 7px; box-shadow: inset 0 0 0 1.5px currentColor; }
 
 .count { color: var(--text-mute); font-size: var(--fs-2); }
 
-.tabs { display: flex; gap: var(--sp-5); margin-top: var(--sp-4); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; flex-wrap: wrap; gap: 0 var(--sp-5); margin-top: var(--sp-4); border-bottom: 1px solid var(--line); }
 .tab {
   position: relative; padding: 9px 0; border: 0; background: transparent;
+  min-width: 44px; /* короткая подпись («Keys») тоже должна быть целью нажатия */
   color: var(--text-dim); font-size: var(--fs-3); font-weight: 500;
   transition: color var(--dur-1) linear;
 }
@@ -391,6 +401,32 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   font-size: var(--fs-1); text-transform: uppercase; letter-spacing: .06em; color: var(--text-mute);
 }
 
+/* ── плитки обзора ──────────────────────────────────────────────────────── */
+/* Плитка-ссылка ведёт туда, где это число разбирается по частям; плитка без
+   ссылки (.tile-flat) — только показание: обещание перехода не даём. */
+.tiles {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.tile {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--sp-1);
+  min-height: 76px; padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface);
+  color: inherit; text-decoration: none;
+  /* плитка бывает кнопкой: у неё свои шрифт, центровка и рамка */
+  font: inherit; text-align: left; cursor: pointer;
+  appearance: none;
+  transition: border-color var(--dur-1) linear, background var(--dur-1) linear;
+}
+a.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.tile-num { font: 500 var(--fs-6) / 1.1 var(--font-mono); color: var(--text); }
+.tile-num.is-muted { color: var(--text-mute); }
+.tile-label {
+  font-size: var(--fs-2); color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.tile-flat { border-style: dashed; }
+
 /* ── блоки ──────────────────────────────────────────────────────────────── */
 .block { margin-top: var(--sp-7); }
 .block-head { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
@@ -407,7 +443,6 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .empty-title { font-size: var(--fs-4); font-weight: 600; color: var(--text); margin-bottom: var(--sp-1); }
 .empty-text { max-width: 52ch; margin: 0 auto var(--sp-3); }
 .empty > .empty-text:last-child { margin-bottom: 0; }
-.drawer-body .empty { padding: var(--sp-4); }
 .empty-state {
   padding: var(--sp-8) var(--sp-5); text-align: center;
   border: 1px dashed var(--line-strong); border-radius: var(--r-3);
@@ -437,7 +472,8 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .btn-danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); }
 
 .link-btn {
-  border: 0; background: transparent; padding: 0 0 2px;
+  display: inline-flex; align-items: center; min-height: 32px; /* цель нажатия, а не вид */
+  border: 0; background: transparent; padding: 6px 4px 2px;
   color: var(--accent); font-size: var(--fs-2);
   border-bottom: 1px solid transparent;
 }
@@ -445,7 +481,7 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 
 .ghost-icon {
   display: inline-grid; place-items: center; flex: none;
-  width: 30px; height: 30px; padding: 0;
+  width: 32px; height: 32px; padding: 0;
   border: 0; border-radius: var(--r-2); background: transparent; color: var(--text-dim);
   transition: background var(--dur-1) linear, color var(--dur-1) linear;
 }
@@ -489,6 +525,10 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
 .cell-iso { color: var(--warn); }
 /* наборы, в которых стоит сервер: список имён переносится, а не рвёт таблицу */
 .cell-sets { font-size: var(--fs-2); color: var(--text-dim); min-width: 12ch; }
+/* ссылка в ячейке: цель нажатия 32px, а строка таблицы выше не становится */
+.cell-name a, #host-sets-body td a, #host-calls-body td a, #calls-body td a {
+  display: inline-block; padding: 8px 4px; margin: -8px -4px;
+}
 .cell-sets span { overflow-wrap: anywhere; }
 
 /* доля в By set: тонкая полоса */
@@ -521,6 +561,8 @@ html.rail-compact .rail-add { justify-content: center; padding: 9px 0; }
   border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface);
 }
 .segbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px; /* цель нажатия, а не только вид */
   padding: 6px 12px; border: 0; background: transparent;
   color: var(--text-dim); font-size: var(--fs-2); white-space: nowrap;
 }
@@ -656,6 +698,8 @@ select.input { padding-right: 6px; }
 .dialog-foot .btn-danger { margin-right: auto; }
 
 .inline-form { display: grid; gap: var(--sp-2); }
+/* форма выпуска ключа узкая: широкая строка «поле + кнопка» читается как ошибка вёрстки */
+#key-form { max-width: 46ch; }
 
 /* ключи: имя, подпись, действия */
 .keylist { display: grid; gap: var(--sp-2); }
@@ -670,7 +714,8 @@ select.input { padding-right: 6px; }
 .key-sub { display: block; margin-top: 2px; font-size: var(--fs-1); color: var(--text-mute); }
 .key-badge { margin-left: 6px; vertical-align: middle; }
 .key-note { display: flex; gap: var(--sp-2); align-items: center; }
-.key-note .input { min-height: 30px; font-size: var(--fs-2); }
+/* подпись ключа — короткая: поле не растягивается на всю ширину панели */
+.key-note .input { min-height: 30px; font-size: var(--fs-2); max-width: 34ch; }
 .key-acts { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 @media (max-width: 640px) {
   .keyitem { grid-template-columns: minmax(0, 1fr); }
@@ -683,28 +728,7 @@ select.input { padding-right: 6px; }
 }
 .newkey code { font-family: var(--font-mono); font-size: var(--fs-3); overflow-wrap: anywhere; }
 
-/* ── дровер деталей: реестр, переменные, лог ────────────────────────────── */
-#side.drawer {
-  position: fixed; inset: 0 0 0 auto; z-index: 70;
-  display: flex; flex-direction: column;
-  width: min(480px, 100vw); height: 100vh;
-  background: var(--bg); border-left: 1px solid var(--line);
-  transform: translateX(100%);
-  transition: transform var(--dur-3) var(--ease);
-}
-body.side-open #side.drawer { transform: none; }
-.drawer-head {
-  display: flex; align-items: center; gap: var(--sp-3);
-  height: var(--topbar-h); flex: none;
-  padding: 0 var(--sp-3) 0 var(--sp-4);
-  border-bottom: 1px solid var(--line);
-}
-.drawer-head h2 { font-size: var(--fs-4); font-weight: 600; }
-.drawer-head .ghost-icon { margin-left: auto; }
-.drawer-seg { margin: var(--sp-3) var(--sp-4) 0; align-self: flex-start; }
-.drawer-body { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-.pane { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); align-content: start; }
-
+/* ── переменные ─────────────────────────────────────────────────────────── */
 .varlist { display: grid; gap: 2px; max-width: 72ch; }
 .varlist li {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
@@ -731,7 +755,8 @@ body.side-open #side.drawer { transform: none; }
   color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere;
   overflow: auto;
 }
-body.log-wide #side.drawer { width: min(900px, 100vw); }
+/* лог вкладки набора: высота окна, а не подписи — прокрутка внутри лога */
+#tab-logs .log { height: min(60vh, 520px); }
 /* промт целиком бывает длинным: в диалоге он прокручивается сам */
 .prompt-out { max-height: 40vh; min-height: 120px; }
 
@@ -760,15 +785,14 @@ body.log-wide #side.drawer { width: min(900px, 100vw); }
 }
 .statusbar .right { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 
-/* ── затемнение под рейлом и дровером ───────────────────────────────────── */
+/* ── затемнение под рейлом ──────────────────────────────────────────────── */
 .scrim {
   position: fixed; inset: 0; z-index: 50;
   background: rgba(4, 7, 11, .5);
   opacity: 0; pointer-events: none;
   transition: opacity var(--dur-2) linear;
 }
-body.rail-open .scrim,
-body.side-open .scrim { opacity: 1; pointer-events: auto; }
+body.rail-open .scrim { opacity: 1; pointer-events: auto; }
 
 .only-mobile { display: none; }
 
@@ -859,6 +883,16 @@ body.side-open .scrim { opacity: 1; pointer-events: auto; }
   .filters { gap: var(--sp-2); }
   .segmented { width: 100%; }
   .segbtn { flex: 1 1 0; text-align: center; }
+  /* пять пилюль страниц не делятся поровну в 375 px: подписи переносятся */
+  /* пять страниц в строку не влезают: сетка 2×2 и последняя на всю ширину */
+  .pagenav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pagenav .segbtn { flex: none; }
+  .pagenav .segbtn:last-child { grid-column: 1 / -1; }
+  /* плитки обзора — две в ряд, ниже 360 px одна */
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+  .tile { min-height: 68px; padding: var(--sp-2) var(--sp-3); }
+  /* подпись плитки остаётся 12 px: мельче читать нечего */
+  .tile-label { letter-spacing: 0; }
   /* на телефоне имя страницы в крошке не переносится: «All servers» ломалось
      на две строки и растягивало шапку */
   .crumb-set { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
