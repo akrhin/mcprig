@@ -9,6 +9,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/akrhin/mcprig/internal/safepath"
 )
 
 // Периоды, которые принимает панель.
@@ -431,8 +433,12 @@ var fileCache = struct {
 }{m: map[string]cacheEntry{}}
 
 // cached отдаёт разобранное значение, если файл не менялся с прошлого раза.
-// nil — файла нет или он битый; битый файл не кэшируется.
+// nil — файла нет или он битый; битый файл не кэшируется. Путь не из каталога
+// набора (обход каталога) — тоже nil: читать его нечем и не для чего.
 func cached(path string, load func() (any, error)) any {
+	if !safepath.Path(path) {
+		return nil
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil

@@ -272,6 +272,28 @@ func TestWrapRejectsRelativeCwd(t *testing.T) {
 	}
 }
 
+// Путь с «..» не должен доехать до bwrap: после Clean он либо относительный
+// (обход каталога), либо уже чистый — если чистый, монтируется именно он.
+func TestWrapDotDotPath(t *testing.T) {
+	stubAvailable(t, nil)
+	for _, bad := range []string{"../etc", "../../etc/passwd"} {
+		srv := sandboxed(bad)
+		if _, err := Wrap(srv, srv.Command); err == nil || !strings.Contains(err.Error(), "..") {
+			t.Fatalf("путь %q принят: %v", bad, err)
+		}
+	}
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dotted := dir + "/sub/.."
+	got := mustWrap(t, sandboxed(dotted))
+	if hasSeq(got, "--ro-bind", dotted, dotted) || !hasSeq(got, "--ro-bind", dir, dir) {
+		t.Fatalf("путь с «..» не приведён к чистому: %v", got)
+	}
+}
+
 // prlimitPath повторяет выбор пути из Wrap: exec.LookPath, иначе имя.
 func prlimitPath() string {
 	if p, err := exec.LookPath("prlimit"); err == nil {

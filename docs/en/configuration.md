@@ -111,7 +111,7 @@ rejected with `тег untrusted требует sandbox: сервер без из
 | --- | --- | --- | --- |
 | `mode` | `bwrap` / `none` | `bwrap` | `none` turns isolation off for this server; the block then only costs a warning |
 | `onUnavailable` | `deny` / `warn` / `allow` | `deny` | what happens when bubblewrap cannot start: refuse the server (fail-closed), run it confined by nothing and log a warning into the set log, or run it silently. An `untrusted` server accepts only `deny` |
-| `ro` | array of absolute paths | `/usr /bin /lib /lib64 /etc/ssl /etc/resolv.conf /etc/passwd /etc/group` | mounted read-only. An explicit list replaces the defaults, and any absolute path is allowed — including one under `/home`. Only a missing *default* path is skipped; a path you named must exist, and that is checked when the server starts, not when the config loads. Mounts are ordered parent before child, so `rw` on a subdirectory of an `ro` root works and the reverse silently stays read-only |
+| `ro` | array of absolute paths | `/usr /bin /lib /lib64 /etc/ssl /etc/resolv.conf /etc/passwd /etc/group` | mounted read-only. An explicit list replaces the defaults, and any absolute path is allowed — including one under `/home` — but the path is cleaned first and one that still climbs out (`..`) is refused. Only a missing *default* path is skipped; a path you named must exist, and that is checked when the server starts, not when the config loads. Mounts are ordered parent before child, so `rw` on a subdirectory of an `ro` root works and the reverse silently stays read-only |
 | `rw` | array of absolute paths | empty | mounted read-write; wins over `ro` on the same path |
 | `network` | `none` / `allow` | `none` | `allow` keeps the host network namespace; there is no per-host allowlist |
 | `memoryMb` | int | `2048` | `RLIMIT_AS` — virtual memory, not RSS. Go and node need at least 2048; under 512 neither starts |
@@ -149,7 +149,8 @@ filesystem and the host network namespace, not a virtual machine.
 
 Messages you may meet, and what they mean:
 `sandbox unavailable: <причина>` (bubblewrap is missing or userns is denied and
-`deny` is set), `sandbox: путь "…" не существует`, `sandbox: cwd "…" должен
+`deny` is set), `sandbox: путь "…" не существует`, `sandbox: путь "…" должен
+быть абсолютным и без «..»`, `sandbox: cwd "…" должен
 быть абсолютным`, `sandbox: неизвестные поля: …`.
 
 ### Both command forms
@@ -336,7 +337,7 @@ A set field in `registry.json` — where to report that the set broke:
 
 | field | meaning |
 | --- | --- |
-| `webhook` | `http://` or `https://` address with a non-empty host; any other scheme is rejected on write (400). `null`, an empty string or no block means no notifications |
+| `webhook` | `http://` or `https://` address with a non-empty host and no `user:pass@`; any other scheme is rejected on write (400), and the same check runs again right before sending, so a registry edited by hand cannot turn notifications into a request somewhere else. `null`, an empty string or no block means no notifications |
 
 An event is a `POST` with `Content-Type: application/json` and five fields:
 

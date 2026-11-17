@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/safelog"
 )
 
 const (
@@ -130,7 +131,7 @@ func (n *notifier) send(webhook string, ev notifyEvent) error {
 	}
 	// Адрес вебхука в лог не идёт: в нём бывает собственный токен, а post
 	// уже снял адрес с ошибки транспорта.
-	n.log.Warn("вебхук набора не отправлен", "set", ev.Set, "event", ev.Event, "err", lastErr)
+	n.log.Warn("вебхук набора не отправлен", "set", safelog.Value(ev.Set), "event", safelog.Value(ev.Event), "err", lastErr)
 	return lastErr
 }
 
@@ -145,9 +146,18 @@ func redactURL(err error) error {
 }
 
 func (n *notifier) post(webhook string, body []byte) error {
+	u, err := url.Parse(webhook)
+	if err != nil {
+		return redactURL(err)
+	}
+	// Схема, хост и учётные данные проверяются до запроса: адрес приходит из
+	// реестра, а file:// или user:pass@ увели бы запрос мимо вебхука.
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return errors.New("вебхук: нужен адрес http:// или https:// с хостом, без user:pass@")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhook, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
 	if err != nil {
 		return redactURL(err)
 	}
