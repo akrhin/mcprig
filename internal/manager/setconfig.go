@@ -14,6 +14,7 @@ import (
 	"github.com/akrhin/mcprig/internal/atomicfile"
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/safelog"
 	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/akrhin/mcprig/internal/toollock"
 	"github.com/akrhin/mcprig/internal/toolout"
@@ -214,7 +215,7 @@ func migrateLog(log *slog.Logger, dataDir, id string) {
 		return
 	}
 	if err := os.Rename(old, next); err != nil && log != nil {
-		log.Warn("лог набора не переименован", "set", id, "err", err)
+		log.Warn("лог набора не переименован", "set", safelog.Value(id), "err", err)
 	}
 }
 

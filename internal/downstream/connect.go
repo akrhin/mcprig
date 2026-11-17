@@ -14,6 +14,7 @@ import (
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/oauth"
+	"github.com/akrhin/mcprig/internal/safelog"
 	"github.com/akrhin/mcprig/internal/sandbox"
 )
 
@@ -136,7 +137,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 			// Песочница запрошена, но не применена (onUnavailable warn|allow):
 			// об этом должен знать лог набора и health, а не только пакет.
 			if c.Log != nil {
-				c.Log.Warn("сервер стартует без изоляции", "server", srv.Name, "причина", res.Reason)
+				c.Log.Warn("сервер стартует без изоляции", "server", safelog.Value(srv.Name), "причина", safelog.Value(res.Reason))
 			}
 			if c.OnSandboxFallback != nil {
 				c.OnSandboxFallback(srv, res.Reason)
@@ -156,7 +157,7 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		if err != nil || !fileExists(exe) {
 			if c.Log != nil {
 				c.Log.Warn("child-guard недоступен: сервер стартует без сторожа",
-					"server", srv.Name, "путь", exe, "ошибка", err)
+					"server", safelog.Value(srv.Name), "путь", safelog.Value(exe), "ошибка", err)
 			}
 			exe = ""
 		}

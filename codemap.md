@@ -38,7 +38,7 @@ Two processes come out of one `main`:
 | Directory | Responsibility | Map |
 | --- | --- | --- |
 | `cmd/` | Process entry points: the shipped binary and a test fixture server | [View Map](cmd/codemap.md) |
-| `internal/` | All library code: panel, MCP facade, HTTP surface, downstream, config, registry, OAuth, stats, sandbox, quarantine, cleanup helpers | [View Map](internal/codemap.md) |
+| `internal/` | All library code: panel, MCP facade, HTTP surface, downstream, config, registry, OAuth, stats, sandbox, quarantine, path and log hygiene, cleanup helpers | [View Map](internal/codemap.md) |
 | `web/` | Panel front end (SPA, no framework) plus `embed.go` that carries it in the binary | [View Map](web/codemap.md) |
 | `e2e/` | End-to-end suites: lifecycle (panel + set + stdio downstream), contract against a live BASE, proxy, keys, stdio | — |
 | `deploy/` | systemd units (`mcprig.service`, `mcprig-set@.service`, `mcprig-warm.{service,timer}`), `docker-compose.yml`, example sets | — |

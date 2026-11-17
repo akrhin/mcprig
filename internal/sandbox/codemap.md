@@ -18,9 +18,11 @@ works (`sandbox.go:1-4`). `Probe` says whether the sandbox is usable (`:295`).
   prefixed. On probe failure `onUnavailable` decides: `warn`/`allow` return
   `Result{Argv, Reason}`, `deny` (default) errors and the server does not start
   (`Wrap`, `:132-157`).
-- **Mounts** (`bwrapArgv`, `:159-274`). Paths must be absolute, one argv element
-  each, so a flag-looking value cannot become a flag (`:164-171`). Missing is
-  fatal except defaults from `config.DefaultSandboxRO` (`:172-180`, `:201-205`);
+- **Mounts** (`bwrapArgv`, `:159-274`). Paths are `filepath.Clean`ed, then must
+  pass `safepath.Path` — absolute, no `..`, no control characters (`:171-176`) —
+  and each stays one argv element, so a flag-looking value cannot become a flag
+  (`:162-166`). Missing is fatal except defaults from `config.DefaultSandboxRO`
+  (`:177-185`, `:206-210`);
   duplicates merge, `--bind` beats `--ro-bind` (`:181-187`). Base mounts first
   so a config path under `/tmp` is not hidden: `--size` = `tmpMb`, `--tmpfs /tmp`
   `--proc /proc --dev /dev` (`:196-199`); `srv.Cwd` bound read-only (`:212-216`);

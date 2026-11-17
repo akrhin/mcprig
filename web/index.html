@@ -79,10 +79,6 @@
           <span class="sr" data-i18n="head.copy">copy</span>
         </button>
 
-        <button class="ghost-icon" type="button" id="side-open" aria-controls="side" aria-expanded="false" aria-label="Details" data-i18n-title="top.details" data-i18n-aria="top.details">
-          <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-        </button>
-
         <div class="tmenu" id="tmenu">
           <button class="ghost-icon" type="button" id="theme-btn" aria-haspopup="true" aria-expanded="false" aria-controls="theme-menu" aria-label="Appearance" data-i18n-aria="top.theme">
             <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 1.6 1.6 0 0 0 0-3.2 1.9 1.9 0 0 1 0-3.8h2.4A6.6 6.6 0 0 0 21 7.4C21 4.9 16.9 3 12 3Z"/><circle cx="8" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="6.8" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.6" cy="9.2" r="1.1" fill="currentColor" stroke="none"/></svg>
@@ -170,15 +166,15 @@
         </button>
       </div>
 
-      <!-- страницы панели: наборы, весь реестр, переменные. Ссылки настоящие —
-           адрес переживает перезагрузку и пересылается как есть -->
+      <!-- страницы панели: обзор хоста, наборы, срез, весь реестр, переменные.
+           Ссылки настоящие — адрес переживает перезагрузку и пересылается как есть -->
       <nav class="segmented pagenav" id="pagenav" aria-label="Panel pages" data-i18n-aria="nav.label">
-        <a class="segbtn" href="#/sets" data-page="sets" aria-current="page" data-i18n="nav.sets">Sets</a>
+        <a class="segbtn" href="#/" data-page="host" data-i18n="nav.host">Overview</a>
+        <a class="segbtn" href="#/sets" data-page="sets" data-i18n="nav.sets">Sets</a>
+        <a class="segbtn" href="#/stats/today" data-page="stats" data-i18n="nav.stats">Statistics</a>
         <a class="segbtn" href="#/servers" data-page="servers" data-i18n="nav.servers">All servers</a>
         <a class="segbtn" href="#/vars" data-page="vars" data-i18n="nav.vars">Variables</a>
       </nav>
-
-      <div id="page-sets">
 
       <section class="empty-state" id="empty-state" hidden>
         <p class="empty-title" data-i18n="empty.title">No sets yet</p>
@@ -189,6 +185,76 @@
         </div>
       </section>
 
+      <!-- обзор хоста: что происходит на этой машине, а не какие есть наборы.
+           Плитка с числом — ссылка туда, где это число разбирается по частям. -->
+      <div id="page-host">
+        <section class="block" aria-labelledby="host-h">
+          <div class="block-head">
+            <h2 id="host-h" data-i18n="host.title">Host</h2>
+            <p class="block-meta" id="host-note" data-i18n="host.sub" role="status"></p>
+          </div>
+          <div class="tiles" id="host-tiles">
+            <a class="tile" href="#/sets"><span class="tile-num mono" id="h-running">—</span><span class="tile-label" data-i18n="host.running">sets running</span></a>
+            <a class="tile" href="#/sets"><span class="tile-num mono" id="h-stopped">—</span><span class="tile-label" data-i18n="host.stopped">sets stopped</span></a>
+            <a class="tile" href="#/servers"><span class="tile-num mono" id="h-ok">—</span><span class="tile-label" data-i18n="host.srvOk">servers ok</span></a>
+            <a class="tile" href="#/servers"><span class="tile-num mono" id="h-unchecked">—</span><span class="tile-label" data-i18n="host.srvUnchecked">not checked</span></a>
+            <a class="tile" href="#/servers"><span class="tile-num mono" id="h-failed">—</span><span class="tile-label" data-i18n="host.srvFailed">servers failing</span></a>
+            <div class="tile tile-flat"><span class="tile-num mono" id="h-pending">—</span><span class="tile-label" data-i18n="host.pending">tools to approve</span></div>
+            <a class="tile" href="#/stats/7d"><span class="tile-num mono" id="h-calls">—</span><span class="tile-label" data-i18n="host.calls">calls · 7 days</span></a>
+            <a class="tile" href="#/stats/7d"><span class="tile-num mono" id="h-err">—</span><span class="tile-label" data-i18n="kpi.errRate">error rate</span></a>
+            <div class="tile tile-flat"><span class="tile-num mono" id="h-toolout">—</span><span class="tile-label" data-i18n="host.toolout">tool output</span></div>
+          </div>
+          <p class="field-help" data-i18n="host.tooloutHelp">The proxy has no API for the size of /tool-out or how long it keeps files, so this panel shows a dash instead of a guess.</p>
+        </section>
+
+        <section class="block" aria-labelledby="host-sets-h">
+          <div class="block-head">
+            <h2 id="host-sets-h" data-i18n="host.sets">Sets by activity</h2>
+            <p class="block-meta" id="host-sets-note"></p>
+          </div>
+          <table class="table rtable" id="host-sets-table" aria-labelledby="host-sets-h">
+            <thead>
+              <tr>
+                <th scope="col" data-i18n="col.set">Set</th>
+                <th scope="col" data-i18n="host.thState">State</th>
+                <th scope="col" data-i18n="setSrv.thLast">Last request</th>
+              </tr>
+            </thead>
+            <tbody id="host-sets-body"></tbody>
+          </table>
+          <div class="empty" id="host-sets-empty" hidden>
+            <p class="empty-title" data-i18n="empty.title">No sets yet</p>
+            <p class="empty-text" data-i18n="host.setsEmpty">A set is one MCP endpoint; create one to see it here.</p>
+          </div>
+        </section>
+
+        <section class="block" aria-labelledby="host-calls-h">
+          <div class="block-head">
+            <h2 id="host-calls-h" data-i18n="host.latest">Latest calls</h2>
+            <p class="block-meta mono" id="host-calls-note"></p>
+          </div>
+          <table class="table rtable" id="host-calls-table" aria-labelledby="host-calls-h">
+            <thead>
+              <tr>
+                <th scope="col" data-i18n="tail.thTime">time</th>
+                <th scope="col" data-i18n="col.set">Set</th>
+                <th scope="col" data-i18n="tail.thServer">server</th>
+                <th scope="col" data-i18n="tail.thTool">tool</th>
+                <th scope="col" class="num" data-i18n="tail.thMs">ms</th>
+                <th scope="col" data-i18n="tail.thStatus">status</th>
+              </tr>
+            </thead>
+            <tbody id="host-calls-body"></tbody>
+          </table>
+          <div class="empty" id="host-calls-empty" hidden>
+            <p class="empty-title" data-i18n="tail.empty">no calls yet</p>
+            <p class="empty-text" data-i18n="host.callsEmpty">Calls appear here as soon as a set serves.</p>
+          </div>
+        </section>
+      </div>
+
+      <div id="page-sets">
+
       <div class="set-head" id="phead" hidden>
         <div class="set-head-row">
           <h1 class="set-title" id="set-name">—</h1>
@@ -196,7 +262,6 @@
           <span class="badge badge-unknown" id="set-state"><span class="dot"></span><span id="set-state-t">—</span></span>
           <div class="set-actions">
             <button class="btn" type="button" id="io" data-i18n="io.open">Import / Export</button>
-            <button class="btn" type="button" id="keys"><span data-i18n="head.keys">Keys</span> <span class="count mono" id="keys-count">0</span></button>
             <button class="btn" type="button" id="prompt-open" data-i18n="prompt.open">Prompt</button>
             <button class="btn" type="button" id="restart" hidden data-i18n="head.restart">Restart</button>
             <button class="btn btn-primary" type="button" id="run">—</button>
@@ -226,16 +291,51 @@
 
       <div class="tabs" id="tabs" role="tablist" aria-label="Set views">
         <button class="tab" role="tab" type="button" id="tabbtn-overview" data-tab="overview" aria-controls="tab-overview" aria-selected="true" tabindex="0" data-i18n="tabs.overview">Overview</button>
+        <button class="tab" role="tab" type="button" id="tabbtn-servers" data-tab="servers" aria-controls="tab-servers" aria-selected="false" tabindex="-1" data-i18n="tabs.servers">Servers</button>
+        <button class="tab" role="tab" type="button" id="tabbtn-keys" data-tab="keys" aria-controls="tab-keys" aria-selected="false" tabindex="-1" data-i18n="tabs.keys">Keys</button>
+        <button class="tab" role="tab" type="button" id="tabbtn-tools" data-tab="tools" aria-controls="tab-tools" aria-selected="false" tabindex="-1" data-i18n="tabs.tools">Tools</button>
         <button class="tab" role="tab" type="button" id="tabbtn-calls" data-tab="calls" aria-controls="tab-calls" aria-selected="false" tabindex="-1" data-i18n="tabs.calls">Calls</button>
-        <button class="tab" role="tab" type="button" id="tabbtn-stats" data-tab="stats" aria-controls="tab-stats" aria-selected="false" tabindex="-1" data-i18n="tabs.stats">Statistics</button>
+        <button class="tab" role="tab" type="button" id="tabbtn-logs" data-tab="logs" aria-controls="tab-logs" aria-selected="false" tabindex="-1" data-i18n="tabs.logs">Logs</button>
       </div>
 
       <section id="tab-overview" role="tabpanel" aria-labelledby="tabbtn-overview" tabindex="0">
+        <!-- сводка набора: состояние сейчас и трафик за 7 дней. Плитка не
+             украшение — с неё начинают разбираться, и она ведёт во вкладку -->
+        <div class="tiles" id="set-tiles">
+          <button class="tile" type="button" data-goto="servers"><span class="tile-num mono" id="t-ok">—</span><span class="tile-label" data-i18n="host.srvOk">servers ok</span></button>
+          <button class="tile" type="button" data-goto="servers"><span class="tile-num mono" id="t-unchecked">—</span><span class="tile-label" data-i18n="host.srvUnchecked">not checked</span></button>
+          <button class="tile" type="button" data-goto="servers"><span class="tile-num mono" id="t-failed">—</span><span class="tile-label" data-i18n="host.srvFailed">servers failing</span></button>
+          <button class="tile" type="button" data-goto="keys"><span class="tile-num mono" id="t-keys">—</span><span class="tile-label" data-i18n="tabs.keys">Keys</span></button>
+          <button class="tile" type="button" data-goto="tools"><span class="tile-num mono" id="t-pending">—</span><span class="tile-label" data-i18n="host.pending">tools to approve</span></button>
+          <div class="tile tile-flat"><span class="tile-num mono" id="t-up">—</span><span class="tile-label" data-i18n="host.up">up since</span></div>
+        </div>
+
+        <div class="kpis" id="kpis">
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-calls">—</span>
+            <span class="kpi-label" data-i18n="kpi.calls">calls</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-err">—</span>
+            <span class="kpi-label" data-i18n="kpi.errRate">error rate</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-p50">—</span>
+            <span class="kpi-label" data-i18n="kpi.p50">p50</span>
+          </div>
+          <div class="kpi od-stat">
+            <span class="kpi-num mono" id="k-p95">—</span>
+            <span class="kpi-label" data-i18n="kpi.p95">p95</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-servers" role="tabpanel" aria-labelledby="tabbtn-servers" tabindex="0" hidden>
         <section class="block" id="set-srv-block" aria-labelledby="set-srv-h">
           <div class="block-head">
             <h2 id="set-srv-h" data-i18n="setSrv.title">Servers</h2>
             <p class="block-meta" id="set-srv-note" role="status"></p>
-            <button class="btn btn-sm" type="button" id="srv-add" data-i18n="setSrv.add">Add server</button>
+            <button class="btn" type="button" id="srv-add" data-i18n="setSrv.add">Add server</button>
           </div>
           <table class="table rtable" id="set-srv-table" aria-labelledby="set-srv-h">
             <thead>
@@ -257,32 +357,74 @@
           <div class="od-row srv-compose" id="srv-compose">
             <label class="field-help" for="srv-attach" data-i18n="setSrv.attachLabel">Add a registry server to this set</label>
             <select class="input" id="srv-attach"></select>
-            <button class="btn btn-sm" type="button" id="srv-attach-add" data-i18n="setSrv.attach">add to set</button>
+            <button class="btn" type="button" id="srv-attach-add" data-i18n="setSrv.attach">add to set</button>
           </div>
           <p class="field-help" id="srv-attach-none" hidden data-i18n="setSrv.attachNone">every server in the registry is already in this set</p>
           <p class="field-help" id="srv-compose-help" data-i18n="setSrv.composeHelp">The list is saved at once. A running set applies the change without a restart, and a removed server loses its session. An empty set starts and serves no tools.</p>
           <p class="field-error" id="srv-compose-err" role="alert" tabindex="-1" hidden></p>
         </section>
+      </section>
 
-        <!-- сводка за 7 дней: второстепенная, строкой под таблицей серверов -->
-        <div class="kpis" id="kpis">
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-calls">—</span>
-            <span class="kpi-label" data-i18n="kpi.calls">calls</span>
+      <section id="tab-keys" role="tabpanel" aria-labelledby="tabbtn-keys" tabindex="0" hidden>
+        <section class="block" aria-labelledby="keys-h">
+          <div class="block-head">
+            <h2 id="keys-h" data-i18n="tabs.keys">Keys</h2>
+            <p class="block-meta mono" id="keys-count">0</p>
           </div>
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-err">—</span>
-            <span class="kpi-label" data-i18n="kpi.errRate">error rate</span>
+          <p class="block-meta" data-i18n="keys.sub">A key authenticates one client. It is shown once, right after it is created.</p>
+          <form class="inline-form" id="key-form" novalidate>
+            <div class="field" id="key-profile-field" hidden>
+              <label for="key-profile" data-i18n="keys.profile">Profile</label>
+              <select class="input" id="key-profile"></select>
+              <p class="field-help" data-i18n="keys.profileHelp">A profile limits the key to the rules the set lists under that name.</p>
+            </div>
+            <label class="field-label" for="key-label" data-i18n="keys.newLabel">New key label</label>
+            <div class="od-row">
+              <input class="input od-fill" id="key-label" name="label" autocomplete="off" spellcheck="false" placeholder="ci-runner" data-i18n-ph="keys.notePh">
+              <button class="btn btn-primary" type="submit" data-i18n="keys.issue">issue a key</button>
+            </div>
+          </form>
+
+          <div class="newkey" id="new-key-box" hidden>
+            <span class="field-label label-ok" data-i18n="keys.once">Copy this key now — it is not shown again</span>
+            <code id="new-key"></code>
+            <div class="od-row"><button class="btn btn-sm" type="button" id="new-key-copy" data-i18n="keys.copy">Copy key</button></div>
           </div>
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-p50">—</span>
-            <span class="kpi-label" data-i18n="kpi.p50">p50</span>
+
+          <p class="form-alert" id="keys-warn" role="alert" hidden></p>
+
+          <ul class="keylist" id="key-list" aria-label="Keys for this set"></ul>
+          <p class="empty" id="keys-empty" hidden data-i18n="head.noKey">no keys</p>
+          <p class="field-help" data-i18n="keys.note">Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.</p>
+        </section>
+      </section>
+
+      <section id="tab-tools" role="tabpanel" aria-labelledby="tabbtn-tools" tabindex="0" hidden>
+        <section class="block" aria-labelledby="tools-h">
+          <div class="block-head">
+            <h2 id="tools-h" data-i18n="tabs.tools">Tools</h2>
+            <p class="block-meta mono" id="tools-count"></p>
+            <button class="btn" type="button" id="tools-refresh" data-i18n="log.refresh">refresh</button>
           </div>
-          <div class="kpi od-stat">
-            <span class="kpi-num mono" id="k-p95">—</span>
-            <span class="kpi-label" data-i18n="kpi.p95">p95</span>
+          <p class="block-meta" data-i18n="tools.sub">descriptors the proxy remembers — a changed one waits for your approval</p>
+          <div class="filters">
+            <label class="fsel"><span data-i18n="setSrv.thServer">Server</span><select id="tools-server" class="input"></select></label>
           </div>
-        </div>
+          <p class="field-error" id="tools-err" role="alert" hidden></p>
+          <div class="tools-wrap">
+            <table class="table rtable" aria-labelledby="tools-h">
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="tools.thTool">Tool</th>
+                  <th scope="col" data-i18n="tools.thState">State</th>
+                  <th scope="col" class="num" data-i18n="tools.thAct">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="lock-body"></tbody>
+            </table>
+          </div>
+          <p class="empty" id="tools-empty" hidden data-i18n="tools.empty">this set has not listed any tools yet</p>
+        </section>
       </section>
 
       <section id="tab-calls" role="tabpanel" aria-labelledby="tabbtn-calls" tabindex="0" hidden>
@@ -321,7 +463,26 @@
         </div>
       </section>
 
-      <section id="tab-stats" role="tabpanel" aria-labelledby="tabbtn-stats" tabindex="0" hidden>
+      <section id="tab-logs" role="tabpanel" aria-labelledby="tabbtn-logs" tabindex="0" hidden>
+        <section class="block" aria-labelledby="logs-h">
+          <div class="block-head">
+            <h2 id="logs-h" data-i18n="tabs.logs">Logs</h2>
+            <p class="block-meta mono" id="log-count">0</p>
+            <button class="btn" type="button" id="log-refresh" data-i18n="log.refresh">refresh</button>
+          </div>
+          <p class="block-meta" data-i18n="log.tail">log tail of the set</p>
+          <div class="log" id="log" aria-live="polite" tabindex="0"></div>
+          <p class="empty" id="log-empty" hidden data-i18n="log.empty">log is empty</p>
+        </section>
+      </section>
+      </div><!-- /page-sets -->
+
+      <!-- срез по всем наборам: у него свой адрес (#/stats/today), значит и своя страница -->
+      <section class="block" id="page-stats" aria-labelledby="stats-h" hidden>
+        <div class="block-head">
+          <h2 id="stats-h" data-i18n="nav.stats">Statistics</h2>
+          <p class="block-meta"></p>
+        </div>
         <div class="filters">
           <div class="segmented" role="group" aria-label="Period" id="s-period">
             <button class="segbtn" type="button" data-period="today" aria-pressed="true" data-i18n="stats.today">Today</button>
@@ -451,7 +612,6 @@
         </div>
         <p class="form-alert" id="stats-unreach" role="status" hidden></p>
       </section>
-      </div><!-- /page-sets -->
 
       <section class="block" id="page-servers" aria-labelledby="all-srv-h" hidden>
         <div class="block-head">
@@ -522,30 +682,6 @@
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
-
-<aside class="drawer" id="side" aria-hidden="true" aria-labelledby="side-h">
-  <div class="drawer-inner">
-    <div class="drawer-head">
-      <h2 id="side-h" data-i18n="side.label">Details</h2>
-      <span class="count mono" id="log-count">0</span>
-      <button class="ghost-icon" type="button" id="side-close" aria-label="Close details" data-i18n-aria="side.close">
-        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-
-    <div class="drawer-body">
-      <section class="pane" id="pane-log">
-        <div class="od-row">
-          <p class="block-meta" data-i18n="log.tail">log tail of the set</p>
-          <button class="btn btn-xs" type="button" id="log-wide" aria-pressed="false" title="expand the log panel" data-i18n-title="log.wideTip" data-i18n="log.wide">wider</button>
-          <button class="btn btn-xs" type="button" id="log-refresh" data-i18n="log.refresh">refresh</button>
-        </div>
-        <div class="log" id="log" aria-live="polite" tabindex="0"></div>
-        <p class="empty" id="log-empty" hidden data-i18n="log.empty">log is empty</p>
-      </section>
-    </div>
-  </div>
-</aside>
 
 <dialog class="dialog drawer" id="srv-dlg" aria-labelledby="srvform-h">
   <form class="dialog-inner" id="srvform" novalidate>
@@ -688,83 +824,6 @@
       <p class="field-error" id="srvlog-err" role="alert" hidden></p>
       <div class="log srvlog" id="srvlog" tabindex="0" aria-live="polite"></div>
       <p class="empty" id="srvlog-empty" hidden data-i18n="log.empty">log is empty</p>
-    </div>
-  </div>
-</dialog>
-
-<dialog class="dialog drawer" id="tools-dlg" aria-labelledby="tools-h">
-  <div class="dialog-inner">
-    <div class="dialog-head">
-      <div>
-        <h2 id="tools-h">—</h2>
-        <p class="dialog-sub" data-i18n="tools.sub">descriptors the proxy remembers — a changed one waits for your approval</p>
-      </div>
-      <button class="ghost-icon" type="button" id="tools-close" aria-label="Close" data-i18n-aria="common.close">
-        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <div class="dialog-body tools-body">
-      <div class="od-row">
-        <span class="block-meta mono" id="tools-count"></span>
-        <button class="btn btn-xs" type="button" id="tools-refresh" data-i18n="log.refresh">refresh</button>
-      </div>
-      <p class="field-error" id="tools-err" role="alert" hidden></p>
-      <div class="tools-wrap">
-        <table class="table" aria-labelledby="tools-h">
-          <thead>
-            <tr>
-              <th scope="col" data-i18n="tools.thTool">Tool</th>
-              <th scope="col" data-i18n="tools.thState">State</th>
-              <th scope="col" class="num" data-i18n="tools.thAct">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="lock-body"></tbody>
-        </table>
-      </div>
-      <p class="empty" id="tools-empty" hidden data-i18n="tools.empty">this set has not listed any tools yet</p>
-    </div>
-  </div>
-</dialog>
-
-<dialog class="dialog modal" id="keys-dlg" aria-labelledby="keys-title">
-  <div class="dialog-inner">
-    <div class="dialog-head">
-      <div>
-        <h2 id="keys-title"><span data-i18n="keys.title">Set keys</span> <span class="mono" id="dlg-set">—</span></h2>
-        <p class="dialog-sub" data-i18n="keys.sub">A key authenticates one client. It is shown once, right after it is created.</p>
-      </div>
-      <button class="ghost-icon" type="button" id="keys-close" aria-label="Close" data-i18n-aria="common.close">
-        <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <div class="dialog-body">
-      <form class="inline-form" id="key-form" novalidate>
-        <div class="field" id="key-profile-field" hidden>
-          <label for="key-profile" data-i18n="keys.profile">Profile</label>
-          <select class="input" id="key-profile"></select>
-          <p class="field-help" data-i18n="keys.profileHelp">A profile limits the key to the rules the set lists under that name.</p>
-        </div>
-        <label class="field-label" for="key-label" data-i18n="keys.newLabel">New key label</label>
-        <div class="od-row">
-          <input class="input od-fill" id="key-label" name="label" autocomplete="off" spellcheck="false" placeholder="ci-runner" data-i18n-ph="keys.notePh">
-          <button class="btn btn-primary" type="submit" data-i18n="keys.issue">issue a key</button>
-        </div>
-      </form>
-
-      <div class="newkey" id="new-key-box" hidden>
-        <span class="field-label label-ok" data-i18n="keys.once">Copy this key now — it is not shown again</span>
-        <code id="new-key"></code>
-        <div class="od-row"><button class="btn btn-sm" type="button" id="new-key-copy" data-i18n="keys.copy">Copy key</button></div>
-      </div>
-
-      <p class="form-alert" id="keys-warn" role="alert" hidden></p>
-
-      <ul class="keylist" id="key-list" aria-label="Keys for this set"></ul>
-      <p class="empty" id="keys-empty" hidden data-i18n="head.noKey">no keys</p>
-      <p class="field-help" data-i18n="keys.note">Only whoever issued a token knows it: the panel shows the first 8 characters. Revoking a key takes effect without restarting the set.</p>
-    </div>
-    <div class="dialog-foot">
-      <button class="btn" type="button" id="keys-done" data-i18n="common.done">done</button>
     </div>
   </div>
 </dialog>

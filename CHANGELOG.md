@@ -8,6 +8,20 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Added
+
+- Panel: an overview page at `#/` — sets running and stopped, servers by health,
+  tools waiting for approval, calls and errors over 7 days, and the newest calls;
+  the list of sets moved to `#/sets`.
+- Panel: every tab of a set has its own address (`#/set/<id>/servers`, `…/keys`,
+  `…/tools`, `…/calls`, `…/logs`); back and forward walk through tabs, an unknown
+  tab opens the overview. Statistics became a page of its own (`#/stats/<period>`).
+
+### Changed
+
+- Panel: the set log is a **Logs** tab, keys and tool approvals are tabs of their
+  own, and the details drawer is gone.
+
 ## [0.6.4] - 2026-11-17
 
 ### Fixed

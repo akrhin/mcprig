@@ -48,9 +48,11 @@
 - **Legacy single token migrates in place.** `normalizeKeys` drops malformed and duplicate
   keys, back-fills `createdAt`, copies `note` to `label`, and adopts the old set-level
   `token` as key id `"legacy"` when nothing survives (`keys.go:95-119`, `types.go:22`).
-- **Strict where the TS reference was lenient.** `namePattern =
-  ^[a-z0-9][a-z0-9_-]{0,63}$` (`validate.go:15`) gates server names (`validate.go:144`)
-  and set ids (`store.go:120`, `validate.go:364`); `stringMapStrict` refuses non-string
+- **Strict where the TS reference was lenient.** Names go through
+  `safepath.Name` (`internal/safepath`), the shared rule
+  `^[a-z0-9][a-z0-9_-]{0,63}$`: server names (`validate.go:142`)
+  and set ids (`store.go:132`, `validate.go:367`); it lives in its own package
+  because the panel and the stats reader apply it too. `stringMapStrict` refuses non-string
   `env`/`headers` (`validate.go:82-105`); exactly one of `command[]`/`url`
   (`validate.go:223-229`); `cwd` only stdio (`validate.go:246-248`);
   `sandbox`/`permissions`/`expose` go through the set's own `config` parsers
