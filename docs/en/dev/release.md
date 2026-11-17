@@ -25,6 +25,8 @@ releases; Gitea keeps a mirror of the code and runs exactly one workflow,
    `docker/` changed — the tag builds the images anyway, so a push to `master`
    does not repeat that work.
 3. GitHub `codeql` scans Go and the panel's JavaScript on every push and weekly;
+   `.github/codeql/codeql-config.yml` keeps generated pages (`docs/diagrams/`)
+   and UI mockups (`design/ui/`) out of the scan — they are output, not code;
    `dependency-review` fails a pull request that adds a dependency with a
    high-severity advisory.
 4. GitHub `release` runs on the tag. `ci` does not run on tags, so the release

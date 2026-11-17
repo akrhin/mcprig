@@ -24,6 +24,8 @@ set. `internal/manager` is the only place where the two roles meet.
 | `internal/toolout/` | `tool-out` directory: `.owner` sidecars and retention sweep (not the cut itself) | [View Map](toolout/codemap.md) |
 | `internal/atomicfile/` | Atomic file replacement: temp in the same directory, `0600`, fsync, rename | [View Map](atomicfile/codemap.md) |
 | `internal/healthconst/` | Health-probe budget shared by the panel and the MCP facade (`TTL`, `Timeout` = 15 s); a separate package because `manager` imports `mcpserver` in tests | [View Map](healthconst/codemap.md) |
+| `internal/safepath/` | Shape checks for values that reach a filesystem path: one segment (`Name`, the registry's name rule) and a path to read (`Path`) | [View Map](safepath/codemap.md) |
+| `internal/safelog/` | `Value`: a log value with control characters removed, so a name from the request cannot forge a log line | [View Map](safelog/codemap.md) |
 
 ## Flow
 
