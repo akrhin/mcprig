@@ -312,6 +312,9 @@ func run() error {
 	}
 	// Env: ребёнку уходит whitelist плюс envAllow сервера, а не весь os.Environ().
 	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log, Env: downstream.EnvFor}
+	// stderr детей набора — в файл рядом с servers.json: панель читает его как
+	// «лог сервера». stdout ребёнка занят протоколом.
+	conn.ServerLogs = downstream.NewServerLogs(filepath.Dir(*cfgPath))
 	mgr := mcpserver.New(cfg, version, conn)
 	defer func() {
 		if err := mgr.Close(); err != nil {

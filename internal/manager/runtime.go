@@ -392,6 +392,9 @@ func (rt *Runtime) stopProc(id string, p *process) {
 	rt.mu.Lock()
 	delete(rt.procs, id)
 	rt.mu.Unlock()
+	// Хвосты серверов принадлежат прошлому запуску: набор погашен, и панель не
+	// должна выдавать старые строки за текущие.
+	clearServerLogs(rt.dataDir, id)
 	if live {
 		rt.log.Info("набор " + safelog.Value(id) + ": остановлен")
 	}
@@ -703,16 +706,24 @@ func tailFile(path string, lines int) ([]string, error) {
 	return []string{}, nil
 }
 
-// ServerLogs — строки лога, где имя сервера встречается отдельным словом.
+// ServerLogs — хвост вывода процесса сервера плюс строки лога набора, где имя
+// сервера встречается отдельным словом. Вывод ребёнка пишет процесс набора в
+// serverlogs/<имя>.log (stdout у stdio-сервера занят протоколом), а в лог
+// набора он не попадает вовсе — без файла у сервера был пустой лог.
 func (rt *Runtime) ServerLogs(id, server string, lines int) []string {
-	all := rt.Logs(id, 5000)
+	if lines <= 0 {
+		lines = 200
+	}
 	out := make([]string, 0, 64)
-	for _, line := range all {
+	for _, line := range rt.Logs(id, 5000) {
 		if mentions(line, server) {
 			out = append(out, line)
 		}
 	}
-	if lines > 0 && len(out) > lines {
+	if tail, err := tailFile(ServerLogPath(rt.dataDir, id, server), lines); err == nil {
+		out = append(out, tail...)
+	}
+	if len(out) > lines {
 		out = out[len(out)-lines:]
 	}
 	return out

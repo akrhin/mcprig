@@ -13,6 +13,7 @@ import (
 
 	"github.com/akrhin/mcprig/internal/atomicfile"
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/safelog"
 	"github.com/akrhin/mcprig/internal/stats"
@@ -200,6 +201,18 @@ func pruneLock(dataDir, id string, body []byte) {
 // LogPath — <dataDir>/sets/<id>/mcprig.log.
 func LogPath(dataDir, id string) string {
 	return filepath.Join(dataDir, "sets", id, "mcprig.log")
+}
+
+// ServerLogPath — <dataDir>/sets/<id>/serverlogs/<server>.log: хвост вывода
+// процесса сервера, который ведёт сам набор.
+func ServerLogPath(dataDir, id, name string) string {
+	return downstream.ServerLogPath(filepath.Join(dataDir, "sets", id), name)
+}
+
+// clearServerLogs убирает хвосты серверов: после остановки или перезапуска
+// строки прошлого запуска не должны выглядеть текущими.
+func clearServerLogs(dataDir, id string) {
+	_ = os.RemoveAll(filepath.Join(dataDir, "sets", id, "serverlogs"))
 }
 
 // migrateLog переносит унаследованный lazy-mcp.log в mcprig.log один раз: без

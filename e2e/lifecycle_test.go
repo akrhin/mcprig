@@ -125,6 +125,48 @@ func TestLifecycleStartServeStop(t *testing.T) {
 	}
 }
 
+func TestLifecycleServerLogShowsChildOutput(t *testing.T) {
+	if testing.Short() {
+		t.Skip("сборка бинарей и супервизия процессов — долгий сценарий")
+	}
+	l := newLifecycle(t)
+	defer l.close()
+
+	const marker = "лог сервера: вывод процесса"
+	fixture := l.build("./cmd/testmcp", "testmcp")
+	l.post("/api/servers", map[string]any{
+		"name": "fix", "command": []string{fixture},
+		"env": map[string]string{"TESTMCP_STDERR": marker},
+	}, http.StatusCreated)
+	l.post("/api/sets", map[string]any{"name": "slog", "servers": []string{"fix"}}, http.StatusCreated)
+	l.post("/api/sets/slog/start", nil, http.StatusOK)
+
+	// Процесс сервера поднимается прогревом уже после ответа start: ждём строку.
+	path := "/api/sets/slog/servers/fix/logs?lines=20"
+	var logs []any
+	found := false
+	deadline := time.Now().Add(30 * time.Second)
+	for !found && time.Now().Before(deadline) {
+		logs, _ = l.get(path)["logs"].([]any)
+		for _, line := range logs {
+			if text, _ := line.(string); strings.Contains(text, marker) {
+				found = true
+			}
+		}
+		if !found {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	if !found {
+		t.Fatalf("в логе сервера нет вывода его процесса: %v", logs)
+	}
+
+	l.post("/api/sets/slog/stop", nil, http.StatusOK)
+	if after, _ := l.get(path)["logs"].([]any); len(after) != 0 {
+		t.Fatalf("после остановки остался вывод прошлого запуска: %v", after)
+	}
+}
+
 func TestLifecycleRestartAfterKill(t *testing.T) {
 	if testing.Short() {
 		t.Skip("супервизия и backoff — долгий сценарий")

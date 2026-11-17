@@ -3,6 +3,7 @@ package downstream
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -56,6 +57,11 @@ type Connector struct {
 	// на уведомление только если сервер объявил tools.listChanged в
 	// InitializeResult (client.go:341 в go-sdk v1.8.0).
 	OnToolsChanged func(*config.Server)
+
+	// ServerLogs принимает stderr процессов серверов и переживает старт: без
+	// него вывод ребёнка жил только в хвосте ошибки подключения, и панель
+	// показывала для сервера пустой лог. nil — не писать.
+	ServerLogs *ServerLogs
 }
 
 func (c *Connector) Connect(ctx context.Context, srv *config.Server) (*mcp.ClientSession, error) {
@@ -169,7 +175,13 @@ func (c *Connector) transport(ctx context.Context, srv *config.Server) (mcp.Tran
 		// остаются в системе (см. groupTransport).
 		cmd.SysProcAttr = childAttr()
 		tail := &stderrTail{}
-		cmd.Stderr = tail
+		// Хвост в памяти нужен ошибке старта, файл — панели: вывод ребёнка
+		// идёт в оба. stdout занят протоколом, поэтому логируется только stderr.
+		var sink io.Writer = tail
+		if w := c.ServerLogs.Writer(srv); w != nil {
+			sink = io.MultiWriter(tail, w)
+		}
+		cmd.Stderr = sink
 		// A set runs with an env already narrowed by the manager; the server's
 		// own env wins over it.
 		base := os.Environ()
