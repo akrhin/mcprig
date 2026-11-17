@@ -27,6 +27,7 @@ import (
 
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/safelog"
 	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/akrhin/mcprig/internal/toolout"
 )
@@ -196,7 +197,7 @@ func New(opts Options) (*Manager, error) {
 			continue
 		}
 		if err := stats.Rotate(dir, time.Now(), log); err != nil {
-			log.Warn("stats: ротация при старте", "set", set.ID, "err", err)
+			log.Warn("stats: ротация при старте", "set", safelog.Value(set.ID), "err", err)
 		}
 	}
 	a, err := newAuth(opts.Auth)
@@ -287,7 +288,7 @@ func (m *Manager) Autostart() {
 		set := set
 		go func() {
 			if _, err := m.startSet(context.Background(), set); err != nil {
-				m.log.Warn("автостарт набора не удался", "set", set.ID, "err", err)
+				m.log.Warn("автостарт набора не удался", "set", safelog.Value(set.ID), "err", err)
 			}
 		}()
 	}
@@ -326,7 +327,7 @@ func Run(opts Options) error {
 	if m.tls != nil {
 		scheme = "https"
 	}
-	m.log.Info("менеджер запущен", "addr", srv.Addr, "scheme", scheme, "publicUrl", opts.PublicURL, "data", opts.DataDir, "auth", m.auth.mode)
+	m.log.Info("менеджер запущен", "addr", safelog.Value(srv.Addr), "scheme", scheme, "publicUrl", safelog.Value(opts.PublicURL), "data", safelog.Value(opts.DataDir), "auth", m.auth.mode)
 	m.Autostart()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -336,7 +337,7 @@ func Run(opts Options) error {
 	// в тех же каталогах данных.
 	toolCfg, warns := toolout.FromEnv()
 	for _, w := range warns {
-		m.log.Warn("tool-out: " + w)
+		m.log.Warn("tool-out: " + safelog.Value(w))
 	}
 	toolout.Run(ctx, opts.DataDir, toolCfg, toolout.Interval, m.log)
 
@@ -392,7 +393,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	defer func() {
 		if rec := recover(); rec != nil {
-			m.log.Error("паника в обработчике", "path", r.URL.Path, "panic", rec)
+			m.log.Error("паника в обработчике", "path", safelog.Value(r.URL.Path), "panic", rec)
 			m.fail(w, r, &httpError{http.StatusInternalServerError, "внутренняя ошибка — повторите; если повторяется, смотрите лог панели"})
 		}
 	}()
@@ -705,7 +706,7 @@ func (m *Manager) fail(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 	if status >= 500 {
-		m.log.Error("ошибка API", "method", r.Method, "path", r.URL.Path, "status", status, "err", err)
+		m.log.Error("ошибка API", "method", safelog.Value(r.Method), "path", safelog.Value(r.URL.Path), "status", status, "err", err)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -731,21 +732,21 @@ func (m *Manager) checkCSRF(r *http.Request) error {
 			break
 		}
 		if _, err := r.Cookie(sessionCookie); err == nil {
-			m.log.Warn("csrf: Origin: null с сессионной cookie", "path", r.URL.Path,
-				"ua", r.UserAgent())
+			m.log.Warn("csrf: Origin: null с сессионной cookie", "path", safelog.Value(r.URL.Path),
+				"ua", safelog.Value(r.UserAgent()))
 			return &httpError{http.StatusForbidden, "Origin: null не принимается — откройте панель по её адресу"}
 		}
 		// null без cookie — источник неизвестен, но власти у запроса нет:
 		// в лог, чтобы такой клиент было видно, и дальше по общему пути.
-		m.log.Info("csrf: Origin: null без cookie — запрос обслужен", "path", r.URL.Path,
-			"ua", r.UserAgent())
+		m.log.Info("csrf: Origin: null без cookie — запрос обслужен", "path", safelog.Value(r.URL.Path),
+			"ua", safelog.Value(r.UserAgent()))
 	case origin != "":
 		u, err := url.Parse(origin)
 		if err != nil || !m.originMatches(u, r) {
 			// Значения в лог: без них отказ не отладить с чужой машины.
-			m.log.Warn("csrf: origin не совпал", "origin", origin, "host", r.Host,
-				"x-forwarded-host", r.Header.Get("X-Forwarded-Host"), "path", r.URL.Path,
-				"ua", r.UserAgent())
+			m.log.Warn("csrf: origin не совпал", "origin", safelog.Value(origin), "host", safelog.Value(r.Host),
+				"x-forwarded-host", safelog.Value(r.Header.Get("X-Forwarded-Host")), "path", safelog.Value(r.URL.Path),
+				"ua", safelog.Value(r.UserAgent()))
 			return &httpError{http.StatusForbidden, "origin не совпадает с хостом"}
 		}
 	case r.URL.Path != "/api/login":
@@ -1479,7 +1480,7 @@ func (m *Manager) apiSetUpdate(req *request) error {
 		// применяются живьём, по SIGHUP.
 		var failed map[string]string
 		if restart, why := needsRestart(old, set, m.store.Servers()); restart {
-			m.log.Info("набор "+id+": правка транспорта — перезапуск", "причина", why)
+			m.log.Info("набор "+safelog.Value(id)+": правка транспорта — перезапуск", "причина", why)
 			if _, err := m.RestartSet(context.Background(), set); err != nil {
 				failed = map[string]string{id: err.Error()}
 			}
@@ -1536,7 +1537,7 @@ func needsRestart(old, new *registry.Set, servers []registry.Server) (bool, stri
 func (m *Manager) reloadSetView(ctx context.Context, set *registry.Set) (setView, error) {
 	out, err := m.rt.Reload(ctx, set, m.store.Servers())
 	if err != nil {
-		m.log.Warn("reload набора не удался", "set", set.ID, "err", err)
+		m.log.Warn("reload набора не удался", "set", safelog.Value(set.ID), "err", err)
 		return setView{}, serverError(err.Error())
 	}
 	view := m.setView(set)
@@ -1635,7 +1636,7 @@ func (m *Manager) apiSetDelete(req *request) error {
 	// Каталог набора хранит servers.json с bearer-ключом: удалённый набор не
 	// должен оставлять его на диске.
 	if err := os.RemoveAll(filepath.Join(m.rt.dataDir, "sets", id)); err != nil {
-		m.log.Warn("каталог удалённого набора не убран", "set", id, "err", err)
+		m.log.Warn("каталог удалённого набора не убран", "set", safelog.Value(id), "err", err)
 	}
 	writeJSON(req.w, http.StatusOK, map[string]any{"ok": true})
 	return nil
@@ -1824,7 +1825,7 @@ func (m *Manager) deliverKeys(set *registry.Set, running bool) (setView, string)
 	}
 	view, err := m.reloadSetView(context.Background(), set)
 	if err != nil {
-		m.log.Warn("набор не принял новый список ключей", "set", set.ID, "err", err)
+		m.log.Warn("набор не принял новый список ключей", "set", safelog.Value(set.ID), "err", err)
 		return m.setView(set), err.Error()
 	}
 	return view, view.ReloadError
@@ -1954,7 +1955,7 @@ func (m *Manager) apiKeyRevoke(req *request) error {
 		m.rt.Stop(set)
 		m.health.clear(id)
 		stopped = true
-		m.log.Info("набор остановлен: отозван последний действующий ключ", "set", id, "key", keyID)
+		m.log.Info("набор остановлен: отозван последний действующий ключ", "set", safelog.Value(id), "key", safelog.Value(keyID))
 	} else {
 		view, reloadErr = m.deliverKeys(set, running)
 	}
@@ -2046,7 +2047,7 @@ func (m *Manager) restartSetsUsingEnv(name string) ([]string, map[string]string,
 			continue
 		}
 		if _, err := m.RestartSet(ctx, set); err != nil {
-			m.log.Warn("перезапуск набора после смены секрета не удался", "set", set.ID, "err", err)
+			m.log.Warn("перезапуск набора после смены секрета не удался", "set", safelog.Value(set.ID), "err", err)
 			failed[set.ID] = err.Error()
 			continue
 		}
@@ -2093,7 +2094,7 @@ func (m *Manager) restartSetsUsing(server string) ([]string, map[string]string) 
 			return restarted, failed
 		}
 		if _, err := m.RestartSet(m.ctx, set); err != nil {
-			m.log.Warn("перезапуск набора после правки окружения сервера не удался", "set", set.ID, "err", err)
+			m.log.Warn("перезапуск набора после правки окружения сервера не удался", "set", safelog.Value(set.ID), "err", err)
 			failed[set.ID] = err.Error()
 			continue
 		}
@@ -2118,7 +2119,7 @@ func (m *Manager) reloadSetsUsing(server string) ([]string, map[string]string) {
 		out, err := m.rt.Reload(m.ctx, set, m.store.Servers())
 		switch {
 		case err != nil:
-			m.log.Warn("reload набора после правки сервера не удался", "set", set.ID, "err", err)
+			m.log.Warn("reload набора после правки сервера не удался", "set", safelog.Value(set.ID), "err", err)
 			failed[set.ID] = err.Error()
 		case out.Error != "":
 			failed[set.ID] = out.Error

@@ -23,6 +23,7 @@ import (
 	"github.com/akrhin/mcprig/internal/config"
 	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
+	"github.com/akrhin/mcprig/internal/safelog"
 )
 
 const (
@@ -291,7 +292,7 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	rt.notify.clear(set.ID, "")
 	// Одна строка в stdout: журнал панели читается под логином, а падения и
 	// перезапуски набора должны быть видны в journald.
-	rt.log.Info("набор " + set.ID + ": запущен")
+	rt.log.Info("набор " + safelog.Value(set.ID) + ": запущен")
 	return rt.status(set), nil
 }
 
@@ -320,7 +321,7 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 		return
 	}
 	if err != nil {
-		rt.log.Warn("набор завершился", "set", id, "code", code, "err", err)
+		rt.log.Warn("набор завершился", "set", safelog.Value(id), "code", code, "err", err)
 	}
 	webhook := webhookOf(set)
 	if restarts >= maxRestarts {
@@ -362,7 +363,7 @@ func (rt *Runtime) wait(id string, set *registry.Set, servers []registry.Server,
 			rs, fresh = freshSet, freshServers
 		}
 		if _, err := rt.startLocked(context.Background(), rs, fresh); err != nil {
-			rt.log.Warn("перезапуск набора не удался", "set", id, "err", err)
+			rt.log.Warn("перезапуск набора не удался", "set", safelog.Value(id), "err", err)
 			// Набор остался лежать: панель увидит это только в журнале, а
 			// вебхук должен узнать, что перезапуск не спас.
 			rt.notify.emit(webhookOf(rs), id, "", "set.restart_failed", code)
@@ -392,7 +393,7 @@ func (rt *Runtime) stopProc(id string, p *process) {
 	delete(rt.procs, id)
 	rt.mu.Unlock()
 	if live {
-		rt.log.Info("набор " + id + ": остановлен")
+		rt.log.Info("набор " + safelog.Value(id) + ": остановлен")
 	}
 }
 
@@ -550,14 +551,14 @@ func (rt *Runtime) Reload(ctx context.Context, set *registry.Set, servers []regi
 // logReload — одна строка в лог набора на попытку, без ключей и env.
 func (rt *Runtime) logReload(id string, out ReloadOutcome) {
 	if out.Error != "" {
-		rt.log.Warn("reload: набор " + id + " отклонён: " + out.Error)
+		rt.log.Warn("reload: набор " + safelog.Value(id) + " отклонён: " + safelog.Value(out.Error))
 		return
 	}
 	skipped := "ничего"
 	if len(out.RestartNeeded) > 0 {
 		skipped = strings.Join(out.RestartNeeded, ", ")
 	}
-	rt.log.Info(fmt.Sprintf("reload: набор %s применён, generation %d, пропущено: %s", id, out.Generation, skipped))
+	rt.log.Info(fmt.Sprintf("reload: набор %s применён, generation %d, пропущено: %s", safelog.Value(id), out.Generation, skipped))
 }
 
 func (rt *Runtime) proc(id string) *process {
@@ -762,7 +763,7 @@ func (rt *Runtime) closeSet(id string, deadline time.Time) {
 	case <-acquired:
 	case <-time.After(wait):
 		timedOut = true
-		rt.log.Warn("набор не отдал блокировку при остановке — гашу по известному pid", "set", id)
+		rt.log.Warn("набор не отдал блокировку при остановке — гашу по известному pid", "set", safelog.Value(id))
 	}
 	if p := rt.proc(id); p != nil {
 		rt.kill(p, closeGrace)

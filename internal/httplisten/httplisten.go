@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/safelog"
 	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/akrhin/mcprig/internal/toolout"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -144,7 +145,7 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	// его дольше этого срока нельзя, даже если чистка до файла не дошла.
 	retention, warns := toolout.FromEnv()
 	for _, w := range warns {
-		log.Warn("httplisten: tool-out", "warn", w)
+		log.Warn("httplisten: tool-out", "warn", safelog.Value(w))
 	}
 	// Набор под панелью получает срок из реестра (BuildSetConfig кладёт его в
 	// servers.json): окружение набора собирается вручную, и MCPRIG_TOOLOUT_TTL
@@ -447,11 +448,11 @@ func logRequests(next http.Handler, log *slog.Logger) http.Handler {
 		}
 		// Headers, body and the Authorization value never reach this line.
 		log.Info("http",
-			"method", r.Method,
-			"path", r.URL.Path,
+			"method", safelog.Value(r.Method),
+			"path", safelog.Value(r.URL.Path),
 			"status", sw.status,
 			"duration", time.Since(start),
-			"remote", r.RemoteAddr,
+			"remote", safelog.Value(r.RemoteAddr),
 		)
 	})
 }

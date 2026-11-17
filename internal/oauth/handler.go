@@ -15,6 +15,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
+
+	"github.com/akrhin/mcprig/internal/safelog"
 )
 
 // Handler — OAuth-обработчик MCP-транспорта: SDK-обработчик, методы продвинуты
@@ -92,7 +94,7 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 			return nil, fmt.Errorf("oauth %s: повторная авторизация не начинается — вход уже запрошен", o.ServerName)
 		}
 		log.Info("требуется авторизация MCP-сервера: откройте URL в браузере",
-			"server", o.ServerName, "url", args.URL)
+			"server", safelog.Value(o.ServerName), "url", safelog.Value(args.URL))
 		if o.Authorize != nil {
 			res, err := o.Authorize(ctx, args.URL)
 			if err != nil {
@@ -108,7 +110,7 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 		if err := browser(args.URL); err != nil {
 			// URL остаётся в логе — его можно открыть вручную.
 			log.Warn("не удалось открыть браузер, откройте URL из лога вручную",
-				"server", o.ServerName, "err", err)
+				"server", safelog.Value(o.ServerName), "err", err)
 		}
 		res, err := cb.Wait(ctx)
 		if err != nil {
@@ -148,7 +150,7 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 	if o.Store != nil {
 		if tok, ok := o.Store.Load(key); ok {
 			log.Info("используется сохранённый OAuth-токен",
-				"server", o.ServerName, "expiry", tok.Expiry)
+				"server", safelog.Value(o.ServerName), "expiry", tok.Expiry)
 			cfg.InitialTokenSource = savedTokenSource(o.Store, key, tok, log, o.ServerName)
 		}
 	}
@@ -159,7 +161,7 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 			return src, nil
 		}
 		if err := o.Store.Save(key, tok); err != nil {
-			log.Warn("не удалось сохранить OAuth-токен", "server", o.ServerName, "err", err)
+			log.Warn("не удалось сохранить OAuth-токен", "server", safelog.Value(o.ServerName), "err", err)
 		}
 		err := o.Store.SaveClient(key, ClientInfo{
 			ClientID:     oc.ClientID,
@@ -168,7 +170,7 @@ func NewHandler(_ context.Context, o Options) (*Handler, error) {
 			AuthStyle:    oc.Endpoint.AuthStyle,
 		})
 		if err != nil {
-			log.Warn("не удалось сохранить регистрацию OAuth-клиента", "server", o.ServerName, "err", err)
+			log.Warn("не удалось сохранить регистрацию OAuth-клиента", "server", safelog.Value(o.ServerName), "err", err)
 		}
 		return &persistingSource{base: src, store: o.Store, key: key, last: tok.AccessToken, log: log, server: o.ServerName}, nil
 	}
