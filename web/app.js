@@ -1583,6 +1583,15 @@
   // общий такт держит st.busy: клик в это окно раньше молча пропадал
   function busyNote() { fail(t('busy.wait')); }
 
+  // клик по «Запустить» сразу после создания набора попадал в такт и терялся:
+  // ждём до 4 с, и только потом говорим, что занято
+  function whenFree(fn, tries) {
+    tries = tries || 0;
+    if (!st.busy) { return fn(); }
+    if (tries >= 40) { return busyNote(); }
+    setTimeout(function () { whenFree(fn, tries + 1); }, 100);
+  }
+
   function fail(msg, err) {
     if (err && window.console) { console.error(err); }
     var bar = $('errbar');
@@ -1959,7 +1968,8 @@
   // полное поле делает правку одной операцией, без чтения текущего состава.
   function saveSetServers(btn, names) {
     var set = current();
-    if (!set || st.busy) { return busyNote(); }
+    if (!set) { return; }
+    if (st.busy) { return whenFree(function () { saveSetServers(btn, names); }); }
     st.busy = true;
     if (btn) { btn.disabled = true; }
     setSrvErr('');
@@ -2218,7 +2228,7 @@
 
   function refreshHost() {
     // не чаще раза в 8 с: снимок хоста — это N запросов, а /api/state идёт каждые 5
-    if (st.host.busy) { return busyNote(); }
+    if (st.host.busy) { return; }
     if (!st.sets.length && !st.servers.length) { return; }
     if (st.host.at && Date.now() - Date.parse(st.host.at) < 8000) { return; }
     st.host.busy = true;
@@ -4043,7 +4053,7 @@
   /* ---------- действия ---------- */
 
   function act(btn, path, done) {
-    if (st.busy) { return busyNote(); }
+    if (st.busy) { return whenFree(function () { act(btn, path, done); }); }
     st.busy = true;
     var label = btn.textContent;
     btn.disabled = true;
