@@ -40,6 +40,8 @@ repository the project is built in.
   `Cannot set properties of null`; the feedback now goes to the button label.
 - Panel: deleting the open set returns to the list of sets; before, the next set
   in the rail was opened, which read as "wrong set".
+- Panel: on a narrow screen the copy feedback shrank the address button from 74 to
+  45 px; it now shows a mark there and keeps its width.
 - Panel: statistics opened by address stayed blank for up to 15 s — the load ran
   before `/api/state` knew the sets and returned early; it now starts as soon as
   the set is known.
