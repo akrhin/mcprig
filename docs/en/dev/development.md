@@ -76,6 +76,22 @@ against this binary (`E2E_STRICT=1`). The checks are derived from
 An empty `E2E_BASE` skips the suite; with `E2E_STRICT=1` it exits non-zero so a
 skipped run cannot read as a passed gate.
 
+## Panel acceptance
+
+`scripts/acceptance/panel.cjs` walks the panel from an empty data directory and
+checks 37 things a person would do by hand — the rail, themes, navigation, sets,
+servers, keys, tools, statistics, the log, variables, import. It needs Playwright
+and any stdio MCP server to attach, and the panel must be empty and passwordless:
+
+```bash
+MCPRIG_DATA_DIR=$(mktemp -d) MCPRIG_AUTH=off MCPRIG_PORT=9131 ./mcprig panel &
+ACC_BASE=http://127.0.0.1:9131 ACC_DAP=/path/to/stdio-mcp \
+  node scripts/acceptance/panel.cjs
+```
+
+A failed step prints the browser state next to it, so a timing flake is told
+apart from a defect. The run is not part of CI: it needs a browser.
+
 ## Live stand
 
 `scripts/dev-real-set.sh` builds the binary, starts a panel with auth off, adds

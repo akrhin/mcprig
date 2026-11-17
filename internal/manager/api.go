@@ -1712,7 +1712,9 @@ func (m *Manager) apiServerLogs(req *request) error {
 	// пустой хвост без причины значит «сервер молчал»; причина уходит в ответ,
 	// иначе отказ чтения выглядит как тишина сервера
 	if err != nil {
-		body["error"] = err.Error()
+		// абсолютный путь каталога данных наружу не нужен: оператору хватает
+		// имени файла внутри набора
+		body["error"] = strings.ReplaceAll(err.Error(), m.rt.dataDir+string(os.PathSeparator), "")
 	}
 	writeJSON(req.w, http.StatusOK, body)
 	return nil

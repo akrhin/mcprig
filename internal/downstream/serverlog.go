@@ -74,6 +74,11 @@ func (l *ServerLogs) Writer(srv *config.Server) io.Writer {
 		l.warn("файл хвоста не открыт", srv.Name, err)
 		return nil
 	}
+	// режим у существующего файла OpenFile не меняет, а хвост не должен быть
+	// читаем шире владельца даже после ручной правки прав
+	if err := f.Chmod(0o600); err != nil {
+		l.warn("права хвоста не поправлены", srv.Name, err)
+	}
 	w := &serverLog{file: f, log: l.log, server: srv.Name}
 	if info, err := f.Stat(); err == nil {
 		w.size = info.Size()

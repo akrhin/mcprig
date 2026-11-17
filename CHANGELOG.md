@@ -29,6 +29,12 @@ repository the project is built in.
   nothing; it now says an operation is in progress.
 - Panel: the statistics page loaded its data only on the second tick when opened
   by address; it now asks as soon as the sets are known.
+- Server log: the mode of an existing tail file is brought back to `0600` when it
+  is opened, and a read failure answers with the file name inside the set rather
+  than the absolute data path.
+- Test: `scripts/acceptance/panel.cjs` — the 37-step panel walk — now lives in
+  the repository instead of a scratch directory, and `web/ids_test.go` fails
+  when `app.js` asks for an id `index.html` does not have.
 - Panel: the copy button of the endpoint moved the address out of the DOM for the
   second it showed "copied" — switching the language in that window threw
   `Cannot set properties of null`; the feedback now goes to the button label.

@@ -188,6 +188,9 @@ func TestServerLogsReportReadFailure(t *testing.T) {
 	if body.Error == "" {
 		t.Fatalf("отказ чтения хвоста не попал в ответ: %+v", body)
 	}
+	if strings.Contains(body.Error, e.dir) {
+		t.Fatalf("в ответ ушёл абсолютный путь каталога данных: %q", body.Error)
+	}
 }
 
 // TestMentionsMatchesWholeWord: строки лога набора попадают в лог сервера

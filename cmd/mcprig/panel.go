@@ -42,12 +42,21 @@ func panelFlags(fs *flag.FlagSet, panel *string, helpPanel string, creds *panelC
 // MCPRIG_PORT (9091 по умолчанию, как в deploy/mcprig.service).
 func panelBaseURL(panel string) string {
 	if panel != "" {
-		return panel
+		return withScheme(panel)
 	}
 	if v := os.Getenv("MCPRIG_PANEL_URL"); v != "" {
-		return v
+		return withScheme(v)
 	}
 	return "http://127.0.0.1:" + envDefault("MCPRIG_PORT", "9091")
+}
+
+// withScheme принимает адрес без схемы: «127.0.0.1:9091» — то, что человек
+// копирует из `ss` или из браузера без http://.
+func withScheme(v string) string {
+	if strings.Contains(v, "://") {
+		return v
+	}
+	return "http://" + v
 }
 
 // newPanelClient — клиент панели с cookie jar. Пароль задан — входит через
