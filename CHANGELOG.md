@@ -8,6 +8,8 @@ repository the project is built in.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-17
+
 ### Fixed
 
 - `mcprig panel -h` / `--help` lists all twenty-seven environment variables the
