@@ -235,3 +235,33 @@
 | контраст и тап-таргеты | raven `audit_contrast`, `audit_tap_targets` |
 | артефакт дизайна и превью | open-design `get_project` |
 | отладка с точкой останова | dap-mcp `debug_launch` c `breakpoints` → `debug_snapshot` |
+
+## Набор `ha` на боевой панели (2026-11-17)
+
+Проверено живым прогоном под паролем (вход `POST /api/login`, `Origin` обязателен
+на небезопасных методах, иначе `403`; пароль брался из окружения, в чат не
+попадал).
+
+- Набор `ha` (порт 9102, `autostart: true`) — **8 серверов, все `healthy`**:
+  `siyuan`, `ticktick`, `qbittorrent`, `commafeed-mcp`, `arr-lidarr`,
+  `arr-prowlarr`, `arr-slskd`, `arr-status`; 969 инструментов, ни одного в
+  ожидании подтверждения. Набор запущен с 11:57.
+- Проверка каждого сервера (`POST /api/servers/<имя>/probe`) — 200 у всех восьми:
+  `qbittorrent` 152 мс, `arr-prowlarr` 76 мс, `arr-slskd` 59 мс,
+  `arr-lidarr` 151 мс, `arr-status` 272 мс, `siyuan` 574 мс,
+  `commafeed-mcp` 4257 мс, `ticktick` 5605 мс (медленные — их бэкенды, не прокси).
+- Ключ выдаётся и отзывается: `POST /api/sets/ha/keys` → `{token, key}`, после
+  работы `DELETE /api/sets/ha/keys/<id>` → `revokedAt`; в списке остаётся
+  `activeKeys: 1`.
+- Через выданный ключ MCP отвечает: `initialize` 200 (`protocolVersion`
+  2025-11-25), `tools/list` — 9 мета-инструментов, `list_servers` — восемь
+  серверов с описаниями, числом инструментов и пометкой `approval`.
+- Отказы внятные: неизвестный инструмент — `Error: неизвестный инструмент
+  "app_version" у сервера "qbittorrent"`, а `describe_commands` на него отвечает
+  `{"commands": [], "missing": ["app_version"]}` — то есть промах виден и в
+  ошибке, и в описании.
+- Собственный отказ сервера проходит насквозь как `isError: true` с текстом
+  бэкенда: `siyuan` `list_notebooks` → `{"error": "fetch failed", "endpoint":
+  "/api/notebook/lsNotebooks"}`. Сервер `healthy` — значит связь с ним есть, а
+  падает его собственный API (адрес или токен SiYuan), это дело настройки
+  сервера, не прокси.

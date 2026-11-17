@@ -10,6 +10,26 @@ repository the project is built in.
 
 ### Fixed
 
+- Server log: the **Log** dialog of a server showed only the access lines of the
+  set and was empty in practice. The child's stderr now goes to
+  `sets/<id>/serverlogs/<name>.log`, capped at 256 KiB and cleared on stop, and
+  the dialog appends that tail to the set lines.
+- Panel: the copy button of the endpoint moved the address out of the DOM for the
+  second it showed "copied" — switching the language in that window threw
+  `Cannot set properties of null`; the feedback now goes to the button label.
+- Panel: deleting the open set returns to the list of sets; before, the next set
+  in the rail was opened, which read as "wrong set".
+- Panel: statistics opened by address stayed blank for up to 15 s — the load ran
+  before `/api/state` knew the sets and returned early; it now starts as soon as
+  the set is known.
+- Panel: the statistics filters (server, tool, client) survive a reload.
+- Panel: building a prompt with an empty task showed nothing and left the button
+  enabled; the "set has no servers" hint sat inside the field that is hidden in
+  exactly that case and was unreachable. Both are shown now.
+- Panel: revoking the active key stops the set and takes a few seconds; the keys
+  tab now says so while it waits instead of going quiet.
+- Panel: buttons and the key-note field were 27–31 px tall; the tap target
+  minimum is 32 px, and the Calls checkbox is pressed through its label.
 - Panel: choosing a set in the rail opens that set from any page — from the host
   overview, statistics, all servers; before, the click only changed the window
   title, and on a fresh install the tabs of a set could not be reached at all.

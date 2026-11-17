@@ -19,7 +19,7 @@ CSP: no inline scripts or styles.
 | top bar | breadcrumbs `mcprig / <page or set>`, the MCP endpoint of the open set with a copy button, the appearance menu — **theme** (Default or Windows 98) and the colour scheme of that theme — the interface language, and a static `admin` chip that is hidden on narrow screens |
 | left rail | all sets as name plus `:port · state` and a state dot; **+ New set** |
 | pages | **Overview** at `#/`, **Sets** at `#/sets`, **Statistics** at `#/stats/<period>`, **All servers** at `#/servers` and **Variables** at `#/vars`, as pills at the top of the content; a set keeps `#/set/<id>` and each of its tabs has its own address, so a reload, a back button and a shared link all land where they should |
-| sets page | the list of sets at `#/sets`: name with `:port`, state, the number of servers and of keys; a row opens the set. An address that names no set — the bare `#/sets` or a route the panel does not know — lands here, not on the set that was open last |
+| sets page | the list of sets at `#/sets`: name with `:port`, state, the number of servers and of keys; a row opens the set. An address that names no set — the bare `#/sets` or a route the panel does not know — lands here, not on the set that was open last; deleting the open set lands here too, not on a neighbour |
 | host overview | what the daemon is serving right now: sets running and sets stopped, servers ok, not checked and failing, tools waiting for approval, calls and error rate over the last 7 days, and the size and retention of `/tool-out` as a dash — the API has no field for it, so the panel says so instead of guessing. Under the tiles: every set by last call with its state and the daemon's reason, and the latest calls of all sets; a row opens that set. On a phone each call reads as a card — time and status, set and server, tool and duration — while the sets list keeps its columns |
 | set head | name, port chip, state badge, **Import / Export**, **Prompt**, **Restart**, **Start/Stop**, and the red **Delete set** that removes the set and its directory; under them the key prefix with its `key:<mark>` label, the number of servers and tools plus the `list_commands` weight (bytes, tokens) |
 | tabs | **Overview**, **Servers**, **Keys**, **Tools**, **Calls** and **Logs** of the open set, at `#/set/<id>`, `#/set/<id>/servers`, `…/keys`, `…/tools`, `…/calls` and `…/logs`; an unknown tab opens **Overview**, a tab click adds a history entry, and the back and forward buttons walk through the tabs |
@@ -28,6 +28,7 @@ CSP: no inline scripts or styles.
 | all servers page | the whole registry of the host: name with the daemon's reason on the second line, type, health, tool count from the last **Check**, the sets the server belongs to, and **Check**, **Authorize**, **Log**, **Edit** and the **×** that deletes it from the registry; **Add server** sits in the head |
 | import and export | the **Import / Export** dialog: the whole registry or one set as JSON, with **Download JSON** and **Copy**; import from a JSON file or a pasted `mcpServers` object — the preview names the servers that will be added, sets found in the file are skipped with a note (sets are made in the panel), and `env` and `headers` go out and come in as written |
 | calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
+| statistics page | the period (today, 7 days, 30 days, archive), the server, tool and client filters and **reset**, totals and the series. The first answer arrives as soon as the sets are known, so a direct `#/stats/<period>` link is filled at once instead of waiting for the 15 s tick. The three filters are kept in the browser (`localStorage`, `mcprig.stats.*`) and survive a reload; the set of the view still follows the rail |
 | variables page | every `${NAME}` your servers reference with whether a value is set and where it comes from, a form that writes a value, and the **×** that forgets it |
 | logs tab | the log tail of the set with **refresh**; it is a tab, not a drawer, so the log keeps its place in the address `#/set/<id>/logs` |
 | footer | the status bar: `M servers` of the registry, `mcprig <version>` and the time it was updated. The sets and how many are running are the line at the bottom of the left rail — `N sets · M running` |
@@ -93,10 +94,11 @@ does not validate them itself — it shows what the backend answers, including
 `тег untrusted требует sandbox: сервер без изоляции не стартует`.
 
 Each server row has a **Log** button: it opens a drawer with the set's log
-filtered by that server's name — a server has no log file of its own. The
-drawer reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the
-lines as text; a name that never appears in the log shows `log is empty`, and a
-failed request keeps the lines already shown and reports the reason above them.
+filtered by that server's name plus the tail of the server process's own stderr
+(`sets/<id>/serverlogs/<name>.log`, cleared when the set stops). The drawer
+reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the lines as
+text; a server that has neither shows `log is empty`, and a failed request keeps
+the lines already shown and reports the reason above them.
 
 The **Tools** button of a row switches to the **Tools** tab with that server
 picked in its **Server** filter
