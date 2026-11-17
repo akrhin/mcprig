@@ -4462,7 +4462,10 @@
     if (!btn) { return; }
     var back = label || btn.innerHTML;
     var done = function (ok) {
-      btn.textContent = ok ? t('head.copied') : t('head.copyFail');
+      // на узком экране подпись живёт в тесной кнопке: слова раздвигали её с
+      // 67 до 132 px, поэтому там только знак
+      var narrow = window.innerWidth <= 640;
+      btn.textContent = ok ? (narrow ? '✓' : t('head.copied')) : (narrow ? '⚠' : t('head.copyFail'));
       clearTimeout(copyTimer);
       // кнопки здесь иконочные: текст возвращается разметкой, а не строкой;
       // элемент с data-i18n (подпись адреса) берёт строку заново — язык мог смениться

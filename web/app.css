@@ -935,6 +935,9 @@ body.rail-open .scrim { opacity: 1; pointer-events: auto; }
      «mcprig» и так в заголовке окна и в рейле. */
   .endpoint { max-width: 132px; padding: 5px 8px; }
   .endpoint-url { display: none; }
+  /* отклик «скопировано» короче подписи, и без этого кнопка ужималась на
+     глазах: держим ширину подписи на узком экране */
+  #copy { min-width: 74px; justify-content: center; }
   .crumb-root, .crumbs .crumb-sep { display: none; }
   /* на телефоне чип пользователя — только имя без действия; он и вылезал за край */
   .who { display: none; }
