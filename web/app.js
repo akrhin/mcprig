@@ -1736,9 +1736,10 @@
     return { cls: 'badge-ok', text: t('srv.healthy') };
   }
 
-  // Один бейдж здоровья на обе таблицы — строка и реестр: цвет и текст живут здесь
+  // Один бейдж здоровья на обе таблицы — строка и реестр: цвет и текст живут здесь.
+  // cls приходит и как «ok» (setState), и как «badge-ok» (badgeState) — сводим к одному.
   function paintBadge(node, st8) {
-    node.className = 'badge ' + st8.cls;
+    node.className = 'badge ' + (st8.cls.indexOf('badge-') === 0 ? st8.cls : 'badge-' + st8.cls);
     node.replaceChildren(el('span', 'dot' + (st8.hollow ? ' dot-hollow' : '')),
       document.createTextNode(st8.text));
   }

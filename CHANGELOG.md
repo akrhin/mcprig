@@ -13,6 +13,9 @@ repository the project is built in.
 - Panel: choosing a set in the rail opens that set from any page — from the host
   overview, statistics, all servers; before, the click only changed the window
   title, and on a fresh install the tabs of a set could not be reached at all.
+- Panel: the state badge of a set (sets list, host overview, servers table) took
+  its colour from a class that does not exist and showed as a black dot —
+  `paintBadge` now accepts both spellings the callers use.
 
 ## [0.6.5] - 2026-11-17
 
