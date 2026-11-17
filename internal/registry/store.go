@@ -17,6 +17,7 @@ import (
 
 	"github.com/akrhin/mcprig/internal/atomicfile"
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/safepath"
 )
 
 // Store is the manager registry. Every exported method takes the lock, so the
@@ -128,7 +129,7 @@ func (s *Store) normalize() {
 		}
 		// id попадает в путь sets/<id>/servers.json: битый id отбрасывает
 		// запись целиком, но не роняет загрузку остальных.
-		if !namePattern.MatchString(set.ID) {
+		if !safepath.Name(set.ID) {
 			s.dropped = append(s.dropped, fmt.Sprintf("id набора %q не подходит под шаблон [a-z0-9][a-z0-9_-]{0,63}", set.ID))
 			continue
 		}

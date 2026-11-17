@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/akrhin/mcprig/internal/safelog"
+	"github.com/akrhin/mcprig/internal/safepath"
 	"github.com/akrhin/mcprig/internal/stats"
 )
 
@@ -74,8 +76,14 @@ func (m *Manager) apiStats(req *request) error {
 }
 
 // statsDir — каталог истории набора: его пишет сам процесс набора рядом со
-// своим конфигом.
+// своим конфигом. Имя набора — сегмент пути, и в него годится только форма
+// реестра: иначе «..» из запроса увёл бы чтение за пределы dataDir. Пустой
+// каталог значит «читать нечего» — вызывающие к этому готовы.
 func (m *Manager) statsDir(id string) string {
+	if !safepath.Name(id) {
+		m.log.Warn("stats: имя набора не годится в сегмент пути", "set", safelog.Value(id))
+		return ""
+	}
 	return filepath.Join(m.rt.dataDir, "sets", id, "stats")
 }
 

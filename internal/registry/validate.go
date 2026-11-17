@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/safepath"
 )
-
-var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 
 // ErrPortBusy — порт занят другим набором или процессом; вызывающий отличает её
 // через errors.Is, не разбирая сообщение. Текст ошибки при этом прежний, поэтому
@@ -141,7 +139,7 @@ func commandOf(in map[string]json.RawMessage) ([]string, error) {
 // parseServer validates one server entry strictly. `name` is the registry key
 // and never comes from the body.
 func parseServer(name string, in map[string]json.RawMessage) (Server, error) {
-	if !namePattern.MatchString(name) {
+	if !safepath.Name(name) {
 		return nil, invalidf("в имени допустимы строчные латинские буквы, цифры, дефис и подчёркивание")
 	}
 	srv := &config.Server{Name: name, Enabled: true}
@@ -366,7 +364,7 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 			}
 		}
 		out.ID = slugify(id)
-		if !namePattern.MatchString(out.ID) {
+		if !safepath.Name(out.ID) {
 			return nil, invalidf("имя набора: строчные латинские буквы, цифры, дефис и подчёркивание")
 		}
 	}
