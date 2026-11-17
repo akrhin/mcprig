@@ -4431,6 +4431,7 @@
 
   var copyTimer = 0;
   function copyText(text, btn, label) {
+    if (!btn) { return; }
     var back = label || btn.innerHTML;
     var done = function (ok) {
       btn.textContent = ok ? t('head.copied') : t('head.copyFail');
@@ -4772,7 +4773,9 @@
   applyPage(st.page);
   applyTab(st.sel ? st.tab : null);
   if (st.page === 'stats') { setPeriod(st.st.period, true); }
-  loadState().then(function () {
+  // первый запрос состояния без обработки отказа останавливал ВСЕ таймеры:
+  // они живут в .then ниже, и панель замирала до перезагрузки
+  loadState().catch(function (e) { fail(e.message, e); }).then(function () {
     every(5000, loadState);
     every(5000, function () {
       if (!st.sel) { return; }
