@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/safepath"
 )
 
 // available проверяет, что bwrap действительно запускается: бинарь есть и
@@ -166,8 +167,11 @@ func bwrapArgv(srv *config.Server, sb *config.Sandbox, argv []string) ([]string,
 	var mounts []mount
 	at := make(map[string]int)
 	bind := func(flag, src string, optional bool) error {
-		if !filepath.IsAbs(src) || len(src) == 0 {
-			return fmt.Errorf("sandbox: путь %q должен быть абсолютным", src)
+		// Clean — до проверки: путь из конфига не должен ходить выше корня, а
+		// bwrap получает ровно тот путь, который проверили.
+		src = filepath.Clean(src)
+		if !safepath.Path(src) {
+			return fmt.Errorf("sandbox: путь %q должен быть абсолютным и без «..»", src)
 		}
 		if _, err := os.Stat(src); err != nil {
 			// Пропуск — только для умолчаний (/lib64 есть не везде). Свой rw
