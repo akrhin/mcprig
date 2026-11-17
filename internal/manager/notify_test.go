@@ -267,6 +267,23 @@ func TestNotifyBadWebhookRejected(t *testing.T) {
 	status(t, w, http.StatusCreated)
 }
 
+// Адрес вебхука проверяется и в самом post: file:// и user:pass@ пришли бы из
+// реестра, который правят руками, и запрос ушёл бы мимо вебхука.
+func TestNotifyPostRejectsUnsafeWebhook(t *testing.T) {
+	n := newNotifier(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for _, hook := range []string{
+		"file:///etc/passwd",
+		"http://user:pass@example.com/hook",
+		"ftp://example.com/hook",
+		"http:///nohost",
+		"://bad",
+	} {
+		if err := n.post(hook, []byte(`{}`)); err == nil {
+			t.Fatalf("адрес %q принят", hook)
+		}
+	}
+}
+
 // all — все строки журнала: проверка «адреса нет ни в одной».
 func (h *captureHandler) all() []captured {
 	h.mu.Lock()
