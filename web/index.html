@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="default" data-palette="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +8,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="themes.css">
+<link rel="stylesheet" href="win98.css">
 <!-- без defer: тема ставится до первой отрисовки, иначе вспышка чужой схемы -->
 <script src="theme.js"></script>
 <script src="app.js" defer></script>
@@ -16,6 +17,16 @@
 <a class="skip" href="#content" data-i18n="a11y.skip">Skip to content</a>
 
 <div class="app" id="app">
+  <!-- титульная полоса окна: рисуется только темой win98, действия — в тулбаре -->
+  <div class="titlebar" aria-hidden="true">
+    <svg class="titlebar-logo" viewBox="0 0 7 6" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M0 1h1v5H0zM3 1h1v5H3zM6 1h1v5H6zM1 1h2v1H1zM4 1h2v1H4z"/></svg>
+    <span class="titlebar-name">mcprig — panel</span>
+    <span class="win-btns">
+      <span class="win-btn"><svg viewBox="0 0 8 8" aria-hidden="true"><rect x="1" y="5" width="6" height="2" fill="currentColor"/></svg></span>
+      <span class="win-btn"><svg viewBox="0 0 8 8" aria-hidden="true"><rect x="1" y="1" width="6" height="6" fill="none" stroke="currentColor"/><rect x="1" y="1" width="6" height="2" fill="currentColor"/></svg></span>
+      <span class="win-btn"><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1 1l6 6M7 1l-6 6" stroke="currentColor" stroke-width="1.2"/></svg></span>
+    </span>
+  </div>
   <aside class="rail" id="rail" aria-label="Sets" data-i18n-aria="rail.title">
     <div class="rail-head">
       <span class="rail-title" data-i18n="rail.title">Sets</span>
@@ -73,30 +84,69 @@
         </button>
 
         <div class="tmenu" id="tmenu">
-          <button class="ghost-icon" type="button" id="theme-btn" aria-haspopup="true" aria-expanded="false" aria-controls="theme-menu" aria-label="Theme" data-i18n-aria="top.theme">
+          <button class="ghost-icon" type="button" id="theme-btn" aria-haspopup="true" aria-expanded="false" aria-controls="theme-menu" aria-label="Appearance" data-i18n-aria="top.theme">
             <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 1.6 1.6 0 0 0 0-3.2 1.9 1.9 0 0 1 0-3.8h2.4A6.6 6.6 0 0 0 21 7.4C21 4.9 16.9 3 12 3Z"/><circle cx="8" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="6.8" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.6" cy="9.2" r="1.1" fill="currentColor" stroke="none"/></svg>
           </button>
-          <div class="menu" id="theme-menu" role="menu" aria-label="Theme" data-i18n-aria="top.theme" hidden>
-            <button class="menu-item" role="menuitemradio" data-theme-opt="dark" aria-checked="true" type="button">
-              <span class="sw" aria-hidden="true"><i></i><i></i></span>
-              Dark
-              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
-            </button>
-            <button class="menu-item" role="menuitemradio" data-theme-opt="light" aria-checked="false" type="button">
-              <span class="sw" aria-hidden="true"><i></i><i></i></span>
-              Light
-              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
-            </button>
-            <button class="menu-item" role="menuitemradio" data-theme-opt="nord" aria-checked="false" type="button">
-              <span class="sw" aria-hidden="true"><i></i><i></i></span>
-              Nord
-              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
-            </button>
-            <button class="menu-item" role="menuitemradio" data-theme-opt="gruvbox" aria-checked="false" type="button">
-              <span class="sw" aria-hidden="true"><i></i><i></i></span>
-              Gruvbox
-              <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
-            </button>
+          <div class="menu" id="theme-menu" role="menu" aria-label="Appearance" data-i18n-aria="top.theme" hidden>
+            <div class="menu-group" role="group" aria-label="Theme" data-i18n-aria="theme.group">
+              <span class="menu-label" data-i18n="theme.group">Theme</span>
+              <button class="menu-item" role="menuitemradio" data-theme-opt="default" aria-checked="true" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="theme.default">Default</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+              <button class="menu-item" role="menuitemradio" data-theme-opt="win98" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="theme.win98">Windows 98</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+            </div>
+            <div class="menu-group" role="group" aria-label="Color scheme" data-family="default" data-i18n-aria="theme.scheme">
+              <span class="menu-label" data-i18n="theme.scheme">Color scheme</span>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="dark" aria-checked="true" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.dark">Dark</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="light" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.light">Light</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="nord" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.nord">Nord</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="gruvbox" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.gruvbox">Gruvbox</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+            </div>
+            <div class="menu-group" role="group" aria-label="Windows 98 color scheme" data-family="win98" data-i18n-aria="theme.scheme98" hidden>
+              <span class="menu-label" data-i18n="theme.scheme98">Windows 98 scheme</span>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="w98" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.w98">Classic</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="w98-cool" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.w98cool">Slate</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="w98-warm" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.w98warm">Wheat</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+              <button class="menu-item" role="menuitemradio" data-palette-opt="w98-hc" aria-checked="false" type="button">
+                <span class="sw" aria-hidden="true"><i></i><i></i></span>
+                <span class="menu-txt" data-i18n="pal.w98hc">High contrast</span>
+                <span class="menu-check" aria-hidden="true"><svg class="od-icon ico-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              </button>
+            </div>
           </div>
         </div>
 

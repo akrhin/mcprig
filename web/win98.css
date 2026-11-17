@@ -1,0 +1,445 @@
+/*
+  mcprig — вид Windows 98. Подключается после app.css и themes.css.
+
+  Здесь только форма: радиусы 0, фаски из двух тонов (светлая сверху-слева,
+  тёмная снизу-справа, инверсия у нажатого), один размер текста 11px,
+  пунктирный фокус, выделение тёмно-синим, утопленные поля и статусбар.
+  Цвет приходит из палитры (html[data-palette="w98*"] в themes.css): --w98-face,
+  --w98-field, --w98-hi, --w98-lo, --w98-sel, --w98-title. Поэтому схема меняет
+  оттенки, не трогая геометрию.
+
+  Внутри этого слоя нет border-radius, box-shadow и градиентов — фаска
+  собирается только из border. Так тему видно в коде, а не в оттенках серого.
+*/
+
+html[data-theme="win98"] {
+  --r-1: 0px; --r-2: 0px; --r-3: 0px; --r-pill: 0px;
+
+  --fs-1: 10px; --fs-2: 11px; --fs-3: 11px; --fs-4: 11px;
+  --fs-5: 12px; --fs-6: 14px; --fs-7: 17px; --fs-8: 20px;
+
+  --font-sans: "MS Sans Serif", "Liberation Sans", Tahoma, Verdana, "DejaVu Sans", sans-serif;
+  --font-mono: "Lucida Console", "Liberation Mono", "Courier New", monospace;
+
+  /* Win98 не знает плавных переходов: меню и дровер появляются сразу */
+  --dur-1: 0s; --dur-2: 0s; --dur-3: 0s; --ease: linear;
+
+  --rail-w: 208px;
+  --topbar-h: 26px;
+  --status-h: 24px;
+  --content-max: 1440px;
+  --title-h: 18px;
+
+  background: var(--bg);
+}
+
+html[data-theme="win98"] body {
+  line-height: 1.35;
+  -webkit-font-smoothing: auto;
+}
+
+/* подписи полей и заголовки колонок — не капсом: в Win98 их писали как есть */
+html[data-theme="win98"] :is(.rail-title, .meta-label, .field > label, .field-label,
+  .fsel > span, .kpi-label, .chip, .endpoint-label, .field-group > legend,
+  .table th, .menu-label) {
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+  font-size: var(--fs-2); color: var(--text-dim);
+}
+
+html[data-theme="win98"] ::selection { background: var(--w98-sel); color: var(--w98-sel-ink); }
+
+/* фокус — пунктирная рамка, как у кнопки по Tab в Win98; фон поля не меняется.
+   Рамка идёт внутри элемента, в 3px от края, поэтому не выходит за габариты. */
+html[data-theme="win98"] :focus-visible {
+  outline: 1px dotted var(--w98-dk);
+  outline-offset: -3px;
+  border-radius: 0;
+}
+/* у подписей и ссылок нет кромки, в которую можно вписать рамку: там она снаружи */
+html[data-theme="win98"] :is(a, .link-btn, .crumb-root):focus-visible { outline-offset: 1px; }
+
+/* ── окно: титульная полоса во всю ширину ───────────────────────────────── */
+html[data-theme="win98"] .titlebar {
+  display: flex; align-items: center; gap: 4px;
+  grid-column: 1 / -1;
+  height: var(--title-h); flex: none;
+  padding: 0 2px;
+  background: var(--w98-title); color: var(--w98-title-ink);
+  font-size: var(--fs-2); font-weight: 700;
+  border-bottom: 1px solid var(--w98-dk);
+}
+html[data-theme="win98"] .titlebar-logo { width: 14px; height: 12px; flex: none; }
+html[data-theme="win98"] .titlebar-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+html[data-theme="win98"] .win-btns { display: flex; gap: 2px; margin-left: auto; flex: none; }
+html[data-theme="win98"] .win-btn {
+  display: grid; place-items: center; width: 16px; height: 14px;
+  border: 1px solid;
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+  background: var(--w98-face); color: var(--text);
+}
+html[data-theme="win98"] .win-btn svg { width: 8px; height: 8px; }
+
+/* ── оболочка ───────────────────────────────────────────────────────────── */
+/* титульная полоса занимает первую строку сетки, рейл и содержимое — вторую */
+html[data-theme="win98"] .rail {
+  border-right: 1px solid var(--w98-lo);
+  height: calc(100vh - var(--title-h));
+}
+html[data-theme="win98"] .main { min-height: calc(100vh - var(--title-h)); }
+html[data-theme="win98"] .rail-head { padding: 0 var(--sp-2); border-bottom: 1px solid var(--w98-lo); }
+html[data-theme="win98"] .rail-foot { border-top: 1px solid var(--w98-lo); background: var(--bg-rail); }
+html[data-theme="win98"] .rail-sets { padding: var(--sp-1); gap: 0; }
+html[data-theme="win98"] .topbar {
+  min-height: var(--topbar-h); height: auto; gap: 6px;
+  padding: 2px 4px;
+  background: var(--w98-face);
+  border-bottom: 1px solid var(--w98-lo);
+}
+html[data-theme="win98"] .crumbs { font-size: var(--fs-2); color: var(--text-dim); }
+html[data-theme="win98"] .crumb-root { color: var(--text); font-weight: 700; }
+html[data-theme="win98"] .content { padding: var(--sp-4) clamp(8px, 1.6vw, 24px) var(--sp-6); }
+
+html[data-theme="win98"] .set-item { padding: 3px 6px; }
+html[data-theme="win98"] .set-item:hover { background: var(--surface-2); }
+/* выбранный набор — строка списка с выделением, а не подсветка акцентом */
+html[data-theme="win98"] .set-item[aria-current="true"] {
+  background: var(--w98-sel); color: var(--w98-sel-ink);
+}
+html[data-theme="win98"] .set-item[aria-current="true"]::before { display: none; border-radius: 0; }
+html[data-theme="win98"] .set-item[aria-current="true"] .set-sub,
+html[data-theme="win98"] .set-item[aria-current="true"] .rail-count { color: var(--w98-sel-ink); }
+html[data-theme="win98"] .rail-add {
+  border: 2px solid;
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+  background: var(--w98-face); color: var(--text); padding: 3px var(--sp-2);
+}
+html[data-theme="win98"] .rail-add:hover { border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi); background: var(--surface-2); }
+
+/* ── кнопки ─────────────────────────────────────────────────────────────── */
+html[data-theme="win98"] .btn {
+  min-height: 23px; padding: 0 10px;
+  border: 2px solid;
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+  background: var(--w98-face); color: var(--text);
+  font-size: var(--fs-2); font-weight: 400;
+}
+html[data-theme="win98"] .btn:hover { background: var(--surface-2); }
+html[data-theme="win98"] .btn:active {
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  padding: 1px 9px 0 11px;   /* нажатая кнопка уводит подпись на пиксель */
+}
+html[data-theme="win98"] .btn:disabled { color: var(--text-mute); background: var(--w98-face); opacity: 1; }
+/* главное действие — та же кнопка с чёрной рамкой по кругу, как default в Win98 */
+html[data-theme="win98"] .btn-primary { background: var(--w98-face); color: var(--text); font-weight: 700; outline: 1px solid var(--w98-dk); }
+html[data-theme="win98"] .btn-primary:hover { background: var(--surface-2); }
+html[data-theme="win98"] .btn-primary:active { outline: 0; }
+html[data-theme="win98"] .btn-danger { color: var(--err); }
+html[data-theme="win98"] .btn-ghost { border-color: transparent; background: transparent; }
+html[data-theme="win98"] .btn-ghost:hover { background: var(--surface-2); }
+html[data-theme="win98"] .btn-sm, html[data-theme="win98"] .btn-xs { min-height: 24px; padding: 0 8px; font-size: var(--fs-2); }
+html[data-theme="win98"] .btn-sm:active, html[data-theme="win98"] .btn-xs:active { padding: 1px 5px 0 7px; }
+
+/* иконочные кнопки: плоские до наведения, как кнопки панели инструментов */
+html[data-theme="win98"] .ghost-icon {
+  width: 24px; height: 24px;
+  border: 1px solid transparent; background: transparent; color: var(--text);
+}
+html[data-theme="win98"] .ghost-icon:hover {
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+  background: var(--surface-2); color: var(--text);
+}
+html[data-theme="win98"] .ghost-icon[aria-pressed="true"] { border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo); }
+html[data-theme="win98"] .ghost-icon:disabled { opacity: 1; color: var(--text-mute); }
+
+html[data-theme="win98"] .link-btn { border-bottom: 1px dotted var(--accent); font-size: var(--fs-2); }
+
+html[data-theme="win98"] .endpoint {
+  padding: 0 4px; border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-field); color: var(--text);
+}
+html[data-theme="win98"] .endpoint:hover { border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo); color: var(--text); }
+
+html[data-theme="win98"] .who { padding: 0 6px 0 0; border: 1px solid var(--w98-lo); background: var(--bg); font-size: var(--fs-2); }
+html[data-theme="win98"] .who-initial {
+  width: 16px; height: 16px; border-radius: 0;
+  background: var(--w98-sel); color: var(--w98-sel-ink); font-weight: 700; font-size: var(--fs-1);
+}
+
+/* ── меню оформления ────────────────────────────────────────────────────── */
+/* классический выпадающий список: 1px чёрная рамка, утопнутая по верхнему и
+   левому краю, изнутри — светлая линия, панель на 2px от кнопки */
+html[data-theme="win98"] .menu {
+  gap: 0; padding: 2px; min-width: 180px;
+  top: calc(100% + 2px);
+  border: 1px solid var(--w98-dk);
+  border-top-color: var(--w98-lo); border-left-color: var(--w98-lo);
+  outline: 1px solid var(--w98-hi); outline-offset: -2px;
+  background: var(--w98-face);
+}
+html[data-theme="win98"] .menu-group + .menu-group {
+  margin-top: 2px; padding-top: 2px; border-top: 1px solid var(--w98-lo);
+}
+html[data-theme="win98"] .menu-label { padding: 2px 6px; }
+html[data-theme="win98"] .menu-item { padding: 2px 6px; font-size: var(--fs-2); }
+html[data-theme="win98"] .menu-item:hover, html[data-theme="win98"] .menu-item:focus-visible {
+  background: var(--w98-sel); color: var(--w98-sel-ink);
+  outline: 1px dotted var(--w98-sel-ink); outline-offset: -3px;
+}
+html[data-theme="win98"] .menu-item:hover .menu-check, html[data-theme="win98"] .menu-item:focus-visible .menu-check { color: var(--w98-sel-ink); }
+/* галочка — только у выбранного пункта; место под неё остаётся у всех */
+html[data-theme="win98"] .menu-check { color: var(--w98-dk); opacity: 1; }
+html[data-theme="win98"] .menu-item:not([aria-checked="true"]) .menu-check { visibility: hidden; }
+/* мнемоника: первая буква подчёркнута, как в меню Win98 */
+html[data-theme="win98"] .menu-txt::first-letter { text-decoration: underline; }
+html[data-theme="win98"] .sw {
+  border: 1px solid var(--w98-dk); width: 14px; height: 12px;
+}
+html[data-theme="win98"] .sw i { width: 7px; height: 12px; }
+
+/* ── таблицы: белый список внутри серого окна ───────────────────────────── */
+html[data-theme="win98"] .table { background: var(--w98-field); border: 1px solid var(--w98-lo); }
+html[data-theme="win98"] .table th {
+  padding: 2px var(--sp-2); background: var(--w98-face);
+  border: 1px solid;
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+}
+html[data-theme="win98"] .table td { padding: 3px var(--sp-2); border-bottom: 1px solid var(--line-soft); }
+html[data-theme="win98"] .table tbody tr:hover { background: var(--surface-2); }
+html[data-theme="win98"] .table .cell-name, html[data-theme="win98"] .key-name { font-weight: 400; }
+/* на узком экране строки становятся карточками: подписи полей — как в свойствах Win98 */
+html[data-theme="win98"] :is(.rtable, #all-srv-table) td::before {
+  text-transform: none; letter-spacing: 0; font-size: var(--fs-2); color: var(--text-dim);
+}
+html[data-theme="win98"] .cell-time, html[data-theme="win98"] .cell-sub { font-size: var(--fs-2); }
+
+html[data-theme="win98"] .share-bar { height: 8px; border: 1px solid var(--w98-lo); background: var(--w98-field); }
+
+html[data-theme="win98"] .chip { padding: 0 4px; border: 1px solid var(--w98-lo); background: var(--w98-face); }
+html[data-theme="win98"] .badge {
+  padding: 0 6px; border: 1px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-field); font-size: var(--fs-2);
+}
+/* точки состояния — квадратики: Win98 рисовал значок, а не круг */
+html[data-theme="win98"] .dot { width: 7px; height: 7px; border-radius: 0; }
+html[data-theme="win98"] .dot-hollow { width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 0; background: transparent; box-shadow: none; }
+html[data-theme="win98"] .legend i { border-radius: 0; border: 1px solid var(--w98-dk); }
+
+/* ── вкладки: папка, активная поверх линии ──────────────────────────────── */
+html[data-theme="win98"] .tabs {
+  gap: 2px; align-items: flex-end; padding: 0 2px;
+  border-bottom: 1px solid var(--w98-lo);
+}
+html[data-theme="win98"] .tab {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 21px; padding: 0 10px; margin-bottom: -1px;
+  border: 2px solid;
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+  background: var(--w98-face); color: var(--text); font-weight: 400;
+}
+/* активная вкладка выше на 2px и сливается с панелью: нижней кромки нет */
+html[data-theme="win98"] .tab[aria-selected="true"] {
+  height: 23px; padding: 0 10px; border-bottom-color: var(--w98-face); font-weight: 700;
+}
+html[data-theme="win98"] .tab[aria-selected="true"]::after { display: none; }
+html[data-theme="win98"] .tab:hover { color: var(--text); }
+
+/* ── сегменты и фильтры: ряд кнопок, выбранная — нажатая ────────────────── */
+html[data-theme="win98"] .segmented { gap: 2px; border: 0; background: transparent; }
+html[data-theme="win98"] .segbtn {
+  padding: 2px 10px;
+  border: 2px solid;
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+  background: var(--w98-face); color: var(--text); font-size: var(--fs-2);
+}
+html[data-theme="win98"] .segbtn + .segbtn { border-left-color: var(--w98-hi); }
+html[data-theme="win98"] .segbtn:hover { background: var(--surface-2); color: var(--text); }
+html[data-theme="win98"] .segbtn[aria-pressed="true"],
+html[data-theme="win98"] .segbtn[aria-selected="true"],
+html[data-theme="win98"] .pagenav .segbtn[aria-current="page"] {
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-face); color: var(--text); font-weight: 700;
+}
+html[data-theme="win98"] .pagenav { margin-bottom: var(--sp-3); }
+
+/* ── поля форм: утопленные, белые ───────────────────────────────────────── */
+html[data-theme="win98"] :is(.input, .prompt-out) {
+  min-height: 22px; padding: 1px 4px;
+  border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-field); color: var(--text); font-size: var(--fs-2);
+}
+html[data-theme="win98"] .input:hover { border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo); }
+html[data-theme="win98"] .input:focus-visible {
+  outline: 1px dotted var(--w98-dk); outline-offset: -5px; box-shadow: none;
+}
+/* стрелку списка рисуем сами: у Win98 она своя, треугольником */
+html[data-theme="win98"] select.input {
+  appearance: none; -webkit-appearance: none;
+  padding: 0 17px 0 4px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5'%3E%3Cpath d='M0 0h9L4.5 5z' fill='%23000'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 5px center;
+}
+html[data-theme="win98"] textarea.input { min-height: 52px; padding: 3px 4px; }
+html[data-theme="win98"] .field-help, html[data-theme="win98"] .field-error { font-size: var(--fs-2); }
+html[data-theme="win98"] .field-group {
+  padding: var(--sp-2); margin-top: var(--sp-2);
+  border: 1px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+}
+html[data-theme="win98"] .field-group > legend { padding: 0 4px; background: var(--w98-face); color: var(--text-dim); }
+
+html[data-theme="win98"] .searchfield {
+  padding: 0 4px; border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-field);
+}
+html[data-theme="win98"] .searchfield .input {
+  border: 0; background: transparent; min-height: 18px; padding: 1px 0;
+}
+html[data-theme="win98"] .searchfield .input:focus-visible { outline-offset: 0; }
+
+/* чекбокс: своя рамка, потому что системный в этой теме выглядит чужим */
+html[data-theme="win98"] .check input[type="checkbox"] {
+  appearance: none; display: inline-grid; place-content: center;
+  width: 13px; height: 13px; margin: 0;
+  border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-field);
+}
+html[data-theme="win98"] .check input[type="checkbox"]:checked::after {
+  content: ""; width: 3px; height: 6px; margin-bottom: 2px;
+  border: solid var(--w98-dk); border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+html[data-theme="win98"] .check input[type="checkbox"]:focus-visible { outline: 1px dotted var(--w98-dk); outline-offset: 1px; }
+
+html[data-theme="win98"] .form-alert {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--w98-dk);
+  border-left: 4px solid var(--err);
+  background: var(--w98-face); color: var(--err); font-size: var(--fs-2);
+}
+html[data-theme="win98"] .form-alert-warn { border-left-color: var(--warn); color: var(--warn); }
+html[data-theme="win98"] .form-alert-ok { border-left-color: var(--ok); color: var(--ok); }
+
+/* ── блоки, сводка, пустые состояния ────────────────────────────────────── */
+html[data-theme="win98"] .block-head { margin-bottom: var(--sp-2); }
+html[data-theme="win98"] .block-head h2 { font-size: var(--fs-5); font-weight: 700; }
+html[data-theme="win98"] .kpi-num { font-weight: 400; }
+html[data-theme="win98"] .kpis { margin-top: var(--sp-3); }
+html[data-theme="win98"] .empty, html[data-theme="win98"] .empty-state {
+  border: 1px solid var(--w98-lo); background: var(--w98-face); padding: var(--sp-4);
+}
+html[data-theme="win98"] .skel { border: 1px solid var(--w98-lo); background: var(--w98-face); animation: none; }
+html[data-theme="win98"] .set-head { border-bottom: 1px solid var(--w98-lo); padding-bottom: var(--sp-3); }
+html[data-theme="win98"] .meta-sep { background: var(--w98-lo); }
+html[data-theme="win98"] .alertbar {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--w98-dk); border-left: 4px solid var(--warn);
+  background: var(--w98-face); font-size: var(--fs-2);
+}
+html[data-theme="win98"] .alertbar-err { border-left-color: var(--err); }
+
+/* ── диалоги и дровер: заголовок окна тёмно-синим ───────────────────────── */
+html[data-theme="win98"] .dialog {
+  border: 2px solid;
+  border-color: var(--w98-hi) var(--w98-dk) var(--w98-dk) var(--w98-hi);
+  background: var(--w98-face);
+}
+html[data-theme="win98"] .dialog::backdrop { background: rgba(0, 0, 0, .35); }
+html[data-theme="win98"] .dialog-head {
+  padding: 2px 2px 2px var(--sp-2);
+  background: var(--w98-title); color: var(--w98-title-ink);
+  border-bottom: 2px solid var(--w98-face);
+}
+html[data-theme="win98"] .dialog-head h2 { font-size: var(--fs-3); font-weight: 700; }
+html[data-theme="win98"] .dialog-sub { color: var(--w98-title-ink); font-size: var(--fs-2); max-width: none; }
+html[data-theme="win98"] .dialog-head .ghost-icon { width: 16px; height: 14px; color: var(--w98-title-ink); border: 1px solid var(--w98-hi); }
+html[data-theme="win98"] .dialog-head .ghost-icon:hover { background: var(--w98-face); color: var(--text); border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo); }
+html[data-theme="win98"] .dialog-body { padding: var(--sp-3); gap: var(--sp-3); }
+html[data-theme="win98"] .dialog-foot { padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--w98-lo); }
+
+html[data-theme="win98"] .drawer-head {
+  padding: 2px var(--sp-2);
+  background: var(--w98-title); color: var(--w98-title-ink);
+  border-bottom: 2px solid var(--w98-face);
+}
+html[data-theme="win98"] .drawer-head h2 { font-size: var(--fs-3); font-weight: 700; }
+html[data-theme="win98"] :is(.dialog-head, .drawer-head) .count { color: var(--w98-title-ink); }
+html[data-theme="win98"] .drawer-head .ghost-icon { color: var(--w98-title-ink); border: 1px solid var(--w98-hi); }
+html[data-theme="win98"] .drawer-head .ghost-icon:hover { background: var(--w98-face); color: var(--text); }
+html[data-theme="win98"] .drawer-seg { margin: var(--sp-2) var(--sp-2) 0; }
+html[data-theme="win98"] .drawer-body { padding: var(--sp-2); gap: var(--sp-2); }
+html[data-theme="win98"] #side.drawer { border-left: 2px solid var(--w98-lo); }
+
+html[data-theme="win98"] .log {
+  padding: var(--sp-2);
+  border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-field); color: var(--text); font-size: var(--fs-2);
+}
+html[data-theme="win98"] .varlist {
+  gap: 0; padding: 1px;
+  border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  background: var(--w98-field);
+}
+html[data-theme="win98"] .varlist li { padding: 2px var(--sp-1); border-bottom: 1px solid var(--line-soft); }
+html[data-theme="win98"] .varlist li:last-child { border-bottom: 0; }
+html[data-theme="win98"] .keyitem { padding: var(--sp-2); border: 1px solid var(--w98-lo); background: var(--bg); }
+html[data-theme="win98"] .keyitem[data-revoked="true"] { opacity: 1; color: var(--text-mute); }
+html[data-theme="win98"] .newkey { padding: var(--sp-2); border: 1px solid var(--ok); background: var(--w98-face); }
+
+/* ── статусбар: строка утопленных сегментов ─────────────────────────────── */
+html[data-theme="win98"] .statusbar {
+  gap: 2px; height: auto; min-height: 22px; padding: 2px 2px 0;
+  border-top: 1px solid var(--w98-hi);
+  background: var(--w98-face); color: var(--text);
+  font-size: var(--fs-2);
+}
+html[data-theme="win98"] .statusbar > span:not(.right),
+html[data-theme="win98"] .statusbar .right > span {
+  display: flex; align-items: center;
+  padding: 0 6px;
+  border: 2px solid;
+  border-color: var(--w98-lo) var(--w98-hi) var(--w98-hi) var(--w98-lo);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* .right — контейнер сегментов, а не сегмент: рамку держат его дети */
+html[data-theme="win98"] .statusbar > .right { border: 0; padding: 0; gap: 2px; }
+
+/* ── скроллбары: серые, широкие, с фаской на бегунке ────────────────────── */
+html[data-theme="win98"] ::-webkit-scrollbar { width: 16px; height: 16px; }
+html[data-theme="win98"] ::-webkit-scrollbar-track { background: var(--w98-face); border-left: 1px solid var(--w98-lo); }
+html[data-theme="win98"] ::-webkit-scrollbar-thumb {
+  border: 2px solid;
+  border-color: var(--w98-hi) var(--w98-lo) var(--w98-lo) var(--w98-hi);
+  background: var(--w98-face);
+}
+html[data-theme="win98"] ::-webkit-scrollbar-thumb:hover { background: var(--surface-2); }
+html[data-theme="win98"] ::-webkit-scrollbar-corner { background: var(--w98-face); }
+
+/* ── затемнение под дровером ────────────────────────────────────────────── */
+/* закрыто видимостью, а не opacity: в этом слое прозрачность не живёт */
+html[data-theme="win98"] .scrim { opacity: 1; visibility: hidden; background: rgba(0, 0, 0, .35); }
+html[data-theme="win98"] body.side-open .scrim,
+html[data-theme="win98"] body.rail-open .scrim { visibility: visible; }
+
+/* ── High Contrast: чёрное поле, белые кромки, жёлтый акцент ────────────── */
+/* стрелка списка светлая, иначе чёрная на чёрном поле не видна */
+html[data-theme="win98"][data-palette="w98-hc"] select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5'%3E%3Cpath d='M0 0h9L4.5 5z' fill='%23fff'/%3E%3C/svg%3E");
+}
+/* заливки наведения в HC нет: фон чёрный, поэтому строка обводится пунктиром */
+html[data-theme="win98"][data-palette="w98-hc"] :is(.set-item:not([aria-current="true"]), .table tbody tr):hover {
+  outline: 1px dotted var(--w98-dk); outline-offset: -1px;
+}
+
+/* ── система просит больше контраста: кромки толще, фокус заметнее ──────── */
+@media (prefers-contrast: more) {
+  html[data-theme="win98"] :is(.btn, .input, .tab, .segbtn, .badge, .table th,
+    .statusbar > span:not(.right), .statusbar .right > span) { border-width: 3px; }
+  html[data-theme="win98"] :focus-visible { outline-width: 2px; }
+}
