@@ -22,7 +22,14 @@ D10–D13).
   приходит через `env:` (`TAG`, `REF`) и читается как переменная, checkout
   релиза идёт с `persist-credentials: false`. Остаток — не код: кто вправе
   пушить теги `v*` и запускать dispatch, решают protection rules на хостинге,
-  из репозитория этого не видно. **Правка применена, права не подтверждены.**
+  из репозитория этого не видно. Проверено 2026-11-18 по API обоих хостов:
+  `tag_protections` и `branch_protections` в Gitea — `[]`, `rulesets` на
+  GitHub — `[]`, то есть **любой, у кого есть право записи, может запушить
+  `v*` и запустить release**. Правило поставлено 2026-11-18 на обоих хостах:
+  ruleset `protect release tags` (id 27553037, `creation`/`update`/`deletion`
+  для `refs/tags/v*`, обход — только роль admin) и tag protection Gitea
+  (id 1, `v*`, whitelist `sintez`). Репозиторий это не проверяет — состояние
+  читается по API хоста.
 - **D7 · Nice · кэш статистики обнулялся целиком** — `c5d32f3`: переполнение
   `cacheMax = 4096` вытесняет старейшую четверть по `mtime` файла
   (`TestCacheEvictsOldestQuarter`).
@@ -31,37 +38,41 @@ D10–D13).
   (`X-MCPRig-Caller: panel`), ключ набора — редакцию с метками `(аноним)` и
   пустыми текстами ошибок (`TestStatsRedactedPerCaller`). Документация
   приведена в соответствие: `docs/en|ru/architecture.md`, `docs/en|ru/panel.md`.
-- **D10 · Should · reload расщеплял поколения токенов и профилей** — `93f82a2`:
+- **D10 · Should · reload расщеплял поколения токенов и профилей** — `cf8c130`:
   `Reload` первым, `SetAuth` только при пустом `RestartNeeded`, иначе одна
   строка `Warn` (`TestReloadRejectsKeyWhileProfilesRolledBack`,
   `TestReloadAppliesKeyAndProfileTogether`).
-- **D12 · Should · текст ошибки апстрима шёл мимо маскировки** — `93f82a2`:
+- **D12 · Should · текст ошибки апстрима шёл мимо маскировки** — `cf8c130`:
   `err` чистится после решения о повторе, `recordMeta` маскирует мета-ошибку
   объединением секретов всех серверов (`TestInvokeCommandMasksSecretInProtocolError`,
   `TestMetaStatsMaskUpstreamSecret`).
-- **D1 · Should · карта `refreshAt` не удаляла записи** — `93f82a2`:
+- **D1 · Should · карта `refreshAt` не удаляла записи** — `cf8c130`:
   `sweepRefresh` выметает метки старше `catalogRefreshEvery` каждые 1024
   записи или при потолке 4096 (`TestMayRefreshSweepsStaleMarks`).
-- **D2 · Should · кэш здоровья вечно ждал после паники пробы** — `fd75b48`:
+- **D2 · Should · кэш здоровья вечно ждал после паники пробы** — `edebeb8`:
   `loadGuarded` с `recover`, один `Warn`, `wait` закрыт, вид пуст
   (`TestHealthCachePanicDoesNotHang`).
 - **D3 · Should · webhook-состояние не чистилось при удалении набора** —
-  `fd75b48`: `notifier.clearSet(id)` рядом с `rt.Forget(id)`
+  `edebeb8`: `notifier.clearSet(id)` рядом с `rt.Forget(id)`
   (`TestNotifyStateClearedOnDelete`).
-- **D4 · Should · маскирование только по имени поля** — `fd75b48`: фильтр имени
+- **D4 · Should · маскирование только по имени поля** — `edebeb8`: фильтр имени
   снят, маскируется любое значение `env`/`headers` от 8 байт, `Bearer `
   снимается (`TestSecretsMasksEveryValue`).
-- **D5 · Should · неудачные входы чистились только при >1024** — `fd75b48`:
+- **D5 · Should · неудачные входы чистились только при >1024** — `edebeb8`:
   просроченные окна убираются при каждой записи, сверх `loginFailsMax = 1024`
   вытесняется запись с самым ранним окном (`TestLoginFailsMapBounded`,
   `TestLoginFailsDropsExpired`).
-- **D6 · Should · приёмка панели не гонялась в CI** — `4eb30b4`: `ACC_DAP`
+- **D6 · Should · приёмка панели не гонялась в CI** — `63ae976`: `ACC_DAP`
   стал необязательным (26 шагов без stdio-сервера, 11 пропускаются с явной
   строкой), job `acceptance` в `.github/workflows/ci.yml` собирает бинарь,
   поднимает панель на свободном порту 9100–9189 и гоняет приёмку, бюджет
-  8 минут. Локальный прогон блока: `total 26, skipped 11, failed 0`. Сам
-  раннер (`playwright install --with-deps`) не проверен — **needs_validation
-  до первого прогона на PR**.
+  8 минут. Локальный прогон блока: `total 26, skipped 11, failed 0`.
+  На реальном раннере проверено: прогон
+  [44316150632](https://github.com/akrhin/mcprig/actions/runs/44316150632),
+  job `acceptance` — success, 13:40:49 → 13:46:10Z (5 мин 21 с из 8):
+  `playwright install --with-deps chromium`, сборка бинаря, панель, 26 шагов,
+  `failed: 0`.
+
 - README застыл на v0.6.3 (`README.md:34`, `README.ru.md:34`) — заменено на
   `releases/latest` в `e469bd1`.
 
