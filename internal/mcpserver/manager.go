@@ -123,6 +123,9 @@ type Manager struct {
 	// платить за чужой refresh.
 	refreshMu sync.Mutex
 	refreshAt map[string]time.Time
+	// refreshSweeps считает записи refreshAt: уборка идёт каждые
+	// refreshSweepEvery, чтобы карта не росла всю жизнь процесса.
+	refreshSweeps int
 
 	// ToolOutURL, when set, names a truncated answer by its /tool-out URL
 	// instead of a path: the caller reached this process over HTTP with a key
@@ -693,6 +696,11 @@ func (m *Manager) recordMeta(name string, fn mcp.ToolHandler) mcp.ToolHandler {
 		if recErr == nil && res != nil && res.IsError {
 			recErr = errors.New(resultMessage(res))
 		}
+		// Мета-вызов не привязан к одному серверу, а его текст ошибки (ошибка
+		// сессии апстрима) тоже повторяет ключ: чистим секретами всего набора.
+		if recErr != nil {
+			recErr = errors.New(config.ScrubSecrets(recErr.Error(), m.allSecrets()))
+		}
 		if m.Stats != nil && !stats.ServiceCall(ctx) {
 			m.Stats.Record(labelOf(ctx, req), "mcprig", name, time.Since(start), recErr)
 		}
@@ -1244,8 +1252,13 @@ func (m *Manager) callWithRetry(ctx context.Context, label string, e *entry, nam
 	// иначе память растёт от любого выдуманного command_name.
 	// Инструмент может вернуть ошибку содержимым (isError) вместо ошибки
 	// протокола — для счётчика это провал, иначе «ошибки» в панели всегда 0.
-	// Секреты маскируются до счётчика: ошибка апстрима повторяет ключ в теле,
-	// а он не должен попасть ни в контекст модели, ни в выгрузку tool-out.
+	// Секреты маскируются до счётчика: ошибка апстрима повторяет ключ в теле
+	// так же охотно, как ответ, а она идёт и в контекст модели (errResult),
+	// и в счётчики, и в выгрузку tool-out — чистим до всех трёх сразу.
+	// Тип ошибки меняется до счётчика: ниже по течению важен только текст.
+	if err != nil {
+		err = errors.New(config.ScrubSecrets(err.Error(), e.secrets))
+	}
 	res = scrubSecrets(res, e.secrets)
 	recErr := err
 	if recErr == nil && res != nil && res.IsError {

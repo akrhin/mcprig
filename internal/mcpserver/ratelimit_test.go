@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -316,5 +317,30 @@ func TestRateLimitBucketKeyIsShort(t *testing.T) {
 		if len(key) != 16 {
 			t.Fatalf("длина ключа корзины %d, want 16", len(key))
 		}
+	}
+}
+
+// Метка refresh старше окна уже ничего не подавляет, поэтому уборка выметает
+// её. Свежие метки остаются, и подавление повтора внутри 5 с работает.
+func TestMayRefreshSweepsStaleMarks(t *testing.T) {
+	m := New(&config.Config{}, "test", nil)
+	defer m.Close()
+	ctx := context.Background()
+	stale := identityOf(ctx) + "\x00old"
+	m.refreshAt = map[string]time.Time{stale: time.Now().Add(-time.Minute)}
+
+	for i := 0; i < refreshSweepEvery; i++ {
+		if !m.mayRefresh(ctx, "s"+strconv.Itoa(i)) {
+			t.Fatalf("первый refresh %d отбит", i)
+		}
+	}
+	if _, ok := m.refreshAt[stale]; ok {
+		t.Fatal("протухшая метка осталась после уборки")
+	}
+	if _, ok := m.refreshAt[identityOf(ctx)+"\x00s0"]; !ok {
+		t.Fatal("свежая метка выметена")
+	}
+	if m.mayRefresh(ctx, "s0") {
+		t.Fatal("повтор внутри 5 с не подавлен")
 	}
 }

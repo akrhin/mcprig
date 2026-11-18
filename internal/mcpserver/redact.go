@@ -11,6 +11,17 @@ import (
 // serverSecrets — секреты сервера: env и заголовки с «секретным» именем.
 func serverSecrets(srv *config.Server) []string { return srv.Secrets() }
 
+// allSecrets — объединение секретов всех серверов набора: мета-вызов не
+// привязан к одной записи, а его ошибка (сессия апстрима) может нести чужой
+// ключ.
+func (m *Manager) allSecrets() []string {
+	var out []string
+	for _, e := range m.allEntries() {
+		out = append(out, e.secrets...)
+	}
+	return out
+}
+
 // scrub заменяет секреты сервера в тексте ответа: апстрим охотно повторяет
 // ключ в теле ошибки (tavily присылает его в validation details), а прокси не
 // должен передавать это в контекст модели и в счётчики. Структурированный

@@ -63,7 +63,7 @@ and wraps it with `internal/httplisten` (main.go:346-349); `status`, `logs`,
 
 `serve` (main.go:291-392): parse flags → `-version` prints and exits →
 `internal/config.Load` → `slog` on stderr → OTLP tracing when the env asks
-(`startTracing`, main.go:602) → `oauth.OpenStore(stateDir())` →
+(`startTracing`, main.go:609) → `oauth.OpenStore(stateDir())` →
 `downstream.Connector` with an env whitelist (`downstream.EnvFor`) and, in
 `serve`, the on-disk server tails (`conn.ServerLogs`, main.go:317) →
 `mcpserver.New` → `mgr.LockPath = lockPath()` →
@@ -78,15 +78,19 @@ a transport token exists (main.go:345) → `httplisten.New` → listen address f
 in a goroutine → log line `прокси слушает` with address and usable server count
 (main.go:381) → 5-second graceful shutdown on signal (main.go:386-391).
 
-SIGHUP reload (main.go:394-435): read the nonce from `<config dir>/reload.request`
+SIGHUP reload (main.go:394-442): read the nonce from `<config dir>/reload.request`
 before loading; `config.Load`; on failure `mgr.ReloadFailed` and the previous
-config keeps serving; on success apply the auth policy to the listener
-(`handler.SetAuth`, main.go:427), then `mgr.Reload`; finally write
+config keeps serving; on success `mgr.Reload` runs first (main.go:428) — profiles
+and tokens are one generation, so a key handed to the listener while the manager
+still holds the rolled-back profile table would pass unprofiled — and the auth
+policy reaches the listener (`handler.SetAuth`, main.go:435) only when
+`RestartNeeded` is empty; otherwise one warning line names the fields that wait
+for a set restart (main.go:431-433). Then write
 `<config dir>/reload.status` atomically (temp file, 0600, rename —
-main.go:498-535) with nonce, generation, applied, restartNeeded, error.
-`stdio` (main.go:549-596) is the same assembly minus listener, auth policy and
+main.go:505-542) with nonce, generation, applied, restartNeeded, error.
+`stdio` (main.go:556-603) is the same assembly minus listener, auth policy and
 warm-up — config, tracing, OAuth store, connector (no `ServerLogs`), manager,
-lock, recorder labelled `stdio` (main.go:579-580), history at `<stateDir>/stdio/stats`,
+lock, recorder labelled `stdio` (main.go:586-587), history at `<stateDir>/stdio/stats`,
 tool-out sweeper, then `mgr.Server().Run(ctx, &mcp.StdioTransport{})`.
 
 `panel`: `cmd` loads no config; `internal/manager` reads `registry.json`, takes
@@ -128,16 +132,16 @@ an empty tail, and `printLogs` prints a server's line through `safelog.Text`
 session cookie without it (panel.go:120, 145).
 
 On-disk layout: config default `os.UserConfigDir()/mcprig/servers.json`
-(main.go:537-542); state dir `MCPRIG_DATA_DIR`, else `$XDG_STATE_HOME/mcprig`,
-else `~/.local/state/mcprig`, else `.mcprig` (main.go:618-630); OAuth tokens at
+(main.go:544-549); state dir `MCPRIG_DATA_DIR`, else `$XDG_STATE_HOME/mcprig`,
+else `~/.local/state/mcprig`, else `.mcprig` (main.go:625-637); OAuth tokens at
 `<state>/oauth.json` and per set `<state>/sets/<id>/oauth.json`;
 approved-descriptor lock at `<MCPRIG_DATA_DIR>/tools.lock.json`, empty path when
 the variable is unset so a manual `serve` has no quarantine owner
-(main.go:636-641); tool-out dumps under `<MCPRIG_DATA_DIR or os.TempDir()>/tool-out`
+(main.go:643-648); tool-out dumps under `<MCPRIG_DATA_DIR or os.TempDir()>/tool-out`
 (internal/toolout/toolout.go:47-55); warm token file
 `~/.config/mcprig/<set>.token` (warm.go:304, 309). Environment read directly
 here: `MCPRIG_PPROF` (main.go:38), `MCPRIG_SET` (main.go:326, 579),
-`MCPRIG_DATA_DIR`/`XDG_STATE_HOME` (main.go:618-630); the full set `panel`
+`MCPRIG_DATA_DIR`/`XDG_STATE_HOME` (main.go:625-637); the full set `panel`
 reads is the `panelEnv` table, which `panel -h` prints (main.go:125-153) —
 OpenBao's `BAO_*`/`OPENBAO_*` arrive from `internal/manager/secrets.go:115-128`.
 Also
