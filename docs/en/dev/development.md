@@ -79,7 +79,7 @@ skipped run cannot read as a passed gate.
 ## Panel acceptance
 
 `scripts/acceptance/panel.cjs` walks the panel from an empty data directory and
-checks 37 things a person would do by hand — the rail, themes, navigation, sets,
+checks 38 things a person would do by hand — the rail, themes, navigation, sets,
 servers, keys, tools, statistics, the log, variables, import. 11 of them attach
 a stdio MCP server and therefore need `ACC_DAP`; without it those steps are
 skipped with a line each and the rest still run. It needs Playwright, and the

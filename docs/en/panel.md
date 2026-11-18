@@ -25,7 +25,7 @@ CSP: no inline scripts or styles.
 | tabs | **Overview**, **Servers**, **Keys**, **Tools**, **Calls** and **Logs** of the open set, at `#/set/<id>`, `#/set/<id>/servers`, `…/keys`, `…/tools`, `…/calls` and `…/logs`; an unknown tab opens **Overview**, a tab click adds a history entry, and the back and forward buttons walk through the tabs |
 | KPIs | calls, error rate, p50 and p95 of the selected set over the last 7 days, under the tiles of the set **Overview** |
 | servers of the set, on the **Servers** tab | name with a second line (daemon error, isolation, description), type, health, tool count, last request, **Check**, **Log**, **Tools**, **Edit** and the **×** that detaches the server from the set; under the table sit the registry picker and **add to set** |
-| all servers page | the whole registry of the host: name with the daemon's reason on the second line, type, health, tool count from the last **Check**, the sets the server belongs to, and **Check**, **Authorize**, **Log**, **Edit** and the **×** that deletes it from the registry; **Add server** sits in the head |
+| all servers page | the whole registry of the host: name with the daemon's reason on the second line, type, health, tool count from the set catalog or the last **Check**, the sets the server belongs to, and **Check**, **Authorize**, **Log**, **Edit** and the **×** that deletes it from the registry; **Add server** sits in the head |
 | import and export | the **Import / Export** dialog: the whole registry or one set as JSON, with **Download JSON** and **Copy**; import from a JSON file or a pasted `mcpServers` object — the preview names the servers that will be added, sets found in the file are skipped with a note (sets are made in the panel), and `env` and `headers` go out and come in as written |
 | calls table | time, server, tool, client, milliseconds, status; search box and **errors only**. Meta-tools (`list_servers`, `list_commands`, `describe_commands`) appear here too, as server `mcprig`; a failure shows its reason next to the status, the full text in a tooltip |
 | statistics page | the period (today, 7 days, 30 days, archive), the server, tool and client filters and **reset**, totals and the series. The first answer arrives as soon as the sets are known, so a direct `#/stats/<period>` link is filled at once instead of waiting for the 15 s tick. The three filters are kept in the browser (`localStorage`, `mcprig.stats.*`) and survive a reload; the set of the view still follows the rail |
@@ -39,9 +39,12 @@ health answer is on its way the cell keeps a skeleton bar instead of guessing.
 The badge of the all-servers page uses the same component and the same three
 states; a server outside the open set stays **Not checked** until **Check**
 probes it there, and a server of a stopped set says that the set is off.
-The tool count of one server is not part of the health answer, so the **Tools**
-column shows `—` until **Check** probes that server; the head of the set shows
-the total for the whole set.
+The tool count of one server is not part of the health answer. A server of a
+running set takes it from that set's catalog (`GET /api/sets/<id>/tools`, the
+descriptors `tools.lock.json` remembers), so the **Tools** column shows the
+number as soon as the set has listed its tools; **Check** replaces it with a
+live count of the same server. A server of a stopped set, and one no catalog
+knows, keeps `—`; the head of the set shows the total for the whole set.
 
 The browser title names what is open: `mcprig — Overview`, `mcprig — Sets` and
 the like for other pages, `mcprig — set <name>` on a set, and with ` · <tab>`
@@ -149,8 +152,9 @@ key stops the set; revoking one of several leaves it running.
 
 The **All servers** page lists the whole registry of the host, not the
 composition of one set. A row carries the name with the daemon's reason of a
-failure below it, the transport, the health badge, the tool count the last
-**Check** found, the sets the server belongs to and the actions: **Check**
+failure below it, the transport, the health badge, the tool count of the set
+catalog or of the last **Check**, the sets the server belongs to and the
+actions: **Check**
 (`POST /api/servers/<name>/probe`), **Authorize** for a remote server that
 answered `401`, **Log** of the open set, **Edit** and the **×** that deletes the
 server from the registry — the dialog names the sets it leaves first. Deleting

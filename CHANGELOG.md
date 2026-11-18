@@ -8,7 +8,12 @@ repository the project is built in.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- The **Tools** column of a set's servers and of the all-servers page takes the
+  count from the catalog of a running set (`GET /api/sets/<id>/tools`) instead
+  of waiting for **Check** on every row; a probe still replaces it with a live
+  count, and a stopped set keeps `—`.
 
 ## [0.6.6]
 
