@@ -6,7 +6,10 @@ tools, statistics, the log, variables and import. It exits non-zero when a step
 fails and prints the browser state next to the failure, so a flake is told apart
 from a defect.
 
-Requirements: Playwright and a stdio MCP server to attach (any will do).
+Requirements: Playwright. A stdio MCP server to attach (`ACC_DAP`) is optional:
+without it the 11 server-bound steps are skipped with a `skip … (ACC_DAP не
+задан)` line and the run judges the remaining 26. CI (`.github/workflows/ci.yml`,
+job `acceptance`) runs the 26-step variant on a freshly built panel.
 
 ```bash
 MCPRIG_DATA_DIR=$(mktemp -d) MCPRIG_AUTH=off MCPRIG_PORT=9131 ./mcprig panel &

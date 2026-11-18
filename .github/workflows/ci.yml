@@ -161,6 +161,46 @@ jobs:
           fi
           node --check web/app.js
 
+  # Приёмка панели: 26 шагов без ACC_DAP (37 с ним — но stdio-сервера в CI нет).
+  # Ловит то, чего не видит `node --check`: маршруты, формы, темы, ключи, пустые
+  # состояния. Панель поднимается на чистом каталоге, без пароля, на loopback.
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Версия playwright прибита: браузеры качаются под конкретную сборку.
+      - name: Playwright и Chromium
+        run: |
+          npm i --no-save --no-package-lock playwright@1.65.0
+          npx playwright install --with-deps chromium
+      - name: Сборка панели
+        run: go build -o mcprig ./cmd/mcprig
+      - name: Приёмка панели
+        run: |
+          set -euo pipefail
+          DATA=$(mktemp -d)
+          # Панель не должна занять 9190: скрипт приёмки ждёт его свободным для
+          # набора beta (R7–R9 проверяют отказ и приём порта).
+          PORT=$(for p in $(seq 9100 9189); do
+            (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null || { echo "$p"; break; }
+          done)
+          MCPRIG_DATA_DIR="$DATA" MCPRIG_AUTH=off MCPRIG_PORT="$PORT" ./mcprig panel >panel.log 2>&1 &
+          PANEL=$!
+          trap 'kill $PANEL 2>/dev/null || true' EXIT
+          for _ in $(seq 60); do
+            curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && break
+            sleep 0.5
+          done
+          curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null || { echo "панель не ответила на /healthz"; cat panel.log; exit 1; }
+          ACC_BASE="http://127.0.0.1:$PORT" node scripts/acceptance/panel.cjs || { cat panel.log; exit 1; }
+
   # Образ собирается только там, где его могут сломать: на PR и только если
   # тронуты Dockerfile, .dockerignore или зависимости. На push в master тесты
   # уже прошли, а тег всё равно собирает образы заново (release.yml).

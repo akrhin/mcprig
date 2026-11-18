@@ -6,13 +6,11 @@
 //   ACC_BASE=http://127.0.0.1:9131 ACC_DAP=/path/to/stdio-mcp npm i -g playwright && node panel.cjs
 //
 // ACC_DAP — любой stdio MCP-сервер: по нему проверяются привязка, инструменты и журнал.
+// Без ACC_DAP эти шаги пропускаются (в CI браузер есть, stdio-сервера нет), остальные
+// выполняются, и итог failed считается по выполненным.
 const { chromium } = require("playwright");
 const BASE = process.env.ACC_BASE || "http://127.0.0.1:9131";
 const DAP = process.env.ACC_DAP || "";
-if (!DAP) {
-  console.error("ACC_DAP не задан: укажите путь к любому stdio MCP-серверу, например ACC_DAP=$(command -v mcp-server-time)");
-  process.exit(2);
-}
 
 const results = [];
 let page, dialogMode = "accept", dialogs = [];
@@ -27,6 +25,10 @@ async function step(name, fn) {
     if (v === false) { bad(name, "assert"); } else { ok(name, v); }
   } catch (e) { bad(name, e.message); }
 }
+const skipped = [];
+function skip(name) { skipped.push(name); console.log(`skip ${name} (ACC_DAP не задан)`); }
+// Шаги с привязанным stdio-сервером: без ACC_DAP их нечем проверить.
+const stepDap = (name, fn) => (DAP ? step(name, fn) : skip(name));
 const api = async (path, opts) => page.evaluate(async ([p, o]) => {
   const r = await fetch(p, Object.assign({ headers: { Origin: location.origin, "Content-Type": "application/json" } }, o || {}));
   const t = await r.text();
@@ -275,7 +277,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
   });
 
   /* ---------- серверы ---------- */
-  await step("U1 создание сервера: пустое имя отклоняется", async () => {
+  await stepDap("U1 создание сервера: пустое имя отклоняется", async () => {
     await go("#/servers");
     await page.click("#srv-new");
     await page.waitForTimeout(300);
@@ -290,7 +292,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     return err.trim().slice(0, 50);
   });
 
-  await step("U2 создание сервера stdio", async () => {
+  await stepDap("U2 создание сервера stdio", async () => {
     await page.fill("#sf-name", "dap");
     await page.selectOption("#sf-transport", "stdio");
     await page.fill("#sf-command", DAP);
@@ -303,7 +305,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     if (!(await page.isVisible("#all-srv-table"))) throw new Error("таблица не показана");
   });
 
-  await step("U3 правка сервера сохраняет env, cwd и описание", async () => {
+  await stepDap("U3 правка сервера сохраняет env, cwd и описание", async () => {
     await go("#/servers");
     await page.click('#all-srv-table tr[data-name="dap"] [data-edit]');
     await page.waitForTimeout(400);
@@ -318,7 +320,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     if (srv.description !== "debug adapter" && srv.desc !== "debug adapter") throw new Error("описание " + JSON.stringify(srv));
   });
 
-  await step("U4 проверка сервера кнопкой check", async () => {
+  await stepDap("U4 проверка сервера кнопкой check", async () => {
     await page.click('#all-srv-table tr[data-name="dap"] [data-check]');
     const cell = await waitFor(async () => {
       const t = await page.textContent('#all-srv-table tbody tr[data-name="dap"]');
@@ -328,7 +330,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     return cell.replace(/\s+/g, " ").slice(0, 60);
   });
 
-  await step("U5 лог сервера из реестра", async () => {
+  await stepDap("U5 лог сервера из реестра", async () => {
     const visible = await page.isVisible('#all-srv-table tr[data-name="dap"] [data-log]');
     if (!visible) return "кнопка спрятана: сервер не привязан к набору";
     await page.click('#all-srv-table tr[data-name="dap"] [data-log]');
@@ -342,7 +344,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     return txt.trim().split("\n").length + " строк";
   });
 
-  await step("V1 привязка сервера к набору", async () => {
+  await stepDap("V1 привязка сервера к набору", async () => {
     await go("#/set/alpha/servers");
     await page.selectOption("#srv-attach", "dap");
     await page.click("#srv-attach-add");
@@ -352,7 +354,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     if (!row) throw new Error("нет строки в таблице набора");
   });
 
-  await step("V2 кнопка tools у сервера набора открывает вкладку с фильтром", async () => {
+  await stepDap("V2 кнопка tools у сервера набора открывает вкладку с фильтром", async () => {
     await page.click('#set-srv-body tr[data-name="dap"] [data-tools]');
     await page.waitForTimeout(600);
     const h = await page.evaluate(() => location.hash);
@@ -361,7 +363,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     if (sel !== "dap") throw new Error("фильтр " + sel);
   });
 
-  await step("V3 проверка сервера набора", async () => {
+  await stepDap("V3 проверка сервера набора", async () => {
     await go("#/set/alpha/servers");
     await page.click('#set-srv-body tr[data-name="dap"] [data-check]');
     const t = await waitFor(async () => {
@@ -372,7 +374,7 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     return t.replace(/\s+/g, " ").slice(0, 60);
   });
 
-  await step("W1 запуск набора кнопкой Start", async () => {
+  await stepDap("W1 запуск набора кнопкой Start", async () => {
     await go("#/set/alpha");
     const label = await page.textContent("#run");
     await page.click("#run");
@@ -384,14 +386,14 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
     return `«${label.trim()}» → «${after.trim()}»`;
   });
 
-  await step("W2 перезапуск набора", async () => {
+  await stepDap("W2 перезапуск набора", async () => {
     await page.click("#restart");
     // перезапуск = стоп + старт: ждём состояния, а не времени
     const a = await waitFor(async () => { const s = await setOf("alpha"); return s && s.runtime && s.runtime.running ? s : null; }, 30000);
     if (!a) throw new Error("после перезапуска не работает");
   });
 
-  await step("W3 инструменты: таблица, фильтр и одобрение", async () => {
+  await stepDap("W3 инструменты: таблица, фильтр и одобрение", async () => {
     await go("#/set/alpha/tools");
     const rows = await waitFor(async () => { const n = await page.locator("#lock-body tr").count(); return n > 0 ? n : null; }, 40000);
     if (!rows) {
@@ -543,6 +545,6 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
   if (process.env.ACC_OUT) {
     require("fs").writeFileSync(process.env.ACC_OUT, JSON.stringify(results, null, 1), { mode: 0o600 });
   }
-  console.log(JSON.stringify({ total: results.length, failed: failed.length, failedList: failed.map(f => f.name + " :: " + f.why) }, null, 1));
+  console.log(JSON.stringify({ total: results.length, skipped: skipped.length, failed: failed.length, failedList: failed.map(f => f.name + " :: " + f.why) }, null, 1));
   process.exit(failed.length ? 1 : 0);
 })();
