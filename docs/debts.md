@@ -38,31 +38,31 @@ D10–D13).
   (`X-MCPRig-Caller: panel`), ключ набора — редакцию с метками `(аноним)` и
   пустыми текстами ошибок (`TestStatsRedactedPerCaller`). Документация
   приведена в соответствие: `docs/en|ru/architecture.md`, `docs/en|ru/panel.md`.
-- **D10 · Should · reload расщеплял поколения токенов и профилей** — `cf8c130`:
+- **D10 · Should · reload расщеплял поколения токенов и профилей** — `0dfb26d`:
   `Reload` первым, `SetAuth` только при пустом `RestartNeeded`, иначе одна
   строка `Warn` (`TestReloadRejectsKeyWhileProfilesRolledBack`,
   `TestReloadAppliesKeyAndProfileTogether`).
-- **D12 · Should · текст ошибки апстрима шёл мимо маскировки** — `cf8c130`:
+- **D12 · Should · текст ошибки апстрима шёл мимо маскировки** — `0dfb26d`:
   `err` чистится после решения о повторе, `recordMeta` маскирует мета-ошибку
   объединением секретов всех серверов (`TestInvokeCommandMasksSecretInProtocolError`,
   `TestMetaStatsMaskUpstreamSecret`).
-- **D1 · Should · карта `refreshAt` не удаляла записи** — `cf8c130`:
+- **D1 · Should · карта `refreshAt` не удаляла записи** — `0dfb26d`:
   `sweepRefresh` выметает метки старше `catalogRefreshEvery` каждые 1024
   записи или при потолке 4096 (`TestMayRefreshSweepsStaleMarks`).
-- **D2 · Should · кэш здоровья вечно ждал после паники пробы** — `edebeb8`:
+- **D2 · Should · кэш здоровья вечно ждал после паники пробы** — `d9e1198`:
   `loadGuarded` с `recover`, один `Warn`, `wait` закрыт, вид пуст
   (`TestHealthCachePanicDoesNotHang`).
 - **D3 · Should · webhook-состояние не чистилось при удалении набора** —
-  `edebeb8`: `notifier.clearSet(id)` рядом с `rt.Forget(id)`
+  `d9e1198`: `notifier.clearSet(id)` рядом с `rt.Forget(id)`
   (`TestNotifyStateClearedOnDelete`).
-- **D4 · Should · маскирование только по имени поля** — `edebeb8`: фильтр имени
+- **D4 · Should · маскирование только по имени поля** — `d9e1198`: фильтр имени
   снят, маскируется любое значение `env`/`headers` от 8 байт, `Bearer `
   снимается (`TestSecretsMasksEveryValue`).
-- **D5 · Should · неудачные входы чистились только при >1024** — `edebeb8`:
+- **D5 · Should · неудачные входы чистились только при >1024** — `d9e1198`:
   просроченные окна убираются при каждой записи, сверх `loginFailsMax = 1024`
   вытесняется запись с самым ранним окном (`TestLoginFailsMapBounded`,
   `TestLoginFailsDropsExpired`).
-- **D6 · Should · приёмка панели не гонялась в CI** — `63ae976`: `ACC_DAP`
+- **D6 · Should · приёмка панели не гонялась в CI** — `04a607a`: `ACC_DAP`
   стал необязательным (26 шагов без stdio-сервера, 11 пропускаются с явной
   строкой), job `acceptance` в `.github/workflows/ci.yml` собирает бинарь,
   поднимает панель на свободном порту 9100–9189 и гоняет приёмку, бюджет
