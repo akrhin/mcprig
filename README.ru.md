@@ -46,7 +46,7 @@ umask 077; printf '%s' '<token>' > demo.key
 
 ![mcprig panel](design/ui/panel.png)
 
-*Панель: наборы со своими портами и точками входа и серверы одного набора — транспорт и число инструментов.*
+*Панель: наборы со своими портами и точками входа, серверы одного набора и его трафик за 7 дней.*
 
 Docker работает так же и не требует Go: `docker pull ghcr.io/akrhin/mcprig:latest`
 (`latest-full` добавляет node и python для `npx`/`uvx`-серверов). Юниты systemd,
