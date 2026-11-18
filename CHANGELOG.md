@@ -10,6 +10,32 @@ repository the project is built in.
 
 ### Fixed
 
+- Reload applies profiles and keys as one generation: the listener receives the
+  new token list only when the reload needs no restart, so a key that arrived
+  together with a transport change is refused until the set restarts instead of
+  being accepted without its profile (D10).
+- Upstream error text is masked like the payload: a server repeating its own
+  secret inside an error no longer leaks it into the tool answer, the counters
+  or `raw-*.jsonl`, meta-tools included (D12).
+- Secrets are masked by value rather than by field name: every `env` or header
+  value of 8 bytes or more becomes `***` — `GITHUB_PAT` and `CF_ACCESS`
+  included — so a tool catalog may show `***` where a harmless path used to be
+  (D4).
+- A panic inside the health probe no longer hangs every later request to that
+  set: the single-flight is released, the probe is retried and one `Warn` is
+  logged (D2).
+- Deleting a set forgets its webhook transitions, so a new set created under the
+  same id warns again (D3).
+- Failed logins: expired windows are dropped on every recorded failure and the
+  map is capped at 1024 entries, instead of being cleaned only when it had
+  already overflowed (D5).
+- The tool-catalog throttle map sweeps marks older than its 5 s window instead
+  of growing for the lifetime of the process (D1).
+- The statistics cache evicts the oldest quarter of its files by `mtime` instead
+  of dropping the whole map at 4096 entries (D7).
+- CI: the `acceptance` job runs the 26-step panel acceptance on a freshly built
+  binary; `ACC_DAP` became optional and its 11 stdio steps are skipped with a
+  line in the output (D6).
 - `GET /stats` of a set no longer hands the full snapshot to whoever holds the
   set's key: a key now gets counters and latencies with client labels replaced
   by `(аноним)` and upstream error texts emptied. The full snapshot goes to the
