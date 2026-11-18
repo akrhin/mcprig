@@ -29,7 +29,9 @@ decides whether a running set is reloaded, restarted or left alone.
   (`auth.go:261`). Sessions are memory-only (`sessionStore`, `auth.go:88`): 32
   random bytes + HMAC-SHA256, 12 h TTL (`auth.go:24,102-136`), so a restart logs
   everyone out. Login takes 5 failures/minute per IP, at most 2 concurrent scrypt
-  hashes, 8 pending (`auth.go:181-188`). `scryptKey` is RFC 7914 on the stdlib
+  hashes, 8 pending (`auth.go:181-190`); the failure map is capped at 1024 entries —
+  expired windows are dropped on every write and the earliest window is evicted
+  (`loginFailedOne`, `auth.go:444`). `scryptKey` is RFC 7914 on the stdlib
   (`scrypt.go:15`); hash `scrypt$N$r$p$salt$hash` (`auth.go:55`), parameters read
   from the stored hash rather than fixed in code (`auth.go:49-82`).
 - **Pre-dispatch gates.** `checkCSRF` (`api.go:716`) rejects `Sec-Fetch-Site:
@@ -67,10 +69,13 @@ decides whether a running set is reloaded, restarted or left alone.
   (`resolve`, `secrets.go:382`); 30 s cache (`secrets.go:236`), errors never
   cached; `Resolve` fans out 8 at a time in declared order (`secrets.go:310`);
   `config.ReservedEnvName` names are never substituted (`secrets.go:284`).
-- **Health is a 15 s single-flight cache.** `healthCache.get` (`health.go:73`)
+- **Health is a 15 s single-flight cache.** `healthCache.get` (`health.go:75`)
   loads under a background context so a cancelled browser request cannot poison
   the cache; probe timeout 15 s, outer budget 30 s (`health.go:19-30`).
-  `bearerTransport` (`health.go:117`) adds the set token and
+  The leader's probe goes through `loadGuarded` (`health.go:127`): a panic closes
+  `wait` and leaves an empty view, so the next request retries instead of hanging
+  on an open channel.
+  `bearerTransport` (`health.go:145`) adds the set token and
   `stats.ServiceCallHeader`, keeping panel calls out of counters.
 - **OAuth is a channel handshake.** `authFlow{State,URL,Message}` (`oauth.go:23`) per
   `set\x00server`; `POST .../authorize` answers 202 and connects via
@@ -131,7 +136,10 @@ decides whether a running set is reloaded, restarted or left alone.
 - **Reads.** `GET /api/sets/<id>/servers` → `healthCache.get` → `m.probe` →
   `fetchSetHealth` → MCP `list_servers`, then `noteHealth` logs only transitions;
   `GET /api/calls` merges live `/stats` with on-disk history of stopped sets
-  (`calls.go:70`); `GET /api/stats` reads `sets/<id>/stats` (`stats.go:25`);
+  (`calls.go:70`); the live read marks itself with `stats.ServiceCallHeader`
+  (`fetchSetStats`, `calls.go:199,217`), so the set returns the full snapshot and
+  redaction of an open set happens in `apiCalls` (`calls.go:112-121`);
+  `GET /api/stats` reads `sets/<id>/stats` (`stats.go:25`);
   `POST /api/sets/<id>/prompt` renders a catalog, falls back to `tools.lock.json`
   names and scrubs secrets (`prompt.go:105-122`). `GET /api/sets/<id>/logs` and
   `…/servers/<n>/logs` put the read failure into the body as `error` next to an
@@ -139,8 +147,10 @@ decides whether a running set is reloaded, restarted or left alone.
   dir is shortened before it leaves the panel.
 - **Delete and shutdown.** `apiSetDelete` (`api.go:1625`) stops the process, drops
   the health cache, deletes the registry entry, `RemoveAll`s the set directory
-  because `servers.json` holds a live bearer token (`api.go:1638`) and calls
-  `Runtime.Forget` (`api.go:1641`). `Close` cancels
+  because `servers.json` holds a live bearer token (`api.go:1638`), calls
+  `Runtime.Forget` (`api.go:1641`) and `notifier.clearSet` (`api.go:1642`):
+  webhook transition marks are keyed `set/server`, and a deleted set would
+  otherwise silence a new set with the same id (`notify.go:114`). `Close` cancels
   the manager context, stops the health ticker and closes browse sessions; `Runtime.Close`
   (`runtime.go:784`) kills sets in parallel within one budget, draining webhooks.
 

@@ -6,7 +6,7 @@
   (`config.go:1-4`).
 - Holds the policy primitives both sides must agree on: the permissions gate
   (`permissions.go:1-2`), key profiles (`profiles.go`), the rate-limit block
-  (`ratelimit.go:10-13`) and secret masking (`secrets.go:8-14`) — the panel's browse path
+  (`ratelimit.go:10-13`) and secret masking (`secrets.go:13-34`) — the panel's browse path
   and the proxy's `invoke_command` call the same functions.
 - Validates each server without failing the load: an unusable entry keeps a
   `ConfigError` and shows up unhealthy (`config.go:27-28,938-968`).
@@ -70,9 +70,10 @@
   `perTool` (`ratelimit.go:57-59`); a zero block is stored as the field's absence
   (`ratelimit.go:66-79`). It lives in the registry entry, is copied into the set's
   `servers.json`, and the proxy enforces it where calls happen (`ratelimit.go:10-13`).
-- **Secrets** (`secrets.go:10`): every `env`/`header` whose name matches
-  `key|token|secret|pass|auth|credential` contributes its value if at least 8 chars, with a
-  leading `Bearer ` stripped (`secrets.go:15-37`); `ScrubSecrets` replaces them with `***` in
+- **Secrets** (`secrets.go:13`): every `env`/`header` value of at least 8 chars, no name
+  filter — a token under a "non-secret" name used to leak, and `${VAR}` is already
+  expanded by the time this runs (`expandSecrets`, `config.go:966`); a leading `Bearer `
+  is stripped (`secrets.go:13-34`); `ScrubSecrets` replaces them with `***` in
   text that leaves the process — child stderr, upstream errors (`secrets.go:41-49`), applied
   by `internal/manager/prompt.go:110,117-120,184`. What a client sees carries fingerprints,
   not tokens: `clientNames` (6-hex `sha256` → label) and `keyProfiles` (`config.go:792-799`).
@@ -103,7 +104,7 @@
   (`internal/manager/setconfig.go:161-171`) renders registry state into
   `<dataDir>/sets/<id>/servers.json` atomically, 0600, `${VAR}` unexpanded
   (`setconfig.go:24-25`); the spawned process reads it back via `Load`.
-- **Secret path at start.** `Server.Secrets()` (`secrets.go:15-37`) collects the values and
+- **Secret path at start.** `Server.Secrets()` (`secrets.go:13-34`) collects the values and
   the process scrubs child output with them; `ReservedEnvName` (`config.go:565`) filters what
   the child may receive in `env`/`envAllow` (`internal/downstream/env.go`).
 

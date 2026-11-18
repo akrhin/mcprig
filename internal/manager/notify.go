@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -105,6 +106,21 @@ func (n *notifier) clear(setID, server string) {
 	}
 	n.mu.Lock()
 	delete(n.last, setID+"/"+server)
+	n.mu.Unlock()
+}
+
+// clearSet забывает все переходы набора сразу: удалённый набор не должен
+// навсегда подавлять события нового набора с тем же id.
+func (n *notifier) clearSet(setID string) {
+	if n == nil {
+		return
+	}
+	n.mu.Lock()
+	for key := range n.last {
+		if strings.HasPrefix(key, setID+"/") {
+			delete(n.last, key)
+		}
+	}
 	n.mu.Unlock()
 }
 

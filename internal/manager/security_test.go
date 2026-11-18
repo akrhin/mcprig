@@ -185,6 +185,48 @@ func TestLoginQueueLimitsScrypt(t *testing.T) {
 	}
 }
 
+// Карта неудачных входов не растёт от потока новых адресов: сверх потолка
+// вытесняется запись с самым ранним окном, свежий адрес учтён, счётчик живого
+// чужого адреса на месте.
+func TestLoginFailsMapBounded(t *testing.T) {
+	a, err := newAuth(AuthOptions{Off: true})
+	if err != nil {
+		t.Fatalf("newAuth: %v", err)
+	}
+	ip := func(i int) string { return fmt.Sprintf("10.%d.%d.%d", i>>16&255, i>>8&255, i&255) }
+	for i := 0; i <= loginFailsMax; i++ {
+		a.loginFailedOne(ip(i))
+	}
+	if n := len(a.loginFails); n != loginFailsMax {
+		t.Fatalf("записей в карте = %d, ожидался потолок %d", n, loginFailsMax)
+	}
+	if w := a.loginFails[ip(loginFailsMax)]; w == nil || w.count != 1 {
+		t.Fatalf("последний адрес не учтён: %+v", w)
+	}
+	if _, ok := a.loginFails[ip(0)]; ok {
+		t.Fatal("самая старая по окну запись не вытеснена")
+	}
+	if w := a.loginFails[ip(loginFailsMax/2)]; w == nil || w.count != 1 {
+		t.Fatalf("счётчик живого чужого адреса потерян: %+v", w)
+	}
+}
+
+// Просроченная запись исчезает при следующей неудаче, а не ждёт переполнения.
+func TestLoginFailsDropsExpired(t *testing.T) {
+	a, err := newAuth(AuthOptions{Off: true})
+	if err != nil {
+		t.Fatalf("newAuth: %v", err)
+	}
+	a.loginFails["old"] = &failWindow{count: 3, reset: time.Now().Add(-time.Second)}
+	a.loginFailedOne("new")
+	if _, ok := a.loginFails["old"]; ok {
+		t.Fatal("просроченная запись осталась в карте")
+	}
+	if w := a.loginFails["new"]; w == nil || w.count != 1 {
+		t.Fatalf("новая запись: %+v", w)
+	}
+}
+
 // Редирект OpenBao на чужой хост не должен уносить X-Vault-Token.
 func TestBaoRedirectDoesNotLeakToken(t *testing.T) {
 	var leaked bool

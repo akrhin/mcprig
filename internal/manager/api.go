@@ -236,7 +236,7 @@ func New(opts Options) (*Manager, error) {
 		log:     log,
 		version: version,
 		tls:     tlsConf,
-		health:  newHealthCache(),
+		health:  newHealthCache(log),
 		browse:  newBrowser(sec, version, opts.DataDir),
 		ctx:     ctx,
 		cancel:  cancel,
@@ -1639,6 +1639,9 @@ func (m *Manager) apiSetDelete(req *request) error {
 		m.log.Warn("каталог удалённого набора не убран", "set", safelog.Value(id), "err", err)
 	}
 	m.rt.Forget(id)
+	// Отметки переходов живут по ключу «набор/сервер»: без чистки новый набор с
+	// тем же id молча не получил бы ни одного предупреждения.
+	m.rt.notify.clearSet(id)
 	writeJSON(req.w, http.StatusOK, map[string]any{"ok": true})
 	return nil
 }
