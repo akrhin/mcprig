@@ -10,6 +10,10 @@
 
 ## [Unreleased]
 
+Новых изменений пока нет.
+
+## [0.6.7]
+
 ### Исправлено
 
 - Колонка **Инструментов** в таблице серверов набора и на странице всех
@@ -1267,7 +1271,8 @@
 - Образы Docker (slim и full), релиз Gitea Actions с goreleaser и govulncheck,
   Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/akrhin/mcprig/compare/v0.6.6...v0.6.7
 [0.6.3]: https://github.com/akrhin/mcprig/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/akrhin/mcprig/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1

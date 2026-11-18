@@ -8,6 +8,10 @@ repository the project is built in.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.6.7]
+
 ### Fixed
 
 - The **Tools** column of a set's servers and of the all-servers page takes the
@@ -1271,7 +1275,8 @@ repository the project is built in.
 - Docker images (slim and full), Gitea Actions release with goreleaser and
   govulncheck, Go 1.27.3.
 
-[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/akrhin/mcprig/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/akrhin/mcprig/compare/v0.6.6...v0.6.7
 [0.6.3]: https://github.com/akrhin/mcprig/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/akrhin/mcprig/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/akrhin/mcprig/compare/v0.6.0...v0.6.1
