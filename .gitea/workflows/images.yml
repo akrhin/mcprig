@@ -29,6 +29,9 @@ jobs:
           REGISTRY: ${{ secrets.REGISTRY }}
           REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          # Имя ref — только через env: подстановка ${{ }} в текст shell
+          # исполняет метасимволы имени как код в job с паролем реестра.
+          REF: ${{ gitea.ref_name }}
         run: |
           set -euo pipefail
           if [ -z "${REGISTRY:-}" ] || [ -z "${REGISTRY_USER:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
@@ -42,7 +45,7 @@ jobs:
             exit 0
           fi
           # Версия без v — та же форма, что у goreleaser и в main.version.
-          ref="${{ gitea.ref_name }}"
+          ref="$REF"
           ver=$(printf '%s' "${ref:-dev}" | sed 's/^v//')
           revision=$(git rev-parse --short HEAD)
           repo="$REGISTRY/sintez/mcprig"

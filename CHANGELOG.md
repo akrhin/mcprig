@@ -10,6 +10,13 @@ repository the project is built in.
 
 ### Fixed
 
+- Release pipeline: the tag name was expanded into the text of `run:` blocks in
+  jobs that hold a write token and the registry password, so a tag containing
+  shell metacharacters became code. The tag now arrives through `env:` and is
+  read as `"$TAG"`; the release checkout keeps no credentials in `.git/config`
+  (`persist-credentials: false`). The Gitea image workflow takes `gitea.ref_name`
+  the same way. Who may push `v*` tags is a hosting-side protection rule that
+  this repository cannot confirm.
 - Server log: the **Log** dialog of a server showed only the access lines of the
   set and was empty in practice. The child's stderr now goes to
   `sets/<id>/serverlogs/<name>.log`, capped at 256 KiB, kept after a stop so the
