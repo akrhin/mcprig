@@ -50,6 +50,16 @@ variables `#page-vars:667`. Five `<dialog>`s: server editor `srv-dlg:711`, serve
 log `srvlog-dlg:833`, OAuth `auth-dlg:856`, import/export `io-dlg:881`, prompt
 `prompt-dlg:934`; keys and tools are tabs of the set, not dialogs.
 
+**The tool count of a row has two sources, the fresh one wins.** A probe of the
+row's own server fills `st.probeTools` (`probeServer`, `POST
+/api/servers/<name>/probe`, `web/app.js:2032-2055`); without one, `toolCount()`
+(`web/app.js:2019-2030`) reads the catalog of a running set that holds the
+server — `GET /api/sets/<id>/tools` (`tools.lock.json`), counted per `server`
+and fetched once per set open by `ensureSetTools()` into `st.setTools`
+(`web/app.js:2001-2017`). A stopped set, and a server no catalog knows, keeps
+`—`. The count is not part of the health answer, which is why the column has a
+source of its own.
+
 **Rendering is manual DOM with keyed reconciliation.** `el()` builds nodes
 (`web/app.js:919-924`); `sync(box, items, key, make, fill)` keeps a
 `Map` on the container, patches existing rows in place, inserts new ones, drops

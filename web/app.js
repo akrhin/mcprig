@@ -148,7 +148,7 @@
       'setSrv.thTools': 'Tools',
       'setSrv.thLast': 'Last call',
       'setSrv.thAct': 'Actions',
-      'setSrv.toolsTip': 'tool count comes from a probe of this server',
+      'setSrv.toolsTip': 'tool count comes from the set catalog; a check confirms it live',
       'setSrv.lastTip': 'from the last 100 calls',
       'setSrv.emptyTitle': 'This set has no servers',
       'setSrv.emptyText': 'Servers live in the host registry; attach one to give this set tools to serve.',
@@ -531,7 +531,7 @@
       'setSrv.thTools': 'Инструментов',
       'setSrv.thLast': 'Последний вызов',
       'setSrv.thAct': 'Действия',
-      'setSrv.toolsTip': 'число инструментов — из проверки этого сервера',
+      'setSrv.toolsTip': 'число инструментов — из каталога набора, проверка уточняет вживую',
       'setSrv.lastTip': 'по последним 100 вызовам',
       'setSrv.emptyTitle': 'В наборе нет серверов',
       'setSrv.emptyText': 'Серверы живут в реестре хоста; подключите один, чтобы у набора появились инструменты.',
@@ -889,6 +889,8 @@
     version: '',
     // probe — доказательства строки «Проверить»: они свежее кэша health (15 с)
     probeTools: {}, probeHealth: {}, healthBusy: false,
+    // setTools — каталог набора по серверам (id → {сервер: сколько инструментов})
+    setTools: {},
     tab: link.tab || 'overview', page: link.page, railPref: '',
     // list — страница «Наборы» без набора в адресе: показывается список, а не обзор
     list: link.page === 'sets' && !link.set,
@@ -1915,7 +1917,7 @@
         }
         // у остановленного набора инструментов нет, до проверки число
         // неизвестно: прочерк приглушённым — он не равен нулю и не загадка
-        var tc = st.probeTools[row.name];
+        var tc = toolCount(row.name);
         var tcell = tr.children[3];
         tcell.textContent = !running || tc == null ? '—' : fmtN(tc);
         tcell.classList.toggle('is-muted', tcell.textContent === '—');
@@ -1992,6 +1994,40 @@
       .then(function () { st.busy = false; if (btn) { btn.disabled = false; } });
   }
 
+  // Каталог набора помнит, сколько инструментов даёт каждый его сервер
+  // (tools.lock.json): счётчик строки берётся оттуда, а проверка уточняет его
+  // живым опросом. Впустую при недоступном каталоге не ходим: одна попытка на
+  // открытие набора, прочерк честнее нуля.
+  function ensureSetTools(id) {
+    if (st.setTools[id]) { return st.setTools[id]; }
+    st.setTools[id] = {};
+    get('/api/sets/' + encodeURIComponent(id) + '/tools').then(function (data) {
+      if (!st.setTools[id]) { return; }
+      var counts = {};
+      ((data && data.tools) || []).forEach(function (row) {
+        counts[row.server] = (counts[row.server] || 0) + 1;
+      });
+      st.setTools[id] = counts;
+      renderSetServers();
+      renderHost();
+    }).catch(function () { st.setTools[id] = {}; });
+    return st.setTools[id];
+  }
+
+  // Число инструментов сервера: свежая проба сильнее каталога, каталог —
+  // любого запущенного набора, где сервер стоит.
+  function toolCount(name) {
+    if (st.probeTools[name] != null) { return st.probeTools[name]; }
+    var sets = st.sets || [];
+    for (var i = 0; i < sets.length; i++) {
+      var s = sets[i];
+      if (!(s.runtime && s.runtime.running) || (s.servers || []).indexOf(name) < 0) { continue; }
+      var counts = ensureSetTools(s.id);
+      if (counts[name] != null) { return counts[name]; }
+    }
+    return null;
+  }
+
   // Одна проба на оба списка: из неё же берётся число инструментов строки.
   function probeServer(name, btn) {
     if (btn) { btn.disabled = true; }
@@ -2038,6 +2074,7 @@
     st.calls = null;
     st.probeTools = {};
     st.probeHealth = {};
+    st.setTools = {};
     st.healthBusy = false;
     st.logKey = '';
     // статистика идёт за рельсом: свой фильтр набора начинается с текущего,
@@ -2524,7 +2561,8 @@
           ? badgeState(probed, row.ownRunning, row.own, true)
           : badgeState(h, row.ownRunning, row.own));
         badge.title = (probed && probed.error) || (h && h.error) || (probed ? t('srv.probeOkTip') : '');
-        tr.children[3].textContent = st.probeTools[row.name] != null ? fmtN(st.probeTools[row.name]) : '—';
+        var tc2 = toolCount(row.name);
+        tr.children[3].textContent = tc2 != null ? fmtN(tc2) : '—';
         var setsCell = tr.querySelector('.cell-sets span');
         setsCell.textContent = row.sets.length
           ? row.sets.map(function (s) { return s.name || s.id; }).join(', ')

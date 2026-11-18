@@ -1,4 +1,4 @@
-// Приёмка панели: 37 шагов от чистого каталога данных — рейл, темы, навигация,
+// Приёмка панели: 38 шагов от чистого каталога данных — рейл, темы, навигация,
 // наборы, серверы, ключи, инструменты, статистика, журнал, переменные, импорт.
 //
 // Запуск (нужен playwright; панель поднимается на чистом каталоге, без пароля):
@@ -416,6 +416,27 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
       return `${rows} строк, одобрено, changed ${changed}`;
     }
     return `${rows} строк, одобрять нечего`;
+  });
+
+  await stepDap("W4 колонка tools берёт число из каталога набора без проверки", async () => {
+    // чистая страница: проба и каталог в памяти панели пустеют только с
+    // перезагрузкой документа, и число обязано появиться само, из каталога
+    await page.evaluate(() => { location.hash = "#/set/alpha/servers"; });
+    await page.reload();
+    const cell = await waitFor(async () => {
+      const t = (await page.textContent('#set-srv-body tr[data-name="dap"] td.num')).trim();
+      return t && t !== "—" ? t : null;
+    }, 20000);
+    if (!cell) throw new Error("колонка tools пуста до проверки");
+    // реестр хоста живёт тем же числом: сервер из работающего набора известен
+    await page.evaluate(() => { location.hash = "#/host"; });
+    await page.reload();
+    const reg = await waitFor(async () => {
+      const t = (await page.textContent('#servers tr[data-name="dap"] td.num')).trim();
+      return t && t !== "—" ? t : null;
+    }, 20000);
+    if (!reg) throw new Error("в реестре хоста tools пуст до проверки");
+    return `набор ${cell}, реестр ${reg}`;
   });
 
   await step("X1 выдача ключа с подписью", async () => {
