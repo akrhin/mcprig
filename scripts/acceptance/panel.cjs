@@ -420,15 +420,24 @@ page.on("pageerror", e => consoleErrors.push("pageerror@" + lastStep + ": " + (e
 
   await step("X1 выдача ключа с подписью", async () => {
     await go("#/set/alpha/keys");
-    const before = await page.locator("#key-list li").count();
+    // Ждём по имени, а не по количеству: выдача ключа перезапускает набор,
+    // список может перерисоваться и потерять или переставить прежние строки,
+    // а фиксированная пауза под нагрузкой не дожидается ответа демона.
+    const beforeIds = (await page.locator("#key-list li .key-name").allTextContents()).map(s => s.trim());
     await page.fill("#key-label", "cli");
     await page.click("#key-form button[type=submit]");
-    // выдача ключа перезапускает набор: ответ демона идёт секундами, ждём состояние, а не отсчёт
-    const grew = await waitFor(async () => (await page.locator("#key-list li").count()) > before, 30000);
+    const fresh = await waitFor(async () => {
+      const ids = (await page.locator("#key-list li .key-name").allTextContents()).map(s => s.trim());
+      return ids.find(id => id && beforeIds.indexOf(id) < 0) || null;
+    }, 60000);
     const box = (await page.textContent("#new-key-box").catch(() => "")) || "";
-    if (!grew) throw new Error(`список не обновился: ${before}`);
+    if (!fresh) {
+      const now = (await page.locator("#key-list li .key-name").allTextContents()).map(s => s.trim());
+      throw new Error(`нового ключа нет в списке за 60 с: было [${beforeIds.join(", ")}], сейчас [${now.join(", ")}]`);
+    }
     if (box.indexOf("shown") < 0 && box.trim().length < 5) throw new Error("нет подсказки «показывается один раз»");
     const a = await setOf("alpha");
+    if (!a.keys.some(k => k.id === fresh)) throw new Error(`ключа ${fresh} нет в состоянии`);
     if (!a.keys.some(k => k.label === "cli")) throw new Error("подписи нет в состоянии");
     return box.trim().slice(0, 40);
   });

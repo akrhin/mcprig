@@ -16,6 +16,9 @@ func TestHealthLoopLogsWithoutAPI(t *testing.T) {
 	h := &captureHandler{}
 	var bad atomic.Bool
 	bad.Store(true)
+	// Сколько раз проба увидела сервер здоровым: строка пишется только на
+	// переходе, поэтому ждать надо самого опроса, а не паузы между тиками.
+	var healthyProbes atomic.Int32
 	dir := t.TempDir()
 	m, err := New(Options{
 		DataDir:     dir,
@@ -28,6 +31,9 @@ func TestHealthLoopLogsWithoutAPI(t *testing.T) {
 			out := setHealth{Servers: make([]serverHealth, len(set.Servers))}
 			for i, name := range set.Servers {
 				healthy := !bad.Load()
+				if healthy {
+					healthyProbes.Add(1)
+				}
 				out.Servers[i] = serverHealth{Name: name, Healthy: &healthy}
 				if !healthy {
 					out.Servers[i].Error = "нет соединения"
@@ -73,8 +79,18 @@ func TestHealthLoopLogsWithoutAPI(t *testing.T) {
 		t.Fatalf("строка задублировалась на тиках: %d", n)
 	}
 
+	// Возвращаем сервер в строй и ждём не паузы, а фактического здорового
+	// опроса: под нагрузкой окно «здоровья» проскакивает между тиками, и
+	// переход unhealthy→unhealthy не даёт второй строки.
+	seen := healthyProbes.Load()
 	bad.Store(false)
-	time.Sleep(50 * time.Millisecond)
+	deadline := time.Now().Add(3 * time.Second)
+	for healthyProbes.Load() == seen && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if healthyProbes.Load() == seen {
+		t.Fatalf("проба ни разу не увидела сервер здоровым за 3 с")
+	}
 	bad.Store(true)
 	waitLines(base + 2)
 }
