@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -61,5 +62,53 @@ func TestQuerySetsCachesParsedFiles(t *testing.T) {
 	}
 	if third.Totals.Calls != 2 {
 		t.Fatalf("вызовов после правки %d, ожидалось 2", third.Totals.Calls)
+	}
+}
+
+// Переполнение кэша вытесняет самую старую четверть по mtime файлов, а не всю
+// карту: свежие записи переживают переполнение, новая запись добавлена, потолок
+// держится.
+func TestCacheEvictsOldestQuarter(t *testing.T) {
+	reset := func() {
+		fileCache.Lock()
+		fileCache.m = map[string]cacheEntry{}
+		fileCache.Unlock()
+	}
+	reset()
+	t.Cleanup(reset)
+
+	base := time.Date(2026, 11, 11, 10, 0, 0, 0, time.Local)
+	fileCache.Lock()
+	for i := 0; i < cacheMax; i++ {
+		fileCache.m[fmt.Sprintf("old-%d", i)] = cacheEntry{mtime: base.Add(time.Duration(i) * time.Minute)}
+	}
+	fileCache.Unlock()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "raw-2026-11-11.jsonl")
+	if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := cached(path, func() (any, error) { return "fresh", nil }); got != "fresh" {
+		t.Fatalf("cached вернул %v, ожидалось fresh", got)
+	}
+
+	fileCache.Lock()
+	defer fileCache.Unlock()
+	if got := len(fileCache.m); got > cacheMax {
+		t.Fatalf("размер карты %d, потолок %d", got, cacheMax)
+	}
+	for i := 0; i < cacheMax/4; i++ {
+		if _, ok := fileCache.m[fmt.Sprintf("old-%d", i)]; ok {
+			t.Fatalf("самая старая запись old-%d осталась в карте", i)
+		}
+	}
+	for _, i := range []int{cacheMax / 4, cacheMax - 1} {
+		if _, ok := fileCache.m[fmt.Sprintf("old-%d", i)]; !ok {
+			t.Fatalf("свежая запись old-%d вытеснена", i)
+		}
+	}
+	if _, ok := fileCache.m[path]; !ok {
+		t.Fatalf("новая запись %q не добавлена", path)
 	}
 }

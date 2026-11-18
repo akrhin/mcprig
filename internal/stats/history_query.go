@@ -455,11 +455,28 @@ func cached(path string, load func() (any, error)) any {
 	}
 	fileCache.Lock()
 	if len(fileCache.m) >= cacheMax {
-		fileCache.m = map[string]cacheEntry{}
+		evictOldest(fileCache.m, len(fileCache.m)/4)
 	}
 	fileCache.m[path] = cacheEntry{mtime: info.ModTime(), size: info.Size(), val: val}
 	fileCache.Unlock()
 	return val
+}
+
+// evictOldest освобождает n записей кэша, начиная с самых старых по mtime:
+// четверть разом дешевле, чем искать одну запись на каждый файл, а свежие
+// записи, к которым панель вернётся в том же запросе, остаются.
+func evictOldest(m map[string]cacheEntry, n int) {
+	if n < 1 {
+		n = 1
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return m[keys[i]].mtime.Before(m[keys[j]].mtime) })
+	for _, k := range keys[:min(n, len(keys))] {
+		delete(m, k)
+	}
 }
 
 func loadRaw(path string) []rawLine {
