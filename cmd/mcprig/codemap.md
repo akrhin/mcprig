@@ -21,15 +21,15 @@ Top-level subcommands (dispatch: `main.go:179-247`):
 | command | flags (definition site) |
 | --- | --- |
 | `serve` (default) | `-config` main.go:98, `-version` main.go:99, `-addr` main.go:100 |
-| `stdio` | `-config` main.go:106 |
+| `stdio` | `-config` main.go:157 |
 | `auth` | `-set` auth.go:73, `-config` auth.go:74, `-timeout` (6m) auth.go:75; positional server name auth.go:82 |
-| `approve` | `-set` approve.go:33, `-all` approve.go:34, `-panel` approve.go:35, `-password` approve.go:36, `-secret` approve.go:37, `-user` approve.go:38; positional `server/tool` approve.go:53 |
+| `approve` | `-set` approve.go:31, `-all` approve.go:32, `-panel`/`-password`/`-secret`/`-user` from `panelFlags` (panel.go:34-39); positional `server/tool` approve.go:47 |
 | `panel` | `-h`/`--help` prints the environment table (`newPanelFlags` main.go:107-118, `panelEnv` main.go:125-153); any other argument is a `usageError` (main.go:170-171) |
 | `init` | `-client` init.go:27, `-set` init.go:28, `-remote` init.go:29, `-key` init.go:30, `-key-file` init.go:31, `-binary` init.go:32, `-config` init.go:33 |
-| `doctor` | `-config` doctor.go:71, `-json` doctor.go:72 |
-| `warm` | `-url` warm.go:62, `-panel` warm.go:63, `-set` warm.go:64, `-all` warm.go:65, `-timeout` (2m) warm.go:66, `-token` warm.go:67, `-token-file` warm.go:68, `-config` warm.go:69, `-json` warm.go:70, `-password` warm.go:71, `-secret` warm.go:72, `-user` warm.go:73 |
-| `status` | `-panel` status.go:72, `-set` status.go:73, `-json` status.go:74, `-timeout` (10s) status.go:75, `-password` status.go:76, `-secret` status.go:77, `-user` status.go:78 |
-| `logs` | `-panel` logs.go:47, `-set` logs.go:48, `-server` logs.go:49, `-n` (200) logs.go:50, `-f` logs.go:51, `-json` logs.go:52, `-password` logs.go:53, `-secret` logs.go:54, `-user` logs.go:55 |
+| `doctor` | `-config` doctor.go:70, `-json` doctor.go:71 |
+| `warm` | `-url` warm.go:61, `-set` warm.go:62, `-all` warm.go:63, `-timeout` (2m) warm.go:64, `-token` warm.go:65, `-token-file` warm.go:66, `-config` warm.go:67, `-json` warm.go:68, panel flags warm.go:69 |
+| `status` | `-set` status.go:70, `-json` status.go:71, `-timeout` (10s) status.go:72, panel flags status.go:73 |
+| `logs` | `-set` logs.go:47, `-server` logs.go:48, `-n` (200) logs.go:49, `-f` logs.go:50, `-json` logs.go:51, panel flags logs.go:52 |
 
 ## Design
 
@@ -48,96 +48,102 @@ help instead of `serve`. An unknown subcommand is a `usageError`, never a silent
 otherwise; `doctor` and `warm` problems exit `1` without an extra line because
 their report is already printed (main.go:64-67).
 
-Mode dispatch (`run`, main.go:264-389) maps `stdio|auth|panel|init|doctor|warm|
+Mode dispatch (`run`, main.go:264-392) maps `stdio|auth|panel|init|doctor|warm|
 approve|status|logs` to their `run*`; anything else is `serve`. `panel` is one
 call, `manager.Run(manager.FromEnv(version))` (main.go:275): the panel is
 `internal/manager`, configured by environment rather than flags.
 Layering: `cmd/mcprig` carries no protocol logic. `serve` assembles
 `internal/mcpserver` (proxy) over `internal/downstream` (child processes, OAuth)
-and wraps it with `internal/httplisten` (main.go:343-346); `status`, `logs`,
+and wraps it with `internal/httplisten` (main.go:346-349); `status`, `logs`,
 `warm`, `approve` are HTTP clients of the panel API; `doctor` reads
 `registry.json`, the config and probes sockets (`auth` is
 `internal/downstream` with a print-only browser, auth.go:99-109).
 
 ## Flow
 
-`serve` (main.go:291-389): parse flags → `-version` prints and exits →
+`serve` (main.go:291-392): parse flags → `-version` prints and exits →
 `internal/config.Load` → `slog` on stderr → OTLP tracing when the env asks
-(`startTracing`, main.go:599) → `oauth.OpenStore(stateDir())` →
-`downstream.Connector` with an env whitelist (`downstream.EnvFor`) →
+(`startTracing`, main.go:602) → `oauth.OpenStore(stateDir())` →
+`downstream.Connector` with an env whitelist (`downstream.EnvFor`) and, in
+`serve`, the on-disk server tails (`conn.ServerLogs`, main.go:317) →
 `mcpserver.New` → `mgr.LockPath = lockPath()` →
 `stats.NewRecorder(MCPRIG_SET)` assigned before warm-up so the panel sees schema
 weight → history at `<dir of config>/stats`, warning only on failure
-(main.go:330-335) → `go mgr.Warm` in the background → `mgr.ToolOutURL` only when
-a transport token exists (main.go:342) → `httplisten.New` → listen address from
+(main.go:331-338) → `go mgr.Warm` in the background → `mgr.ToolOutURL` only when
+a transport token exists (main.go:345) → `httplisten.New` → listen address from
 `-addr`, else `transport.host`/`transport.port`, else `127.0.0.1:9100`
-(main.go:348-359) → `http.Server` with `ReadHeaderTimeout` 10s and `IdleTimeout`
-60s but no `ReadTimeout`, because sets stream SSE (main.go:362) →
+(main.go:351-362) → `http.Server` with `ReadHeaderTimeout` 10s and `IdleTimeout`
+60s but no `ReadTimeout`, because sets stream SSE (main.go:365) →
 `SIGINT`/`SIGTERM` context → `SIGHUP` loop → `startToolout` → `ListenAndServe`
 in a goroutine → log line `прокси слушает` with address and usable server count
-→ 5-second graceful shutdown on signal (main.go:386-388).
+(main.go:381) → 5-second graceful shutdown on signal (main.go:386-391).
 
-SIGHUP reload (main.go:392-434): read the nonce from `<config dir>/reload.request`
+SIGHUP reload (main.go:394-435): read the nonce from `<config dir>/reload.request`
 before loading; `config.Load`; on failure `mgr.ReloadFailed` and the previous
 config keeps serving; on success apply the auth policy to the listener
-(`handler.SetAuth`, main.go:424), then `mgr.Reload`; finally write
+(`handler.SetAuth`, main.go:427), then `mgr.Reload`; finally write
 `<config dir>/reload.status` atomically (temp file, 0600, rename —
-main.go:495-532) with nonce, generation, applied, restartNeeded, error.
-`stdio` (main.go:546-594) is the same assembly minus listener, auth policy and
-warm-up — config, tracing, OAuth store, connector, manager, lock, recorder
-labelled `stdio` (main.go:576), history at `<stateDir>/stdio/stats`,
+main.go:498-535) with nonce, generation, applied, restartNeeded, error.
+`stdio` (main.go:549-596) is the same assembly minus listener, auth policy and
+warm-up — config, tracing, OAuth store, connector (no `ServerLogs`), manager,
+lock, recorder labelled `stdio` (main.go:579-580), history at `<stateDir>/stdio/stats`,
 tool-out sweeper, then `mgr.Server().Run(ctx, &mcp.StdioTransport{})`.
 
 `panel`: `cmd` loads no config; `internal/manager` reads `registry.json`, takes
-the `manager.pid` lock in the data dir (internal/manager/api.go:370-385),
+the `manager.pid` lock in the data dir (internal/manager/api.go:374-389),
 listens on `MCPRIG_HOST:MCPRIG_PORT` (default `127.0.0.1:9091`) and spawns each
 set as `<MCPRIG_CLI> serve --config <set>/servers.json` in its own process group
 with `MCPRIG_SET` and `MCPRIG_DATA_DIR=<data>/sets/<id>`
-(internal/manager/runtime.go:242-243, 841-846), writing set logs to
-`<data>/sets/<id>/mcprig.log` (internal/manager/setconfig.go:195-197); this
-package itself writes only `reload.status`.
+(internal/manager/runtime.go:262-265, 905), writing set logs to
+`<data>/sets/<id>/mcprig.log` and each server's stderr to
+`<data>/sets/<id>/serverlogs/<name>.log` (internal/manager/setconfig.go:201-209);
+this package itself writes only `reload.status`.
 
 `auth` resolves the target (auth.go:32-59): `-set` reads
 `<stateDir>/sets/<set>/servers.json` and stores the token in that same directory;
 `-config` keeps the store in the caller's data dir. It prints the link, waits up
 to `-timeout`, and reports whether `oauth.json` was written.
-`warm` has three paths after pre-checks (warm.go:82-93): `-config` in-process via
-`internal/mcpserver` (warm.go:170), `-all` from `/api/sets` (warm.go:400), else a
-single set, with `-url` bypassing the panel or the port resolved by name
-(warm.go:358-380). Token precedence `--token` → `--token-file` → `MCPRIG_TOKEN`
-→ `~/.config/mcprig/<set>.token` (warm.go:306-326); a failed set makes the
-process exit `1` via `errWarmProblems`.
+`warm` has three paths after pre-checks (warm.go:78-89): `-config` in-process via
+`internal/mcpserver` (`warmLocal`, warm.go:166), `-all` from `/api/sets`
+(`warmAll`, warm.go:384), else a single set (`warmOne`, warm.go:125), with `-url`
+bypassing the panel or the port resolved by name (`endpointFor`, warm.go:342).
+Token precedence `--token` → `--token-file` → `MCPRIG_TOKEN`
+→ `~/.config/mcprig/<set>.token` (`warmToken`, warm.go:290-309); a failed set
+makes the process exit `1` via `errWarmProblems` (warm.go:31).
 
 ## Integration
 
 Internal packages here: `config`, `downstream`, `httplisten`, `manager`,
 `mcpserver`, `oauth`, `stats`, `toolout` (main.go:22-30), plus `registry` and
 `sandbox` (doctor.go:22-26) and `toollock` (approve.go:17). Panel API consumed
-by the CLI: `POST /api/login` (panel.go:56), `/healthz`
-(status.go:201), `/api/state` (status.go:125), `/api/calls?set=&limit=1`
-(status.go:173), `/api/sets` (warm.go:389), `POST /api/sets/<set>/tools/approve`
-(approve.go:103), `/api/sets/<id>/logs` and
-`/api/sets/<id>/servers/<name>/logs` (logs.go:118-120). Every write carries
+by the CLI: `POST /api/login` (panel.go:80), `/healthz`
+(status.go:197), `/api/state` (status.go:120), `/api/calls?set=&limit=1`
+(status.go:168), `/api/sets` (warm.go:384), `POST /api/sets/<set>/tools/approve`
+(approve.go:98), `/api/sets/<id>/logs` and
+`/api/sets/<id>/servers/<name>/logs` (logs.go:115-117). `fetchLogs`
+(`logs.go:114-140`) turns the panel's `error` field into a CLI error instead of
+an empty tail, and `printLogs` prints a server's line through `safelog.Text`
+(`logs.go:191-205`). Every write carries
 `Origin` computed from the panel URL, because the panel's CSRF check rejects a
-session cookie without it (panel.go:119-121, 138-143).
+session cookie without it (panel.go:120, 145).
 
 On-disk layout: config default `os.UserConfigDir()/mcprig/servers.json`
-(main.go:534-539); state dir `MCPRIG_DATA_DIR`, else `$XDG_STATE_HOME/mcprig`,
-else `~/.local/state/mcprig`, else `.mcprig` (main.go:615-627); OAuth tokens at
+(main.go:537-542); state dir `MCPRIG_DATA_DIR`, else `$XDG_STATE_HOME/mcprig`,
+else `~/.local/state/mcprig`, else `.mcprig` (main.go:618-630); OAuth tokens at
 `<state>/oauth.json` and per set `<state>/sets/<id>/oauth.json`;
 approved-descriptor lock at `<MCPRIG_DATA_DIR>/tools.lock.json`, empty path when
 the variable is unset so a manual `serve` has no quarantine owner
-(main.go:633-638); tool-out dumps under `<MCPRIG_DATA_DIR or os.TempDir()>/tool-out`
+(main.go:636-641); tool-out dumps under `<MCPRIG_DATA_DIR or os.TempDir()>/tool-out`
 (internal/toolout/toolout.go:47-55); warm token file
-`~/.config/mcprig/<set>.token` (warm.go:320, 340-346). Environment read directly
-here: `MCPRIG_PPROF` (main.go:38), `MCPRIG_SET` (main.go:323),
-`MCPRIG_DATA_DIR`/`XDG_STATE_HOME` (main.go:616-628); the full set `panel`
+`~/.config/mcprig/<set>.token` (warm.go:304, 309). Environment read directly
+here: `MCPRIG_PPROF` (main.go:38), `MCPRIG_SET` (main.go:326, 579),
+`MCPRIG_DATA_DIR`/`XDG_STATE_HOME` (main.go:618-630); the full set `panel`
 reads is the `panelEnv` table, which `panel -h` prints (main.go:125-153) —
 OpenBao's `BAO_*`/`OPENBAO_*` arrive from `internal/manager/secrets.go:115-128`.
 Also
-`MCPRIG_PANEL_URL`/`MCPRIG_PORT` (panel.go:32-35), `MCPRIG_PASSWORD`
-(panel.go:46), `MCPRIG_PROXY_SECRET`, `MCPRIG_USER_HEADER` (panel.go:149, 159),
-`MCPRIG_TOKEN` (warm.go:317), `MCPRIG_KEY` (init.go:131), plus for `doctor`
+`MCPRIG_PANEL_URL`/`MCPRIG_PORT` (panel.go:42-50), `MCPRIG_PASSWORD`
+(panel.go:70), `MCPRIG_PROXY_SECRET`, `MCPRIG_USER_HEADER` (panel.go:173, 183),
+`MCPRIG_TOKEN` (warm.go:301), `MCPRIG_KEY` (init.go:131), plus for `doctor`
 `MCPRIG_BIND_IP`/`MCPRIG_HOST`/`MCPRIG_PORT`/`MCPRIG_PUBLIC_URL`/`MCPRIG_AUTH`/
 `MCPRIG_PASSWORD_HASH` (doctor.go:88-98).
 `deploy/` relation: `mcprig.service` runs `mcprig panel` with

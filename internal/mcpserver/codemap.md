@@ -115,7 +115,8 @@ and back.
 10. Cap: `truncateResult` (`toolout.go:60`) returns a fitting answer untouched; otherwise the whole answer goes to the
     tool-out directory with an owner sidecar and the caller gets the head plus a marker naming the path or the
     `/tool-out/` URL (`toolout.go:262`). `invoke_many` uses `truncateValue` (`toolout.go:267`) so a plain text answer
-    stays a string.
+    stays a string. Both the dump and its `.owner` sidecar are opened with `O_CREATE|O_EXCL` (`toolout.go:384-411`):
+    `os.WriteFile` would follow a symlink planted in the dump directory and truncate someone else's file.
 
 ## Integration
 

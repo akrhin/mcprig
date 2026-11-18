@@ -29,7 +29,7 @@ Two processes come out of one `main`:
   tool descriptor is denied, sandbox failure denies, unreadable lock file denies
   (`internal/toollock/codemap.md`, `internal/sandbox/codemap.md`).
 - Panel and set never share memory — reload is a file plus a nonce plus a signal
-  (`internal/manager`, `runtime.go:40-41`).
+  (`internal/manager`, `runtime.go:40-42`).
 - No build step for the UI: the panel is hand-written JS/CSS embedded with
   `go:embed` (`web/codemap.md`).
 
@@ -42,7 +42,7 @@ Two processes come out of one `main`:
 | `web/` | Panel front end (SPA, no framework) plus `embed.go` that carries it in the binary | [View Map](web/codemap.md) |
 | `e2e/` | End-to-end suites: lifecycle (panel + set + stdio downstream), contract against a live BASE, proxy, keys, stdio | — |
 | `deploy/` | systemd units (`mcprig.service`, `mcprig-set@.service`, `mcprig-warm.{service,timer}`), `docker-compose.yml`, example sets | — |
-| `scripts/` | Gates and stands: `contract-e2e.sh`, `sandbox-e2e.sh`, `dev-real-set.sh`, `docs-check.sh`, `release-notes.sh` | — |
+| `scripts/` | Gates and stands: `contract-e2e.sh`, `sandbox-e2e.sh`, `dev-real-set.sh`, `docs-check.sh`, `release-notes.sh`; `acceptance/panel.cjs` is the 37-step Playwright walk of the panel (`scripts/acceptance/README.md`, `ACC_DAP` points at any stdio MCP server) | — |
 | `docs/` | Documentation: `docs/en/` (canon), `docs/ru/` (mirror), `docs/history/` (plans, audits, reference contract), `docs/diagrams/` | — |
 | `design/` | Logos, tokens, UI screenshots; not part of the build | — |
 
@@ -68,8 +68,8 @@ spawns `mcprig serve`, and reloads it through `reload.request` + SIGHUP.
   `go.opentelemetry.io/otel`, `golang.org/x/time/rate`.
 - State on disk: config `$XDG_CONFIG_HOME/mcprig/servers.json`; data
   `$XDG_STATE_HOME/mcprig` (override `MCPRIG_DATA_DIR`) — `registry.json`,
-  `sets/<id>/{servers.json,oauth.json,tools.lock.json,logs}`,
-  `tool-out/` (`cmd/mcprig/main.go:564-574`, `internal/manager/api.go:98-107`).
+  `sets/<id>/{servers.json,oauth.json,tools.lock.json,logs,serverlogs/}`,
+  `tool-out/` (`cmd/mcprig/main.go:618-630,636-641`, `internal/manager/api.go:98-107`).
 - Diagram sources live as `.json` beside generated `.html`/`.png` in
   `docs/diagrams/`; only the `.json` is edited (`AGENTS.md`).
 
