@@ -5,10 +5,63 @@ CURRENT-GOAL. Строка закрывается коммитом и получ
 `решение` — когда выяснилось, что менять не нужно.
 
 Ревизия 2026-11-18, источники: полный аудит
-[`history/audits/2026-11-18-full-repo-audit.md`](history/audits/2026-11-18-full-repo-audit.md)
-и независимый свежий аудит того же дня (чтением, ~54 тыс. строк; находки совпали).
+[`history/audits/2026-11-18-full-repo-audit.md`](history/audits/2026-11-18-full-repo-audit.md),
+независимый свежий аудит того же дня (чтением, ~54 тыс. строк; находки совпали)
+и отдельный аудит безопасности по скиллу `security-audit` (прогон
+`mcprig-2026-11-18-1416`, 49 юнитов покрытия, только чтение исходников — отсюда
+D10–D13).
 
 ## Открытые
+
+### D10 · Should · Reload расщепляет поколения токенов и профилей
+`cmd/mcprig/main.go:426-429`, `internal/mcpserver/manager.go:412-422,528-536`,
+`internal/mcpserver/permissions.go:36,56-59`
+`main` отдаёт новые токены слушателю (`SetAuth`) до `Manager.Reload`. Если reload
+требует перезапуска (`RestartNeeded` — сменились host/port/path/type/allowedHosts),
+`keepLiveTransport` откатывает и `Transport`, и `Profiles`, а слушатель уже принял
+новый ключ: вызов таким ключом проходит без профиля, то есть без ограничений,
+которые профиль должен был наложить. Состояние держится до перезапуска процесса
+набора — панель по `restartNeeded` не перезапускает, только пишет в лог.
+Вероятность низкая (нужен reload с расхождением транспортных полей — правка
+`servers.json` руками и SIGHUP в standalone-пути), ущерб высокий.
+Fix: применять `Reload` первым и отдавать слушателю политику того поколения,
+которое реально вступило в силу; либо при непустом `RestartNeeded` не звать
+`SetAuth` и оставить старые ключи до перезапуска.
+
+### D11 · Should · `/stats` отдаёт любому ключу чужие данные
+`internal/httplisten/httplisten.go:194-200`, `internal/stats/stats.go:155,274-323`
+Набор с ключами отвечает на `GET /stats` полным снимком любому валидному ключу:
+метки других клиентов (заметка владельца либо `UA` + 6 hex отпечатка), счётчики,
+задержки и тексты ошибок апстрима. Редакция (`SnapshotRedacted`) недостижима:
+для наборного режима `anon` всегда `false`, чужой токен получает 401. Так это и
+описано в `docs/en/architecture.md:187-189` — то есть контроль не сломан, его нет.
+Fix: либо снимок по вызывающему (свои строки + агрегаты), либо редакция для всех,
+кроме служебного вызова панели, и явная строка в документации.
+
+### D12 · Should · Текст ошибки апстрима идёт мимо маскировки
+`internal/mcpserver/manager.go:1249-1256,1786-1791,688-701`,
+`internal/downstream/connect.go:77-88`, `internal/stats/history.go:177`
+`callWithRetry` маскирует только полезную нагрузку; сам `err` возвращается в
+`errResult` как `"Error: " + err.Error()` без вычистки, а SDK отдаёт в тексте
+`error.message` апстрима. Сервер, повторивший в ошибке настроенный секрет, отдаёт
+его в контекст модели. Для семи мета-инструментов (`list_servers`,
+`list_commands`, `describe_commands` и четыре ресурсных) `recordMeta` кладёт тот
+же текст в счётчики и `raw-*.jsonl`, откуда он виден в живом `/stats`. Это
+противоречит комментарию в `internal/mcpserver/redact.go:14-18`.
+Fix: чистить `err` на выходе `callWithRetry`/`recordMeta` тем же `scrubSecrets`,
+что и результат.
+
+### D13 · Needs validation · Имя тега подставляется в текст shell-скрипта
+`.github/workflows/release.yml:80,91,109`, `.gitea/workflows/images.yml:45`
+`${{ inputs.tag || github.ref_name }}` и `${{ gitea.ref_name }}` стоят внутри
+`run:` в job, где лежат write-токен (`GH_TOKEN`, `contents/packages: write`) и
+пароль реестра; `git check-ref-format` принимает `refs/tags/v$(id)` — то есть
+формат ref сам метасимволы не отсекает. Блокер: из репозитория не видно, кто
+вправе пушить `v*` теги и запускать dispatch (protection rules, environment
+rules живут на хостинге). Fix независимо от вердикта: передавать ref через
+`env:` и читать как переменную, добавить `persist-credentials: false` в checkout
+релиза.
+
 
 ### D1 · Should · Карта health-опросов не удаляет записи
 `internal/mcpserver/ratelimit.go:50-65`, `internal/mcpserver/manager.go:125`
