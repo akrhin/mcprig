@@ -82,8 +82,10 @@ for today/7d, `day` for 30d, `month` for archive; `bucket=hour|day|month`
 overrides it (`history_query.go:417-425`). `bySet` rows exist only through
 `QuerySets` (each directory carries its set name), and a set with no calls is
 omitted, not zeroed (`history_query.go:237-242,341-347`). Parsed files are cached
-by `mtime`+`size` under a global mutex, cleared wholesale at `cacheMax = 4096`
-(`history_query.go:427-467`); files carry no set name — `rawLine`/`Triple` have no
+by `mtime`+`size` under a global mutex; at `cacheMax = 4096` the oldest quarter
+by the files' own `mtime` is evicted before the new entry goes in, so fresh
+entries survive the overflow instead of the whole map being dropped
+(`history_query.go:419-480`); files carry no set name — `rawLine`/`Triple` have no
 such field, the set comes from the `Source` (`history_query.go:239-242`).
 
 ## Flow
@@ -92,7 +94,7 @@ such field, the set comes from the `Source` (`history_query.go:239-242`).
    `m.Stats.Record(label, server, tool, duration, err)`; `manager.go:688` records
    the proxy's meta-tools on the pseudo-server `"mcprig"`. Both first check
    `stats.ServiceCall(ctx)`; identity (key fingerprint, service-call mark, caller
-   address, client label) is in the request context from `httplisten.go:326-339`.
+   address, client label) is in the request context from `httplisten.go:318-332`.
 2. `Recorder.Record` updates counters, reservoir and tail ring, then hands the
    line to `History.Record` (non-blocking enqueue) and returns; the history
    goroutine appends it to the file of the call's own day, switching at midnight
@@ -100,8 +102,9 @@ such field, the set comes from the `Source` (`history_query.go:239-242`).
 
 Outward:
 
-- `GET /stats` on the set → `Snapshot` (bearer present) or `SnapshotRedacted`
-  (`httplisten.go:196-208`), JSON.
+- `GET /stats` on the set → `SnapshotRedacted` for every caller, and the full
+  `Snapshot` only for the panel's service call (`X-MCPRig-Caller: panel`),
+  JSON (`httplisten.go:187-202`).
 - Panel `GET /api/calls` polls running sets' `/stats` in parallel with a 2 s
   timeout, stopped sets through `TailFromDir`, redacting an open set's disk tail
   (`internal/manager/calls.go:66-129`); `GET /api/stats` answers `QuerySets` over

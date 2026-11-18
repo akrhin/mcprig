@@ -397,7 +397,11 @@ loses no output: the old file stays in place and the error
 text is shown in the set status `error`.
 
 `/api/calls` polls each running set's `/stats` with a 2 s timeout and its
-registry key. A **running** set that does not answer is listed in `unreachable`
+registry key, and marks the request as the panel's own service call
+(`X-MCPRig-Caller: panel`) — that is what earns the full snapshot; any other
+holder of the key gets the redacted one (see
+[architecture.md](architecture.md)). A **running** set that does not answer is
+listed in `unreachable`
 by id; its error text is not forwarded. A stopped set is not polled: its tail
 and counters come from the raw journal on disk (see [Call history](#call-history)),
 so a missing directory answers empty instead of landing in `unreachable`.

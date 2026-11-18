@@ -192,6 +192,33 @@ func TestCallsMergeAndLimit(t *testing.T) {
 	}
 }
 
+// Запрос /stats уходит как служебный вызов панели: без заголовка набор после
+// правки слушателя отдал бы только редактированный снимок.
+func TestCallsStatsSentAsPanelCall(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fs")
+	id := e.addSetBody(t, map[string]any{"name": "panel", "servers": []string{"fs"}})
+
+	caller := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		caller <- r.Header.Get(stats.ServiceCallHeader)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(stats.Snapshot{Set: id})
+	}))
+	defer srv.Close()
+	markRunning(e.m, id, serverPort(t, srv))
+
+	status(t, e.do(t, http.MethodGet, "/api/calls?set="+id, nil), http.StatusOK)
+	select {
+	case got := <-caller:
+		if got != stats.ServiceCallerPanel {
+			t.Fatalf("%s = %q, ожидалось %q", stats.ServiceCallHeader, got, stats.ServiceCallerPanel)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("/api/calls не сходил в /stats набора")
+	}
+}
+
 // Остановленный набор отдаёт свой журнал с диска: панель не должна показывать
 // «0 вызовов» там, где /api/stats видит те же вызовы в истории.
 func TestCallsStoppedReadsHistory(t *testing.T) {

@@ -10,6 +10,11 @@ repository the project is built in.
 
 ### Fixed
 
+- `GET /stats` of a set no longer hands the full snapshot to whoever holds the
+  set's key: a key now gets counters and latencies with client labels replaced
+  by `(аноним)` and upstream error texts emptied. The full snapshot goes to the
+  panel's own poll only (`X-MCPRig-Caller: panel`), so `/api/calls` keeps
+  showing labels and errors as before.
 - Release pipeline: the tag name was expanded into the text of `run:` blocks in
   jobs that hold a write token and the registry password, so a tag containing
   shell metacharacters became code. The tag now arrives through `env:` and is

@@ -184,9 +184,12 @@ Each set serves one stateless endpoint:
   matched;
 - 4 MiB request body cap;
 - no read timeout (an SSE stream must not be cut), 60 s idle timeout;
-- `GET /healthz` public, `GET /stats` protected by the same bearer; an open set
-  has no key, so an anonymous `GET /stats` is answered with a redacted snapshot —
-  no client labels, no upstream error text ([panel.md](panel.md#health)).
+- `GET /healthz` public, `GET /stats` protected by the same bearer. The full
+  snapshot — client labels, upstream error texts — goes to the panel's own
+  service call only (`X-MCPRig-Caller: panel`, sent by the manager that polls a
+  set); every key gets the redacted one: counters and latencies stay, client
+  labels become `(аноним)` and error texts are dropped
+  ([panel.md](panel.md#health)).
 
 ## OAuth
 

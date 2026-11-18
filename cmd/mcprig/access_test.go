@@ -73,10 +73,25 @@ func (e *accessEnv) reload() {
 // stats забирает снимок слушателя: без заголовка — как анонимный клиент.
 func (e *accessEnv) stats(auth string) (int, stats.Snapshot) {
 	e.t.Helper()
+	return e.statsWith(auth, "")
+}
+
+// statsPanel забирает полный снимок так, как это делает панель: набор отдаёт
+// метки клиентов и тексты ошибок только служебному вызову.
+func (e *accessEnv) statsPanel(auth string) (int, stats.Snapshot) {
+	e.t.Helper()
+	return e.statsWith(auth, stats.ServiceCallerPanel)
+}
+
+func (e *accessEnv) statsWith(auth, caller string) (int, stats.Snapshot) {
+	e.t.Helper()
 	r := httptest.NewRequest(http.MethodGet, "/stats", nil)
 	r.Host = "127.0.0.1"
 	if auth != "" {
 		r.Header.Set("Authorization", "Bearer "+auth)
+	}
+	if caller != "" {
+		r.Header.Set(stats.ServiceCallHeader, caller)
 	}
 	w := httptest.NewRecorder()
 	e.handler.ServeHTTP(w, r)
@@ -185,7 +200,7 @@ func TestIssuedLabelAppliesWithoutRestart(t *testing.T) {
 	if code, body := e.call("k1"); code != http.StatusOK || body != label {
 		t.Fatalf("метка ключа не применилась: %d %q", code, body)
 	}
-	code, snap := e.stats("k1")
+	code, snap := e.statsPanel("k1")
 	if code != http.StatusOK {
 		t.Fatalf("stats: %d", code)
 	}
