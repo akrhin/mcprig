@@ -12,8 +12,10 @@ repository the project is built in.
 
 - Server log: the **Log** dialog of a server showed only the access lines of the
   set and was empty in practice. The child's stderr now goes to
-  `sets/<id>/serverlogs/<name>.log`, capped at 256 KiB and cleared on stop, and
-  the dialog appends that tail to the set lines.
+  `sets/<id>/serverlogs/<name>.log`, capped at 256 KiB, kept after a stop so the
+  trace stays readable and cleared on the next start; an automatic restart
+  appends under a new marker instead of wiping the reason the server died. The
+  dialog appends that tail to the set lines.
 - Server log: each run of the process opens with a `— запуск <date time> —`
   marker, so a restart after a crash is told apart from the first start; a tail
   that exists but cannot be read now comes with `error` in the answer and the
@@ -75,6 +77,22 @@ repository the project is built in.
 - Server log: a failed write, truncate or cleanup of the tail is now reported in
   the set log instead of leaving "log is empty" for weeks, and one oversized
   write can no longer push the file over its cap.
+- Auth: `X-Forwarded-*` was trusted from any loopback peer once
+  `MCPRIG_PROXY_SECRET` was set, which let that peer skip the login limit by
+  naming a fresh client address; the request must now carry
+  `x-mcp-proxy-secret` as well.
+- Panel: a deleted set left its rings, locks and nonces in memory, so a new set
+  with the same id appeared stopped, and a pending operation of a removed set
+  was never finished.
+- Panel: a count the panel does not know yet (`tools to approve`, servers with an
+  error) printed `0`; it shows a dash instead of a wrong number.
+- CLI: `mcprig logs --server` printed "log is empty" when the tail could not be
+  read; the answer carries `error` and the command prints the reason.
+- Panel: the **Logs** tab of a set reported "log is empty" when `mcprig.log` existed
+  but could not be read; it now names the reason above the box.
+- Panel: the **Log** dialog subtitle described the format wrongly (it said "set
+  log only"); it now says the set lines come first and the process tail after them,
+  and the same sentence is used by the tab.
 
 ## [0.6.5] - 2026-11-17
 

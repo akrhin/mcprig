@@ -27,6 +27,9 @@ func TestClientIPFollowsHeaderOnlyForProxy(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/login", nil)
 	r.RemoteAddr = "10.0.0.5:5555"
 	r.Header.Set("X-Forwarded-For", "1.2.3.4, 5.6.7.8")
+	// Прокси предъявляет секрет: без него адрес из заголовка не берётся даже
+	// с loopback-пира, иначе локальный процесс обходил бы лимит входа.
+	r.Header.Set("X-MCP-Proxy-Secret", "s")
 
 	if got := (&auth{}).clientIP(r); got != "10.0.0.5" {
 		t.Fatalf("без прокси заголовок подделывается: %q", got)
@@ -45,6 +48,9 @@ func loginAs(e *env, password, remote, xff string) int {
 	req.RemoteAddr = remote
 	if xff != "" {
 		req.Header.Set("X-Forwarded-For", xff)
+	}
+	if e.secret != "" {
+		req.Header.Set("X-MCP-Proxy-Secret", e.secret)
 	}
 	w := httptest.NewRecorder()
 	e.m.ServeHTTP(w, req)

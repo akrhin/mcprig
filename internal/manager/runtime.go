@@ -139,6 +139,18 @@ func (rt *Runtime) setLock(id string) *sync.Mutex {
 	return l
 }
 
+// Forget снимает всё, что Runtime держит по id: после удаления набора кольцо
+// с причиной прошлой ошибки иначе всплывёт у нового набора с тем же именем, а
+// память панели будет расти с числом когда-либо созданных наборов.
+func (rt *Runtime) Forget(id string) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	delete(rt.procs, id)
+	delete(rt.rings, id)
+	delete(rt.locks, id)
+	delete(rt.nonces, id)
+}
+
 func (rt *Runtime) ring(id string) *ring {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
@@ -236,6 +248,16 @@ func (rt *Runtime) startLocked(ctx context.Context, set *registry.Set, servers [
 	// запуска поколение начинается с 1, а старый файл мог дожить до него.
 	_ = os.Remove(ReloadStatusPath(rt.dataDir, set.ID))
 	_ = os.Remove(ReloadRequestPath(rt.dataDir, set.ID))
+
+	// Хвосты серверов чистятся только на первом запуске: после ручного stop
+	// строки остаются читаемыми, а автоперезапуск после падения дописывает
+	// вывод в тот же файл под новой меткой — иначе трейс падения исчезал бы
+	// через секунду после падения, то есть в самом частом случае.
+	if restarts == 0 {
+		if err := clearServerLogs(rt.dataDir, set.ID); err != nil {
+			rt.log.Warn("хвосты серверов не удалены", "set", safelog.Value(set.ID), "err", safelog.Value(err.Error()))
+		}
+	}
 
 	cmd := exec.CommandContext(context.Background(), rt.cliPath, "serve", "--config", cfgPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -393,11 +415,6 @@ func (rt *Runtime) stopProc(id string, p *process) {
 	rt.mu.Lock()
 	delete(rt.procs, id)
 	rt.mu.Unlock()
-	// Хвосты серверов принадлежат прошлому запуску: набор погашен, и панель не
-	// должна выдавать старые строки за текущие.
-	if err := clearServerLogs(rt.dataDir, id); err != nil {
-		rt.log.Warn("хвосты серверов не удалены", "set", safelog.Value(id), "err", safelog.Value(err.Error()))
-	}
 	if live {
 		rt.log.Info("набор " + safelog.Value(id) + ": остановлен")
 	}
@@ -643,14 +660,17 @@ func (rt *Runtime) status(set *registry.Set) RuntimeStatus {
 }
 
 // Logs — хвост файла лога набора; кольцо нужно, только пока файла нет.
-func (rt *Runtime) Logs(id string, lines int) []string {
+// Ошибка чтения возвращается наверх: без неё «файл не читается» и «набор
+// молчит» выглядят одинаково.
+func (rt *Runtime) Logs(id string, lines int) ([]string, error) {
 	if lines <= 0 {
 		lines = 200
 	}
-	if out, err := tailFile(LogPath(rt.dataDir, id), lines); err == nil {
-		return out
+	out, err := tailFile(LogPath(rt.dataDir, id), lines)
+	if err == nil || errors.Is(err, os.ErrNotExist) {
+		return out, nil
 	}
-	return rt.ring(id).tail(lines)
+	return nil, err
 }
 
 // tailFile — последние lines строк файла. Логи ротируются на 5 МиБ, а панель
@@ -726,7 +746,12 @@ func (rt *Runtime) ServerLogs(id, server string, lines int) ([]string, error) {
 		lines = 200
 	}
 	out := make([]string, 0, 64)
-	for _, line := range rt.Logs(id, 5000) {
+	logs, err := rt.Logs(id, 5000)
+	if err != nil {
+		rt.log.Warn("хвост лога набора не прочитан", "set", safelog.Value(id), "err", safelog.Value(err.Error()))
+		logs = nil
+	}
+	for _, line := range logs {
 		if mentions(line, server) {
 			out = append(out, line)
 		}
@@ -905,11 +930,20 @@ func listenHost(bindIP string) string {
 // portFree проверяет, что порт свободен: готовность набора проверяется
 // подсоединением, и чужой слушатель выглядел бы поднявшимся набором.
 func portFree(host string, port int) error {
-	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
-	if err != nil {
-		return &conflictErr{msg: fmt.Sprintf("порт %d занят другим процессом — выберите другой порт", port)}
+	// Свежеостановленный набор отпускает порт не мгновенно: его процесс уже
+	// получил SIGTERM, но слушатель живёт ещё несколько миллисекунд. Пяти
+	// попыток хватает, чтобы перезапуск сразу после остановки не падал
+	// «порт занят»; чужой слушатель по-прежнему виден через секунду.
+	var err error
+	for try := 0; try < 5; try++ {
+		var ln net.Listener
+		ln, err = (&net.ListenConfig{}).Listen(context.Background(), "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+		if err == nil {
+			return ln.Close()
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
-	return ln.Close()
+	return &conflictErr{msg: fmt.Sprintf("порт %d занят другим процессом — выберите другой порт", port)}
 }
 
 // humanDuration — длительность для человека: «6 мин», «5 с» вместо «6m0s».
@@ -989,17 +1023,6 @@ func (r *ring) push(line string) {
 	}
 }
 
-func (r *ring) tail(n int) []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if n > len(r.lines) {
-		n = len(r.lines)
-	}
-	out := make([]string, n)
-	copy(out, r.lines[len(r.lines)-n:])
-	return out
-}
-
 // setError запоминает ошибку записи лога: пустая строка — ошибка снята.
 func (r *ring) setError(msg string) {
 	r.mu.Lock()
@@ -1034,6 +1057,11 @@ func (w *logWriter) setErr(msg string) {
 func (w *logWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	// Один Write длиннее потолка оставил бы файл больше объявленного: пишем
+	// хвост.
+	if int64(len(p)) > maxLogBytes {
+		p = p[len(p)-int(maxLogBytes):]
+	}
 	if w.size+int64(len(p)) > maxLogBytes {
 		w.rotate()
 	}

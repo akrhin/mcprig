@@ -67,7 +67,11 @@ func TestSetLogMigratesInheritedFile(t *testing.T) {
 	if _, err := os.Stat(old); !os.IsNotExist(err) {
 		t.Fatalf("lazy-mcp.log остался: %v", err)
 	}
-	if logs := e.m.rt.Logs(id, 500); !strings.Contains(strings.Join(logs, "\n"), "хвост из lazy-mcp") {
+	logs, lerr := e.m.rt.Logs(id, 500)
+	if lerr != nil {
+		t.Fatalf("журнал набора: %v", lerr)
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "хвост из lazy-mcp") {
 		t.Fatalf("унаследованный хвост потерян: %v", logs)
 	}
 }
@@ -156,14 +160,27 @@ func TestServerLogsShowProcessOutput(t *testing.T) {
 		t.Fatalf("лог сервера = %q", got)
 	}
 
+	// Остановка хвост не стирает: вывод упавшего запуска объясняет падение, и
+	// кнопка «перезапустить» не должна уничтожать единственную улику.
 	e.m.rt.Stop(set)
-
 	w = e.do(t, http.MethodGet, "/api/sets/"+id+"/servers/fake/logs?lines=10", nil)
 	status(t, w, http.StatusOK)
 	if after := decode[struct {
 		Logs []string `json:"logs"`
-	}](t, w).Logs; len(after) != 0 {
-		t.Fatalf("после остановки остался вывод прошлого запуска: %q", after)
+	}](t, w).Logs; len(after) != 2 {
+		t.Fatalf("после остановки вывод пропал: %q", after)
+	}
+
+	// А новый запуск начинает файл заново — с метки и без строк прошлого.
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("повторный старт: %v", err)
+	}
+	w = e.do(t, http.MethodGet, "/api/sets/"+id+"/servers/fake/logs?lines=10", nil)
+	status(t, w, http.StatusOK)
+	if again := decode[struct {
+		Logs []string `json:"logs"`
+	}](t, w).Logs; len(again) != 0 {
+		t.Fatalf("новый запуск оставил строки прошлого: %q", again)
 	}
 }
 

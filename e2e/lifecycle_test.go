@@ -161,9 +161,36 @@ func TestLifecycleServerLogShowsChildOutput(t *testing.T) {
 		t.Fatalf("в логе сервера нет вывода его процесса: %v", logs)
 	}
 
+	// Остановка хвост не стирает: вывод объясняет, почему сервер умер, и
+	// кнопка «перезапустить» не должна уничтожать единственную улику.
 	l.post("/api/sets/slog/stop", nil, http.StatusOK)
-	if after, _ := l.get(path)["logs"].([]any); len(after) != 0 {
-		t.Fatalf("после остановки остался вывод прошлого запуска: %v", after)
+	if after, _ := l.get(path)["logs"].([]any); len(after) == 0 {
+		t.Fatal("после остановки вывод прошлого запуска пропал")
+	}
+
+	// А новый запуск начинает файл заново: метка запуска одна, и строка процесса
+	// в хвосте одна — своя, а не накопленная с прошлого раза.
+	l.post("/api/sets/slog/start", nil, http.StatusOK)
+	deadline = time.Now().Add(30 * time.Second)
+	for {
+		after, _ := l.get(path)["logs"].([]any)
+		marks, hits := 0, 0
+		for _, line := range after {
+			text, _ := line.(string)
+			if strings.Contains(text, "— запуск ") {
+				marks++
+			}
+			if strings.Contains(text, marker) {
+				hits++
+			}
+		}
+		if marks == 1 && hits <= 1 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("после нового запуска в хвосте %d меток и %d строк процесса: %v", marks, hits, after)
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 

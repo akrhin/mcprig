@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -210,8 +209,9 @@ func ServerLogPath(dataDir, id, name string) string {
 	return downstream.ServerLogPath(filepath.Join(dataDir, "sets", id), name)
 }
 
-// clearServerLogs убирает хвосты серверов: после остановки или перезапуска
-// строки прошлого запуска не должны выглядеть текущими.
+// clearServerLogs убирает хвосты серверов на первом запуске набора: строки
+// прошлого сеанса не должны выглядеть текущими, а автоперезапуск после падения
+// дописывает в тот же файл под новой меткой, чтобы трейс не пропадал.
 func clearServerLogs(dataDir, id string) error {
 	if !safepath.Name(id) {
 		return fmt.Errorf("имя набора %q вне шаблона", id)
@@ -242,12 +242,10 @@ func writeAtomic(path string, body []byte) error {
 	return atomicfile.Write(path, body)
 }
 
-var envRefRe = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
-
 // addRefs собирает имена ${VAR} из строки в seen.
 func addRefs(seen map[string]bool, text string) {
-	for _, m := range envRefRe.FindAllStringSubmatch(text, -1) {
-		seen[m[1]] = true
+	for _, name := range config.EnvRefs(text) {
+		seen[name] = true
 	}
 }
 
@@ -359,12 +357,9 @@ func expandServer(srv *config.Server, sec *Secrets) *config.Server {
 		return v.value, v.source != ""
 	}
 	expand := func(text string) string {
-		return envRefRe.ReplaceAllStringFunc(text, func(m string) string {
-			name := envRefRe.FindStringSubmatch(m)[1]
-			if v, ok := lookup(name); ok {
-				return v
-			}
-			return m
+		return config.ExpandEnvRefs(text, func(name string) (string, bool) {
+			v, ok := lookup(name)
+			return v, ok
 		})
 	}
 	cp := *srv

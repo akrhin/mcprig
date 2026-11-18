@@ -345,6 +345,30 @@ func TestAddSetRejectsDuplicateServers(t *testing.T) {
 	}
 }
 
+// TestAddSetTakesIDAsTyped: имя вне шаблона — отказ, а не тихое переименование;
+// регистр и пробелы по краям приводятся, внутренние пробелы — нет.
+func TestAddSetTakesIDAsTyped(t *testing.T) {
+	store := openStore(t, t.TempDir())
+	port := strconv.Itoa(freePort(t))
+
+	if _, err := store.AddSet(json.RawMessage(`{"name":"My Set","port":` + port + `}`)); err == nil {
+		t.Fatal("имя с пробелом принято")
+	} else if !strings.Contains(err.Error(), "имя набора") {
+		t.Fatalf("ошибка не называет правило: %v", err)
+	}
+	if store.Set("my-set") != nil {
+		t.Fatal("набор с подогнанным id записан")
+	}
+
+	set, err := store.AddSet(json.RawMessage(`{"name":"  My-Lab  ","port":` + port + `}`))
+	if err != nil {
+		t.Fatalf("AddSet: %v", err)
+	}
+	if set.ID != "my-lab" {
+		t.Fatalf("id = %q, want my-lab", set.ID)
+	}
+}
+
 func TestPortBusySeesListenerOutsideLoopback(t *testing.T) {
 	host := hostIPv4(t)
 	ln, err := net.Listen("tcp", net.JoinHostPort(host, "0"))

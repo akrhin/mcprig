@@ -50,6 +50,7 @@ func TestForwardedHeadersTrustedPeerOnly(t *testing.T) {
 		req.Host = "evil.internal:9088"
 		req.RemoteAddr = remote
 		req.Header.Set("X-Forwarded-Host", "mcprig.example")
+		req.Header.Set("X-MCP-Proxy-Secret", secret)
 		return req
 	}
 	// Host не разрешён, публичное имя — только в заголовке.
@@ -77,8 +78,15 @@ func TestTrustedProxiesDefaultAndParse(t *testing.T) {
 		t.Fatal("пустой список: доверие не-loopback пиру")
 	}
 	req.RemoteAddr = "[::1]:5000"
+	req.Header.Set("x-mcp-proxy-secret", "s")
 	if !a.trustsProxy(req) {
 		t.Fatal("loopback обязан быть доверенным")
+	}
+	// S-05: адрес пира сам по себе доверия не даёт — без секрета forwarded-
+	// заголовки не действуют, иначе локальный процесс обходил бы лок-аут входа.
+	req.Header.Del("x-mcp-proxy-secret")
+	if a.trustsProxy(req) {
+		t.Fatal("loopback без секрета признан прокси")
 	}
 	for _, bad := range []string{"10.0.0.300", "10.0.0.0/33"} {
 		if _, err := newAuth(AuthOptions{Off: true, ProxySecret: "s", TrustedProxies: bad}); err == nil {

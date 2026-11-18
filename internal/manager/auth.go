@@ -297,6 +297,12 @@ func (a *auth) trustsProxy(r *http.Request) bool {
 	if a.proxySecret == "" {
 		return false
 	}
+	// Секрет проверяется до адреса пира: иначе любой локальный процесс,
+	// дотянувшийся до порта, подставлял бы свежий X-Forwarded-For и обходил
+	// лимит попыток входа.
+	if got := r.Header.Get("x-mcp-proxy-secret"); subtle.ConstantTimeCompare([]byte(got), []byte(a.proxySecret)) != 1 {
+		return false
+	}
 	ip := net.ParseIP(httplisten.HostOnly(r.RemoteAddr))
 	if ip == nil {
 		return false

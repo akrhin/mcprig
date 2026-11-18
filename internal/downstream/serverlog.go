@@ -62,6 +62,7 @@ func (l *ServerLogs) Writer(srv *config.Server) io.Writer {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if w := l.files[srv.Name]; w != nil {
+		w.markStart()
 		return w
 	}
 	path := ServerLogPath(l.setDir, srv.Name)
@@ -69,6 +70,11 @@ func (l *ServerLogs) Writer(srv *config.Server) io.Writer {
 		// Без строки здесь «лог сервера пуст» не отличить от сломанного диска.
 		l.warn("каталог хвоста не создан", srv.Name, err)
 		return nil
+	}
+	// MkdirAll не трогает права существующего каталога: каталог, созданный
+	// старой версией или руками, иначе остался бы читаемым всем.
+	if err := os.Chmod(filepath.Dir(path), 0o700); err != nil { //nolint:gosec // каталог, а не файл
+		l.warn("права каталога хвоста не поправлены", srv.Name, err)
 	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
@@ -86,15 +92,31 @@ func (l *ServerLogs) Writer(srv *config.Server) io.Writer {
 	} else {
 		l.warn("размер хвоста не прочитан", srv.Name, err)
 	}
-	// Метка запуска: без неё перезапуск после падения не отличить от первого
-	// старта, а хвост прошлого запуска выглядит как текущий.
-	if w.size == 0 {
-		if _, err := f.WriteString("— запуск " + time.Now().Format("2006-01-02 15:04:05") + " —\n"); err == nil {
-			w.size = int64(len("— запуск 2006-01-02 15:04:05 —\n"))
-		}
-	}
 	l.files[srv.Name] = w
+	w.markStart()
 	return w
+}
+
+// markStart пишет границу запуска. Writer зовётся на каждый запуск процесса
+// сервера, а файл живёт дольше процесса: без метки хвост упавшего запуска
+// выглядит как вывод текущего.
+func (w *serverLog) markStart() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.markStartLocked()
+}
+
+// markStartLocked пишет метку под уже взятым замком: Writer держит его сам.
+func (w *serverLog) markStartLocked() {
+	if w.broken {
+		return
+	}
+	line := "— запуск " + time.Now().Format("2006-01-02 15:04:05") + " —\n"
+	if _, err := w.file.WriteString(line); err != nil {
+		w.warn("метка запуска не записана")
+		return
+	}
+	w.size += int64(len(line))
 }
 
 // serverLog — stderr одного процесса с пределом размера.
@@ -127,6 +149,9 @@ func (w *serverLog) Write(p []byte) (int, error) {
 	if w.size+int64(len(p)) > serverLogLimit {
 		if err := w.file.Truncate(0); err == nil {
 			w.size = 0
+			// Обрезанный хвост начинает новую страницу с метки: иначе после
+			// переполнения граница запуска пропадает до следующего старта.
+			w.markStartLocked()
 		} else {
 			w.broken = true
 			w.warn("хвост не обрезан, запись остановлена")

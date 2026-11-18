@@ -344,8 +344,8 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 				return nil, err
 			}
 		}
-		// имя больше не подгоняется молча: «My Set» и «my set» — разные
-		// намерения, и набор под чужим id удивлял бы сильнее, чем отказ
+		// Приводится только регистр и пробелы по краям; всё остальное вне
+		// шаблона отвергается: «My Set» не превращается в другой id молча
 		out.ID = strings.ToLower(strings.TrimSpace(id))
 		if !safepath.Name(out.ID) {
 			return nil, invalidf("имя набора: строчные латинские буквы, цифры, дефис и подчёркивание")

@@ -95,13 +95,18 @@ does not validate them itself — it shows what the backend answers, including
 
 Each server row has a **Log** button: it opens a drawer with the set's log
 filtered by that server's name plus the tail of the server process's own stderr
-(`sets/<id>/serverlogs/<name>.log`, cleared when the set stops). The drawer
+(`sets/<id>/serverlogs/<name>.log`). The tail survives a stop so the trace of a
+crash stays readable, and it is cleared on the next start of the set; an automatic
+restart after a crash appends to the same file under a new marker instead, so the
+reason the server died is not wiped a second after it died. The drawer
 reads `GET /api/sets/<id>/servers/<name>/logs?lines=200` and prints the lines as
 text; a server that has neither shows `log is empty`, and a failed request keeps
-the lines already shown and reports the reason above them. The file starts with a
-`— запуск <date time> —` marker, so a restart after a crash is told apart from the
-first start; when the tail exists but cannot be read, the answer carries `error`
-and the drawer prints it instead of pretending the server was silent.
+the lines already shown and reports the reason above them. Every start writes a
+`— запуск <date time> —` marker first, so a restart after a crash is told apart from
+the first start; when the tail exists but cannot be read, the answer carries `error`
+and the drawer prints it instead of pretending the server was silent. The set
+lines come first and the process tail after them, so the two are not one merged
+timeline; a line that names both the server and the access log appears twice.
 
 The **Tools** button of a row switches to the **Tools** tab with that server
 picked in its **Server** filter
@@ -561,7 +566,8 @@ from the `Origin` checks: a failed login grants nothing.
 `Origin` is compared in full — scheme, host and port; `MCPRIG_ALLOWED_HOSTS` is
 not a list of sources (it names the panel itself). `X-Forwarded-Proto`,
 `X-Forwarded-Host` and `X-Forwarded-For` are trusted only when
-`MCPRIG_PROXY_SECRET` is set *and* the peer is loopback or listed in
+`MCPRIG_PROXY_SECRET` is set, the request carries `x-mcp-proxy-secret` equal to it
+(compared in constant time), *and* the peer is loopback or listed in
 `MCPRIG_TRUSTED_PROXIES` (an IP or a CIDR, comma-separated): a trusted proxy
 makes an `https` request count as secure and a forwarded host count as the
 panel's public name, so an `https` Origin matches.

@@ -8,7 +8,11 @@
 // ACC_DAP — любой stdio MCP-сервер: по нему проверяются привязка, инструменты и журнал.
 const { chromium } = require("playwright");
 const BASE = process.env.ACC_BASE || "http://127.0.0.1:9131";
-const DAP = process.env.ACC_DAP || "/home/sintez/.local/share/dap-mcp/bin/dap-mcp";
+const DAP = process.env.ACC_DAP || "";
+if (!DAP) {
+  console.error("ACC_DAP не задан: укажите путь к любому stdio MCP-серверу, например ACC_DAP=$(command -v mcp-server-time)");
+  process.exit(2);
+}
 
 const results = [];
 let page, dialogMode = "accept", dialogs = [];
@@ -37,9 +41,11 @@ async function go(hash) {
   if (same) { await page.reload({ waitUntil: "networkidle" }); } // goto на тот же адрес не перезагружает: маршрут не отработает
   // ждём, пока маршрут отработает и страница отрисуется: иначе следующий шаг
   // проверяет ещё пустой DOM и падает «элемента нет»
-  await page.waitForFunction((h) => location.hash === h, hash, { timeout: 8000 }).catch(() => {});
+  // Таймаут здесь — провал шага, а не повод идти дальше: иначе следующий шаг
+  // падает «элемента нет» на недорисованной странице и прячет настоящую причину.
+  await page.waitForFunction((h) => location.hash === h, hash, { timeout: 8000 });
   if (hash.indexOf("#/set/") === 0) {
-    await page.waitForFunction(() => document.querySelectorAll("#tabs button[data-tab]").length >= 6, null, { timeout: 8000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelectorAll("#tabs button[data-tab]").length >= 6, null, { timeout: 8000 });
   }
   await page.waitForTimeout(400);
 }

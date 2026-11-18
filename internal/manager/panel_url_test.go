@@ -62,6 +62,10 @@ func TestXFHIgnoredWithoutProxySecret(t *testing.T) {
 	}
 
 	trusted := newEnv(t, AuthOptions{Off: true, ProxySecret: strings.Repeat("s", 32), AllowedHosts: []string{"192.168.1.92", "mcprig.example"}})
+	// Заголовки прокси живут только с секретом: он и есть доказательство,
+	// что запрос прошёл через доверенный прокси, а не через локальный процесс.
+	req.Header.Set("X-MCP-Proxy-Secret", strings.Repeat("s", 32))
+	spoofed.Header.Set("X-MCP-Proxy-Secret", strings.Repeat("s", 32))
 	if got := trusted.m.requestAuthorities(req); len(got) != 2 {
 		t.Fatalf("с секретом ожидались Host и X-Forwarded-Host, получено %+v", got)
 	}

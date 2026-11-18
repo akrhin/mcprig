@@ -397,10 +397,22 @@ func createToolOut(owner string) (*os.File, error) {
 	}
 	// Владелец пишется до тела: без него выгрузка не отдаётся никому, и
 	// недописанная пара не должна остаться на диске.
-	if err := os.WriteFile(toolout.OwnerPath(path), []byte(owner+"\n"), 0o600); err != nil {
+	// O_EXCL: os.WriteFile пошёл бы по символической ссылке, подложенной в
+	// каталог выгрузок, и обнулил бы чужой файл.
+	of, err := os.OpenFile(toolout.OwnerPath(path), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
 		_ = f.Close()
 		_ = os.Remove(path)
 		return nil, fmt.Errorf("усечение: владелец выгрузки: %w", err)
+	}
+	_, werr := of.WriteString(owner + "\n")
+	if cerr := of.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return nil, fmt.Errorf("усечение: владелец выгрузки: %w", werr)
 	}
 	return f, nil
 }

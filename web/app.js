@@ -260,9 +260,11 @@
       'log.tail': 'log tail of the set',
       'log.refresh': 'refresh',
       'log.empty': 'log is empty',
-      'srvlog.sub': 'lines that mention this server — the tail of the set log',
+      'log.fail': 'could not read the log file',
+      'srvlog.sub': 'the set lines that mention this server, then the tail of the server process itself',
       'srvlog.title': 'Log · {server} · {set}',
       'srvlog.fail': 'could not load the log',
+      'srvlog.gone': 'the set or the server no longer exists',
       'srv.tools': 'tools',
       'tools.all': 'all servers',
       'tools.sub': 'descriptors the proxy remembers — a changed one waits for your approval',
@@ -641,9 +643,11 @@
       'log.tail': 'хвост лога набора',
       'log.refresh': 'Обновить',
       'log.empty': 'лог пуст',
-      'srvlog.sub': 'строки, где встречается имя сервера, — хвост лога набора',
+      'log.fail': 'не удалось прочитать файл журнала',
+      'srvlog.sub': 'строки набора с именем сервера, затем хвост stderr самого процесса',
       'srvlog.title': 'Лог · {server} · {set}',
       'srvlog.fail': 'не удалось получить лог',
+      'srvlog.gone': 'набора или сервера уже нет',
       'srv.tools': 'Инструменты',
       'tools.all': 'все серверы',
       'tools.sub': 'дескрипторы, которые помнит прокси, — изменившийся ждёт вашего одобрения',
@@ -1631,7 +1635,7 @@
       else if (st.boot) { st.boot = false; select(st.sel, true); }
       // на прямом адресе статистики первый loadStats() уходил вхолостую (наборов
       // ещё нет) — добираем, как только состояние известно
-      if (st.page === 'stats' && !st.st.facets) { loadStats(); }
+      if (st.page === 'stats' && !st.st.facets && !st.st.seq) { loadStats(); }
       else {
         renderHead();
         renderSetServers();
@@ -2180,7 +2184,12 @@
   function tileWord(id, key, n, kind) {
     var num = $(id);
     var label = num && num.parentElement.querySelector('.tile-label');
-    if (label) { label.textContent = t(key, { w: word(n == null ? 0 : Number(n), kind) }); }
+    // неизвестное число не превращается в «0 tools to approve»: подпись без него
+    if (label) {
+      label.textContent = n == null
+        ? t(key).replace(/\{w\}\s*/, '')
+        : t(key, { w: word(Number(n), kind) });
+    }
   }
 
   // беда видна без чтения подписи: цвет и полоса приходят из CSS
@@ -2234,12 +2243,14 @@
     st.host.busy = true;
     var sets = st.sets.slice();
     var live = sets.filter(function (s) { return s.runtime && s.runtime.running; });
+    // Отказ отдаётся как null, а не как пустой список: «не знаем» и «нет ни
+    // одного» — разные числа на плитке, прочерк против нуля.
     var jobs = live.map(function (s) {
       return get('/api/sets/' + encodeURIComponent(s.id) + '/servers')
-        .then(function (d) { return (d && d.servers) || []; }).catch(function () { return []; });
+        .then(function (d) { return (d && d.servers) || []; }).catch(function () { return null; });
     }).concat(sets.map(function (s) {
       return get('/api/sets/' + encodeURIComponent(s.id) + '/tools')
-        .then(function (d) { return (d && d.tools) || []; }).catch(function () { return []; });
+        .then(function (d) { return (d && d.tools) || []; }).catch(function () { return null; });
     })).concat([
       get('/api/stats?set=all&period=7d&bucket=day').catch(function () { return null; }),
       get('/api/calls?limit=' + HOST_CALLS).catch(function () { return null; })
@@ -2247,15 +2258,20 @@
     return Promise.all(jobs).then(function (out) {
       var map = {}, pending = 0, i = 0;
       for (; i < live.length; i++) {
-        out[i].forEach(function (h) {
+        (out[i] || []).forEach(function (h) {
           if (!h || !h.name) { return; }
           hostServerState(map, h.name, healthy(h) ? 'ok' : h.healthy === false ? 'failed' : 'unknown');
         });
       }
       for (; i < live.length + sets.length; i++) { pending += pendingTools(out[i]); }
+      // хоть один отказ — общее число подтверждений неизвестно, а не «0 на подтверждение»
+      var pendingKnown = out.slice(live.length, live.length + sets.length).every(function (v) { return v !== null; });
       var stats = out[i], calls = out[i + 1];
-      st.host.servers = map;
-      st.host.pending = pending;
+      // карта серверов неполная, если хоть один набор не ответил: тогда плитки
+      // здоровья показывают прочерк, а не счёт по случайной половине
+      var mapKnown = out.slice(0, live.length).every(function (v) { return v !== null; });
+      st.host.servers = mapKnown ? map : null;
+      st.host.pending = pendingKnown ? pending : null;
       st.host.kpi = stats;
       st.host.calls = (calls && calls.calls) || [];
       st.host.at = new Date().toISOString();
@@ -2289,10 +2305,10 @@
     // а прочерк в общей сетке читался как ноль. Пояснение — в подсказке статусбара
     tileWord('h-running', 'host.running', running, 'set');
     tileWord('h-stopped', 'host.stopped', sets.length - running, 'set');
-    tileWord('h-ok', 'host.srvOk', map ? ok : 0, 'server');
-    tileWord('h-failed', 'host.srvFailed', map ? failed : 0, 'server');
-    tileWord('h-pending', 'host.pending', st.host.pending || 0, 'tool');
-    tileWord('h-calls', 'host.calls', tot ? tot.calls : 0, 'call');
+    tileWord('h-ok', 'host.srvOk', map ? ok : null, 'server');
+    tileWord('h-failed', 'host.srvFailed', map ? failed : null, 'server');
+    tileWord('h-pending', 'host.pending', st.host.pending, 'tool');
+    tileWord('h-calls', 'host.calls', tot ? tot.calls : null, 'call');
     badTile('h-failed', !!map && failed > 0);
     badTile('h-err', !!(tot && tot.calls && tot.failures));
     [].forEach.call(document.querySelectorAll('#host-tiles .tile-num'), function (n) {
@@ -2859,7 +2875,19 @@
     if (wasSel) { st.list = true; st.sel = null; history.pushState(null, '', '#/sets'); }
     send('DELETE', '/api/sets/' + encodeURIComponent(set.id), null, true)
       .then(function () { return loadState(); })
-      .catch(function (err) { setDelErr(err.message); })
+      .catch(function (err) {
+        // отказ (ключ, порт, 500) возвращает человека в набор: иначе он уже на
+        // списке, плашка ошибки спрятана в шапке набора и причина теряется
+        if (wasSel) {
+          st.sel = set.id;
+          st.list = false;
+          applyPage('sets');
+          var back = setHash(set.id, st.tab);
+          if (location.hash !== back) { history.pushState(null, '', back); }
+        }
+        fail(err.message, err);
+        setDelErr(err.message);
+      })
       .then(function () { st.busy = false; btn.disabled = false; });
   }
 
@@ -3367,6 +3395,9 @@
     var id = st.sel;
     return get('/api/sets/' + id + '/logs?lines=200').then(function (data) {
       if (id !== st.sel) { return; }
+      var box = $('log-err');
+      box.textContent = data && data.error ? t('log.fail') + ' · ' + data.error : '';
+      show(box, !!(data && data.error));
       renderLog((data && data.logs) || []);
     }).catch(function (e) { fail(e.message, e); });
   }
@@ -3434,7 +3465,12 @@
       .then(function (data) {
         if (seq !== srvLog.seq) { return; }
         renderSrvLog((data && data.logs) || []);
-        if (data && data.error) {
+        if (data === null) {
+          // 404: набора или сервера уже нет — пустой хвост молчал бы об этом
+          var gone = $('srvlog-err');
+          gone.textContent = t('srvlog.fail') + ' · ' + t('srvlog.gone');
+          gone.hidden = false;
+        } else if (data.error) {
           // пустой хвост без причины значит «сервер молчал»; причина — отказ чтения
           var box = $('srvlog-err');
           box.textContent = t('srvlog.fail') + ' · ' + data.error;
@@ -3644,9 +3680,9 @@
         } : { servers: [], tools: [], clients: [] };
         // выбор, которого нет в новом наборе, снимаем: иначе список показывает
         // «все», а запрос продолжает фильтровать старым значением
-        if (st.st.server && st.st.facets.servers.indexOf(st.st.server) < 0) { st.st.server = ''; }
-        if (st.st.tool && st.st.facets.tools.indexOf(st.st.tool) < 0) { st.st.tool = ''; }
-        if (st.st.client && st.st.facets.clients.indexOf(st.st.client) < 0) { st.st.client = ''; }
+        if (st.st.server && st.st.facets.servers.indexOf(st.st.server) < 0) { st.st.server = ''; storeLocal('mcprig.stats.server', ''); }
+        if (st.st.tool && st.st.facets.tools.indexOf(st.st.tool) < 0) { st.st.tool = ''; storeLocal('mcprig.stats.tool', ''); }
+        if (st.st.client && st.st.facets.clients.indexOf(st.st.client) < 0) { st.st.client = ''; storeLocal('mcprig.stats.client', ''); }
         fillFilters();
         return get(statsPath(true));
       });
@@ -4162,7 +4198,6 @@
     // Двойной клик отсекает кнопка; общий st.busy трогать нельзя: такт обзора
     // держит его во время автовыбора, и сохранение подписи молча пропадало.
     if (!set || btn.disabled) { return; }
-    st.busy = true;
     btn.disabled = true;
     show($('keys-warn'), false);
     send('PATCH', '/api/sets/' + encodeURIComponent(set.id) + '/keys/' + encodeURIComponent(keyID),
@@ -4173,7 +4208,7 @@
         }
         return loadState().then(function () { renderKeys(current() || set); });
       }).catch(function (e) { fail(e.message, e); })
-      .then(function () { st.busy = false; btn.disabled = false; });
+      .then(function () { btn.disabled = false; });
   }
 
   /* ---------- язык ----------

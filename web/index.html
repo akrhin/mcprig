@@ -494,6 +494,7 @@
           <p class="block-meta" data-i18n="log.tail">log tail of the set</p>
           <div class="log" id="log" aria-live="polite" tabindex="0"></div>
           <p class="empty" id="log-empty" hidden data-i18n="log.empty">log is empty</p>
+          <p class="field-error" id="log-err" role="alert" hidden></p>
         </section>
       </section>
       </div><!-- /page-sets -->
@@ -834,7 +835,7 @@
     <div class="dialog-head">
       <div>
         <h2 id="srvlog-h">—</h2>
-        <p class="dialog-sub" data-i18n="srvlog.sub">lines that mention this server — the tail of the set log</p>
+        <p class="dialog-sub" data-i18n="srvlog.sub">the set lines that mention this server, then the tail of the server process itself</p>
       </div>
       <button class="ghost-icon" type="button" id="srvlog-close" aria-label="Close" data-i18n-aria="common.close">
         <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>

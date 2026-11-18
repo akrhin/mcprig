@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 )
 
 // MaxLatencySamples bounds the per-(client, tool) latency reservoir used for
@@ -43,11 +42,7 @@ func cleanMessage(s string) string {
 	if len(s) <= MaxMessageBytes {
 		return s
 	}
-	cut := MaxMessageBytes
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + "…"
+	return cutRune(s, MaxMessageBytes) + "…"
 }
 
 // OtherLabel — метка счётчика, вбирающего пары сверх MaxCounters.
@@ -64,11 +59,7 @@ func CleanLabel(s string) string {
 		return r
 	}, s)
 	if len(s) > MaxLabelBytes {
-		cut := MaxLabelBytes
-		for cut > 0 && !utf8.RuneStart(s[cut]) {
-			cut--
-		}
-		s = s[:cut]
+		s = cutRune(s, MaxLabelBytes)
 	}
 	return s
 }

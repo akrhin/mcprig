@@ -1638,6 +1638,7 @@ func (m *Manager) apiSetDelete(req *request) error {
 	if err := os.RemoveAll(filepath.Join(m.rt.dataDir, "sets", id)); err != nil {
 		m.log.Warn("каталог удалённого набора не убран", "set", safelog.Value(id), "err", err)
 	}
+	m.rt.Forget(id)
 	writeJSON(req.w, http.StatusOK, map[string]any{"ok": true})
 	return nil
 }
@@ -1692,9 +1693,12 @@ func (m *Manager) apiSetLogs(req *request) error {
 	if m.store.Set(id) == nil {
 		return notFound("набор " + id + " не найден")
 	}
-	writeJSON(req.w, http.StatusOK, map[string]any{
-		"logs": m.rt.Logs(id, linesParam(req.r, 200)),
-	})
+	logs, err := m.rt.Logs(id, linesParam(req.r, 200))
+	body := map[string]any{"logs": logs}
+	if err != nil {
+		body["error"] = strings.ReplaceAll(err.Error(), m.rt.dataDir+string(os.PathSeparator), "")
+	}
+	writeJSON(req.w, http.StatusOK, body)
 	return nil
 }
 
