@@ -8,6 +8,10 @@ repository the project is built in.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.6.6]
+
 ### Fixed
 
 - Reload applies profiles and keys as one generation: the listener receives the
