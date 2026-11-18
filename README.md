@@ -46,7 +46,7 @@ umask 077; printf '%s' '<token>' > demo.key
 
 ![mcprig panel](design/ui/panel.png)
 
-*The panel: sets on their own ports and endpoints, and the servers of one set with transport and tool counts.*
+*The panel: sets on their own ports and endpoints, the servers of one set, and its traffic for the last 7 days.*
 
 Docker works the same way, with no Go toolchain needed:
 `docker pull ghcr.io/akrhin/mcprig:latest` (`latest-full` adds node and python for
