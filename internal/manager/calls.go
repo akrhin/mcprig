@@ -193,8 +193,9 @@ func (m *Manager) runningPort(set *registry.Set) int {
 	return st.Port
 }
 
-// fetchSetStats читает /stats набора: у открытого набора токена нет, поэтому
-// запрос идёт без заголовка и набор сам отдаёт редактированный снимок.
+// fetchSetStats читает /stats набора. Заголовок служебного вызова нужен: набор
+// отдаёт полный снимок только панели, а анонимизацию открытого набора (метка
+// клиента и текст ошибки) делает apiCalls на своей стороне.
 func (m *Manager) fetchSetStats(ctx context.Context, set *registry.Set, port int) (stats.Snapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, callsTimeout)
 	defer cancel()
@@ -211,6 +212,9 @@ func (m *Manager) fetchSetStats(ctx context.Context, set *registry.Set, port int
 	if set.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+set.Token)
 	}
+	// Полный снимок /stats — только служебному вызову панели: открытому набору
+	// без заголовка он теперь отвечает редактированным снимком.
+	req.Header.Set(stats.ServiceCallHeader, stats.ServiceCallerPanel)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return stats.Snapshot{}, err

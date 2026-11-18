@@ -7,15 +7,21 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/httplisten"
 	"github.com/akrhin/mcprig/internal/mcpserver"
+	"github.com/akrhin/mcprig/internal/stats"
 )
 
 func quietLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
@@ -174,5 +180,100 @@ func TestServeReloadsOnSIGHUP(t *testing.T) {
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// ─── ключи и профили — одно поколение ────────────────────────────────────────
+
+// reloadServe — набор и его живой слушатель из файла: ключи и профили
+// проверяются настоящим запросом, как у serve.
+type reloadServe struct {
+	path string
+	mgr  *mcpserver.Manager
+	h    *httplisten.Server
+}
+
+func newReloadServe(t *testing.T, body string) *reloadServe {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "servers.json")
+	writeServers(t, path, body)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	mgr := mcpserver.New(cfg, "test", nil)
+	t.Cleanup(func() { _ = mgr.Close() })
+	h, err := httplisten.New(cfg, mgr.Server(), quietLog(), nil)
+	if err != nil {
+		t.Fatalf("httplisten.New: %v", err)
+	}
+	return &reloadServe{path: path, mgr: mgr, h: h}
+}
+
+// post гоняет один MCP-запрос через живой слушатель.
+func (s *reloadServe) post(t *testing.T, auth, body string) (int, string) {
+	t.Helper()
+	r := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+	r.Host = "127.0.0.1"
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Accept", "application/json, text/event-stream")
+	if auth != "" {
+		r.Header.Set("Authorization", "Bearer "+auth)
+	}
+	w := httptest.NewRecorder()
+	s.h.ServeHTTP(w, r)
+	return w.Code, w.Body.String()
+}
+
+const reloadInit = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":` +
+	`{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}`
+
+// Транспортные поля отвергнуты — профили откачены вместе с ними, и новый ключ
+// не принимается слушателем: иначе он прошёл бы без профиля по чужой таблице.
+func TestReloadRejectsKeyWhileProfilesRolledBack(t *testing.T) {
+	const oldKey, newKey = "old-key-0123456789", "new-key-0123456789"
+	s := newReloadServe(t, `{"servers": [{"name": "alpha", "command": ["downstream"], "enabled": true}],
+		"transport": {"type": "http", "authTokens": ["`+oldKey+`"], "allowedHosts": ["127.0.0.1"]}}`)
+
+	writeServers(t, s.path, `{"servers": [{"name": "alpha", "command": ["downstream"], "enabled": true}],
+		"transport": {"type": "http", "authTokens": ["`+oldKey+`", "`+newKey+`"],
+			"allowedHosts": ["127.0.0.1", "localhost"],
+			"keyProfiles": {"`+stats.Fingerprint(newKey)+`": "strict"}},
+		"profiles": {"strict": {"deny": ["alpha/*"]}}}`)
+	res := reloadOnce(s.mgr, s.h, s.path, quietLog())
+	if !slices.Contains(res.RestartNeeded, "allowedHosts") {
+		t.Fatalf("restartNeeded = %v, ждали allowedHosts", res.RestartNeeded)
+	}
+	if code, body := s.post(t, newKey, reloadInit); code != http.StatusUnauthorized {
+		t.Fatalf("новый ключ принят без профиля: %d %s", code, body)
+	}
+	if code, body := s.post(t, oldKey, reloadInit); code != http.StatusOK {
+		t.Fatalf("старый ключ перестал работать: %d %s", code, body)
+	}
+}
+
+// Без транспортных расхождений новый ключ принимается сразу и сразу под своим
+// профилем: токен и профиль едут одним поколением.
+func TestReloadAppliesKeyAndProfileTogether(t *testing.T) {
+	const oldKey, newKey = "old-key-0123456789", "new-key-0123456789"
+	s := newReloadServe(t, `{"servers": [{"name": "alpha", "command": ["downstream"], "enabled": true}],
+		"transport": {"type": "http", "authTokens": ["`+oldKey+`"], "allowedHosts": ["127.0.0.1"]}}`)
+
+	writeServers(t, s.path, `{"servers": [{"name": "alpha", "command": ["downstream"], "enabled": true}],
+		"transport": {"type": "http", "authTokens": ["`+oldKey+`", "`+newKey+`"],
+			"allowedHosts": ["127.0.0.1"],
+			"keyProfiles": {"`+stats.Fingerprint(newKey)+`": "strict"}},
+		"profiles": {"strict": {"deny": ["alpha/*"]}}}`)
+	if res := reloadOnce(s.mgr, s.h, s.path, quietLog()); len(res.RestartNeeded) != 0 || res.Err != "" {
+		t.Fatalf("reload: %+v", res)
+	}
+	if code, body := s.post(t, newKey, reloadInit); code != http.StatusOK {
+		t.Fatalf("новый ключ не принят сразу: %d %s", code, body)
+	}
+	callBody := `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":` +
+		`{"name":"invoke_command","arguments":{"server":"alpha","command_name":"echo"}}}`
+	code, body := s.post(t, newKey, callBody)
+	if code != http.StatusOK || !strings.Contains(body, "Blocked by mcprig policy") {
+		t.Fatalf("профиль нового ключа не действует: %d %s", code, body)
 	}
 }

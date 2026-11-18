@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -530,17 +529,8 @@ func checkServices(o doctorOptions, reg *registry.Data, regErr error) []doctorLi
 	return lines
 }
 
-var secretRefRe = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
-
 func mentionedSecrets(raw []byte) []string {
-	seen := map[string]bool{}
-	for _, m := range secretRefRe.FindAllSubmatch(raw, -1) {
-		seen[string(m[1])] = true
-	}
-	names := make([]string, 0, len(seen))
-	for name := range seen {
-		names = append(names, name)
-	}
+	names := config.EnvRefs(string(raw))
 	sort.Strings(names)
 	return names
 }

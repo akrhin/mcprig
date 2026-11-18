@@ -76,6 +76,28 @@ against this binary (`E2E_STRICT=1`). The checks are derived from
 An empty `E2E_BASE` skips the suite; with `E2E_STRICT=1` it exits non-zero so a
 skipped run cannot read as a passed gate.
 
+## Panel acceptance
+
+`scripts/acceptance/panel.cjs` walks the panel from an empty data directory and
+checks 37 things a person would do by hand — the rail, themes, navigation, sets,
+servers, keys, tools, statistics, the log, variables, import. 11 of them attach
+a stdio MCP server and therefore need `ACC_DAP`; without it those steps are
+skipped with a line each and the rest still run. It needs Playwright, and the
+panel must be empty and passwordless:
+
+```bash
+MCPRIG_DATA_DIR=$(mktemp -d) MCPRIG_AUTH=off MCPRIG_PORT=9131 ./mcprig panel &
+ACC_BASE=http://127.0.0.1:9131 ACC_DAP=/path/to/stdio-mcp \
+  node scripts/acceptance/panel.cjs
+```
+
+A failed step prints the browser state next to it, so a timing flake is told
+apart from a defect. CI runs the 26 steps that need no stdio server: the
+`acceptance` job in `.github/workflows/ci.yml` builds the binary, starts the
+panel on a free port of 9100–9189 and waits for `/healthz`. Who changed the
+panel's routes or forms without updating the script sees a red job rather than
+a stale green one.
+
 ## Live stand
 
 `scripts/dev-real-set.sh` builds the binary, starts a panel with auth off, adds

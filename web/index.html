@@ -70,8 +70,8 @@
       </nav>
 
       <div class="topbar-end">
-        <button class="endpoint" type="button" id="copy" title="Copy MCP endpoint" data-i18n-title="head.copyTip">
-          <span class="endpoint-label" data-i18n="head.endpoint">Endpoint</span>
+        <button class="endpoint" type="button" id="copy" aria-label="Copy the MCP endpoint URL" data-i18n-aria="head.copyAria">
+          <span class="endpoint-label" id="copy-label" data-i18n="head.endpoint" aria-live="polite">Endpoint</span>
           <span class="endpoint-url mono od-truncate" id="endpoint">—</span>
           <span class="endpoint-ico" aria-hidden="true">
             <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
@@ -199,17 +199,15 @@
             <a class="tile" href="#/servers"><span class="tile-num mono" id="h-ok">—</span><span class="tile-label" data-i18n="host.srvOk">servers ok</span></a>
             <a class="tile" href="#/servers"><span class="tile-num mono" id="h-unchecked">—</span><span class="tile-label" data-i18n="host.srvUnchecked">not checked</span></a>
             <a class="tile" href="#/servers"><span class="tile-num mono" id="h-failed">—</span><span class="tile-label" data-i18n="host.srvFailed">servers failing</span></a>
-            <div class="tile tile-flat"><span class="tile-num mono" id="h-pending">—</span><span class="tile-label" data-i18n="host.pending">tools to approve</span></div>
+            <a class="tile" href="#/servers"><span class="tile-num mono" id="h-pending">—</span><span class="tile-label" data-i18n="host.pending">tools to approve</span></a>
             <a class="tile" href="#/stats/7d"><span class="tile-num mono" id="h-calls">—</span><span class="tile-label" data-i18n="host.calls">calls · 7 days</span></a>
             <a class="tile" href="#/stats/7d"><span class="tile-num mono" id="h-err">—</span><span class="tile-label" data-i18n="kpi.errRate">error rate</span></a>
-            <div class="tile tile-flat"><span class="tile-num mono" id="h-toolout">—</span><span class="tile-label" data-i18n="host.toolout">tool output</span></div>
           </div>
-          <p class="field-help" data-i18n="host.tooloutHelp">The proxy has no API for the size of /tool-out or how long it keeps files, so this panel shows a dash instead of a guess.</p>
         </section>
 
-        <section class="block" aria-labelledby="host-sets-h">
+        <section class="block" id="host-sets-sec" aria-labelledby="host-sets-h">
           <div class="block-head">
-            <h2 id="host-sets-h" data-i18n="host.sets">Sets by activity</h2>
+            <h2 id="host-sets-h" data-i18n="host.sets">Sets needing attention</h2>
             <p class="block-meta" id="host-sets-note"></p>
           </div>
           <table class="table rtable" id="host-sets-table" aria-labelledby="host-sets-h">
@@ -222,10 +220,6 @@
             </thead>
             <tbody id="host-sets-body"></tbody>
           </table>
-          <div class="empty" id="host-sets-empty" hidden>
-            <p class="empty-title" data-i18n="empty.title">No sets yet</p>
-            <p class="empty-text" data-i18n="host.setsEmpty">A set is one MCP endpoint; create one to see it here.</p>
-          </div>
         </section>
 
         <section class="block" aria-labelledby="host-calls-h">
@@ -255,6 +249,25 @@
 
       <div id="page-sets">
 
+      <!-- список наборов: страница «Наборы» и всё, что не разобрано адресом -->
+      <section class="block" id="sets-list" aria-labelledby="sets-h" hidden>
+        <div class="block-head">
+          <h2 id="sets-h" data-i18n="nav.sets">Sets</h2>
+          <p class="block-meta" id="sets-note" role="status"></p>
+        </div>
+        <table class="table rtable" id="sets-table" aria-labelledby="sets-h">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="col.set">Set</th>
+              <th scope="col" data-i18n="host.thState">State</th>
+              <th scope="col" class="num" data-i18n="head.servers">Servers</th>
+              <th scope="col" class="num" data-i18n="tabs.keys">Keys</th>
+            </tr>
+          </thead>
+          <tbody id="sets-body"></tbody>
+        </table>
+      </section>
+
       <div class="set-head" id="phead" hidden>
         <div class="set-head-row">
           <h1 class="set-title" id="set-name">—</h1>
@@ -269,17 +282,25 @@
           </div>
         </div>
         <div class="set-meta">
-          <span class="meta-label" data-i18n="head.key">Key</span>
-          <code class="mono key-val" id="key">—</code>
-          <button class="ghost-icon" type="button" id="key-copy" aria-label="Copy key" data-i18n-title="head.copyKey" data-i18n-aria="head.copyKey">
-            <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          </button>
-          <code class="mono meta-mark" id="key-mark" hidden data-i18n-title="head.keyMarkTip">—</code>
+          <span class="meta-pair">
+            <span class="meta-label" data-i18n="head.key">Key</span>
+            <code class="mono key-val" id="key">—</code>
+            <button class="ghost-icon" type="button" id="key-copy" aria-label="Copy key" data-i18n-title="head.copyKey" data-i18n-aria="head.copyKey">
+              <svg class="od-icon ico-15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </button>
+            <code class="mono meta-mark" id="key-mark" hidden data-i18n-title="head.keyMarkTip">—</code>
+          </span>
           <span class="meta-sep" aria-hidden="true"></span>
-          <span class="meta-label" data-i18n="head.servers">Servers</span><span class="mono" id="meta-servers">0</span>
-          <span class="meta-label" data-i18n="head.tools">Tools</span><span class="mono" id="meta-tools">—</span>
+          <span class="meta-pair">
+            <span class="meta-label" data-i18n="head.servers">Servers</span><span class="mono" id="meta-servers">0</span>
+          </span>
+          <span class="meta-pair">
+            <span class="meta-label" data-i18n="head.tools">Tools</span><span class="mono" id="meta-tools">—</span>
+          </span>
           <span class="meta-sep" aria-hidden="true"></span>
-          <span class="meta-label" title="tools/list schema of this set" data-i18n-title="head.schemaTip">LIST_COMMANDS</span><code class="mono meta-schema" id="schema" data-i18n-title="head.schemaTip">—</code>
+          <span class="meta-pair">
+            <span class="meta-label" data-i18n="head.schemaLabel" title="tools/list schema of this set" data-i18n-title="head.schemaTip">Tools schema</span><code class="mono meta-schema" id="schema" data-i18n-title="head.schemaTip">—</code>
+          </span>
         </div>
       </div>
 
@@ -473,6 +494,7 @@
           <p class="block-meta" data-i18n="log.tail">log tail of the set</p>
           <div class="log" id="log" aria-live="polite" tabindex="0"></div>
           <p class="empty" id="log-empty" hidden data-i18n="log.empty">log is empty</p>
+          <p class="field-error" id="log-err" role="alert" hidden></p>
         </section>
       </section>
       </div><!-- /page-sets -->
@@ -484,17 +506,20 @@
           <p class="block-meta"></p>
         </div>
         <div class="filters">
-          <div class="segmented" role="group" aria-label="Period" id="s-period">
-            <button class="segbtn" type="button" data-period="today" aria-pressed="true" data-i18n="stats.today">Today</button>
-            <button class="segbtn" type="button" data-period="7d" aria-pressed="false" tabindex="-1" data-i18n="stats.7d">7 days</button>
-            <button class="segbtn" type="button" data-period="30d" aria-pressed="false" tabindex="-1" data-i18n="stats.30d">30 days</button>
-            <button class="segbtn" type="button" data-period="archive" aria-pressed="false" tabindex="-1" data-i18n="stats.archive">Archive</button>
+          <div class="fsel">
+            <span id="s-period-h" data-i18n="stats.period">period</span>
+            <div class="segmented" role="group" aria-labelledby="s-period-h" id="s-period">
+              <button class="segbtn" type="button" data-period="today" aria-pressed="true" data-i18n="stats.today">Today</button>
+              <button class="segbtn" type="button" data-period="7d" aria-pressed="false" tabindex="-1" data-i18n="stats.7d">7 days</button>
+              <button class="segbtn" type="button" data-period="30d" aria-pressed="false" tabindex="-1" data-i18n="stats.30d">30 days</button>
+              <button class="segbtn" type="button" data-period="archive" aria-pressed="false" tabindex="-1" data-i18n="stats.archive">Archive</button>
+            </div>
           </div>
           <label class="fsel"><span data-i18n="stats.set">set</span><select id="s-set" class="input"></select></label>
           <label class="fsel"><span data-i18n="stats.server">server</span><select id="s-server" class="input"></select></label>
           <label class="fsel"><span data-i18n="stats.tool">tool</span><select id="s-tool" class="input"></select></label>
           <label class="fsel"><span data-i18n="stats.client">client</span><select id="s-client" class="input"></select></label>
-          <button class="link-btn" type="button" id="s-reset" data-i18n="stats.reset">reset</button>
+          <button class="btn btn-sm" type="button" id="s-reset" data-i18n="stats.reset">reset</button>
         </div>
 
         <section class="block" id="s-chart-block" aria-labelledby="s-activity-title">
@@ -670,7 +695,7 @@
       </section>
     </main>
 
-    <footer class="statusbar">
+    <footer class="statusbar" data-i18n-title="host.tooloutHelp">
       <span class="mono" id="status-counts">—</span>
       <span class="right">
         <span class="mono" id="f-version">—</span>
@@ -810,7 +835,7 @@
     <div class="dialog-head">
       <div>
         <h2 id="srvlog-h">—</h2>
-        <p class="dialog-sub" data-i18n="srvlog.sub">lines that mention this server — the tail of the set log</p>
+        <p class="dialog-sub" data-i18n="srvlog.sub">the set lines that mention this server, then the tail of the server process itself</p>
       </div>
       <button class="ghost-icon" type="button" id="srvlog-close" aria-label="Close" data-i18n-aria="common.close">
         <svg class="od-icon ico-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -932,8 +957,8 @@
         <div class="field" id="prompt-srv-field">
           <span class="field-label" data-i18n="prompt.servers">Servers · all when none is chosen</span>
           <div class="checklist" id="prompt-servers"></div>
-          <p class="field-help" id="prompt-nosrv" hidden data-i18n="prompt.noServers">The set has no servers — the text will list no tools.</p>
         </div>
+        <p class="field-help" id="prompt-nosrv" hidden data-i18n="prompt.noServers">The set has no servers — the text will list no tools.</p>
         <p class="field-help" id="prompt-warn" hidden></p>
         <p class="field-error" id="prompt-err" role="alert" tabindex="-1" hidden></p>
         <div class="od-row">

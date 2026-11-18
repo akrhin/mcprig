@@ -28,7 +28,7 @@ with `subtle.ConstantTimeCompare` against every entry, so token length does not
 leak and a mismatch reveals nothing (`httplisten.go:70-105`). An empty token set
 accepts nothing.
 
-**Construction (`New`, `httplisten.go:107-211`).**
+**Construction (`New`, `httplisten.go:106-204`).**
 
 - missing `transport` or server → startup error; tokens come from
   `transport.authTokens`, falling back to a single `authToken`
@@ -46,16 +46,16 @@ accepts nothing.
   `DisableLocalhostProtection: true` because `AllowedHosts` is the one Host
   policy (`httplisten.go:167-180,29-30`).
 
-**Routes** (`httplisten.go:182-210`):
+**Routes** (`httplisten.go:182-203`):
 
 | route | guard | notes |
 | --- | --- | --- |
 | `GET /healthz` | none | plain `ok` |
 | `transport.path` | `openRoute=true` | anonymous only for an open set |
 | `GET /tool-out/{name}` | `openRoute=false` | never anonymous, even on an open set |
-| `GET /stats` | `openRoute=true` | registered only when a `*stats.Recorder` is passed; bearer decides full vs redacted snapshot |
+| `GET /stats` | `openRoute=true` | registered only when a `*stats.Recorder` is passed; the full snapshot goes only to the panel's service call (`X-MCPRig-Caller: panel`), every other caller — any valid key or an open set — gets `SnapshotRedacted` (`httplisten.go:187-202`) |
 
-**guard** (`httplisten.go:277-346`) is the per-request policy: methods
+**guard** (`httplisten.go:273-339`) is the per-request policy: methods
 `GET/HEAD/POST/DELETE` else 405 with `Allow`; `HostAllowed(r.Host)`; `Origin`,
 when present, must parse and pass `HostAllowed(u.Host)`; an absent
 `Authorization` passes only for `openRoute && anonymous`, a presented one is
@@ -64,22 +64,22 @@ set for free); then context enrichment — key fingerprint
 (`stats.WithClientKey`), panel service call, caller host without port,
 client label — and `http.MaxBytesReader` at 4 MiB.
 
-**Host policy** (`httplisten.go:395-421`). Port is dropped on both sides; an
+**Host policy** (`httplisten.go:391-416`). Port is dropped on both sides; an
 empty list means `127.0.0.1, localhost, ::1`; `"*"` admits everything. The same
 `HostAllowed`/`HostOnly` serve the panel, so "not configured" never degrades into
 "any host" (`internal/manager/auth.go:294,313,395`).
 
-**Client label** (`httplisten.go:348-372`): owner's key name from
+**Client label** (`httplisten.go:341-367`): owner's key name from
 `transport.clientNames` wins; otherwise `stats.Label(fingerprint, userAgent)`
 where the fingerprint comes only from a genuinely presented bearer value.
 
-**tool-out** (`httplisten.go:213-275`): name must be `^[0-9a-f]{16}$` and a
+**tool-out** (`httplisten.go:206-271`): name must be `^[0-9a-f]{16}$` and a
 `<name>.owner` file must hold the reader's fingerprint — mismatch, missing owner
 or missing file is 404 (never 403: a wrong name must not confirm a dump exists);
 older than the TTL is 410; the body is served by `http.ServeContent`, so `HEAD`
 and `Range` work; headers `nosniff`, `no-store`, `no-referrer`.
 
-**Access log** (`httplisten.go:423-463`): `statusWriter` records the status and
+**Access log** (`httplisten.go:418-460`): `statusWriter` records the status and
 keeps `Unwrap` so SSE flushing via `http.ResponseController` still works;
 `logRequests` logs method, path, status, duration, remote — never headers, body
 or the `Authorization` value.
@@ -92,9 +92,9 @@ not be cut (`cmd/mcprig/main.go:310-311`).
 
 Inward, one HTTP request:
 
-1. `logRequests` wraps the mux (`httplisten.go:210`), timing the request.
+1. `logRequests` wraps the mux (`httplisten.go:203`), timing the request.
 2. the mux picks the route and hands it to `guard` with the route's
-   openness (`httplisten.go:187-208`).
+   openness (`httplisten.go:182-201`).
 3. `guard` checks method, Host, Origin, bearer, then writes the identity into
    the request context and caps the body.
 4. `next.ServeHTTP` — the SDK's stateless handler resolves tools on the one

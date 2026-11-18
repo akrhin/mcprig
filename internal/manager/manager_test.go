@@ -48,8 +48,9 @@ func TestMain(m *testing.M) {
 }
 
 type env struct {
-	m   *Manager
-	dir string
+	m      *Manager
+	dir    string
+	secret string // MCPRIG_PROXY_SECRET: прокси обязан предъявить его в заголовке
 }
 
 func newEnv(t *testing.T, auth AuthOptions) *env {
@@ -83,7 +84,7 @@ func newEnvLog(t *testing.T, auth AuthOptions, log *slog.Logger) *env {
 		t.Fatalf("New: %v", err)
 	}
 	t.Cleanup(m.Close)
-	return &env{m: m, dir: dir}
+	return &env{m: m, dir: dir, secret: auth.ProxySecret}
 }
 
 // do шлёт запрос в менеджер. body == nil — без тела.

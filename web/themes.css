@@ -23,6 +23,7 @@
   --line: #232b35;
   --line-soft: #1a212a;
   --line-strong: #35404e;
+  --field-line: #606b7b;    /* рамка поля: 3.23:1 на --surface, WCAG 1.4.11 просит 3:1 */
 
   --text: #e7edf4;
   --text-dim: #9aa8b6;
@@ -52,6 +53,7 @@ html[data-palette="light"] {
   --line: #dde2ea;
   --line-soft: #e9edf3;
   --line-strong: #c3ccd8;
+  --field-line: #8a94a4;    /* 3.06:1 на белом поле */
 
   --text: #0f151d;
   --text-dim: #4a5563;
@@ -82,6 +84,7 @@ html[data-palette="nord"] {
   --line: #3f4756;
   --line-soft: #353c48;
   --line-strong: #4c566a;
+  --field-line: #8b95a8;    /* 3.45:1 на --surface */
 
   --text: #eceff4;
   --text-dim: #c6cdd8;
@@ -92,7 +95,8 @@ html[data-palette="nord"] {
   --accent-ink: #1b2029;
   --accent-soft: #33424d;
 
-  --ok: #a3be8c;
+  /* ok светлее канона #a3be8c: на 14%-тинте бейджа (#485257) канон даёт 3.93 */
+  --ok: #b8cfa4;
   --warn: #ebcb8b;
   /* err светлее канона #bf616a: на тинте badge-err канон даёт 2.67 */
   --err: #f0bcc0;
@@ -112,6 +116,7 @@ html[data-palette="gruvbox"] {
   --line: #3c3836;
   --line-soft: #32302f;
   --line-strong: #504945;
+  --field-line: #7c6f64;    /* 3.03:1 на --surface; канон gruvbox fg4 */
 
   --text: #ebdbb2;
   --text-dim: #d5c4a1;

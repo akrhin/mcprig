@@ -1,0 +1,172 @@
+package downstream
+
+import (
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/safelog"
+	"github.com/akrhin/mcprig/internal/safepath"
+)
+
+// ServerLogs пишет вывод процессов серверов на диск: набор живёт отдельным
+// процессом, и панель иначе не увидит ни одной строки ребёнка — stdout у
+// stdio-сервера занят протоколом, а stderr доходил только до хвоста ошибки
+// старта в памяти. nil у Connector — не писать.
+type ServerLogs struct {
+	log    *slog.Logger
+	setDir string
+	mu     sync.Mutex
+	files  map[string]*serverLog
+}
+
+// warn пишет сбой хвоста в лог набора: без этой строки пустой лог сервера
+// не отличить от неработающего диска.
+func (l *ServerLogs) warn(what, server string, err error) {
+	if l.log == nil {
+		return
+	}
+	if err != nil {
+		l.log.Warn("хвост сервера: "+what, "server", safelog.Value(server), "err", safelog.Value(err.Error()))
+		return
+	}
+	l.log.Warn("хвост сервера: "+what, "server", safelog.Value(server))
+}
+
+// serverLogLimit — сколько байт вывода держим на сервер. Хвост читается окном
+// в 64 КиБ, так что больше за один ответ панель всё равно не получит.
+const serverLogLimit = 256 << 10
+
+// ServerLogPath — <dir>/serverlogs/<server>.log: файл хвоста одного сервера.
+func ServerLogPath(dir, name string) string {
+	return filepath.Join(dir, "serverlogs", name+".log")
+}
+
+// NewServerLogs заводит приёмник вывода для каталога набора (там, где лежит
+// его servers.json).
+func NewServerLogs(setDir string, log *slog.Logger) *ServerLogs {
+	return &ServerLogs{setDir: setDir, log: log, files: map[string]*serverLog{}}
+}
+
+// Writer — приёмник stderr одного сервера. Файл открывается один раз на
+// процесс: переподключение сервера дописывает его же, а не начинает заново.
+// nil — сервер без годного имени не логируется.
+func (l *ServerLogs) Writer(srv *config.Server) io.Writer {
+	if l == nil || srv == nil || !safepath.Name(srv.Name) {
+		return nil
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if w := l.files[srv.Name]; w != nil {
+		w.markStart()
+		return w
+	}
+	path := ServerLogPath(l.setDir, srv.Name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		// Без строки здесь «лог сервера пуст» не отличить от сломанного диска.
+		l.warn("каталог хвоста не создан", srv.Name, err)
+		return nil
+	}
+	// MkdirAll не трогает права существующего каталога: каталог, созданный
+	// старой версией или руками, иначе остался бы читаемым всем.
+	if err := os.Chmod(filepath.Dir(path), 0o700); err != nil { //nolint:gosec // каталог, а не файл
+		l.warn("права каталога хвоста не поправлены", srv.Name, err)
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		l.warn("файл хвоста не открыт", srv.Name, err)
+		return nil
+	}
+	// режим у существующего файла OpenFile не меняет, а хвост не должен быть
+	// читаем шире владельца даже после ручной правки прав
+	if err := f.Chmod(0o600); err != nil {
+		l.warn("права хвоста не поправлены", srv.Name, err)
+	}
+	w := &serverLog{file: f, log: l.log, server: srv.Name}
+	if info, err := f.Stat(); err == nil {
+		w.size = info.Size()
+	} else {
+		l.warn("размер хвоста не прочитан", srv.Name, err)
+	}
+	l.files[srv.Name] = w
+	w.markStart()
+	return w
+}
+
+// markStart пишет границу запуска. Writer зовётся на каждый запуск процесса
+// сервера, а файл живёт дольше процесса: без метки хвост упавшего запуска
+// выглядит как вывод текущего.
+func (w *serverLog) markStart() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.markStartLocked()
+}
+
+// markStartLocked пишет метку под уже взятым замком: Writer держит его сам.
+func (w *serverLog) markStartLocked() {
+	if w.broken {
+		return
+	}
+	line := "— запуск " + time.Now().Format("2006-01-02 15:04:05") + " —\n"
+	if _, err := w.file.WriteString(line); err != nil {
+		w.warn("метка запуска не записана")
+		return
+	}
+	w.size += int64(len(line))
+}
+
+// serverLog — stderr одного процесса с пределом размера.
+type serverLog struct {
+	mu     sync.Mutex
+	file   *os.File
+	size   int64
+	log    *slog.Logger
+	server string
+	broken bool // обрезка не удалась: дописывать нельзя, иначе файл растёт без предела
+}
+
+func (w *serverLog) warn(what string) {
+	if w.log == nil {
+		return
+	}
+	w.log.Warn("хвост сервера: "+what, "server", w.server)
+}
+
+func (w *serverLog) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	// shortcut: при переполнении хвост обрезается целиком, а не ротацией —
+	// старые строки теряются разом, зато файл не растёт без предела.
+	// Один Write может прийти больше лимита: пишем хвост, иначе файл
+	// перескочит потолок и там и останется.
+	if int64(len(p)) > serverLogLimit {
+		p = p[len(p)-int(serverLogLimit):]
+	}
+	if w.size+int64(len(p)) > serverLogLimit {
+		if err := w.file.Truncate(0); err == nil {
+			w.size = 0
+			// Обрезанный хвост начинает новую страницу с метки: иначе после
+			// переполнения граница запуска пропадает до следующего старта.
+			w.markStartLocked()
+		} else {
+			w.broken = true
+			w.warn("хвост не обрезан, запись остановлена")
+		}
+	}
+	if w.broken {
+		return len(p), nil
+	}
+	n, err := w.file.Write(p)
+	w.size += int64(n)
+	// Ошибка записи не возвращается: stdout/stderr ребёнка — диагностика, и
+	// сбой диска не должен ломать его Wait.
+	if err != nil {
+		w.warn("хвост не записан")
+		return len(p), nil
+	}
+	return n, nil
+}

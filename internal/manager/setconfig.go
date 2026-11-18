@@ -7,14 +7,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/akrhin/mcprig/internal/atomicfile"
 	"github.com/akrhin/mcprig/internal/config"
+	"github.com/akrhin/mcprig/internal/downstream"
 	"github.com/akrhin/mcprig/internal/registry"
 	"github.com/akrhin/mcprig/internal/safelog"
+	"github.com/akrhin/mcprig/internal/safepath"
 	"github.com/akrhin/mcprig/internal/stats"
 	"github.com/akrhin/mcprig/internal/toollock"
 	"github.com/akrhin/mcprig/internal/toolout"
@@ -202,6 +203,22 @@ func LogPath(dataDir, id string) string {
 	return filepath.Join(dataDir, "sets", id, "mcprig.log")
 }
 
+// ServerLogPath — <dataDir>/sets/<id>/serverlogs/<server>.log: хвост вывода
+// процесса сервера, который ведёт сам набор.
+func ServerLogPath(dataDir, id, name string) string {
+	return downstream.ServerLogPath(filepath.Join(dataDir, "sets", id), name)
+}
+
+// clearServerLogs убирает хвосты серверов на первом запуске набора: строки
+// прошлого сеанса не должны выглядеть текущими, а автоперезапуск после падения
+// дописывает в тот же файл под новой меткой, чтобы трейс не пропадал.
+func clearServerLogs(dataDir, id string) error {
+	if !safepath.Name(id) {
+		return fmt.Errorf("имя набора %q вне шаблона", id)
+	}
+	return os.RemoveAll(filepath.Join(dataDir, "sets", id, "serverlogs"))
+}
+
 // migrateLog переносит унаследованный lazy-mcp.log в mcprig.log один раз: без
 // этого хвост старого лога пропал бы из панели после переименования.
 func migrateLog(log *slog.Logger, dataDir, id string) {
@@ -225,12 +242,10 @@ func writeAtomic(path string, body []byte) error {
 	return atomicfile.Write(path, body)
 }
 
-var envRefRe = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
-
 // addRefs собирает имена ${VAR} из строки в seen.
 func addRefs(seen map[string]bool, text string) {
-	for _, m := range envRefRe.FindAllStringSubmatch(text, -1) {
-		seen[m[1]] = true
+	for _, name := range config.EnvRefs(text) {
+		seen[name] = true
 	}
 }
 
@@ -342,12 +357,9 @@ func expandServer(srv *config.Server, sec *Secrets) *config.Server {
 		return v.value, v.source != ""
 	}
 	expand := func(text string) string {
-		return envRefRe.ReplaceAllStringFunc(text, func(m string) string {
-			name := envRefRe.FindStringSubmatch(m)[1]
-			if v, ok := lookup(name); ok {
-				return v
-			}
-			return m
+		return config.ExpandEnvRefs(text, func(name string) (string, bool) {
+			v, ok := lookup(name)
+			return v, ok
 		})
 	}
 	cp := *srv

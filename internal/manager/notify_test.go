@@ -249,6 +249,39 @@ func TestNotifyUnhealthyServer(t *testing.T) {
 	e.m.rt.notify.drain()
 }
 
+// Удалённый набор не подавляет события нового набора с тем же id: отметка
+// «набор/сервер» живёт в памяти и без чистки пережила бы удаление.
+func TestNotifyStateClearedOnDelete(t *testing.T) {
+	h := newHook(t, 0)
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+
+	create := func() string {
+		w := e.do(t, http.MethodPost, "/api/sets", map[string]any{
+			"id": "dup", "name": "dup", "servers": []string{"fake"},
+			"notify": map[string]any{"webhook": h.srv.URL},
+		})
+		status(t, w, http.StatusCreated)
+		return decode[struct {
+			ID string `json:"id"`
+		}](t, w).ID
+	}
+	down := false
+	view := setHealth{Servers: []serverHealth{{Name: "fake", Healthy: &down, Error: "нет соединения"}}}
+
+	id := create()
+	e.m.noteHealth(id, view)
+	h.want(t, 1)
+
+	status(t, e.do(t, http.MethodDelete, "/api/sets/"+id, nil), http.StatusOK)
+	if same := create(); same != id {
+		t.Fatalf("новый набор получил id %q вместо %q", same, id)
+	}
+	e.m.noteHealth(id, view)
+	h.want(t, 2)
+	e.m.rt.notify.drain()
+}
+
 // Мусор в notify отвергается API с причиной в теле, годный адрес принимается.
 func TestNotifyBadWebhookRejected(t *testing.T) {
 	e := newEnv(t, AuthOptions{Off: true})

@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 
@@ -16,6 +17,12 @@ type echoIn struct {
 }
 
 func main() {
+	// Панель показывает в диалоге лога вывод процесса сервера: тест проверяет
+	// именно его, поэтому строка в stderr включается переменной, а не всегда.
+	if msg := os.Getenv("TESTMCP_STDERR"); msg != "" {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+
 	server := mcp.NewServer(&mcp.Implementation{Name: "testmcp", Version: "0.0.1"}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "echo", Description: "Echo the given text back."},

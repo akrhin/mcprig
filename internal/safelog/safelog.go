@@ -17,3 +17,17 @@ func Value(s string) string {
 		return r
 	}, s)
 }
+
+// Text — как Value, но оставляет табуляцию: в выводе `mcprig logs` колонки
+// держит именно она, а новую строку ею не подделать.
+func Text(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\t' {
+			return r
+		}
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+}

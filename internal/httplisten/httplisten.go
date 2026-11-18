@@ -185,17 +185,15 @@ func New(cfg *config.Config, srv *mcp.Server, log *slog.Logger, rec *stats.Recor
 	// отдаётся анонимно никогда, даже когда /mcp пускает без ключа.
 	mux.Handle("GET /tool-out/{name}", guard(toolOutHandler(toolout.Dir(toolout.Base()), retention.TTL), auth, false, allowed))
 	if rec != nil {
-		// The panel polls this endpoint; it carries the same bearer as /mcp.
-		// У открытого набора bearer нет ни у кого, поэтому анонимный снимок
-		// редактируется: без меток клиентов и текстов ошибок апстрима.
+		// Полный снимок — только служебному вызову панели (guard размечает его
+		// заголовком X-MCPRig-Caller: panel). Ключ набора видит счётчики и
+		// задержки, но метки клиентов заменены на (аноним), а тексты ошибок
+		// апстрима пусты: иначе любой валидный ключ читает чужие данные.
 		mux.Handle("GET /stats", guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Редакция выбирается до снимка: собранная в редакции копия не
 			// платит за полный снимок, который тут же был бы выброшен.
-			anon := !bearerOK(r, auth.tokens)
-			var snap stats.Snapshot
-			if anon {
-				snap = rec.SnapshotRedacted()
-			} else {
+			snap := rec.SnapshotRedacted()
+			if stats.ServiceCall(r.Context()) {
 				snap = rec.Snapshot()
 			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")

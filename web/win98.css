@@ -441,3 +441,19 @@ html[data-theme="win98"][data-palette="w98-hc"] :is(.set-item:not([aria-current=
     .statusbar > span:not(.right), .statusbar .right > span) { border-width: 3px; }
   html[data-theme="win98"] :focus-visible { outline-width: 2px; }
 }
+
+/* ── тач-экран: цели не меньше 32 px ──────────────────────────────────────
+   Плотность 90-х (21–24 px) — часть образа и на десктопе остаётся как есть:
+   там мышью попадают точно. На узком экране та же плотность оборачивается
+   промахом по «Остановить» и «Удалить набор», поэтому с 859 px вниз высота
+   контролов поднимается до пальца, а вид не меняется. */
+@media (max-width: 859px) {
+  html[data-theme="win98"] :is(.btn, .btn-sm, .btn-xs, .segbtn, .tab,
+    .rail-add, .skip, .input) { min-height: 32px; }
+  html[data-theme="win98"] .ghost-icon { width: 32px; height: 32px; }
+  /* поле поиска живёт внутри своей рамки и ростом рамку за собой тянет */
+  html[data-theme="win98"] .searchfield .input { min-height: 32px; }
+  /* ссылка в ячейке таблицы — цель перехода: 31 px от кегля 11 px, а короткое
+     имя набора ещё и уже 32 px по ширине */
+  html[data-theme="win98"] .table td > a { display: inline-flex; align-items: center; min-height: 32px; min-width: 32px; }
+}

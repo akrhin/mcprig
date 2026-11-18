@@ -79,7 +79,7 @@ What one reload applies:
 | `permissions`, `enabled`, `description`, `tags` | updated in place, session and tool cache kept |
 | untouched server | same record, same session, same cache |
 | set `rateLimit`, `profiles` | applied in place; `requestTimeout` and `healthMonitor` are constants the manager writes and never change |
-| `authToken`, `authTokens`, `allowAnonymous`, `clientNames`, `keyProfiles` | applied live: on reload the panel hands the new token list and the set's openness to the listener (`SetAuth`), and a key's profile is resolved per request — a key rotation or a switch to an open set needs no restart |
+| `authToken`, `authTokens`, `allowAnonymous`, `clientNames`, `keyProfiles` | applied live: on reload the panel hands the new token list and the set's openness to the listener (`SetAuth`), and a key's profile is resolved per request — a key rotation or a switch to an open set needs no restart. When the same reload lists a transport field in `restartNeeded`, the listener keeps its previous tokens: profiles and tokens are one generation, so a new key never arrives without its profile and starts being accepted only after the set restarts |
 | `host`, `port`, `path`, `type`, `allowedHosts`, a `transport` block that appears or disappears | listed in `restartNeeded`, the old values stay in force |
 
 `keyProfiles` is applied live: the manager reads it per request, unlike the
@@ -184,9 +184,12 @@ Each set serves one stateless endpoint:
   matched;
 - 4 MiB request body cap;
 - no read timeout (an SSE stream must not be cut), 60 s idle timeout;
-- `GET /healthz` public, `GET /stats` protected by the same bearer; an open set
-  has no key, so an anonymous `GET /stats` is answered with a redacted snapshot —
-  no client labels, no upstream error text ([panel.md](panel.md#health)).
+- `GET /healthz` public, `GET /stats` protected by the same bearer. The full
+  snapshot — client labels, upstream error texts — goes to the panel's own
+  service call only (`X-MCPRig-Caller: panel`, sent by the manager that polls a
+  set); every key gets the redacted one: counters and latencies stay, client
+  labels become `(аноним)` and error texts are dropped
+  ([panel.md](panel.md#health)).
 
 ## OAuth
 

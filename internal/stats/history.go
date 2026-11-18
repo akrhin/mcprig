@@ -106,6 +106,16 @@ type rawLine struct {
 // maxErrText — потолок текста ошибки в строке журнала, в байтах.
 const maxErrText = 300
 
+// cutRune обрезает строку до n байт по границе руны: разрезанная руна в
+// журнале и в метках счётчиков выглядела бы мусором.
+func cutRune(s string, n int) string {
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
+
 // cleanErrText делает текст ошибки пригодным для одной строки JSONL: переводы
 // строк заменяются пробелом, длинный текст режется по границе руны.
 // Отсутствие поля в старых строках разбор переживает: пустая строка — не ошибка.
@@ -114,11 +124,7 @@ func cleanErrText(s string) string {
 	if len(s) <= maxErrText {
 		return s
 	}
-	cut := maxErrText
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + "…"
+	return cutRune(s, maxErrText) + "…"
 }
 
 type dayFile struct {
@@ -312,9 +318,6 @@ func Rotate(dir string, now time.Time, log ...*slog.Logger) error {
 	return nil
 }
 
-// scanRaw reads a journal line by line. A broken line is skipped: a process
-// killed mid-write leaves a torn last line, and that must not stop the fold
-// or the query.
 // openHistoryFile — точка чтения истории: тест подменяет её и считает открытия.
 var openHistoryFile = os.Open
 
@@ -327,6 +330,9 @@ func readHistoryFile(path string) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
+// scanRaw reads a journal line by line. A broken line is skipped: a process
+// killed mid-write leaves a torn last line, and that must not stop the fold
+// or the query.
 func scanRaw(path string, fn func(rawLine)) error {
 	f, err := openHistoryFile(path)
 	if err != nil {

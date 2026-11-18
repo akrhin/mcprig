@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -488,9 +489,84 @@ func TestStatsNeedsTokenAndNeverLeaksIt(t *testing.T) {
 	if strings.Contains(raw, testToken) {
 		t.Fatalf("токен попал в снимок: %q", raw)
 	}
-	for _, want := range []string{"opencode/2.2.6", "upstream boom"} {
-		if !strings.Contains(raw, want) {
-			t.Fatalf("/stats с ключом: нет %q в теле %q", want, raw)
+	// Ключ набора — не служебный вызов панели: метки клиентов и тексты ошибок
+	// ему не отдаются.
+	for _, forbidden := range []string{"opencode/2.2.6", "upstream boom"} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("/stats с ключом отдал %q: %q", forbidden, raw)
 		}
+	}
+	if !strings.Contains(raw, stats.AnonymousLabel) {
+		t.Fatalf("/stats с ключом: нет редакции %q в теле %q", stats.AnonymousLabel, raw)
+	}
+}
+
+// Полный снимок /stats получает только служебный вызов панели (заголовок
+// X-MCPRig-Caller): чужой валидный ключ видит счётчики и задержки, но метка
+// клиента заменена, а текст ошибки апстрима пуст.
+func TestStatsRedactedPerCaller(t *testing.T) {
+	rec := stats.NewRecorder("closed", 4)
+	rec.Record("клиент-А", "fix", "echo", 5*time.Millisecond, errors.New("upstream boom"))
+	cfg := &config.Config{Transport: &config.HTTPTransport{AuthTokens: []string{testToken, "second-key"}}}
+	h, err := New(cfg, testServer(), slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)), rec)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	get := func(key string, panel bool) stats.Snapshot {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, srv.URL+"/stats", nil)
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+key)
+		if panel {
+			req.Header.Set(stats.ServiceCallHeader, stats.ServiceCallerPanel)
+		}
+		res, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatalf("do: %v", err)
+		}
+		raw := drain(t, res)
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("/stats: статус %d, тело %q", res.StatusCode, raw)
+		}
+		var snap stats.Snapshot
+		if err := json.Unmarshal([]byte(raw), &snap); err != nil {
+			t.Fatalf("разбор снимка %q: %v", raw, err)
+		}
+		return snap
+	}
+
+	for _, key := range []string{"second-key", testToken} {
+		snap := get(key, false)
+		if len(snap.Counters) != 1 || len(snap.Tail) != 1 {
+			t.Fatalf("ключ %q: счётчиков %d, хвост %d — ожидалось по 1", key, len(snap.Counters), len(snap.Tail))
+		}
+		if got := snap.Counters[0].Client; got != stats.AnonymousLabel {
+			t.Fatalf("ключ %q: метка счётчика %q, ожидалась %q", key, got, stats.AnonymousLabel)
+		}
+		if got := snap.Tail[0].Client; got != stats.AnonymousLabel {
+			t.Fatalf("ключ %q: метка хвоста %q, ожидалась %q", key, got, stats.AnonymousLabel)
+		}
+		if got := snap.Tail[0].Message; got != "" {
+			t.Fatalf("ключ %q: текст ошибки %q, ожидалась пустота", key, got)
+		}
+		if snap.Counters[0].Tool != "echo" || snap.Counters[0].Calls != 1 {
+			t.Fatalf("ключ %q: счётчик потерял данные: %+v", key, snap.Counters[0])
+		}
+	}
+
+	full := get("second-key", true)
+	if len(full.Counters) != 1 || len(full.Tail) != 1 {
+		t.Fatalf("панель: счётчиков %d, хвост %d — ожидалось по 1", len(full.Counters), len(full.Tail))
+	}
+	if got := full.Counters[0].Client; got != "клиент-А" {
+		t.Fatalf("панель: метка счётчика %q, ожидалась %q", got, "клиент-А")
+	}
+	if got := full.Tail[0].Message; got != "upstream boom" {
+		t.Fatalf("панель: текст ошибки %q, ожидался %q", got, "upstream boom")
 	}
 }

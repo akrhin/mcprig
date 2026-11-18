@@ -312,6 +312,9 @@ func run() error {
 	}
 	// Env: ребёнку уходит whitelist плюс envAllow сервера, а не весь os.Environ().
 	conn := &downstream.Connector{Version: version, OAuth: cfg.OAuth, Store: store, Log: log, Env: downstream.EnvFor}
+	// stderr детей набора — в файл рядом с servers.json: панель читает его как
+	// «лог сервера». stdout ребёнка занят протоколом.
+	conn.ServerLogs = downstream.NewServerLogs(filepath.Dir(*cfgPath), log)
 	mgr := mcpserver.New(cfg, version, conn)
 	defer func() {
 		if err := mgr.Close(); err != nil {
@@ -417,13 +420,20 @@ func reloadOnce(mgr *mcpserver.Manager, handler *httplisten.Server, cfgPath stri
 	if err != nil {
 		res = mgr.ReloadFailed(err)
 	} else {
-		// Политика доступа применяется слушателем здесь же: выдача нового
-		// ключа и потеря последнего не ждут перезапуска набора. Остальной
-		// транспорт — дело mgr.Reload.
-		if handler != nil && cfg.Transport != nil {
+		// Профили и токены — одно поколение, поэтому сначала Reload, потом
+		// ключи: SetAuth до Reload отдал бы слушателю ключ новой таблицы,
+		// пока менеджер ещё держит старую, и такой ключ прошёл бы без
+		// профиля. Транспортные поля, отвергнутые Reload, откатывают и
+		// профили — тогда новые ключи не принимаются до перезапуска набора.
+		res = mgr.Reload(cfg)
+		switch {
+		case handler == nil || cfg.Transport == nil:
+		case len(res.RestartNeeded) > 0:
+			log.Warn("reload: транспортные поля не вступили в силу, новые ключи начнут приниматься после перезапуска набора",
+				"restartNeeded", strings.Join(res.RestartNeeded, ", "))
+		default:
 			handler.SetAuth(transportTokens(cfg), cfg.Transport.AllowAnonymous, cfg.Transport.ClientNames)
 		}
-		res = mgr.Reload(cfg)
 	}
 	if werr := writeReloadStatus(filepath.Join(dir, "reload.status"), res, nonce); werr != nil {
 		log.Warn("reload.status не записан", "err", werr)

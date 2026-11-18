@@ -181,6 +181,9 @@ type failWindow struct {
 const (
 	loginMaxFails   = 5
 	loginFailWindow = time.Minute
+	// loginFailsMax — потолок карты неудачных входов: сверх него вытесняется
+	// запись с самым ранним окном, иначе карта росла бы от каждого нового IP.
+	loginFailsMax = 1024
 
 	// loginMaxConcurrent — сколько scrypt считается одновременно; остальные ждут.
 	loginMaxConcurrent = 2
@@ -295,6 +298,12 @@ func (a *auth) proxyOK(r *http.Request) bool {
 // бы публичное имя, схему и адрес клиента.
 func (a *auth) trustsProxy(r *http.Request) bool {
 	if a.proxySecret == "" {
+		return false
+	}
+	// Секрет проверяется до адреса пира: иначе любой локальный процесс,
+	// дотянувшийся до порта, подставлял бы свежий X-Forwarded-For и обходил
+	// лимит попыток входа.
+	if got := r.Header.Get("x-mcp-proxy-secret"); subtle.ConstantTimeCompare([]byte(got), []byte(a.proxySecret)) != 1 {
 		return false
 	}
 	ip := net.ParseIP(httplisten.HostOnly(r.RemoteAddr))
@@ -436,18 +445,30 @@ func (a *auth) loginFailedOne(ip string) {
 	a.loginMu.Lock()
 	defer a.loginMu.Unlock()
 	now := time.Now()
+	// Просроченные окна убираются при каждой записи: иначе карта копила бы
+	// адреса, которые больше не пытаются войти, и потолок ничего не держал.
+	for k, v := range a.loginFails {
+		if now.After(v.reset) {
+			delete(a.loginFails, k)
+		}
+	}
 	w := a.loginFails[ip]
 	if w == nil || now.After(w.reset) {
 		w = &failWindow{reset: now.Add(loginFailWindow)}
 		a.loginFails[ip] = w
 	}
 	w.count++
-	if len(a.loginFails) > 1024 {
+	if len(a.loginFails) > loginFailsMax {
+		// Живых записей больше потолка: вытесняем самую старую по окну. Новый
+		// адрес только что получил reset = now+окно, поэтому он не вытесняется.
+		var oldest string
+		var oldestAt time.Time
 		for k, v := range a.loginFails {
-			if now.After(v.reset) {
-				delete(a.loginFails, k)
+			if oldest == "" || v.reset.Before(oldestAt) {
+				oldest, oldestAt = k, v.reset
 			}
 		}
+		delete(a.loginFails, oldest)
 	}
 }
 

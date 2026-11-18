@@ -16,6 +16,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/akrhin/mcprig/internal/safelog"
 )
 
 // logsPollInterval — шаг опроса -f; переменная, чтобы тест не ждал секунду.
@@ -120,10 +122,16 @@ func fetchLogs(ctx context.Context, client *http.Client, base string, creds pane
 		return nil, err
 	}
 	var res struct {
-		Logs []json.RawMessage `json:"logs"`
+		Logs  []json.RawMessage `json:"logs"`
+		Error string            `json:"error"`
 	}
 	if err := json.Unmarshal(raw, &res); err != nil {
 		return nil, fmt.Errorf("панель %s: %s: %w", base, path, err)
+	}
+	// Панель отвечает пустым списком и причиной, когда хвост не прочитан:
+	// молчание в терминале читалось бы как «сервер ничего не писал».
+	if res.Error != "" {
+		return nil, fmt.Errorf("журнал сервера не прочитан: %s", res.Error)
 	}
 	out := make([]logLine, 0, len(res.Logs))
 	for _, r := range res.Logs {
@@ -187,7 +195,9 @@ func printLogs(o *logsConfig, lines []logLine) {
 	var b strings.Builder
 	for _, l := range lines {
 		if !o.JSON {
-			b.WriteString(l.Line)
+			// Вывод сервера — чужой текст: управляющие последовательности в
+			// терминале оператора подменяют видимый лог и заголовок окна.
+			b.WriteString(safelog.Text(l.Line))
 			b.WriteByte('\n')
 			continue
 		}

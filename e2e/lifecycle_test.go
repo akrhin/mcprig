@@ -125,6 +125,75 @@ func TestLifecycleStartServeStop(t *testing.T) {
 	}
 }
 
+func TestLifecycleServerLogShowsChildOutput(t *testing.T) {
+	if testing.Short() {
+		t.Skip("сборка бинарей и супервизия процессов — долгий сценарий")
+	}
+	l := newLifecycle(t)
+	defer l.close()
+
+	const marker = "лог сервера: вывод процесса"
+	fixture := l.build("./cmd/testmcp", "testmcp")
+	l.post("/api/servers", map[string]any{
+		"name": "fix", "command": []string{fixture},
+		"env": map[string]string{"TESTMCP_STDERR": marker},
+	}, http.StatusCreated)
+	l.post("/api/sets", map[string]any{"name": "slog", "servers": []string{"fix"}}, http.StatusCreated)
+	l.post("/api/sets/slog/start", nil, http.StatusOK)
+
+	// Процесс сервера поднимается прогревом уже после ответа start: ждём строку.
+	path := "/api/sets/slog/servers/fix/logs?lines=20"
+	var logs []any
+	found := false
+	deadline := time.Now().Add(30 * time.Second)
+	for !found && time.Now().Before(deadline) {
+		logs, _ = l.get(path)["logs"].([]any)
+		for _, line := range logs {
+			if text, _ := line.(string); strings.Contains(text, marker) {
+				found = true
+			}
+		}
+		if !found {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	if !found {
+		t.Fatalf("в логе сервера нет вывода его процесса: %v", logs)
+	}
+
+	// Остановка хвост не стирает: вывод объясняет, почему сервер умер, и
+	// кнопка «перезапустить» не должна уничтожать единственную улику.
+	l.post("/api/sets/slog/stop", nil, http.StatusOK)
+	if after, _ := l.get(path)["logs"].([]any); len(after) == 0 {
+		t.Fatal("после остановки вывод прошлого запуска пропал")
+	}
+
+	// А новый запуск начинает файл заново: метка запуска одна, и строка процесса
+	// в хвосте одна — своя, а не накопленная с прошлого раза.
+	l.post("/api/sets/slog/start", nil, http.StatusOK)
+	deadline = time.Now().Add(30 * time.Second)
+	for {
+		after, _ := l.get(path)["logs"].([]any)
+		marks, hits := 0, 0
+		for _, line := range after {
+			text, _ := line.(string)
+			if strings.Contains(text, "— запуск ") {
+				marks++
+			}
+			if strings.Contains(text, marker) {
+				hits++
+			}
+		}
+		if marks == 1 && hits <= 1 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("после нового запуска в хвосте %d меток и %d строк процесса: %v", marks, hits, after)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 func TestLifecycleRestartAfterKill(t *testing.T) {
 	if testing.Short() {
 		t.Skip("супервизия и backoff — долгий сценарий")

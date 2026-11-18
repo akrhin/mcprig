@@ -523,6 +523,32 @@ var (
 	fileRefPattern = regexp.MustCompile(`\{file:([^}]+)\}`)
 )
 
+// EnvRefs возвращает имена ${VAR} в порядке появления, без повторов. Одна
+// грамматика на всех: раскрывает config, а проверяют набор и doctor.
+func EnvRefs(text string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range varRefPattern.FindAllStringSubmatch(text, -1) {
+		if !seen[m[1]] {
+			seen[m[1]] = true
+			out = append(out, m[1])
+		}
+	}
+	return out
+}
+
+// ExpandEnvRefs заменяет ${VAR} тем, что вернул lookup; неизвестное имя
+// остаётся как было, чтобы отказ был виден в тексте, а не превращался в пусто.
+func ExpandEnvRefs(text string, lookup func(name string) (string, bool)) string {
+	return varRefPattern.ReplaceAllStringFunc(text, func(m string) string {
+		name := varRefPattern.FindStringSubmatch(m)[1]
+		if v, ok := lookup(name); ok {
+			return v
+		}
+		return m
+	})
+}
+
 // HasFileRef сообщает, есть ли {file:…} в любом месте строки: раскрыватель
 // матчит шаблон где угодно, поэтому проверка по префиксу пропускает
 // «p{file:/…}» и уносит файл вниз.

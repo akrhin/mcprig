@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -52,6 +53,7 @@ type healthEntry struct {
 
 // healthCache — 15 с кэш и single-flight на набор.
 type healthCache struct {
+	log     *slog.Logger
 	mu      sync.Mutex
 	entries map[string]*healthEntry
 	// last — последнее известное состояние серверов набора: журнал пишет
@@ -59,8 +61,8 @@ type healthCache struct {
 	last map[string]map[string]bool
 }
 
-func newHealthCache() *healthCache {
-	return &healthCache{entries: map[string]*healthEntry{}, last: map[string]map[string]bool{}}
+func newHealthCache(log *slog.Logger) *healthCache {
+	return &healthCache{log: log, entries: map[string]*healthEntry{}, last: map[string]map[string]bool{}}
 }
 
 func (c *healthCache) clear(id string) {
@@ -102,15 +104,36 @@ func (c *healthCache) get(ctx context.Context, id string, load func(context.Cont
 		// Лидер грузит под своим ctx: отмена запроса клиента не должна
 		// попадать в кэш как «context canceled» на весь healthTTL.
 		loadCtx, cancel := context.WithTimeout(context.Background(), healthLoadTimeout)
-		view := load(loadCtx)
+		view, panicked := c.loadGuarded(loadCtx, id, load)
 		cancel()
 
 		c.mu.Lock()
-		e.view, e.at, e.wait = view, time.Now(), nil
+		if panicked {
+			// Паника — не ответ: wait закрывается, вид остаётся пустым (Servers
+			// nil), поэтому следующий запрос повторит пробу, а не получит пустоту
+			// как валидный кэш на весь TTL.
+			e.view, e.wait = setHealth{}, nil
+		} else {
+			e.view, e.at, e.wait = view, time.Now(), nil
+		}
 		c.mu.Unlock()
 		close(wait)
 		return view
 	}
+}
+
+// loadGuarded зовёт пробу так, что паника не оставляет wait открытым: иначе
+// каждое следующее обращение к набору висело бы до перезапуска панели.
+func (c *healthCache) loadGuarded(ctx context.Context, id string, load func(context.Context) setHealth) (view setHealth, panicked bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			if c.log != nil {
+				c.log.Warn("проба здоровья набора паникнула", "set", id, "panic", fmt.Sprint(r))
+			}
+			panicked = true
+		}
+	}()
+	return load(ctx), false
 }
 
 // bearerTransport добавляет токен набора к каждому запросу клиента MCP.

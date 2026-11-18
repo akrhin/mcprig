@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -66,7 +67,11 @@ func TestSetLogMigratesInheritedFile(t *testing.T) {
 	if _, err := os.Stat(old); !os.IsNotExist(err) {
 		t.Fatalf("lazy-mcp.log остался: %v", err)
 	}
-	if logs := e.m.rt.Logs(id, 500); !strings.Contains(strings.Join(logs, "\n"), "хвост из lazy-mcp") {
+	logs, lerr := e.m.rt.Logs(id, 500)
+	if lerr != nil {
+		t.Fatalf("журнал набора: %v", lerr)
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "хвост из lazy-mcp") {
 		t.Fatalf("унаследованный хвост потерян: %v", logs)
 	}
 }
@@ -123,5 +128,127 @@ func TestLogWriterRotatesBySize(t *testing.T) {
 	}
 	if info.Size() > maxLogBytes {
 		t.Fatalf("текущий лог %d байт, больше %d", info.Size(), maxLogBytes)
+	}
+}
+
+// TestServerLogsShowProcessOutput: панель отдаёт то, что процесс сервера
+// напечатал в stderr, — до этого диалог лога сервера всегда показывал 0 строк.
+func TestServerLogsShowProcessOutput(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "sl", "fake")
+	set := e.m.store.Set(id)
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("старт: %v", err)
+	}
+
+	// Так же, как это делает процесс набора: serverlogs/<имя>.log в каталоге набора.
+	path := ServerLogPath(e.dir, id, "fake")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("первая строка\nвывод процесса: готов\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	w := e.do(t, http.MethodGet, "/api/sets/"+id+"/servers/fake/logs?lines=10", nil)
+	status(t, w, http.StatusOK)
+	got := decode[struct {
+		Logs []string `json:"logs"`
+	}](t, w).Logs
+	if len(got) != 2 || got[1] != "вывод процесса: готов" {
+		t.Fatalf("лог сервера = %q", got)
+	}
+
+	// Остановка хвост не стирает: вывод упавшего запуска объясняет падение, и
+	// кнопка «перезапустить» не должна уничтожать единственную улику.
+	e.m.rt.Stop(set)
+	w = e.do(t, http.MethodGet, "/api/sets/"+id+"/servers/fake/logs?lines=10", nil)
+	status(t, w, http.StatusOK)
+	if after := decode[struct {
+		Logs []string `json:"logs"`
+	}](t, w).Logs; len(after) != 2 {
+		t.Fatalf("после остановки вывод пропал: %q", after)
+	}
+
+	// А новый запуск начинает файл заново — с метки и без строк прошлого.
+	if _, err := e.m.rt.Start(context.Background(), set, e.m.store.Servers()); err != nil {
+		t.Fatalf("повторный старт: %v", err)
+	}
+	w = e.do(t, http.MethodGet, "/api/sets/"+id+"/servers/fake/logs?lines=10", nil)
+	status(t, w, http.StatusOK)
+	if again := decode[struct {
+		Logs []string `json:"logs"`
+	}](t, w).Logs; len(again) != 0 {
+		t.Fatalf("новый запуск оставил строки прошлого: %q", again)
+	}
+}
+
+// TestServerLogsReportReadFailure: отказ чтения хвоста виден в ответе, иначе
+// пустой список не отличить от «сервер ничего не писал».
+func TestServerLogsReportReadFailure(t *testing.T) {
+	e := newEnv(t, AuthOptions{Off: true})
+	e.addServer(t, "fake")
+	id := e.addSet(t, "slf", "fake")
+	// Каталог на месте файла: чтение падает с EISDIR, а не с «нет файла».
+	path := ServerLogPath(e.dir, id, "fake")
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	w := e.do(t, http.MethodGet, "/api/sets/"+id+"/servers/fake/logs?lines=10", nil)
+	status(t, w, http.StatusOK)
+	body := decode[struct {
+		Logs  []string `json:"logs"`
+		Error string   `json:"error"`
+	}](t, w)
+	if body.Error == "" {
+		t.Fatalf("отказ чтения хвоста не попал в ответ: %+v", body)
+	}
+	if strings.Contains(body.Error, e.dir) {
+		t.Fatalf("в ответ ушёл абсолютный путь каталога данных: %q", body.Error)
+	}
+}
+
+// TestMentionsMatchesWholeWord: строки лога набора попадают в лог сервера
+// только по имени целиком — «fake» не должен ловить «fake2».
+func TestMentionsMatchesWholeWord(t *testing.T) {
+	cases := []struct {
+		line, name string
+		want       bool
+	}{
+		{"получен вызов сервера fake", "fake", true},
+		{"получен вызов сервера fake2", "fake", false},
+		{"fake: старт", "fake", true},
+		{"сбой в fake-сервис", "fake", false},
+	}
+	for _, c := range cases {
+		if got := mentions(c.line, c.name); got != c.want {
+			t.Fatalf("mentions(%q, %q) = %v, ждали %v", c.line, c.name, got, c.want)
+		}
+	}
+}
+
+// tailFile отбрасывает первую строку окна: она прочитана с середины файла и
+// целой строкой лога не является.
+func TestTailFileDropsPartialFirstLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "server.log")
+	lines := []string{"HEAD-" + strings.Repeat("x", 40000)}
+	for i := 0; i < 4; i++ {
+		lines = append(lines, "строка-"+strconv.Itoa(i)+strings.Repeat("y", 10000))
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := tailFile(path, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != lines[3] || got[1] != lines[4] {
+		t.Fatalf("хвост = %q", got)
+	}
+	if strings.Contains(strings.Join(got, ""), "HEAD-") {
+		t.Fatal("в хвост попала обрезанная первая строка")
 	}
 }

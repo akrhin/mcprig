@@ -236,7 +236,7 @@ func New(opts Options) (*Manager, error) {
 		log:     log,
 		version: version,
 		tls:     tlsConf,
-		health:  newHealthCache(),
+		health:  newHealthCache(log),
 		browse:  newBrowser(sec, version, opts.DataDir),
 		ctx:     ctx,
 		cancel:  cancel,
@@ -1638,6 +1638,10 @@ func (m *Manager) apiSetDelete(req *request) error {
 	if err := os.RemoveAll(filepath.Join(m.rt.dataDir, "sets", id)); err != nil {
 		m.log.Warn("каталог удалённого набора не убран", "set", safelog.Value(id), "err", err)
 	}
+	m.rt.Forget(id)
+	// Отметки переходов живут по ключу «набор/сервер»: без чистки новый набор с
+	// тем же id молча не получил бы ни одного предупреждения.
+	m.rt.notify.clearSet(id)
 	writeJSON(req.w, http.StatusOK, map[string]any{"ok": true})
 	return nil
 }
@@ -1692,9 +1696,12 @@ func (m *Manager) apiSetLogs(req *request) error {
 	if m.store.Set(id) == nil {
 		return notFound("набор " + id + " не найден")
 	}
-	writeJSON(req.w, http.StatusOK, map[string]any{
-		"logs": m.rt.Logs(id, linesParam(req.r, 200)),
-	})
+	logs, err := m.rt.Logs(id, linesParam(req.r, 200))
+	body := map[string]any{"logs": logs}
+	if err != nil {
+		body["error"] = strings.ReplaceAll(err.Error(), m.rt.dataDir+string(os.PathSeparator), "")
+	}
+	writeJSON(req.w, http.StatusOK, body)
 	return nil
 }
 
@@ -1707,10 +1714,16 @@ func (m *Manager) apiServerLogs(req *request) error {
 	if !containsName(set.Servers, name) {
 		return notFound("сервер " + name + " не найден в наборе " + id)
 	}
-	writeJSON(req.w, http.StatusOK, map[string]any{
-		"server": name,
-		"logs":   m.rt.ServerLogs(id, name, linesParam(req.r, 200)),
-	})
+	logs, err := m.rt.ServerLogs(id, name, linesParam(req.r, 200))
+	body := map[string]any{"server": name, "logs": logs}
+	// пустой хвост без причины значит «сервер молчал»; причина уходит в ответ,
+	// иначе отказ чтения выглядит как тишина сервера
+	if err != nil {
+		// абсолютный путь каталога данных наружу не нужен: оператору хватает
+		// имени файла внутри набора
+		body["error"] = strings.ReplaceAll(err.Error(), m.rt.dataDir+string(os.PathSeparator), "")
+	}
+	writeJSON(req.w, http.StatusOK, body)
 	return nil
 }
 

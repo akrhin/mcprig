@@ -305,25 +305,6 @@ func mergeServer(cur Server, patch map[string]json.RawMessage) (map[string]json.
 	return out, nil
 }
 
-// slugify turns an id or name into a set id the name pattern accepts.
-func slugify(v string) string {
-	var b strings.Builder
-	dash := false
-	for _, r := range strings.ToLower(strings.TrimSpace(v)) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
-			b.WriteRune(r)
-			dash = false
-		default:
-			if !dash {
-				b.WriteByte('-')
-				dash = true
-			}
-		}
-	}
-	return strings.Trim(b.String(), "-")
-}
-
 func checkPort(port int) error {
 	if port < FirstPort || port > LastPort {
 		return invalidf("порт должен быть целым числом в диапазоне %d–%d", FirstPort, LastPort)
@@ -363,7 +344,9 @@ func (s *Store) buildSet(cur *Set, in map[string]json.RawMessage) (*Set, error) 
 				return nil, err
 			}
 		}
-		out.ID = slugify(id)
+		// Приводится только регистр и пробелы по краям; всё остальное вне
+		// шаблона отвергается: «My Set» не превращается в другой id молча
+		out.ID = strings.ToLower(strings.TrimSpace(id))
 		if !safepath.Name(out.ID) {
 			return nil, invalidf("имя набора: строчные латинские буквы, цифры, дефис и подчёркивание")
 		}

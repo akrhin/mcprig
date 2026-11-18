@@ -8,6 +8,130 @@ repository the project is built in.
 
 ## [Unreleased]
 
+### Fixed
+
+- Reload applies profiles and keys as one generation: the listener receives the
+  new token list only when the reload needs no restart, so a key that arrived
+  together with a transport change is refused until the set restarts instead of
+  being accepted without its profile (D10).
+- Upstream error text is masked like the payload: a server repeating its own
+  secret inside an error no longer leaks it into the tool answer, the counters
+  or `raw-*.jsonl`, meta-tools included (D12).
+- Secrets are masked by value rather than by field name: every `env` or header
+  value of 8 bytes or more becomes `***` — `GITHUB_PAT` and `CF_ACCESS`
+  included — so a tool catalog may show `***` where a harmless path used to be
+  (D4).
+- A panic inside the health probe no longer hangs every later request to that
+  set: the single-flight is released, the probe is retried and one `Warn` is
+  logged (D2).
+- Deleting a set forgets its webhook transitions, so a new set created under the
+  same id warns again (D3).
+- Failed logins: expired windows are dropped on every recorded failure and the
+  map is capped at 1024 entries, instead of being cleaned only when it had
+  already overflowed (D5).
+- The tool-catalog throttle map sweeps marks older than its 5 s window instead
+  of growing for the lifetime of the process (D1).
+- The statistics cache evicts the oldest quarter of its files by `mtime` instead
+  of dropping the whole map at 4096 entries (D7).
+- CI: the `acceptance` job runs the 26-step panel acceptance on a freshly built
+  binary; `ACC_DAP` became optional and its 11 stdio steps are skipped with a
+  line in the output (D6).
+- `GET /stats` of a set no longer hands the full snapshot to whoever holds the
+  set's key: a key now gets counters and latencies with client labels replaced
+  by `(аноним)` and upstream error texts emptied. The full snapshot goes to the
+  panel's own poll only (`X-MCPRig-Caller: panel`), so `/api/calls` keeps
+  showing labels and errors as before.
+- Release pipeline: the tag name was expanded into the text of `run:` blocks in
+  jobs that hold a write token and the registry password, so a tag containing
+  shell metacharacters became code. The tag now arrives through `env:` and is
+  read as `"$TAG"`; the release checkout keeps no credentials in `.git/config`
+  (`persist-credentials: false`). The Gitea image workflow takes `gitea.ref_name`
+  the same way. Who may push `v*` tags is a hosting-side protection rule that
+  this repository cannot confirm.
+- Server log: the **Log** dialog of a server showed only the access lines of the
+  set and was empty in practice. The child's stderr now goes to
+  `sets/<id>/serverlogs/<name>.log`, capped at 256 KiB, kept after a stop so the
+  trace stays readable and cleared on the next start; an automatic restart
+  appends under a new marker instead of wiping the reason the server died. The
+  dialog appends that tail to the set lines.
+- Server log: each run of the process opens with a `— запуск <date time> —`
+  marker, so a restart after a crash is told apart from the first start; a tail
+  that exists but cannot be read now comes with `error` in the answer and the
+  dialog prints it instead of showing "empty" as if the server were silent.
+- Sets: `POST /api/sets` refused to say anything when the name was outside the
+  id pattern — it renamed the set silently. The id is now taken as typed and a
+  bad one is `400` with the rule in the message; the panel reduces the name to
+  that form in the form and shows the rule instead of sending something else.
+- Panel: one refusal of the first `/api/state` stopped every timer for good —
+  the panel then sat frozen until a reload; the failure is reported and the
+  timers start anyway.
+- Panel: a click that landed while the periodic sync held the panel showed
+  nothing; it now says an operation is in progress.
+- Panel: the statistics page loaded its data only on the second tick when opened
+  by address; it now asks as soon as the sets are known.
+- Server log: the mode of an existing tail file is brought back to `0600` when it
+  is opened, and a read failure answers with the file name inside the set rather
+  than the absolute data path.
+- Test: `scripts/acceptance/panel.cjs` — the 37-step panel walk — now lives in
+  the repository instead of a scratch directory, and `web/ids_test.go` fails
+  when `app.js` asks for an id `index.html` does not have.
+- Panel: the copy button of the endpoint moved the address out of the DOM for the
+  second it showed "copied" — switching the language in that window threw
+  `Cannot set properties of null`; the feedback now goes to the button label.
+- Panel: deleting the open set returns to the list of sets; before, the next set
+  in the rail was opened, which read as "wrong set".
+- Panel: on a narrow screen the copy feedback shrank the address button from 74 to
+  45 px; it now shows a mark there and keeps its width.
+- Panel: statistics opened by address stayed blank for up to 15 s — the load ran
+  before `/api/state` knew the sets and returned early; it now starts as soon as
+  the set is known.
+- Panel: the statistics filters (server, tool, client) survive a reload.
+- Panel: building a prompt with an empty task showed nothing and left the button
+  enabled; the "set has no servers" hint sat inside the field that is hidden in
+  exactly that case and was unreachable. Both are shown now.
+- Panel: revoking the active key stops the set and takes a few seconds; the keys
+  tab now says so while it waits instead of going quiet.
+- Panel: buttons and the key-note field were 27–31 px tall; the tap target
+  minimum is 32 px, and the Calls checkbox is pressed through its label.
+- Panel: choosing a set in the rail opens that set from any page — from the host
+  overview, statistics, all servers; before, the click only changed the window
+  title, and on a fresh install the tabs of a set could not be reached at all.
+- Panel: the state badge of a set (sets list, host overview, servers table) took
+  its colour from a class that does not exist and showed as a black dot —
+  `paintBadge` now accepts both spellings the callers use.
+- Panel: a direct link to `#/set/<id>/<tab>` and a reload on it left the page
+  half-filled (health, calls and the tool catalogue arrived only with the 5 s
+  tick, the key profiles never); the first state now loads the set the address
+  names.
+- Panel: the saved key label was silently dropped while the overview tick held
+  the busy flag, and a refused refresh after a revoke said nothing.
+- Panel: the reason of a failed call and of a stopped set was cut to 80/60
+  characters in the markup itself, so pressing it on a touch screen could not
+  reveal the rest; the DOM carries the whole text and only the line clamps it.
+- Panel: deleting the open set jumped to the neighbour in the address bar before
+  returning to the list, leaving a foreign set in the history.
+- CLI: `mcprig logs` printed the child's stderr as is, so escape sequences from a
+  server could rewrite the operator's terminal; control characters are stripped.
+- Server log: a failed write, truncate or cleanup of the tail is now reported in
+  the set log instead of leaving "log is empty" for weeks, and one oversized
+  write can no longer push the file over its cap.
+- Auth: `X-Forwarded-*` was trusted from any loopback peer once
+  `MCPRIG_PROXY_SECRET` was set, which let that peer skip the login limit by
+  naming a fresh client address; the request must now carry
+  `x-mcp-proxy-secret` as well.
+- Panel: a deleted set left its rings, locks and nonces in memory, so a new set
+  with the same id appeared stopped, and a pending operation of a removed set
+  was never finished.
+- Panel: a count the panel does not know yet (`tools to approve`, servers with an
+  error) printed `0`; it shows a dash instead of a wrong number.
+- CLI: `mcprig logs --server` printed "log is empty" when the tail could not be
+  read; the answer carries `error` and the command prints the reason.
+- Panel: the **Logs** tab of a set reported "log is empty" when `mcprig.log` existed
+  but could not be read; it now names the reason above the box.
+- Panel: the **Log** dialog subtitle described the format wrongly (it said "set
+  log only"); it now says the set lines come first and the process tail after them,
+  and the same sentence is used by the tab.
+
 ## [0.6.5] - 2026-11-17
 
 ### Added

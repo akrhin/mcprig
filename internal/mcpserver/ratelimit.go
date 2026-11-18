@@ -35,6 +35,16 @@ const (
 // это тормоз, а не граница безопасности.
 const catalogRefreshEvery = 5 * time.Second
 
+const (
+	// refreshSweepEvery — каждые сколько записей выметать протухшие метки
+	// refreshAt: ключ включает пару (клиент, сервер), и без уборки карта
+	// росла бы всю жизнь процесса.
+	refreshSweepEvery = 1024
+	// maxRefreshMarks — потолок карты: сверх него уборка идёт на каждой
+	// записи.
+	maxRefreshMarks = 4096
+)
+
 // withRefreshDeferred marks an answer built on a cached catalog: the refresh
 // was held back by the throttle, and the caller deserves to know why.
 func withRefreshDeferred(res *mcp.CallToolResult, names []string) *mcp.CallToolResult {
@@ -61,7 +71,22 @@ func (m *Manager) mayRefresh(ctx context.Context, server string) bool {
 		return false
 	}
 	m.refreshAt[key] = now
+	// Метка старше catalogRefreshEvery уже ничего не подавляет, поэтому
+	// протухшие записи выметаются, а не висят до конца процесса.
+	m.refreshSweeps++
+	if m.refreshSweeps%refreshSweepEvery == 0 || len(m.refreshAt) >= maxRefreshMarks {
+		m.sweepRefresh(now)
+	}
 	return true
+}
+
+// sweepRefresh drops marks too old to suppress anything. Runs under refreshMu.
+func (m *Manager) sweepRefresh(now time.Time) {
+	for key, at := range m.refreshAt {
+		if now.Sub(at) >= catalogRefreshEvery {
+			delete(m.refreshAt, key)
+		}
+	}
 }
 
 // refreshCatalogs drops the named servers' cached catalogs, honouring the
